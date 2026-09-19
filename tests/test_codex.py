@@ -65,8 +65,8 @@ class CodexCommandTests(unittest.TestCase):
             ) as terminal:
                 result = run_codex_for_role(
                     config=config,
-                    agent=_agent("workspace-write", backend="app_server"),
-                    role="executor",
+                    agent=_agent("read-only", backend="app_server"),
+                    role="reviewer",
                     repository=repository,
                     prompt="Read the harmless brief.",
                     output_path=output_path,
@@ -74,10 +74,43 @@ class CodexCommandTests(unittest.TestCase):
                 )
 
             self.assertIs(result, expected)
-            self.assertEqual(app_server.call_args.kwargs["role"], "executor")
+            self.assertEqual(app_server.call_args.kwargs["role"], "reviewer")
             self.assertEqual(app_server.call_args.kwargs["agent"].backend, "app_server")
             self.assertEqual(app_server.call_args.kwargs["repository"], repository)
             terminal.assert_not_called()
+
+    def test_role_dispatch_uses_antigravity_only_for_executor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            expected = CommandResult(["agy", "--input-format", "stream-json"], 0, "", "")
+            config = type("Config", (), {"antigravity_command": "agy"})()
+            with patch("dual_codex.antigravity.run_antigravity", return_value=expected) as antigravity:
+                result = run_codex_for_role(
+                    config=config,
+                    agent=_agent("workspace-write", backend="antigravity"),
+                    role="executor",
+                    repository=repository,
+                    prompt="Read the harmless brief.",
+                    output_path=root / "report.json",
+                    schema_path=root / "schema.json",
+                )
+
+            self.assertIs(result, expected)
+            self.assertEqual(antigravity.call_args.kwargs["command"], "agy")
+            self.assertEqual(antigravity.call_args.kwargs["agent"].backend, "antigravity")
+
+            with self.assertRaisesRegex(ValueError, "reserved for the Executor"):
+                run_codex_for_role(
+                    config=config,
+                    agent=_agent("read-only", backend="antigravity"),
+                    role="architect",
+                    repository=repository,
+                    prompt="Read the harmless brief.",
+                    output_path=root / "plan.json",
+                    schema_path=root / "schema.json",
+                )
 
     def test_role_dispatch_rejects_unknown_backend_without_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -87,7 +120,7 @@ class CodexCommandTests(unittest.TestCase):
             with patch("dual_codex.codex.run_codex_exec") as direct, patch(
                 "dual_codex.codex.run_codex_app_server"
             ) as app_server:
-                with self.assertRaisesRegex(ValueError, "Unsupported Codex backend"):
+                with self.assertRaisesRegex(ValueError, "no fallback is permitted"):
                     run_codex_for_role(
                         config=config,
                         agent=agent,
@@ -100,6 +133,20 @@ class CodexCommandTests(unittest.TestCase):
 
             direct.assert_not_called()
             app_server.assert_not_called()
+
+    def test_role_dispatch_rejects_codex_executor_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with self.assertRaisesRegex(ValueError, "no fallback is permitted"):
+                run_codex_for_role(
+                    config=type("Config", (), {"codex_command": "codex"})(),
+                    agent=_agent("workspace-write", backend="windows"),
+                    role="executor",
+                    repository=root,
+                    prompt="Read the harmless brief.",
+                    output_path=root / "report.json",
+                    schema_path=root / "schema.json",
+                )
 
     def test_terminal_capture_normalizes_executor_result_before_schema_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

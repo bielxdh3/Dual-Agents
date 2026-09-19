@@ -1646,6 +1646,51 @@ function idleScreen(model) {{
             self.assertEqual(first.session_id, second.session_id)
             self.assertEqual(first.pid, second.pid)
 
+    def test_persistent_ensure_rejects_session_bound_to_another_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target workspace"
+            other_repository = root / "other workspace"
+            repository.mkdir()
+            other_repository.mkdir()
+            config = _config(root, repository)
+            sessions = config.runs_dir / "terminal-sessions"
+            sessions.mkdir(parents=True)
+            session = TerminalSession(
+                session_id="executor-bound",
+                account="biel4",
+                label="Executor",
+                role="executor",
+                repository=repository,
+                codex_home=root / "profile",
+                pipe=r"\\.\pipe\dual-codex-executor-bound-aaaaaaaaaaaaaaaa",
+                pid=123,
+                started_at="now",
+                log_file=sessions / "executor-bound.pty.log",
+            )
+            (sessions / "executor-bound.json").write_text(json.dumps(session.as_dict()), encoding="utf-8")
+            agent = AgentConfig(
+                codex_home=session.codex_home,
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="biel4",
+                label="Executor",
+            )
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            manager.status = lambda _session_id: {"state": "running"}
+            manager.start = lambda **_kwargs: self.fail("workspace mismatch must not start a replacement TUI")
+
+            with self.assertRaisesRegex(TerminalError, "repository identity mismatch"):
+                manager.ensure(
+                    session_id=session.session_id,
+                    agent=agent,
+                    role="executor",
+                    repository=other_repository,
+                    add_dirs=(),
+                )
+
     def test_start_sets_account_home_and_rejects_duplicate_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "root with spaces"

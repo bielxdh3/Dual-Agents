@@ -110,6 +110,27 @@ class SchemaTests(unittest.TestCase):
             self.assertEqual(error, "")
             self.assertEqual(_report_list(loaded or {}, "tests"), report["tests"])
 
+    def test_delegation_report_accepts_typed_memory_candidates(self) -> None:
+        schema = json.loads(
+            (SCHEMA_ROOT / "delegation-report.schema.json").read_text(encoding="utf-8")
+        )
+        report = {
+            "summary": "done",
+            "files_changed": [],
+            "commands_run": [],
+            "tests": [],
+            "remaining_issues": [],
+            "memory_updates": [
+                {
+                    "kind": "architecture",
+                    "subject": "Executor boundary",
+                    "content": "Antigravity is the active Executor.",
+                    "evidence": "delegation result metadata",
+                }
+            ],
+        }
+        _validate(report, schema)
+
     def test_delegation_report_rejects_malformed_test_entries(self) -> None:
         schema = json.loads(
             (SCHEMA_ROOT / "delegation-report.schema.json").read_text(encoding="utf-8")

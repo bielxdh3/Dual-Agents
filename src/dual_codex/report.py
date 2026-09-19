@@ -10,6 +10,7 @@ from uuid import uuid4
 EXECUTOR_REPORT_FIELDS = frozenset(
     {"summary", "files_changed", "commands_run", "tests", "remaining_issues"}
 )
+EXECUTOR_REPORT_OPTIONAL_FIELDS = frozenset({"memory_updates"})
 EXECUTOR_REPORT_REQUIRED_WITHOUT_TELEMETRY = EXECUTOR_REPORT_FIELDS - {"commands_run"}
 _EXTENDED_REPORT_FIELDS = frozenset(
     {
@@ -26,6 +27,7 @@ _EXTENDED_REPORT_FIELDS = frozenset(
         "commands_run",
         "tests",
         "remaining_issues",
+        "memory_updates",
         "push_result",
         "remote_result",
         "pr_result",
@@ -118,13 +120,16 @@ def _normalise_extended_report(value: Mapping[str, Any]) -> dict[str, Any] | Non
             return None
         if result and result.casefold() not in {"passed", "completed", "updated", "not attempted", "not checked", "not updated"}:
             remaining_issues.append(f"{field}: {result}")
-    return {
+    result = {
         "summary": summary,
         "files_changed": files_changed,
         "commands_run": commands_run,
         "tests": [*tests, *validations_run, *validations_not_run],
         "remaining_issues": remaining_issues,
     }
+    if "memory_updates" in value:
+        result["memory_updates"] = value["memory_updates"]
+    return result
 
 
 def normalise_executor_report(value: Mapping[str, Any]) -> dict[str, Any]:

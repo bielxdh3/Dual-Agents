@@ -1,11 +1,11 @@
-# Dual Codex Orchestrator — contas, roles e fluxo local
+# Dual Agents Orchestrator — Codex Architect + Antigravity/Gemini Executor
 
-Orquestrador local para coordenar contas Codex autenticadas separadamente. Cada
-conta possui seu proprio `CODEX_HOME`; os roles apenas dizem qual conta executa
-cada parte do fluxo.
+Orquestrador local para coordenar o Codex Architect com o unico Executor ativo:
+Google Antigravity/Gemini. O Architect interpreta, delega e revisa; o Executor
+implementa em modo headless e devolve um relatorio estruturado.
 
 ```text
-Task → Architect plan → Executor implementation → Reviewer
+Task → Codex Architect → Antigravity/Gemini Executor → Architect review
                                   ↑                 |
                                   └── correction ───┘
 ```
@@ -181,10 +181,10 @@ substituidos pelos perfis locais de cada maquina.
 
 ## Dashboard local de contas
 
-`dual-codex dashboard` inicia o painel de controle em `127.0.0.1` e abre o
+`dual-codex dashboard` inicia o painel Dual Agents em `127.0.0.1` e abre o
 navegador; use `--no-open` para apenas imprimir a URL ou `--port` para fixar
 uma porta. O painel consulta o App Server por processo/`CODEX_HOME` isolado e
-mostra contas, roles, backend, login, modelos anunciados, reasoning, Fast ou
+mostra contas, roles, backend, status do `agy`, modelos, reasoning, Fast ou
 outro service tier, rate limits, uso e thread persistente quando disponíveis.
 
 O campo `model = ""` significa **Inherit Codex default**. O modelo efetivo só
@@ -204,7 +204,7 @@ roles globais para a conta escolhida quando necessário.
 ### Live Executor
 
 O painel tambem possui a visao `EXECUTOR LIVE`, baseada nos eventos reais do
-Executor App Server. Ela le um journal JSONL por conta, role e identidade do
+Executor Antigravity/Gemini. Ela le um journal JSONL por conta, role e identidade do
 repositorio; nenhum processo Executor falso e criado pelo dashboard. O caminho
 do journal e derivado pelo servidor dentro de `runs_dir`, e o navegador nunca
 envia um caminho de arquivo.
@@ -253,18 +253,18 @@ O fluxo recomendado para uso diario deixa o Codex App como interface visivel:
 ```mermaid
 flowchart LR
     U[Usuario] --> A[Codex App\norquestrador + architect + reviewer]
-    A --> D[dual-codex delegate]
-    D --> E[Codex App Server JSON-RPC\nconta executor + CODEX_HOME separado]
+    A --> D[dual-agents delegate]
+    D --> E[agy stream-json\nAntigravity/Gemini]
     E --> R[resultado JSON + report + Git diff]
     R --> A
     A -->|findings concretos| C[correct]
     C --> E
 ```
 
-Conta visivel: `Codex App -> orquestrador + architect + reviewer`
-Conta oculta: `Codex CLI -> executor`
+Conta visivel: `Codex App -> Architect + reviewer`
+Executor headless: `agy -> Antigravity/Gemini`
 
-Use a frase natural `Use Dual Codex to implement this task.` no App. O App
+Use a frase natural `Use Dual Agents to implement this task.` no App. O App
 inspeciona o repositorio alvo, prepara o pedido JSON, chama o launcher local,
 aguarda `DUAL_CODEX_RESULT`, le o resultado, o report, o estado do Git e o
 diff, e somente entao apresenta a conclusao. O usuario normalmente nao precisa
@@ -288,28 +288,29 @@ O App pode consultar o estado sem expor autenticacao:
 .\scripts\dual-codex.ps1 --config .\config.toml status --json
 ```
 
-## Transporte App Server e fallback TUI
+## Transporte Antigravity/Gemini
 
-O backend preferencial do executor nativo Windows e `app_server`: Dual Codex
-inicia `codex app-server --stdio` com o `CODEX_HOME` isolado da conta, usa
-JSON-RPC newline-delimited, mantem a associacao repositorio→thread e envia a
-tarefa completa por `turn/start`. O ciclo de trabalho e dirigido por
-`turn/started`/`turn/completed`, sem inferir idle ou atividade pela tela.
-`approvalPolicy = "never"` e usado para o executor `workspace-write`; qualquer
-pedido inesperado de aprovacao e recusado, nunca elevado para
-`danger-full-access`. O processo permanece local em stdio, sem listener de
-rede, e as chaves de API herdadas sao removidas do ambiente filho.
+O backend ativo do Executor e o `agy` instalado localmente. A delegacao usa
+`--input-format stream-json --output-format stream-json`, envia um evento NDJSON
+por turno e aguarda o evento terminal `result`, preservando `conversation_id` e
+diagnosticos stderr. O processo falha fechado em erro, timeout, JSON invalido,
+autenticacao indisponivel ou encerramento prematuro; nao ha fallback silencioso
+para um Executor Codex.
 
 Configure por conta:
 
 ```toml
+[orchestrator]
+antigravity_command = "C:/Users/USER/AppData/Local/agy/bin/agy.exe"
+
 [accounts.secondary]
-backend = "app_server"
+backend = "antigravity"
+model = "gemini-3.8-flash-high"
 ```
 
-O backend legado `windows` continua disponivel como `native_tui` para
-diagnostico/fallback. Ele preserva ConPTY, `pty-host.js`, named pipe, readiness,
-rollout scoping e os comandos `dual-codex terminal`.
+Os backends Codex existentes permanecem apenas para compatibilidade do Architect
+e dos comandos legados. O fluxo `delegate` exige `backend = "antigravity"` no
+role `executor` e recusa qualquer substituicao.
 
 ## Terminais Windows persistentes
 

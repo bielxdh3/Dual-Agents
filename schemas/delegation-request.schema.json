@@ -55,6 +55,7 @@
         }
       }
     },
-    "parent_request_id": {"type": "string", "minLength": 1}
+    "parent_request_id": {"type": "string", "minLength": 1},
+    "antigravity_conversation_id": {"type": "string", "minLength": 1, "maxLength": 500}
   }
 }

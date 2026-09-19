@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 import json
 import hashlib
@@ -63,6 +63,7 @@ def _make_config(root: Path, repository: Path, *, clean: bool = True):
                 'runs_dir = "runs"',
                 f"require_clean_git = {'true' if clean else 'false'}",
                 'codex_command = "codex"',
+                f"antigravity_command = {json.dumps(sys.executable)}",
                 "",
                 "[accounts.architect]",
                 'label = "Visible"',
@@ -75,6 +76,7 @@ def _make_config(root: Path, repository: Path, *, clean: bool = True):
                 f"codex_home = {json.dumps(str(profile_root / 'executor'))}",
                 'model = ""',
                 'reasoning_effort = "medium"',
+                'backend = "antigravity"',
                 "",
                 "[roles]",
                 'orchestrator = "architect"',
@@ -150,6 +152,22 @@ class DelegationTests(unittest.TestCase):
                 with self.subTest(override=override):
                     with self.assertRaises(InvalidRequestError):
                         parse_request({**_request(repository), **override}, config)
+
+    def test_repository_override_is_explicit_and_empty_override_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            configured = _make_repository(root, "configured")
+            requested = _make_repository(root, "requested")
+            config = _make_config(root, configured)
+
+            overridden = parse_request(
+                _request(requested),
+                config,
+                repository_override=str(configured),
+            )
+            self.assertEqual(overridden.repository, configured.resolve())
+            with self.assertRaises(InvalidRequestError):
+                parse_request(_request(requested), config, repository_override="")
 
     def test_valid_structured_report_ignores_transport_transcript_failure_markers(self) -> None:
         report = {
@@ -229,6 +247,7 @@ class DelegationTests(unittest.TestCase):
             root = Path(temp)
             repository = _make_repository(root)
             config = _make_config(root, repository)
+            config = replace(config, accounts={**config.accounts, "executor": replace(config.accounts["executor"], backend="windows")})
             expected = CommandResult(["codex", "--no-alt-screen"], 0, "", "")
             with patch("dual_codex.delegation.run_codex_terminal", return_value=expected) as terminal:
                 result = run_delegation_codex_exec(
@@ -306,6 +325,7 @@ class DelegationTests(unittest.TestCase):
             root = Path(temp)
             repository = _make_repository(root)
             config = replace(_make_config(root, repository), codex_command="mock-codex.cmd")
+            config = replace(config, accounts={**config.accounts, "executor": replace(config.accounts["executor"], backend="windows")})
             expected = CommandResult(["codex", "exec"], 0, "", "")
             with patch("dual_codex.delegation._run_codex_exec_legacy", return_value=expected) as legacy:
                 result = run_delegation_codex_exec(
@@ -356,6 +376,164 @@ class DelegationTests(unittest.TestCase):
             self.assertEqual(error, "")
             self.assertIsNotNone(report)
             self.assertEqual(report["commands_run"], [])
+
+    def test_report_validation_deduplicates_equivalent_concatenated_results(self) -> None:
+        report = {
+            "summary": "Executor finished",
+            "files_changed": ["hello.txt"],
+            "commands_run": ["Set-Content hello.txt NEW"],
+            "tests": [{"command": "Get-Content hello.txt", "status": "passed", "details": "NEW"}],
+            "remaining_issues": [],
+            "memory_updates": [],
+        }
+        duplicate = json.dumps(report, indent=2, sort_keys=True)
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "duplicate-report.json"
+            path.write_text(json.dumps(report) + "\n" + duplicate, encoding="utf-8")
+            parsed, error = _read_report(path)
+        self.assertEqual(error, "")
+        self.assertEqual(parsed, report)
+
+    def test_report_validation_rejects_conflicting_concatenated_results(self) -> None:
+        base = {
+            "summary": "Executor finished",
+            "files_changed": ["hello.txt"],
+            "commands_run": [],
+            "tests": [],
+            "remaining_issues": [],
+        }
+        conflicting = {**base, "files_changed": ["other.txt"]}
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "conflicting-report.json"
+            path.write_text(json.dumps(base) + json.dumps(conflicting), encoding="utf-8")
+            parsed, error = _read_report(path)
+        self.assertIsNone(parsed)
+        self.assertIn("conflicting structured JSON results", error)
+
+    def test_report_validation_ignores_human_text_and_non_report_protocol_metadata(self) -> None:
+        report = {
+            "summary": "Executor finished",
+            "files_changed": ["hello.txt"],
+            "commands_run": [],
+            "tests": [],
+            "remaining_issues": [],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "annotated-report.json"
+            path.write_text(
+                "Completed successfully.\n"
+                + json.dumps(report)
+                + "\n"
+                + json.dumps({"toolAction": "done", "toolSummary": "report delivered"})
+                + "\nThanks.",
+                encoding="utf-8",
+            )
+            parsed, error = _read_report(path)
+        self.assertEqual(error, "")
+        self.assertEqual(parsed, report)
+
+    def test_report_validation_classifies_auxiliary_metadata_around_task_result(self) -> None:
+        report = {
+            "summary": "Executor finished",
+            "files_changed": ["hello.txt"],
+            "commands_run": [],
+            "tests": [],
+            "remaining_issues": [],
+            "memory_updates": [],
+        }
+        auxiliary = {"toolAction": "Finishing task", "toolSummary": "Submit task completion report"}
+        report_with_auxiliary = {**report, **auxiliary}
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "auxiliary-report.json"
+            path.write_text(
+                json.dumps(auxiliary) + json.dumps(report) + json.dumps(report_with_auxiliary),
+                encoding="utf-8",
+            )
+            parsed, error = _read_report(path)
+        self.assertEqual(error, "")
+        self.assertEqual(parsed, report)
+
+    def test_report_validation_rejects_only_auxiliary_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "auxiliary-only.json"
+            path.write_text(
+                json.dumps({"toolAction": "Finishing task", "toolSummary": "Submit task completion report"}),
+                encoding="utf-8",
+            )
+            parsed, error = _read_report(path)
+        self.assertIsNone(parsed)
+        self.assertIn("valid structured report", error)
+
+    def test_report_validation_keeps_conflict_visible_with_auxiliary_metadata(self) -> None:
+        base = {
+            "summary": "Executor finished",
+            "files_changed": ["hello.txt"],
+            "commands_run": [],
+            "tests": [],
+            "remaining_issues": [],
+        }
+        conflicting = {**base, "summary": "Different result"}
+        auxiliary = {"toolAction": "Finishing task", "toolSummary": "Submit task completion report"}
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "auxiliary-conflict.json"
+            path.write_text(json.dumps(base) + json.dumps(conflicting) + json.dumps(auxiliary), encoding="utf-8")
+            parsed, error = _read_report(path)
+        self.assertIsNone(parsed)
+        self.assertIn("conflicting structured JSON results", error)
+
+    def test_report_validation_rejects_unknown_structured_json_beside_result(self) -> None:
+        report = {
+            "summary": "Executor finished",
+            "files_changed": ["hello.txt"],
+            "commands_run": [],
+            "tests": [],
+            "remaining_issues": [],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "unknown-extra.json"
+            path.write_text(json.dumps(report) + json.dumps({"unexpected": "metadata"}), encoding="utf-8")
+            parsed, error = _read_report(path)
+        self.assertIsNone(parsed)
+        self.assertIn("unclassified structured JSON", error)
+
+    def test_report_validation_preserves_memory_updates_across_duplicates(self) -> None:
+        report = {
+            "summary": "Executor finished",
+            "files_changed": ["hello.txt"],
+            "commands_run": [],
+            "tests": [],
+            "remaining_issues": [],
+            "memory_updates": [
+                {
+                    "kind": "discovery",
+                    "subject": "duplicate result",
+                    "content": "Equivalent terminal reports are deduplicated.",
+                    "evidence": "focused parser test",
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "metadata-report.json"
+            path.write_text(json.dumps(report) + json.dumps(report), encoding="utf-8")
+            parsed, error = _read_report(path)
+        self.assertEqual(error, "")
+        self.assertEqual(parsed["memory_updates"], report["memory_updates"])
+
+    def test_report_validation_does_not_ignore_invalid_report_shaped_extra_json(self) -> None:
+        report = {
+            "summary": "Executor finished",
+            "files_changed": ["hello.txt"],
+            "commands_run": [],
+            "tests": [],
+            "remaining_issues": [],
+        }
+        invalid_extra = {"summary": "incomplete", "files_changed": []}
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "invalid-extra-report.json"
+            path.write_text(json.dumps(report) + json.dumps(invalid_extra), encoding="utf-8")
+            parsed, error = _read_report(path)
+        self.assertIsNone(parsed)
+        self.assertIn("schema validation failed", error)
 
     def test_report_validation_canonicalises_blocked_extended_executor_result(self) -> None:
         rich_report = {
@@ -543,6 +721,79 @@ class DelegationTests(unittest.TestCase):
             self.assertEqual([event.state for event in events[-2:]], ["started", "completed"])
             self.assertEqual(events[-1].method, "run/completed")
             self.assertLess(events[-2].sequence, events[-1].sequence)
+
+    def test_explicit_request_workspace_beats_config_and_reaches_executor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            configured = _make_repository(root, "configured workspace")
+            target = _make_repository(root, "smoke workspace with spaces")
+            config = _make_config(root, configured)
+            request_file = root / "request.json"
+            result_file = root / "result.json"
+            request_file.write_text(json.dumps(_request(target)), encoding="utf-8")
+            seen: list[Path] = []
+
+            def run_executor(**kwargs):
+                seen.append(kwargs["repository"])
+                (target / "cwd-marker.txt").write_text("target\n", encoding="utf-8")
+                kwargs["output_path"].write_text(
+                    json.dumps(
+                        {
+                            "summary": "Executor finished",
+                            "files_changed": ["cwd-marker.txt"],
+                            "commands_run": [],
+                            "tests": [],
+                            "remaining_issues": [],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                return CommandResult(["agy"], 0, "", "", {"executor_provider": "antigravity"})
+
+            with patch("dual_codex.delegation.antigravity_status", return_value="OK"), patch(
+                "dual_codex.delegation.run_codex_exec", side_effect=run_executor
+            ):
+                outcome = delegate(config, request_file=request_file, result_file=result_file)
+
+            result = json.loads(result_file.read_text(encoding="utf-8"))
+            self.assertEqual(outcome.status, "completed")
+            self.assertEqual(seen, [target.resolve()])
+            self.assertEqual(result["repository"], str(target.resolve()))
+            self.assertEqual(result["files_changed"], ["cwd-marker.txt"])
+            self.assertTrue((target / "cwd-marker.txt").is_file())
+            self.assertFalse((configured / "cwd-marker.txt").exists())
+            artifact = Path(result["task_artifact"])
+            self.assertIn(f"Repository: {target.resolve()}", artifact.read_text(encoding="utf-8"))
+
+    def test_known_smoke_workspace_path_is_preserved_by_request_model(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            configured = _make_repository(root, "configured")
+            config = _make_config(root, configured)
+            smoke_workspace = Path(r"C:\Users\bielx\AppData\Local\Temp\dual-agents-smoke")
+
+            parsed = parse_request(_request(smoke_workspace), config)
+
+            self.assertEqual(parsed.repository, smoke_workspace.resolve())
+
+    def test_missing_explicit_workspace_fails_before_executor_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            configured = _make_repository(root, "configured")
+            missing = root / "missing workspace"
+            config = _make_config(root, configured)
+            request_file = root / "request.json"
+            result_file = root / "result.json"
+            request_file.write_text(json.dumps(_request(missing)), encoding="utf-8")
+
+            with patch("dual_codex.delegation.run_codex_exec") as executor:
+                outcome = delegate(config, request_file=request_file, result_file=result_file)
+
+            result = json.loads(result_file.read_text(encoding="utf-8"))
+            self.assertEqual(outcome.status, "failed")
+            self.assertEqual(result["repository"], str(missing.resolve()))
+            self.assertTrue(result["error"])
+            executor.assert_not_called()
 
     def test_valid_correct_links_parent_and_includes_findings_and_diff(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -794,7 +1045,20 @@ class DelegationTests(unittest.TestCase):
             self.assertEqual(outcome.status, "executor_unavailable")
 
             config = _make_config(root, repository)
-            with patch("dual_codex.delegation.login_status", return_value="NOT LOGGED IN"):
+            config.config_path.write_text(
+                config.config_path.read_text(encoding="utf-8").replace(
+                    'backend = "antigravity"', 'backend = "windows"'
+                ),
+                encoding="utf-8",
+            )
+            config = load_config(config.config_path)
+            with patch("dual_codex.delegation.run_codex_exec") as fallback:
+                outcome = delegate(config, request_file=request_file, result_file=root / "codex-fallback.json")
+            self.assertEqual(outcome.status, "executor_unavailable")
+            fallback.assert_not_called()
+
+            config = _make_config(root, repository)
+            with patch("dual_codex.delegation.antigravity_status", return_value="NOT FOUND"):
                 outcome = delegate(config, request_file=request_file, result_file=root / "logged-out.json")
             self.assertEqual(outcome.status, "executor_unavailable")
 
@@ -897,6 +1161,12 @@ class DelegationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             repository = _make_repository(root)
+            instruction_root = root / "synthetic-instructions"
+            (instruction_root / "skills").mkdir(parents=True)
+            (instruction_root / "AGENTS.md").write_text(
+                "# Synthetic test instructions\n",
+                encoding="utf-8",
+            )
             mock_python = root / "mock codex.py"
             mock_cmd = root / "mock codex.cmd"
             mock_python.write_text(
@@ -908,6 +1178,13 @@ class DelegationTests(unittest.TestCase):
                         "    raise SystemExit(0)",
                         "if args == ['--version']:",
                         "    print('mock-codex 1.0')",
+                        "    raise SystemExit(0)",
+                        "if '--input-format' in args:",
+                        "    print(json.dumps({'event':'init','conversation_id':'mock-conversation'}), flush=True)",
+                        "    sys.stdin.readline()",
+                        "    pathlib.Path('mock_change.txt').write_text('changed\\n', encoding='utf-8')",
+                        "    report = {'summary':'mock complete','files_changed':['mock_change.txt'],'commands_run':[],'tests':[{'command':'validation','status':'passed','details':'ok'}],'remaining_issues':[]}",
+                        "    print(json.dumps({'event':'result','result':{'conversation_id':'mock-conversation','status':'SUCCESS','response':json.dumps(report)}}), flush=True)",
                         "    raise SystemExit(0)",
                         "if args and args[0] == 'exec':",
                         "    pathlib.Path('mock_change.txt').write_text('changed\\n', encoding='utf-8')",
@@ -926,31 +1203,34 @@ class DelegationTests(unittest.TestCase):
                 _make_config(root, repository).config_path.read_text(encoding="utf-8").replace(
                     'codex_command = "codex"',
                     f"codex_command = {json.dumps(str(mock_cmd))}",
+                ).replace(
+                    f"antigravity_command = {json.dumps(sys.executable)}",
+                    f"antigravity_command = {json.dumps(str(mock_cmd))}",
                 ),
                 encoding="utf-8",
             )
             request_file = root / "request.json"
             result_file = root / "result.json"
             request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
-            completed = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "dual_codex.cli",
-                    "--config",
-                    str(config_path),
-                    "delegate",
-                    "--request-file",
-                    str(request_file),
-                    "--result-file",
-                    str(result_file),
-                ],
-                cwd=Path.cwd(),
-                text=True,
-                capture_output=True,
-            )
-            self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertIn("DUAL_CODEX_RESULT", completed.stdout)
+            output = StringIO()
+            errors = StringIO()
+            with patch(
+                "dual_codex.antigravity._CANONICAL_INSTRUCTIONS_ROOT",
+                instruction_root,
+            ), redirect_stdout(output), redirect_stderr(errors):
+                exit_code = main(
+                    [
+                        "--config",
+                        str(config_path),
+                        "delegate",
+                        "--request-file",
+                        str(request_file),
+                        "--result-file",
+                        str(result_file),
+                    ]
+                )
+            self.assertEqual(exit_code, 0, errors.getvalue())
+            self.assertIn("DUAL_CODEX_RESULT", output.getvalue())
             self.assertEqual(json.loads(result_file.read_text(encoding="utf-8"))["status"], "completed")
 
 

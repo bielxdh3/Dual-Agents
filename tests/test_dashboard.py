@@ -193,7 +193,7 @@ console.log(JSON.stringify({
             with urlopen(server.url, timeout=3) as response:
                 html = response.read().decode("utf-8")
             self.assertEqual(response.status, 200)
-            self.assertIn("Dual Codex", html)
+            self.assertIn("Dual Agents", html)
             with urlopen(server.url + "api/status", timeout=3) as response:
                 status = json.loads(response.read())
             self.assertEqual(response.status, 200)

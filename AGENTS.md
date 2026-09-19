@@ -1,10 +1,10 @@
-# Dual Codex App integration
+# Dual Agents App integration
 
-The Codex App is the visible orchestrator, architect, reviewer, and user
-interface. The account assigned to the `executor` role is the only account
-that may be launched for delegated implementation work.
+The Codex App is the visible Codex Architect, reviewer, and user interface.
+Google Antigravity/Gemini is the only active `executor` backend for delegated
+implementation work. Do not substitute a Codex Executor or another backend.
 
-When the user says “Use Dual Codex to implement this task.”:
+When the user says “Use Dual Agents to implement this task.”:
 
 1. Inspect and understand the target repository in the visible App.
 2. Prepare a precise version-1 JSON request with `action: "implement"` and an
@@ -27,7 +27,8 @@ When the user says “Use Dual Codex to implement this task.”:
    diff.
 
 Before delegating, use `status --json` when useful to verify the executor role,
-executor label and login status, the active repository, Git state, and Codex
-CLI version. Delegation refuses an unassigned or unavailable executor. Do not
-invoke the visible orchestrator account through `codex exec` for the same
+executor label, Antigravity/Gemini backend and `agy` status, the active
+repository, Git state, and CLI versions. Delegation refuses an unassigned,
+non-Antigravity, or unavailable Executor; it never falls back silently. Do not
+invoke the visible Architect account through `codex exec` for the same
 delegation, and do not print or read authentication files.

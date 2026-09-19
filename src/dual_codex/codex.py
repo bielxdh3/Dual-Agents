@@ -94,6 +94,25 @@ def run_codex_for_role(
     progress: Callable[[str], None] | None = None,
 ) -> CommandResult:
     """Dispatch orchestration through the configured account backend."""
+    if role == "executor" and agent.backend != "antigravity":
+        raise ValueError(
+            "Dual Agents requires Antigravity/Gemini as the Executor backend; no fallback is permitted."
+        )
+    if agent.backend == "antigravity":
+        if role != "executor":
+            raise ValueError("Antigravity backend is reserved for the Executor role.")
+        from .antigravity import run_antigravity
+
+        return run_antigravity(
+            command=getattr(config, "antigravity_command", "agy"),
+            agent=agent,
+            repository=repository,
+            prompt=prompt,
+            output_path=output_path,
+            schema_path=schema_path,
+            config=config,
+            progress=progress,
+        )
     if agent.backend == "app_server":
         from .terminal import session_id_for
 
