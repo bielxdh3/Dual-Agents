@@ -39,6 +39,22 @@ reasoning_effort = "high"
 service_tier = ""
 backend = "antigravity"
 network_access = false
+# The dashboard normalizes agy slugs such as -low/-medium/-high into one model.
+# Fixed runtime modes (for example Thinking) remain read-only in the UI.
+
+# API profiles use an environment-variable reference; never put the key here.
+# [accounts.api]
+# label = "OpenAI-compatible API"
+# backend = "api"
+# provider_type = "api"
+# adapter_type = "openai_compatible"
+# auth_mode = "environment"
+# auth_reference = "env:DUAL_CODEX_API_KEY"
+# base_url = "https://api.example.invalid/v1"
+# available_models = ["model-id"]
+# supported_reasoning_efforts = []
+# model = "model-id"
+# reasoning_effort = ""
 
 [roles]
 orchestrator = "primary"

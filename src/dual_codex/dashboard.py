@@ -8,6 +8,7 @@ import re
 import shutil
 import threading
 import time
+import unicodedata
 import urllib.parse
 import webbrowser
 from typing import Any
@@ -20,17 +21,31 @@ from .app_server import (
     _sanitize_stderr,
     _load_thread_mapping,
 )
-from .config import AgentConfig, ConfigError, OrchestratorConfig, validate_account_name, validate_setting_value, load_config
+from .config import AgentConfig, ConfigError, OrchestratorConfig, validate_account_name, validate_auth_reference, validate_setting_value, load_config, SUPPORTED_BACKENDS
 from .git import ensure_git_repository, status_porcelain
 from .live_reader import LiveExecutorReader
 from .process import codex_environment, run_command
 from .registry import (
+    add_account,
     abbreviate_path,
     assign_role,
+    label_account,
+    login_account,
     login_status,
+    logout_account,
+    remove_account,
+    rename_account,
     roles_for_account,
+    set_account_enabled,
     set_roles_for_account,
     update_account_settings,
+)
+from .providers import (
+    _antigravity_row_for_selection,
+    provider_capabilities,
+    provider_default_label,
+    provider_for_backend,
+    provider_label,
 )
 
 
@@ -38,9 +53,19 @@ class DashboardError(ValueError):
     """A safe, user-actionable dashboard error."""
 
 
-_ACCOUNT_PATH = re.compile(r"^/api/accounts/([A-Za-z0-9][A-Za-z0-9_-]*)(?:/(models|usage|settings))?$")
+_ACCOUNT_PATH = re.compile(r"^/api/accounts/([A-Za-z0-9][A-Za-z0-9_-]*)(?:/(models|usage|settings|auth))?$")
 _SAFE_HOSTS = {"127.0.0.1", "localhost"}
 LIVE_RECONCILIATION_SECONDS = 10.0
+_AUTH_STATUS_LABELS = {
+    "OK": "Authenticated",
+    "NOT LOGGED IN": "Authentication required",
+    "NOT CONFIGURED": "Authentication required",
+    "UNKNOWN": "Unknown",
+    "NOT FOUND": "Runtime unavailable",
+    "AUTHENTICATION_IN_PROGRESS": "Authentication in progress",
+    "AUTHENTICATION_FAILED": "Authentication failed",
+    "DISABLED": "Disabled",
+}
 
 
 def _now() -> str:
@@ -55,6 +80,10 @@ def _error_text(value: Any) -> str:
     if isinstance(value, dict):
         value = value.get("message") or value.get("error") or "Unavailable"
     return _one_line(_sanitize_stderr(str(value or "Unavailable")))
+
+
+def _auth_status_label(value: str) -> str:
+    return _AUTH_STATUS_LABELS.get(str(value or "UNKNOWN").upper(), "Unknown")
 
 
 def _live_event_name(value: dict[str, Any]) -> str:
@@ -83,11 +112,22 @@ def _agent_for_account(account: Any) -> AgentConfig:
         model=account.model,
         reasoning_effort=account.reasoning_effort,
         sandbox="read-only",
+        runtime_model=account.runtime_model,
+        fixed_mode=account.fixed_mode,
         account_name=account.name,
         label=account.label,
         backend=account.backend,
         service_tier=account.service_tier,
         network_access=account.network_access,
+        provider_type=account.provider_type,
+        adapter_type=account.adapter_type,
+        auth_mode=account.auth_mode,
+        auth_reference=account.auth_reference,
+        state_root=account.state_root,
+        base_url=account.base_url,
+        available_models=account.available_models,
+        supported_reasoning_efforts=account.supported_reasoning_efforts,
+        enabled=account.enabled,
     )
 
 
@@ -204,6 +244,38 @@ class DashboardService:
         self.repository = (repository or config.repository).expanduser().resolve()
         self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._lock = threading.RLock()
+        self._auth_jobs: dict[str, threading.Thread] = {}
+        self._auth_results: dict[str, dict[str, Any]] = {}
+
+    def _auth_raw(self, name: str, account: Any) -> str:
+        with self._lock:
+            job = self._auth_jobs.get(name)
+            if job is not None and job.is_alive():
+                return "AUTHENTICATION_IN_PROGRESS"
+            result = self._auth_results.get(name)
+        if result and result.get("status") == "FAILED":
+            return "AUTHENTICATION_FAILED"
+        return login_status(self.config, account)
+
+    @staticmethod
+    def _auth_actions(account: Any) -> list[str]:
+        if account.backend in {"windows", "app_server"}:
+            return ["status", "authenticate", "reauthenticate", "logout"]
+        return ["status"]
+
+    def _profile_details(self, account: Any, auth_raw: str | None = None) -> dict[str, Any]:
+        raw = auth_raw or self._auth_raw(account.name, account)
+        return {
+            "id": account.name,
+            "display_name": account.label or account.name,
+            "provider": account.provider_type,
+            "provider_label": provider_label(account.provider_type, account.backend),
+            "backend": account.backend,
+            "state_root": abbreviate_path(account.codex_home),
+            "enabled": account.enabled,
+            "auth_status": _auth_status_label(raw),
+            "auth_actions": self._auth_actions(account),
+        }
 
     def _reload(self) -> None:
         self.config = load_config(self.config.config_path)
@@ -264,17 +336,27 @@ class DashboardService:
         account = self.config.accounts.get(name)
         if account is None:
             raise DashboardError(f"Unknown account '{name}'.")
+        auth_raw = self._auth_raw(name, account)
+        provider = provider_for_backend(account.backend) if account.backend in {"antigravity", "api"} else (account.provider_type or provider_for_backend(account.backend))
+        provider_name = provider_label(provider, account.backend)
         base: dict[str, Any] = {
             "name": account.name,
+            "profile_id": account.name,
             "stable_key": account.name,
             "label": account.label,
             "roles": roles_for_account(self.config.roles, account.name),
             "backend": account.backend,
+            "provider": provider,
+            "provider_label": provider_name,
+            "adapter": account.adapter_type,
+            "enabled": account.enabled,
             "codex_home": abbreviate_path(account.codex_home),
-            "login": login_status(self.config, account),
+            "login": auth_raw,
+            "auth_status": _auth_status_label(auth_raw),
+            "profile": self._profile_details(account, auth_raw),
             "configured": {
                 "model": account.model,
-                "model_label": account.model or "Inherit Codex default",
+                "model_label": account.model or provider_default_label(provider, account.backend),
                 "reasoning_effort": account.reasoning_effort,
                 "service_tier": account.service_tier,
                 "service_tier_label": account.service_tier or "Default / not requested",
@@ -289,9 +371,45 @@ class DashboardService:
             "last_error": None,
             "refreshed_at": _now(),
         }
+        if not account.enabled:
+            base["login"] = "DISABLED"
+            base["auth_status"] = "Disabled"
+            base["profile"]["auth_status"] = "Disabled"
+            base["runtime_state"] = "Disabled"
+            base["last_error"] = "Profile is disabled; provider-native state was retained."
+            with self._lock:
+                self._cache[name] = (time.monotonic(), base)
+            return base
         if account.backend != "app_server":
-            base["runtime_state"] = "Connected" if base["login"] == "OK" else ("Unavailable" if base["login"] == "NOT LOGGED IN" else "Unknown")
-            base["capabilities"] = {"app_server": False, "model_list": False, "account_read": False, "rate_limits": False, "usage": False, "thread": False, "thread_token_usage": False, "thread_settings_update": False}
+            discovered = provider_capabilities(self.config, account)
+            base["provider"] = discovered.provider
+            base["provider_label"] = discovered.provider_label
+            base["adapter"] = discovered.adapter
+            base["models"] = list(discovered.models)
+            selected_model = _antigravity_row_for_selection(discovered.models, account.model or account.runtime_model) if account.backend == "antigravity" else None
+            if selected_model is not None:
+                base["configured"]["model_label"] = selected_model.get("display_name") or account.model
+                if selected_model.get("fixed_mode"):
+                    base["configured"]["reasoning_effort"] = f"{selected_model['fixed_mode']} (fixed)"
+            base["capabilities"] = {
+                "app_server": False,
+                "account_read": False,
+                "rate_limits": False,
+                "usage": False,
+                "thread": False,
+                "thread_token_usage": False,
+                "thread_settings_update": True,
+                **discovered.as_dict(),
+            }
+            base["profile"] = {
+                **base["profile"],
+                "credential_status": discovered.credential_status,
+                "profile_isolation": discovered.profile_isolation,
+                "isolation_note": discovered.isolation_note,
+            }
+            base["runtime_state"] = discovered.runtime_status
+            if discovered.error:
+                base["last_error"] = discovered.error
             with self._lock:
                 self._cache[name] = (time.monotonic(), base)
             return base
@@ -333,7 +451,6 @@ class DashboardService:
         base["models"] = models
         base["account"] = {
             "type": account_result.get("account", {}).get("type") if isinstance(account_result.get("account"), dict) else None,
-            "email": account_result.get("account", {}).get("email") if isinstance(account_result.get("account"), dict) and isinstance(account_result.get("account", {}).get("email"), str) else None,
             "plan_type": account_result.get("account", {}).get("planType") if isinstance(account_result.get("account"), dict) else None,
         }
         base["rate_limits"] = _rate_limit_rows(rate_result)
@@ -362,6 +479,19 @@ class DashboardService:
             "reasoning": any(model["reasoning_efforts"] for model in models),
             "service_tier": any(model["service_tiers"] for model in models),
             "thread_settings_update": True,
+            "provider": "codex",
+            "provider_label": "Codex",
+            "adapter": "codex_cli",
+            "effort_levels": sorted({effort for model in models for effort in model["reasoning_efforts"]}),
+            "profile_isolation": True,
+            "isolation_note": "Codex profile state is isolated by the account CODEX_HOME.",
+            "credential_status": "provider-managed",
+        }
+        base["profile"] = {
+            **base["profile"],
+            "credential_status": "provider-managed",
+            "profile_isolation": True,
+            "isolation_note": "Codex profile state is isolated by the account CODEX_HOME.",
         }
         rate_limited = any(row.get("rate_limit_reached") or any((window.get("used_percent") or 0) >= 100 for window in row.get("windows", [])) for row in base["rate_limits"])
         if rate_limited:
@@ -382,6 +512,233 @@ class DashboardService:
 
     def accounts(self, *, force: bool = False) -> list[dict[str, Any]]:
         return [self.collect_account(name, force=force) for name in self.config.accounts]
+
+    @staticmethod
+    def _profile_name(label: str, existing: set[str]) -> str:
+        plain = unicodedata.normalize("NFKD", label).encode("ascii", "ignore").decode("ascii")
+        candidate = re.sub(r"[^A-Za-z0-9_-]+", "-", plain).strip("-_").lower()
+        if not candidate:
+            candidate = "profile"
+        if candidate[0].isdigit():
+            candidate = f"profile-{candidate}"
+        candidate = candidate[:48].rstrip("-_") or "profile"
+        base = candidate
+        suffix = 2
+        while candidate in existing:
+            candidate = f"{base}-{suffix}"
+            suffix += 1
+        return candidate
+
+    def create_profile(self, body: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(body, dict):
+            raise DashboardError("Profile body must be a JSON object.")
+        allowed = {
+            "name", "label", "backend", "codex_home", "model", "reasoning_effort",
+            "enabled", "base_url", "auth_reference", "available_models",
+            "supported_reasoning_efforts", "runtime_model", "fixed_mode",
+        }
+        unknown = sorted(set(body) - allowed)
+        if unknown:
+            raise DashboardError(f"Unknown profile field(s): {', '.join(unknown)}.")
+        label = body.get("label")
+        if not isinstance(label, str) or not label.strip():
+            raise DashboardError("Display name is required.")
+        raw_name = body.get("name")
+        if raw_name is not None and not isinstance(raw_name, str):
+            raise DashboardError("Profile ID must be a string.")
+        name = raw_name.strip() if isinstance(raw_name, str) else self._profile_name(label, set(self.config.accounts))
+        backend = body.get("backend", "windows")
+        if not isinstance(backend, str):
+            raise DashboardError("Provider backend must be a string.")
+        enabled = body.get("enabled", True)
+        if not isinstance(enabled, bool):
+            raise DashboardError("enabled must be a boolean.")
+        for field in ("codex_home", "model", "reasoning_effort", "base_url", "auth_reference", "runtime_model", "fixed_mode"):
+            if field in body and body[field] is not None and not isinstance(body[field], str):
+                raise DashboardError(f"{field} must be a string.")
+        for field in ("available_models", "supported_reasoning_efforts"):
+            if field in body:
+                values = body[field]
+                if not isinstance(values, (list, tuple)) or any(not isinstance(value, str) for value in values):
+                    raise DashboardError(f"{field} must be a list of strings.")
+        try:
+            created = add_account(
+                self.config,
+                name,
+                label=label,
+                codex_home=body.get("codex_home") or None,
+                model=body.get("model", "") or "",
+                reasoning_effort=body.get("reasoning_effort", "") or "",
+                runtime_model=body.get("runtime_model", "") or "",
+                fixed_mode=body.get("fixed_mode", "") or "",
+                backend=backend,
+                auth_reference=body.get("auth_reference", "") or "",
+                base_url=body.get("base_url", "") or "",
+                available_models=body.get("available_models", ()) or (),
+                supported_reasoning_efforts=body.get("supported_reasoning_efforts", ()) or (),
+                enabled=enabled,
+                authenticate=False,
+                output=lambda _message: None,
+            )
+        except ConfigError as exc:
+            raise DashboardError(str(exc)) from exc
+        self._reload()
+        with self._lock:
+            self._cache.clear()
+            self._auth_results.pop(created.name, None)
+        account = self.config.accounts[created.name]
+        return {
+            "schema_version": 1,
+            "profile": self._profile_details(account),
+            "message": "Profile metadata saved; provider authentication remains a separate action.",
+        }
+
+    def update_profile(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(body, dict):
+            raise DashboardError("Profile update body must be a JSON object.")
+        allowed = {"label", "display_name", "new_name", "enabled"}
+        unknown = sorted(set(body) - allowed)
+        if unknown:
+            raise DashboardError(f"Unknown profile field(s): {', '.join(unknown)}.")
+        current_name = validate_account_name(name)
+        if current_name not in self.config.accounts:
+            raise DashboardError(f"Unknown account '{current_name}'.")
+        if "label" in body and "display_name" in body:
+            raise DashboardError("Use label or display_name, not both.")
+        if "label" in body or "display_name" in body:
+            label = body.get("label", body.get("display_name"))
+            if not isinstance(label, str) or not label.strip():
+                raise DashboardError("Display name must be a string.")
+            label_account(self.config, current_name, label)
+            self._reload()
+        if body.get("new_name") is not None:
+            if not isinstance(body["new_name"], str):
+                raise DashboardError("Profile ID must be a string.")
+            rename_account(self.config, current_name, body["new_name"])
+            current_name = body["new_name"].strip()
+            self._reload()
+        if "enabled" in body:
+            if not isinstance(body["enabled"], bool):
+                raise DashboardError("enabled must be a boolean.")
+            set_account_enabled(self.config, current_name, body["enabled"])
+        if not (set(body) & {"label", "display_name", "new_name", "enabled"}):
+            raise DashboardError("Profile update requires a display name, profile ID, or enabled value.")
+        self._reload()
+        with self._lock:
+            self._cache.clear()
+        account = self.config.accounts[current_name]
+        return {"schema_version": 1, "profile": self._profile_details(account), "message": "Profile updated."}
+
+    def remove_profile(self, name: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        body = body or {}
+        if body.get("confirm") is not True:
+            raise DashboardError("Profile removal requires explicit confirmation.")
+        current_name = validate_account_name(name)
+        with self._lock:
+            active = self._auth_jobs.get(current_name)
+            if active is not None and active.is_alive():
+                raise DashboardError("Authentication is still in progress for this profile.")
+        remove_account(self.config, current_name, delete_profile=False)
+        self._reload()
+        with self._lock:
+            self._cache.clear()
+            self._auth_jobs.pop(current_name, None)
+            self._auth_results.pop(current_name, None)
+        return {
+            "schema_version": 1,
+            "account": current_name,
+            "metadata_removed": True,
+            "provider_state_deleted": False,
+            "message": "Profile metadata removed; provider-native state was retained.",
+        }
+
+    def auth_status(self, name: str) -> dict[str, Any]:
+        account = self.config.accounts.get(validate_account_name(name))
+        if account is None:
+            raise DashboardError(f"Unknown account '{name}'.")
+        raw = self._auth_raw(account.name, account)
+        return {
+            "schema_version": 1,
+            "account": account.name,
+            "status": _auth_status_label(raw),
+            "actions": self._auth_actions(account),
+            "provider": account.provider_type,
+            "state_root": abbreviate_path(account.codex_home),
+        }
+
+    def _start_auth(self, name: str, *, reauthenticate: bool) -> dict[str, Any]:
+        account = self.config.accounts.get(validate_account_name(name))
+        if account is None:
+            raise DashboardError(f"Unknown account '{name}'.")
+        if account.backend not in {"windows", "app_server"}:
+            raise DashboardError("Native authentication is only supported for Codex CLI profiles.")
+        with self._lock:
+            active = self._auth_jobs.get(account.name)
+            if active is not None and active.is_alive():
+                return self.auth_status(account.name)
+            config = self.config
+
+            def worker() -> None:
+                try:
+                    login_account(
+                        config,
+                        account.name,
+                        assume_yes=reauthenticate,
+                        output=lambda _message: None,
+                    )
+                    result = {"status": "OK"}
+                except Exception as exc:  # provider-native flow is an external boundary
+                    result = {"status": "FAILED", "message": _error_text(exc)}
+                with self._lock:
+                    self._auth_results[account.name] = result
+                    self._auth_jobs.pop(account.name, None)
+                    self._cache.pop(account.name, None)
+
+            thread = threading.Thread(
+                target=worker,
+                name=f"dual-codex-auth-{account.name}",
+                daemon=True,
+            )
+            self._auth_jobs[account.name] = thread
+            thread.start()
+        return {
+            "schema_version": 1,
+            "account": account.name,
+            "status": "Authentication in progress",
+            "actions": self._auth_actions(account),
+            "message": "Complete the provider-native browser/account/MFA flow manually, then check status.",
+        }
+
+    def auth_action(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(body, dict) or not isinstance(body.get("action"), str):
+            raise DashboardError("Authentication action is required.")
+        action = body["action"].strip().casefold()
+        if action == "status":
+            return self.auth_status(name)
+        if action == "authenticate":
+            return self._start_auth(name, reauthenticate=False)
+        if action == "reauthenticate":
+            return self._start_auth(name, reauthenticate=True)
+        if action == "logout":
+            if body.get("confirm") is not True:
+                raise DashboardError("Logout requires explicit confirmation.")
+            account = self.config.accounts.get(validate_account_name(name))
+            if account is None:
+                raise DashboardError(f"Unknown account '{name}'.")
+            with self._lock:
+                active = self._auth_jobs.get(account.name)
+                if active is not None and active.is_alive():
+                    raise DashboardError("Authentication is still in progress for this profile.")
+            if account.backend not in {"windows", "app_server"}:
+                raise DashboardError("Logout is only supported for Codex CLI profiles.")
+            result = logout_account(self.config, account.name)
+            if result != "OK":
+                raise DashboardError("Provider logout failed.")
+            with self._lock:
+                self._auth_results.pop(account.name, None)
+                self._cache.pop(account.name, None)
+            return self.auth_status(account.name)
+        raise DashboardError("Unsupported authentication action.")
 
     def status(self) -> dict[str, Any]:
         try:
@@ -423,9 +780,52 @@ class DashboardService:
     def live_executor_snapshot(self) -> dict[str, Any]:
         return self.live_executor_reader().snapshot()
 
-    def models(self, name: str) -> dict[str, Any]:
-        account = self.collect_account(name)
-        return {"schema_version": 1, "account": name, "models": account["models"], "capabilities": account["capabilities"]}
+    def models(self, name: str, backend: str | None = None) -> dict[str, Any]:
+        account = self.config.accounts.get(validate_account_name(name))
+        if account is None:
+            raise DashboardError(f"Unknown account '{name}'.")
+        if not account.enabled:
+            return {
+                "schema_version": 1,
+                "account": name,
+                "provider": account.provider_type,
+                "provider_label": provider_label(account.provider_type, account.backend),
+                "models": [],
+                "capabilities": {"runtime_status": "Disabled", "error": "Profile is disabled."},
+            }
+        if backend is None or backend == account.backend:
+            account_data = self.collect_account(name)
+        else:
+            if backend not in SUPPORTED_BACKENDS:
+                raise DashboardError("backend must be one of the supported provider backends.")
+            target = type(account)(
+                **{
+                    **account.__dict__,
+                    "backend": backend,
+                    "provider_type": provider_for_backend(backend),
+                    "adapter_type": {
+                        "antigravity": "antigravity_cli",
+                        "api": "openai_compatible",
+                        "app_server": "codex_cli",
+                        "windows": "codex_cli",
+                    }[backend],
+                }
+            )
+            capabilities = provider_capabilities(self.config, target)
+            account_data = {
+                "provider": capabilities.provider,
+                "provider_label": capabilities.provider_label,
+                "models": list(capabilities.models),
+                "capabilities": capabilities.as_dict(),
+            }
+        return {
+            "schema_version": 1,
+            "account": name,
+            "provider": account_data.get("provider"),
+            "provider_label": account_data.get("provider_label"),
+            "models": account_data["models"],
+            "capabilities": account_data["capabilities"],
+        }
 
     def usage(self, name: str) -> dict[str, Any]:
         account = self.collect_account(name)
@@ -434,7 +834,10 @@ class DashboardService:
     def save_settings(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(body, dict):
             raise DashboardError("Settings body must be a JSON object.")
-        allowed = {"model", "reasoning_effort", "service_tier", "backend", "scope"}
+        allowed = {
+            "model", "reasoning_effort", "service_tier", "backend", "scope",
+            "base_url", "auth_reference", "available_models", "supported_reasoning_efforts",
+        }
         unknown = sorted(set(body) - allowed)
         if unknown:
             raise DashboardError(f"Unknown setting(s): {', '.join(unknown)}.")
@@ -448,34 +851,99 @@ class DashboardService:
         effort = body.get("reasoning_effort")
         tier = body.get("service_tier")
         backend = body.get("backend")
+        base_url = body.get("base_url")
+        auth_reference = body.get("auth_reference")
+        available_models = body.get("available_models")
+        supported_reasoning_efforts = body.get("supported_reasoning_efforts")
         if model is not None and not isinstance(model, str):
             raise DashboardError("model must be a string.")
         if effort is not None and not isinstance(effort, str):
             raise DashboardError("reasoning_effort must be a string.")
         if tier is not None and not isinstance(tier, str):
             raise DashboardError("service_tier must be a string.")
-        if backend is not None and backend not in {"app_server", "windows", "antigravity"}:
-            raise DashboardError("backend must be 'app_server', 'windows', or 'antigravity'.")
+        if backend is not None and backend not in SUPPORTED_BACKENDS:
+            raise DashboardError("backend must be one of the supported provider backends.")
+        if base_url is not None and not isinstance(base_url, str):
+            raise DashboardError("base_url must be a string.")
+        if auth_reference is not None and not isinstance(auth_reference, str):
+            raise DashboardError("auth_reference must be a secret reference string.")
+        if auth_reference:
+            try:
+                validate_auth_reference(auth_reference)
+            except ConfigError as exc:
+                raise DashboardError(str(exc)) from exc
+        for field, value in (("available_models", available_models), ("supported_reasoning_efforts", supported_reasoning_efforts)):
+            if value is not None and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
+                raise DashboardError(f"{field} must be a list of strings.")
         current = self.collect_account(name)
         models = current.get("models", [])
+        target_backend = account.backend if backend is None else backend
+        target_account = account
+        if target_backend != account.backend:
+            target_account = type(account)(
+                **{
+                    **account.__dict__,
+                    "backend": target_backend,
+                    "provider_type": provider_for_backend(target_backend),
+                    "adapter_type": {
+                        "antigravity": "antigravity_cli",
+                        "api": "openai_compatible",
+                        "app_server": "codex_cli",
+                        "windows": "codex_cli",
+                    }[target_backend],
+                }
+            )
+            discovered_target = provider_capabilities(self.config, target_account)
+            models = list(discovered_target.models)
         chosen_model = account.model if model is None else validate_setting_value(model, "model")
-        selected = (next((item for item in models if item["id"] == chosen_model), None) if chosen_model else next((item for item in models if item["is_default"]), None))
+        selected = (next((item for item in models if item["id"] == chosen_model), None) if chosen_model else None)
+        if selected is None and chosen_model and target_backend == "antigravity":
+            selected = _antigravity_row_for_selection(models, chosen_model)
+        if selected is not None:
+            chosen_model = selected["id"]
         if chosen_model and models and selected is None:
-            raise DashboardError("Selected model is not advertised by the installed App Server.")
-        chosen_effort = account.reasoning_effort if effort is None else (validate_setting_value(effort, "reasoning_effort") or "high")
-        if selected and selected["reasoning_efforts"] and chosen_effort not in selected["reasoning_efforts"]:
+            raise DashboardError("Selected model is not advertised by the selected provider.")
+        chosen_effort = account.reasoning_effort if effort is None else validate_setting_value(effort, "reasoning_effort")
+        runtime_model = account.runtime_model if target_backend == account.backend else ""
+        fixed_mode = account.fixed_mode if target_backend == account.backend else ""
+        advertised_efforts = selected["reasoning_efforts"] if selected else list(current.get("capabilities", {}).get("effort_levels", []))
+        if target_backend != account.backend:
+            discovered_target = provider_capabilities(self.config, target_account)
+            advertised_efforts = list(discovered_target.effort_levels)
+        if selected is not None and target_backend == "antigravity":
+            fixed_mode = str(selected.get("fixed_mode") or "")
+            variants = selected.get("runtime_variants") or {}
+            if fixed_mode:
+                chosen_effort = ""
+                runtime_model = str(selected.get("runtime_model") or next(iter(variants.values()), ""))
+            else:
+                runtime_model = str(variants.get(chosen_effort) or "")
+        elif not chosen_model and model is not None and target_backend == "antigravity":
+            chosen_effort = ""
+            runtime_model = ""
+            fixed_mode = ""
+        if advertised_efforts and chosen_effort and chosen_effort not in advertised_efforts:
             raise DashboardError("Selected reasoning effort is not supported by the selected model.")
         chosen_tier = account.service_tier if tier is None else validate_setting_value(tier, "service_tier")
         known_tiers = {item["id"] for item in selected["service_tiers"]} if selected else set()
         if chosen_tier and known_tiers and chosen_tier not in known_tiers:
             raise DashboardError("Selected service tier is not supported by the selected model.")
+        persisted_effort = chosen_effort if (model is not None or effort is not None) else None
         updated = update_account_settings(
             self.config,
             name,
-            model=model,
-            reasoning_effort=effort,
+            model=chosen_model if model is not None else None,
+            reasoning_effort=persisted_effort,
+            runtime_model=runtime_model,
+            fixed_mode=fixed_mode,
             service_tier=tier,
             backend=backend,
+            provider_type=target_account.provider_type if target_backend != account.backend else None,
+            adapter_type=target_account.adapter_type if target_backend != account.backend else None,
+            base_url=base_url,
+            auth_reference=auth_reference,
+            available_models=available_models,
+            supported_reasoning_efforts=supported_reasoning_efforts,
         )
         self._reload()
         with self._lock:
@@ -490,6 +958,8 @@ class DashboardService:
                 "reasoning_effort": updated.reasoning_effort,
                 "service_tier": updated.service_tier,
                 "backend": updated.backend,
+                "provider": updated.provider_type,
+                "credential_configured": bool(updated.auth_reference),
             },
             "message": "Saved for future Dual Codex turns; current persistent thread unchanged.",
         }
@@ -525,7 +995,7 @@ HTML = """<!doctype html>
 <title>Dual Agents · Account control</title><link rel="stylesheet" href="/static/styles.css"><script defer src="/static/app.js"></script></head>
 <body><main class="shell"><header class="hero"><div><p class="eyebrow">LOCAL CONTROL PLANE</p><h1>Dual Agents</h1><p class="lede">Codex Architect and Antigravity/Gemini Executor control.</p></div><div id="health" class="health" aria-live="polite">Loading…</div></header>
 <nav class="view-tabs" aria-label="Dashboard views"><button class="view-tab active" data-view-target="accounts" aria-selected="true">Accounts</button><button class="view-tab" data-view-target="executor" aria-selected="false">EXECUTOR LIVE</button></nav>
-<section class="summary" id="summary" data-account-view></section><section data-account-view><div class="section-head"><div><p class="eyebrow">ACCOUNT REGISTRY</p><h2>Connected accounts</h2></div><button id="refresh" class="button secondary">Refresh</button></div><div id="accounts" class="accounts"><div class="empty">Loading account telemetry…</div></div></section>
+<section class="summary" id="summary" data-account-view></section><section data-account-view id="profiles-view"><div class="section-head"><div><p class="eyebrow">PROFILES / ACCOUNTS</p><h2>Manage profiles</h2><p class="sub">Create provider metadata, isolate Codex state, and start native authentication when needed.</p></div><div class="save-row"><button id="add-profile" class="button">Add profile</button><button id="refresh" class="button secondary">Refresh</button></div></div><div id="profile-form" class="profile-form" hidden><div class="section-head"><div><p class="eyebrow">NEW PROFILE</p><h3>Create profile</h3></div><button id="cancel-profile" class="button secondary" type="button">Cancel</button></div><div class="grid"><div class="field"><label for="profile-label">Display name</label><input id="profile-label" data-profile-label autocomplete="off" required></div><div class="field"><label for="profile-name">Profile ID (optional)</label><input id="profile-name" data-profile-name autocomplete="off" placeholder="Generated from display name"></div><div class="field"><label for="profile-backend">Provider</label><select id="profile-backend" data-profile-backend><option value="windows">Codex</option><option value="antigravity">Gemini / Antigravity</option><option value="api">API / OpenAI-compatible</option></select></div><div class="field"><label for="profile-home">CODEX_HOME / state root</label><input id="profile-home" data-profile-home autocomplete="off" placeholder="Optional safe absolute path"><small>Codex roots are canonicalized and cannot collide with another profile.</small></div><div class="field"><label for="profile-model">Default model</label><input id="profile-model" data-profile-model autocomplete="off"></div><div class="field"><label for="profile-effort">Default effort</label><select id="profile-effort" data-profile-effort><option value="">Provider default</option><option value="low">Low</option><option value="medium">Medium</option><option value="high" selected>High</option><option value="xhigh">XHigh</option></select></div><div class="field" data-profile-api-field hidden><label for="profile-base-url">API base URL</label><input id="profile-base-url" data-profile-base-url autocomplete="off" placeholder="https://…"></div><div class="field" data-profile-api-field hidden><label for="profile-auth-reference">API secret reference</label><input id="profile-auth-reference" data-profile-auth-reference autocomplete="off" placeholder="env:VARIABLE"></div></div><label class="check"><input type="checkbox" data-profile-enabled checked> Enabled</label><div class="save-row"><span class="feedback" data-profile-feedback aria-live="polite">Provider authentication is a separate manual action.</span><button id="save-profile" class="button" type="button">Save profile</button></div></div><div id="profiles" class="profiles"><div class="empty">Loading profiles…</div></div></section><section data-account-view><div class="section-head"><div><p class="eyebrow">PROFILE REGISTRY</p><h2>Provider profiles</h2></div></div><div id="accounts" class="accounts"><div class="empty">Loading provider profiles…</div></div></section>
 <section id="executor-view" class="executor-view" hidden aria-labelledby="executor-heading"><div class="executor-head"><div><p class="eyebrow">LIVE EXECUTOR</p><h2 id="executor-heading">EXECUTOR LIVE</h2><div id="executor-status" class="executor-status" aria-live="polite">IDLE · Waiting for an Executor run.</div></div><div class="executor-actions"><label class="toggle"><input id="executor-follow" type="checkbox" checked> Follow Live</label><button id="executor-pause" class="button secondary" type="button">Pause</button><button id="executor-clear" class="button secondary" type="button">Clear View</button></div></div><div class="executor-meta"><div><span>STATE</span><strong id="executor-state">IDLE</strong></div><div><span>MODEL</span><strong id="executor-model">Unknown</strong></div><div><span>REASONING</span><strong id="executor-reasoning">Unknown</strong></div><div><span>SERVICE TIER</span><strong id="executor-tier">Unknown</strong></div><div><span>THREAD / TURN</span><strong id="executor-thread">Unknown</strong></div><div><span>ELAPSED</span><strong id="executor-elapsed">Unknown</strong></div><div><span>TOKENS</span><strong id="executor-tokens">Unknown</strong></div></div><div class="executor-plan"><div class="executor-label">CURRENT PLAN</div><pre id="executor-plan-content">Unknown / Not available</pre></div><div class="executor-tabs" role="tablist" aria-label="Executor activity"><button class="executor-tab active" data-executor-tab="activity" role="tab" aria-selected="true">Activity</button><button class="executor-tab" data-executor-tab="commands" role="tab" aria-selected="false">Commands</button><button class="executor-tab" data-executor-tab="diffs" role="tab" aria-selected="false">Live Diff</button><button class="executor-tab" data-executor-tab="files" role="tab" aria-selected="false">Files</button></div><div id="executor-feed" class="executor-feed" aria-live="polite"><div class="empty">No Executor activity yet.</div></div></section>
 <footer><span>Loopback-only dashboard</span><span id="updated"></span></footer></main></body></html>"""
 
@@ -533,11 +1003,13 @@ STYLES = """:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--panel2:#18233
 
 STYLES += ".role-editor{border:0;padding:0;margin:0}.role-editor legend{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0}.role-options{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.check{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;color:var(--text);font-size:13px}.check input{accent-color:var(--accent)}"
 
+STYLES += ".profile-form{background:linear-gradient(160deg,#15213a,#0f1729);border:1px solid var(--line);border-radius:14px;padding:18px;margin:0 0 18px;box-shadow:var(--shadow)}.profile-form h3{margin:0;font-size:20px}.profile-form input,.profile-form select,.profile-row input{width:100%;background:#0c1425;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px}.profile-form[hidden]{display:none}.profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-bottom:28px}.profile-row{background:#101a2e;border:1px solid var(--line);border-radius:12px;padding:14px}.profile-row h3{margin:0 0 4px;font-size:18px}.profile-row .profile-meta{display:grid;gap:4px;color:var(--muted);font-size:12px;margin:10px 0}.profile-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.profile-actions .button{font-size:12px;padding:8px 10px}.profile-row .profile-note{color:var(--warn);font-size:12px;margin-top:8px}.profile-row .feedback{margin-top:8px}.profile-row .pill{margin-left:6px}"
+
 STYLES += """.view-tabs{display:flex;gap:8px;margin:0 0 18px;border-bottom:1px solid var(--line);padding-bottom:10px}.view-tab{border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted);padding:8px 12px;font:700 12px/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.08em;cursor:pointer}.view-tab:hover,.view-tab.active{background:#18243b;border-color:var(--line);color:var(--text)}.executor-view[hidden]{display:none}.executor-view{background:#080d17;border:1px solid #263550;border-radius:12px;box-shadow:0 18px 48px #05081180;color:#dce8ff;font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;overflow:hidden}.executor-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;padding:18px;border-bottom:1px solid #263550}.executor-head h2{font:700 clamp(24px,5vw,42px)/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:-.05em;margin:0 0 8px}.executor-head .eyebrow,.executor-label,.executor-meta span{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.executor-status{color:#91a5c5;min-height:20px}.executor-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.executor-actions .button{font:700 12px/1 ui-monospace,SFMono-Regular,Consolas,monospace;padding:9px 11px}.toggle{display:inline-flex;align-items:center;gap:6px;color:#a9bbd8;white-space:nowrap}.toggle input{accent-color:var(--accent)}.executor-meta{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:#263550;border-bottom:1px solid #263550}.executor-meta>div{background:#0d1524;padding:11px 12px;min-width:0}.executor-meta span{display:block;color:#7284a5;font-size:10px;letter-spacing:.1em}.executor-meta strong{display:block;margin-top:5px;color:#e7efff;font-size:13px;overflow-wrap:anywhere}.executor-meta strong[data-state="WORKING"]{color:var(--warn)}.executor-meta strong[data-state="COMPLETE"]{color:var(--good)}.executor-meta strong[data-state="FAILED"]{color:var(--bad)}.executor-plan{padding:14px 18px;border-bottom:1px solid #263550}.executor-label{color:#7284a5;font-size:10px;letter-spacing:.1em}.executor-plan pre{margin:8px 0 0;color:#c7d5ef;white-space:pre-wrap;overflow-wrap:anywhere;max-height:130px;overflow:auto}.executor-tabs{display:flex;gap:4px;padding:10px 12px 0;background:#0d1524}.executor-tab{border:0;border-bottom:2px solid transparent;background:transparent;color:#8194b5;padding:9px 10px;cursor:pointer;font:700 11px/1 ui-monospace,SFMono-Regular,Consolas,monospace}.executor-tab.active{border-bottom-color:var(--accent);color:#edf2ff}.executor-feed{max-height:520px;overflow:auto;padding:0 12px 12px;background:#0a111d}.executor-row{display:grid;grid-template-columns:112px 160px minmax(0,1fr);gap:10px;border-bottom:1px solid #1b2941;padding:10px 6px;min-width:0}.executor-row .executor-time,.executor-row .executor-kind{color:#768bad;font-size:11px;overflow-wrap:anywhere}.executor-row .executor-kind{color:#a9bbd8}.executor-row .executor-message{color:#dce8ff;white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}.executor-empty{color:#7e91b2;padding:24px 8px;text-align:center}.executor-view .empty{border-color:#263550;border-radius:0;padding:24px;background:#0a111d}@media(max-width:800px){.executor-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.executor-head{display:block}.executor-actions{justify-content:flex-start;margin-top:14px}.executor-row{grid-template-columns:84px 1fr}.executor-row .executor-message{grid-column:1/-1}.view-tabs{overflow:auto}}"""
 
-CAPABILITY_SCRIPT = """function modelCapabilities(models, modelId){const rows=Array.isArray(models)?models:[];const selected=modelId?rows.find(row=>row&&row.id===modelId):rows.find(row=>row&&row.is_default);if(!selected)return null;const efforts=Array.isArray(selected.reasoning_efforts)?[...new Set(selected.reasoning_efforts.filter(value=>typeof value==='string'))]:[];const tiers=Array.isArray(selected.service_tiers)?selected.service_tiers.filter(value=>value&&typeof value.id==='string'):[];return {selected,reasoning_efforts:efforts,default_reasoning:typeof selected.default_reasoning==='string'?selected.default_reasoning:null,service_tiers:tiers,default_service_tier:typeof selected.default_service_tier==='string'?selected.default_service_tier:null}}
+CAPABILITY_SCRIPT = """function modelCapabilities(models, modelId){const rows=Array.isArray(models)?models:[];const inherited=!modelId;const selected=inherited?rows.find(row=>row&&row.is_default):rows.find(row=>row&&row.id===modelId);if(!selected)return null;const efforts=Array.isArray(selected.reasoning_efforts)?[...new Set(selected.reasoning_efforts.filter(value=>typeof value==='string'))]:[];const tiers=Array.isArray(selected.service_tiers)?selected.service_tiers.filter(value=>value&&typeof value.id==='string'):[];return {selected,inherited,reasoning_efforts:efforts,default_reasoning:typeof selected.default_reasoning==='string'?selected.default_reasoning:null,fixed_mode:typeof selected.fixed_mode==='string'?selected.fixed_mode:'',service_tiers:tiers,default_service_tier:typeof selected.default_service_tier==='string'?selected.default_service_tier:null}}
 function capabilityValue(current,values,preferred){if(values.includes(current))return {value:current,changed:false};const value=values.includes(preferred)?preferred:(values[0]||'');return {value,changed:current!==value}}
-function reconcileCapabilitySelection(models,modelId,currentReasoning,currentTier){const selected=modelCapabilities(models,modelId);if(!selected)return {selected_model:null,reasoning_efforts:[],reasoning_value:'',reasoning_disabled:true,service_tiers:[],service_tier_value:'',service_tier_disabled:true,message:'Model capabilities are unavailable; dependent controls are disabled.'};const reasoning=selected.reasoning_efforts.length?capabilityValue(currentReasoning,selected.reasoning_efforts,selected.default_reasoning):{value:'',changed:false};const tierIds=selected.service_tiers.map(tier=>tier.id);const tier=tierIds.includes(currentTier)?{value:currentTier,changed:false}:{value:'',changed:Boolean(currentTier)};const messages=[];if(!selected.reasoning_efforts.length)messages.push('Reasoning capabilities are not advertised by the selected model.');if(!tierIds.length)messages.push('No service tier is advertised by the selected model.');if(reasoning.changed)messages.push('Reasoning updated because the selected model does not support the previous value.');if(tier.changed)messages.push('Service tier reset to Default / OFF because the selected model does not advertise it.');return {selected_model:selected.selected.id,reasoning_efforts:selected.reasoning_efforts,reasoning_value:reasoning.value,reasoning_disabled:!selected.reasoning_efforts.length,service_tiers:selected.service_tiers,service_tier_value:tier.value,service_tier_disabled:!tierIds.length,message:messages.join(' ')}}
+function reconcileCapabilitySelection(models,modelId,currentReasoning,currentTier,providerCapabilities){const selected=modelCapabilities(models,modelId);const advertised=providerCapabilities&&Array.isArray(providerCapabilities.effort_levels)?[...new Set(providerCapabilities.effort_levels.filter(value=>typeof value==='string'))]:[];if(!selected&&!advertised.length)return {selected_model:null,reasoning_efforts:[],reasoning_value:'',reasoning_disabled:true,fixed_mode:'',service_tiers:[],service_tier_value:'',service_tier_disabled:true,message:'Capabilities unavailable for this provider.'};const inherited=Boolean(selected&&selected.inherited&&providerCapabilities);const fixedMode=inherited?'':(selected&&selected.fixed_mode||'');const efforts=inherited?[]:(selected?selected.reasoning_efforts:advertised);const defaultReasoning=selected&&selected.default_reasoning||'';const reasoning=fixedMode||inherited?{value:'',changed:Boolean(currentReasoning)}:efforts.length?capabilityValue(currentReasoning,efforts,defaultReasoning):{value:'',changed:Boolean(currentReasoning)};const tiers=selected?selected.service_tiers:[];const tierIds=tiers.map(tier=>tier.id);const tier=tierIds.includes(currentTier)?{value:currentTier,changed:false}:{value:'',changed:Boolean(currentTier)};const messages=[];if(inherited)messages.push('Provider default controls the model and effort.');else if(fixedMode)messages.push(`${fixedMode} (fixed for this model).`);else if(!efforts.length)messages.push('Reasoning capabilities are not advertised by the selected provider.');if(!tierIds.length)messages.push('No service tier is advertised by the selected provider.');if(reasoning.changed)messages.push('Reasoning updated because the selected model does not support the previous value.');if(tier.changed)messages.push('Service tier reset to Default / OFF because the selected provider does not advertise it.');return {selected_model:selected?selected.selected.id:null,reasoning_efforts:efforts,reasoning_value:reasoning.value,reasoning_disabled:inherited||fixedMode||!efforts.length,fixed_mode:fixedMode,service_tiers:tiers,service_tier_value:tier.value,service_tier_disabled:!tierIds.length,message:messages.join(' ')}}
 if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardCapabilities={modelCapabilities,reconcileCapabilitySelection};
 """
 
@@ -545,18 +1017,21 @@ SCRIPT = CAPABILITY_SCRIPT + """const $=s=>document.querySelector(s);const esc=v
 async function get(path,opts){const r=await fetch(path,opts);const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
 function pill(state){const c=state==='Idle'||state==='Connected'?'good':state==='Working'||state==='Rate limited'?'warn':state==='Unavailable'?'bad':'neutral';return `<span class="pill ${c}">${esc(state)}</span>`}
 function bar(row){return (row.windows||[]).map(w=>{const p=Math.max(0,Math.min(100,Number(w.used_percent)||0));return `<div><div class="bar-head"><span>${esc(w.kind)} · ${p}% used</span><span>resets ${fmtReset(w.resets_at)}</span></div><div class="bar"><i style="width:${p}%"></i></div></div>`}).join('')||'<span class="hint">Not available</span>'}
-function options(items,current,inherit){let out=inherit?`<option value="">Inherit Codex default</option>`:'';for(const i of items||[])out+=`<option value="${esc(i.id)}" ${i.id===current?'selected':''}>${esc(i.display_name||i.id)}</option>`;return out}
-function capabilityOptions(state){const efforts=state.reasoning_efforts.length?state.reasoning_efforts.map(value=>`<option value="${esc(value)}" ${value===state.reasoning_value?'selected':''}>${esc(value)}</option>`).join(''):'<option value="">Capabilities unavailable</option>';const tiers='<option value="" '+(!state.service_tier_value?'selected':'')+'>Default / OFF</option>'+state.service_tiers.map(tier=>`<option value="${esc(tier.id)}" ${tier.id===state.service_tier_value?'selected':''}>${esc(tier.name||tier.id)}</option>`).join('');return {efforts,tiers}}
-function renderCapabilities(card,models,announce){const model=card.querySelector('[data-model]').value;const effort=card.querySelector('[data-effort]');const tier=card.querySelector('[data-tier]');const state=reconcileCapabilitySelection(models,model,effort.value,tier.value);const options=capabilityOptions(state);effort.innerHTML=options.efforts;effort.value=state.reasoning_value;effort.disabled=state.reasoning_disabled;tier.innerHTML=options.tiers;tier.value=state.service_tier_value;tier.disabled=state.service_tier_disabled;const feedback=card.querySelector('[data-capability-feedback]');if(announce||state.message)feedback.textContent=state.message||'Capabilities match the selected model.';return state}
+function options(items,current,inherit){let out=inherit?`<option value="">${esc(typeof inherit==='string'?inherit:'Provider default')}</option>`:'';for(const i of items||[])out+=`<option value="${esc(i.id)}" ${i.id===current?'selected':''}>${esc(i.display_name||i.id)}</option>`;if(current&&!Array.from(items||[]).some(i=>i&&i.id===current))out+=`<option value="${esc(current)}" selected>${esc(current)}</option>`;return out}
+ function capabilityOptions(state){const efforts=state.fixed_mode?`<option value="" selected>${esc(state.fixed_mode)} (fixed)</option>`:state.reasoning_efforts.length?state.reasoning_efforts.map(value=>`<option value="${esc(value)}" ${value===state.reasoning_value?'selected':''}>${esc(value)}</option>`).join(''):'<option value="">Capabilities unavailable</option>';const tiers='<option value="" '+(!state.service_tier_value?'selected':'')+'>Default / OFF</option>'+state.service_tiers.map(tier=>`<option value="${esc(tier.id)}" ${tier.id===state.service_tier_value?'selected':''}>${esc(tier.name||tier.id)}</option>`).join('');return {efforts,tiers}}
+function renderCapabilities(card,models,announce){const model=card.querySelector('[data-model]').value;const effort=card.querySelector('[data-effort]');const tier=card.querySelector('[data-tier]');const state=reconcileCapabilitySelection(models,model,effort.value,tier.value,card._providerCapabilities||{});const options=capabilityOptions(state);effort.innerHTML=options.efforts;effort.value=state.reasoning_value;effort.disabled=state.reasoning_disabled;tier.innerHTML=options.tiers;tier.value=state.service_tier_value;tier.disabled=state.service_tier_disabled;const feedback=card.querySelector('[data-capability-feedback]');if(announce||state.message)feedback.textContent=state.message||'Capabilities match the selected provider.';return state}
 const ROLE_NAMES=['orchestrator','architect','reviewer','executor'];
 function roleEditor(a){const assigned=new Set(a.roles||[]);return `<fieldset class="role-editor"><legend>Roles</legend><div class="role-options">${ROLE_NAMES.map(role=>`<label class="check"><input type="checkbox" data-role value="${role}" ${assigned.has(role)?'checked':''}>${role}</label>`).join('')}</div><small>Reviewer falls back to Architect when unassigned.</small></fieldset>`}
-function card(a){const model=a.configured.model||'';const state=reconcileCapabilitySelection(a.models,model,a.configured.reasoning_effort,a.configured.service_tier);const capabilityOptionsForCard=capabilityOptions(state);const usage=a.usage?.summary?.lifetimeTokens;const thread=a.thread;const isExecutor=(a.roles||[]).includes('executor');const backendOptions=isExecutor?`<option value="antigravity" selected>Antigravity / Gemini Executor</option>`:`<option value="app_server" ${a.backend==='app_server'?'selected':''}>App Server</option><option value="windows" ${a.backend==='windows'?'selected':''}>Native Windows TUI</option>`;return `<article class="card" data-account="${esc(a.name)}"><div class="card-head"><div><h3>${esc(a.label||a.name)}</h3><div class="sub">${esc(a.name)} · ${esc(a.backend)} · ${esc(a.codex_home)}</div><div class="sub">Roles: ${esc((a.roles||[]).join(', ')||'none')} · Login: ${esc(a.login)}</div></div>${pill(a.runtime_state)}</div><div class="control">${roleEditor(a)}<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite">No role changes yet.</span><button class="button secondary" data-roles-save>Apply roles</button></div></div><div class="grid"><div class="field"><label>Configured model</label><output>${esc(a.configured.model_label)}</output></div><div class="field"><label>Effective model</label><output>${esc(a.effective.model||'Unknown')}</output></div><div class="field"><label>Configured reasoning</label><output>${esc(a.configured.reasoning_effort)}</output></div><div class="field"><label>Effective reasoning</label><output>${esc(a.effective.reasoning_effort||'Unknown')}</output></div><div class="field"><label>Fast requested / tier</label><output>${esc(a.configured.service_tier||'OFF / default')}</output></div><div class="field"><label>Effective service tier</label><output>${esc(a.effective.service_tier||'Unknown')}</output></div></div><div class="control"><div class="field"><label>Save for future turns</label><select data-model>${options(a.models,model,true)}</select><small>Empty means inherit the installed Codex default. Current thread is not changed.</small></div><div class="grid"><div class="field"><label>Reasoning effort</label><select data-effort ${state.reasoning_disabled?'disabled':''}>${capabilityOptionsForCard.efforts}</select></div><div class="field"><label>Service tier / Fast</label><select data-tier ${state.service_tier_disabled?'disabled':''}>${capabilityOptionsForCard.tiers}</select></div><div class="field"><label>Backend</label><select data-backend ${isExecutor?'disabled':''}>${backendOptions}</select></div></div><div class="feedback" data-capability-feedback aria-live="polite">${esc(state.message||'Capabilities match the selected model.')}</div><div class="save-row"><span class="feedback" data-feedback>Settings are future-turn only.</span><button class="button" data-save>Save settings</button></div></div><div class="control"><div class="metric-label">Usage / rate-limit capacity</div><div class="bars">${(a.rate_limits||[]).map(bar).join('')||'<span class="hint">Not available</span>'}</div><div class="sub" style="margin-top:9px">Lifetime tokens: ${fmtTokens(usage)}</div>${thread?`<div class="thread"><div class="metric-label">Persistent thread</div><div class="value">${esc(thread.name||thread.id||'Unknown')}</div><div class="sub">${esc(thread.status||'Unknown')} · token usage ${a.token_usage?'available':'Not available'}</div></div>`:'<div class="thread sub">Persistent thread: Not available</div>'}</div>${a.last_error?`<div class="error">Telemetry: ${esc(a.last_error)}</div>`:''}</article>`}
-async function refresh(notice){const [s,as]=await Promise.all([get('/api/status'),get('/api/accounts')]);const healthy=as.accounts.some(a=>a.capabilities&&a.capabilities.app_server&&!a.last_error);$('#health').textContent=`App Server: ${healthy?'healthy':s.app_server_health}`;$('#summary').innerHTML=[['Dual Codex',s.dual_codex_version],['Codex CLI',s.codex_cli.version],['Repository',s.repository],['Git',s.git_state]].map(x=>`<div class="stat"><div class="label">${x[0]}</div><strong>${esc(x[1])}</strong></div>`).join('');$('#accounts').innerHTML=as.accounts.map(card).join('')||'<div class="empty">No accounts configured.</div>';$('#updated').textContent=`Updated ${new Date().toLocaleTimeString()}`;document.querySelectorAll('[data-model]').forEach(select=>select.addEventListener('change',()=>renderCapabilities(select.closest('.card'),as.accounts.find(account=>account.name===select.closest('.card').dataset.account)?.models||[],true)));document.querySelectorAll('[data-save]').forEach(btn=>btn.addEventListener('click',async()=>{const c=btn.closest('.card');const f=c.querySelector('[data-feedback]');f.textContent='Saving…';const body={model:c.querySelector('[data-model]').value,backend:c.querySelector('[data-backend]').value,scope:'future_turns'};const effort=c.querySelector('[data-effort]');const tier=c.querySelector('[data-tier]');if(!effort.disabled)body.reasoning_effort=effort.value;if(!tier.disabled)body.service_tier=tier.value;try{await get(`/api/accounts/${encodeURIComponent(c.dataset.account)}/settings`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});f.textContent='Saved for future turns; current thread unchanged.';await refresh()}catch(e){f.textContent=e.message}}));document.querySelectorAll('[data-roles-save]').forEach(btn=>btn.addEventListener('click',async()=>{const c=btn.closest('.card');const f=c.querySelector('[data-role-feedback]');const roles=[...c.querySelectorAll('[data-role]:checked')].map(input=>input.value);f.textContent='Applying…';try{await get('/api/roles/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:c.dataset.account,roles})});await refresh({account:c.dataset.account,message:'Roles updated'});const updated=document.querySelector(`[data-account="${c.dataset.account}"] [data-role-feedback]`);if(updated)updated.textContent='Roles updated';}catch(err){f.textContent=err.message}}))}
+function card(a){const model=a.configured.model||'';const providerCapabilities=a.capabilities||{};const state=reconcileCapabilitySelection(a.models,model,a.configured.reasoning_effort,a.configured.service_tier,providerCapabilities);const capabilityOptionsForCard=capabilityOptions(state);const usage=a.usage?.summary?.lifetimeTokens;const thread=a.thread;const isExecutor=(a.roles||[]).includes('executor');const backendOptions=isExecutor?`<option value="${esc(a.backend)}" selected>${esc(a.provider_label||a.backend)}</option>`:`<option value="app_server" ${a.backend==='app_server'?'selected':''}>Codex App Server</option><option value="windows" ${a.backend==='windows'?'selected':''}>Codex Native Windows TUI</option><option value="antigravity" ${a.backend==='antigravity'?'selected':''}>Antigravity / Gemini</option><option value="api" ${a.backend==='api'?'selected':''}>API / OpenAI-compatible</option>`;const defaultLabel=a.configured.model?'':(a.configured.model_label||'Provider default');return `<article class="card" data-account="${esc(a.name)}" data-provider="${esc(a.provider||'unknown')}"><div class="card-head"><div><h3>${esc(a.label||a.name)}</h3><div class="sub">${esc(a.name)} · ${esc(a.provider_label||a.backend)} · ${esc(a.codex_home)}</div><div class="sub">Roles: ${esc((a.roles||[]).join(', ')||'none')} · Runtime: ${esc(a.runtime_state)}</div></div>${pill(a.runtime_state)}</div><div class="control">${roleEditor(a)}<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite">No role changes yet.</span><button class="button secondary" data-roles-save>Apply roles</button></div></div><div class="grid"><div class="field"><label>Configured model</label><output>${esc(a.configured.model_label)}</output></div><div class="field"><label>Effective model</label><output>${esc(a.effective.model||'Unknown')}</output></div><div class="field"><label>Configured reasoning</label><output>${esc(a.configured.reasoning_effort||'Provider default')}</output></div><div class="field"><label>Effective reasoning</label><output>${esc(a.effective.reasoning_effort||'Unknown')}</output></div><div class="field"><label>Fast requested / tier</label><output>${esc(a.configured.service_tier||'OFF / default')}</output></div><div class="field"><label>Effective service tier</label><output>${esc(a.effective.service_tier||'Unknown')}</output></div></div><div class="control"><div class="field"><label>Save for future turns</label><select data-model>${options(a.models,model,defaultLabel||'Provider default')}</select><small>Empty means inherit the selected provider default. Current thread is not changed.</small></div><div class="grid"><div class="field"><label>Reasoning / effort</label><select data-effort ${state.reasoning_disabled?'disabled':''}>${capabilityOptionsForCard.efforts}</select></div><div class="field"><label>Service tier / Fast</label><select data-tier ${state.service_tier_disabled?'disabled':''}>${capabilityOptionsForCard.tiers}</select></div><div class="field"><label>Backend / provider</label><select data-backend ${isExecutor?'disabled':''}>${backendOptions}</select></div></div><div class="feedback" data-capability-feedback aria-live="polite">${esc(state.message||'Capabilities match the selected provider.')}</div><div class="save-row"><span class="feedback" data-feedback>Settings are future-turn only.</span><button class="button" data-save>Save settings</button></div></div><div class="control"><div class="metric-label">Usage / rate-limit capacity</div><div class="bars">${(a.rate_limits||[]).map(bar).join('')||'<span class="hint">Not available</span>'}</div><div class="sub" style="margin-top:9px">Lifetime tokens: ${fmtTokens(usage)}</div>${thread?`<div class="thread"><div class="metric-label">Persistent thread</div><div class="value">${esc(thread.name||thread.id||'Unknown')}</div><div class="sub">${esc(thread.status||'Unknown')} · token usage ${a.token_usage?'available':'Not available'}</div></div>`:'<div class="thread sub">Persistent thread: Not available</div>'}</div>${a.profile?.isolation_note?`<div class="hint">${esc(a.profile.isolation_note)}</div>`:''}${a.last_error?`<div class="error">Provider: ${esc(a.last_error)}</div>`:''}</article>`}
+ async function refresh(notice){const [s,as]=await Promise.all([get('/api/status'),get('/api/accounts')]);const healthy=as.accounts.some(a=>a.capabilities&&((a.capabilities.app_server&&!a.last_error)||a.runtime_state==='Connected'||a.runtime_state==='Configured'));$('#health').textContent=`Providers: ${healthy?'available':s.app_server_health}`;$('#summary').innerHTML=[['Dual Agents',s.dual_codex_version],['Codex CLI',s.codex_cli.version],['Repository',s.repository],['Git',s.git_state]].map(x=>`<div class="stat"><div class="label">${x[0]}</div><strong>${esc(x[1])}</strong></div>`).join('');renderProfiles(as.accounts);$('#accounts').innerHTML=as.accounts.map(card).join('')||'<div class="empty">No profiles configured.</div>';document.querySelectorAll('.card[data-account]').forEach(node=>{const account=as.accounts.find(row=>row.name===node.dataset.account);node._providerCapabilities=account?.capabilities||{};node._providerModels=account?.models||[];});$('#updated').textContent=`Updated ${new Date().toLocaleTimeString()}`;bindProfileManager();document.querySelectorAll('[data-model]').forEach(select=>select.addEventListener('change',()=>renderCapabilities(select.closest('.card'),select.closest('.card')._providerModels||[],true)));document.querySelectorAll('[data-backend]').forEach(select=>select.addEventListener('change',()=>{const card=select.closest('.card');const account=as.accounts.find(row=>row.name===card.dataset.account);if(account){card._providerCapabilities=account.capabilities||{};card._providerModels=account.models||[];renderCapabilities(card,card._providerModels,true)}}));document.querySelectorAll('[data-save]').forEach(btn=>btn.addEventListener('click',async()=>{const c=btn.closest('.card');const f=c.querySelector('[data-feedback]');f.textContent='Saving…';const body={model:c.querySelector('[data-model]').value,backend:c.querySelector('[data-backend]').value,scope:'future_turns'};const effort=c.querySelector('[data-effort]');const tier=c.querySelector('[data-tier]');if(effort.disabled){const selected=(c._providerModels||[]).find(row=>row&&row.id===body.model);if(selected&&selected.fixed_mode)body.reasoning_effort='';}else body.reasoning_effort=effort.value;if(!tier.disabled)body.service_tier=tier.value;try{await get(`/api/accounts/${encodeURIComponent(c.dataset.account)}/settings`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});f.textContent='Saved for future turns; current thread unchanged.';await refresh()}catch(e){f.textContent=e.message}}));document.querySelectorAll('[data-roles-save]').forEach(btn=>btn.addEventListener('click',async()=>{const c=btn.closest('.card');const f=c.querySelector('[data-role-feedback]');const roles=[...c.querySelectorAll('[data-role]:checked')].map(input=>input.value);f.textContent='Applying…';try{await get('/api/roles/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:c.dataset.account,roles})});await refresh({account:c.dataset.account,message:'Roles updated'});const updated=document.querySelector(`[data-account="${c.dataset.account}"] [data-role-feedback]`);if(updated)updated.textContent='Roles updated';}catch(err){f.textContent=err.message}}))}
 $('#refresh').addEventListener('click',()=>refresh().catch(e=>$('#accounts').innerHTML=`<div class="empty">${esc(e.message)}</div>`));refresh().catch(e=>{$('#health').textContent='Unavailable';$('#accounts').innerHTML=`<div class="empty">${esc(e.message)}</div>`});"""
 
 LIVE_EXECUTOR_SCRIPT = """const EXECUTOR_MAX_ROWS=128;const executorLive={rows:[],cursor:0,snapshot:null,tab:'activity',source:null,reconnect:null,paused:false,follow:true,clearedAt:null,startedAt:null,endedAt:null,connection:'Waiting for an Executor run.'};const executorText=(value,fallback='Unknown')=>value==null||value===''?fallback:String(value);const executorObject=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};const executorNumber=value=>Number.isFinite(Number(value))?Number(value):null;function executorSet(id,value){const node=document.getElementById(id);if(node)node.textContent=executorText(value)}function executorDate(value){const time=Date.parse(value||'');return Number.isFinite(time)?time:null}function executorDuration(start,end){if(start==null)return 'Unknown';const seconds=Math.max(0,Math.floor((end-start)/1000));if(seconds<60)return `${seconds}s`;if(seconds<3600)return `${Math.floor(seconds/60)}m ${seconds%60}s`;return `${Math.floor(seconds/3600)}h ${Math.floor(seconds%3600/60)}m`}function executorDetailText(event){const detail=executorObject(event&&event.detail);if(typeof event?.detail==='string'&&event.detail)return event.detail;for(const key of ['text','output','stdout','stderr','delta','chunk','message','command','path','diff','patch'])if(typeof detail[key]==='string'&&detail[key])return detail[key];return executorText(event&&event.method,'Observed event')}function executorBucket(event){if(!event)return 'activity';if(event.kind==='command_execution')return 'commands';if(event.kind==='file_change')return 'files';const method=executorText(event.method,'').toLowerCase();const detail=executorObject(event.detail);return method.includes('diff')||method.includes('patch')||typeof detail.diff==='string'||typeof detail.patch==='string'?'diffs':'activity'}function executorTokenText(value){const usage=executorObject(value);const total=executorNumber(usage.total);const last=executorNumber(usage.last);if(total==null&&last==null)return 'Unknown';const parts=[];if(total!=null)parts.push(`total ${total.toLocaleString()}`);if(last!=null)parts.push(`last ${last.toLocaleString()}`);return parts.join(' · ')}function executorPlanText(value){if(value==null||value==='')return 'Unknown / Not available';if(typeof value==='string')return value;try{const text=JSON.stringify(value,null,2);return text==='{}'||text==='[]'?'Unknown / Not available':text}catch(_){return 'Unknown / Not available'}}function executorUpdateMetaFromEvent(event){const next=Object.assign({},executorLive.snapshot||{});const detail=executorObject(event.detail);const turn=executorObject(detail.turn);for(const [field,keys] of Object.entries({model:['model'],reasoning_effort:['reasoningEffort','reasoning_effort'],service_tier:['serviceTier','service_tier','tier']})){if(!next[field])for(const source of [turn,detail])for(const key of keys)if(typeof source[key]==='string'&&source[key]){next[field]=source[key];break}}if(!next.thread_id&&event.thread_id)next.thread_id=event.thread_id;if(!next.turn_id&&event.turn_id)next.turn_id=event.turn_id;if(!next.plan&&detail.plan!=null)next.plan=detail.plan;if(event.kind==='token_usage'&&detail.tokenUsage)next.token_usage=detail.tokenUsage;executorLive.snapshot=next}function executorRenderMeta(){const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();executorSet('executor-state',state);const stateNode=document.getElementById('executor-state');if(stateNode)stateNode.dataset.state=state;executorSet('executor-model',snapshot.model);executorSet('executor-reasoning',snapshot.reasoning_effort);executorSet('executor-tier',snapshot.service_tier);const thread=executorText(snapshot.thread_id);const turn=executorText(snapshot.turn_id);executorSet('executor-thread',`${thread} / ${turn}`);executorSet('executor-tokens',executorTokenText(snapshot.token_usage));executorSet('executor-plan-content',executorPlanText(snapshot.plan));executorSet('executor-elapsed',executorDuration(executorLive.startedAt,executorLive.endedAt||Date.now()));executorSet('executor-status',`${state} · ${executorLive.connection}`)}function executorVisibleRows(){if(executorLive.tab==='activity')return executorLive.rows;if(executorLive.tab==='commands')return executorLive.rows.filter(event=>executorBucket(event)==='commands');if(executorLive.tab==='files')return executorLive.rows.filter(event=>executorBucket(event)==='files');return executorLive.rows.filter(event=>executorBucket(event)==='diffs')}function executorRenderRows(){const feed=document.getElementById('executor-feed');if(!feed)return;const rows=executorVisibleRows();const fragment=document.createDocumentFragment();if(!rows.length){const empty=document.createElement('div');empty.className='executor-empty';empty.textContent=executorLive.tab==='activity'?'No Executor activity yet.':`No ${executorLive.tab} evidence available.`;fragment.appendChild(empty)}else for(const event of rows){const row=document.createElement('div');row.className='executor-row';const timestamp=document.createElement('time');timestamp.className='executor-time';timestamp.textContent=executorText(event.timestamp);const kind=document.createElement('span');kind.className='executor-kind';kind.textContent=`${executorText(event.kind,'notification')} / ${executorText(event.state,'observed')}`;const message=document.createElement('span');message.className='executor-message';message.textContent=executorDetailText(event);row.append(timestamp,kind,message);fragment.appendChild(row)}feed.replaceChildren(fragment);if(executorLive.follow&&!executorLive.paused)feed.scrollTop=feed.scrollHeight}function executorRender(){executorRenderMeta();executorRenderRows()}function executorRememberTimes(){const starts=executorLive.rows.filter(event=>event.kind==='turn'&&event.state==='started').map(event=>executorDate(event.timestamp)).filter(value=>value!=null);if(starts.length&&!executorLive.startedAt)executorLive.startedAt=Math.min(...starts);const last=executorLive.rows[executorLive.rows.length-1];const state=executorText(executorLive.snapshot?.state,'IDLE').toUpperCase();if(last&&(state==='COMPLETE'||state==='FAILED'))executorLive.endedAt=executorDate(last.timestamp)||executorLive.endedAt}function executorSetSnapshot(value){const snapshot=executorObject(value);executorLive.snapshot=snapshot;executorLive.cursor=Math.max(executorLive.cursor,executorNumber(snapshot.cursor)||0);if(executorLive.clearedAt==null)executorLive.rows=Array.isArray(snapshot.events)?snapshot.events.slice(-EXECUTOR_MAX_ROWS):[];executorRememberTimes();executorRender()}function executorAddEvent(value,eventName){const event=executorObject(value);const sequence=executorNumber(event.sequence);if(sequence==null||sequence<=executorLive.cursor)return;executorLive.cursor=sequence;executorUpdateMetaFromEvent(event);if(executorLive.clearedAt==null||sequence>executorLive.clearedAt){executorLive.rows.push(event);executorLive.rows=executorLive.rows.slice(-EXECUTOR_MAX_ROWS)}const state=eventName==='failed'||event.kind==='error'||['failed','failure','error'].includes(event.state)?'FAILED':eventName==='complete'||event.kind==='turn'&&['completed','complete'].includes(event.state)?'COMPLETE':event.kind==='turn'&&event.state==='started'?'WORKING':executorText(executorLive.snapshot?.state,'IDLE').toUpperCase();executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{cursor:sequence,state});if(event.kind==='turn'&&event.state==='started'&&!executorLive.startedAt)executorLive.startedAt=executorDate(event.timestamp);if(state==='COMPLETE'||state==='FAILED')executorLive.endedAt=executorDate(event.timestamp)||executorLive.endedAt;executorRender()}function executorConnect(){if(typeof EventSource==='undefined'){executorLive.connection='Live stream is not supported by this browser.';executorRenderMeta();return}if(executorLive.source)executorLive.source.close();const source=new EventSource(`/api/live-executor/events?cursor=${encodeURIComponent(String(executorLive.cursor))}`);executorLive.source=source;source.onopen=()=>{executorLive.connection=`Live stream connected · cursor ${executorLive.cursor}`;executorRenderMeta()};source.addEventListener('snapshot',event=>{try{executorSetSnapshot(JSON.parse(event.data));executorLive.connection=`Live stream connected · cursor ${executorLive.cursor}`;executorRenderMeta()}catch(_){executorLive.connection='Invalid live snapshot received.';executorRenderMeta()}});for(const name of ['live','complete','failed'])source.addEventListener(name,event=>{try{executorAddEvent(JSON.parse(event.data),name);executorLive.connection=`Live stream connected · cursor ${executorLive.cursor}`;executorRenderMeta()}catch(_){executorLive.connection='Invalid live event received.';executorRenderMeta()}});source.onerror=()=>{if(executorLive.source!==source)return;source.close();executorLive.source=null;executorLive.connection='Live stream disconnected; reconnecting.';executorRenderMeta();if(executorLive.reconnect==null)executorLive.reconnect=setTimeout(()=>{executorLive.reconnect=null;executorConnect()},1000)}}function executorShowView(target){document.querySelectorAll('[data-account-view]').forEach(node=>{node.hidden=target!=='accounts'});const view=document.getElementById('executor-view');if(view)view.hidden=target!=='executor';document.querySelectorAll('[data-view-target]').forEach(button=>{const active=button.dataset.viewTarget===target;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active))});if(target==='executor'&&!executorLive.source)executorConnect()}document.querySelectorAll('[data-view-target]').forEach(button=>button.addEventListener('click',()=>executorShowView(button.dataset.viewTarget)));document.querySelectorAll('[data-executor-tab]').forEach(button=>button.addEventListener('click',()=>{executorLive.tab=button.dataset.executorTab;document.querySelectorAll('[data-executor-tab]').forEach(tab=>{const active=tab===button;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active))});executorRenderRows()}));document.getElementById('executor-follow')?.addEventListener('change',event=>{executorLive.follow=event.target.checked;if(executorLive.follow)executorRenderRows()});document.getElementById('executor-pause')?.addEventListener('click',event=>{executorLive.paused=!executorLive.paused;event.currentTarget.textContent=executorLive.paused?'Resume':'Pause';if(!executorLive.paused){executorLive.follow=true;const follow=document.getElementById('executor-follow');if(follow)follow.checked=true;executorRenderRows()}});document.getElementById('executor-clear')?.addEventListener('click',()=>{executorLive.rows=[];executorLive.clearedAt=executorLive.cursor;executorLive.connection='View cleared; server history retained.';executorRender()});setInterval(executorRenderMeta,1000);executorRender();"""
+SCRIPT += """function profileValue(value){return value==null?'':String(value)}function profileCard(a){const p=a.profile||{};const actions=Array.isArray(p.auth_actions)?p.auth_actions:[];const buttons=actions.filter(action=>action!=='status').map(action=>`<button class=\"button secondary\" data-profile-auth=\"${esc(action)}\" data-profile-id=\"${esc(a.name)}\">${action==='reauthenticate'?'Re-authenticate':action[0].toUpperCase()+action.slice(1)}</button>`).join('');const statusButton=actions.includes('status')?`<button class=\"button secondary\" data-profile-auth=\"status\" data-profile-id=\"${esc(a.name)}\">Check status</button>`:'';const removeDisabled=(a.roles||[]).length?'disabled':'';return `<article class=\"profile-row\" data-profile-row=\"${esc(a.name)}\"><h3>${esc(p.display_name||a.label||a.name)} ${pill(p.auth_status||a.login)}</h3><div class=\"profile-meta\"><span>ID: ${esc(a.name)}</span><span>Provider: ${esc(p.provider_label||a.provider_label||a.backend)}</span><span>State root: ${esc(p.state_root||a.codex_home)}</span><span>Enabled: ${esc(a.enabled?'yes':'no')} · Auth: ${esc(p.auth_status||a.auth_status||a.login)}</span><span>Roles: ${esc((a.roles||[]).join(', ')||'none')}</span></div><input data-profile-label-edit value=\"${esc(profileValue(p.display_name||a.label||a.name))}\" aria-label=\"Display name for ${esc(a.name)}\"><div class=\"profile-actions\"><button class=\"button\" data-profile-label-save data-profile-id=\"${esc(a.name)}\">Save name</button><button class=\"button secondary\" data-profile-enabled data-profile-id=\"${esc(a.name)}\">${a.enabled?'Disable':'Enable'}</button>${statusButton}${buttons}<button class=\"button secondary\" data-profile-remove data-profile-id=\"${esc(a.name)}\" ${removeDisabled}>Remove metadata</button></div>${p.isolation_note?`<div class=\"profile-note\">${esc(p.isolation_note)}</div>`:''}<div class=\"feedback\" data-profile-row-feedback aria-live=\"polite\"></div></article>`}function renderProfiles(accounts){const target=document.getElementById('profiles');if(target)target.innerHTML=(accounts||[]).map(profileCard).join('')||'<div class=\"empty\">No profiles configured.</div>'}function profileBackendFields(){const backend=document.querySelector('[data-profile-backend]');const api=backend&&backend.value==='api';document.querySelectorAll('[data-profile-api-field]').forEach(node=>{node.hidden=!api})}function bindProfileManager(){const add=document.getElementById('add-profile');const form=document.getElementById('profile-form');const cancel=document.getElementById('cancel-profile');const save=document.getElementById('save-profile');const backend=document.querySelector('[data-profile-backend]');if(add&&form)add.onclick=()=>{form.hidden=false;document.querySelector('[data-profile-label]')?.focus()};if(cancel&&form)cancel.onclick=()=>{form.hidden=true};if(backend)backend.onchange=profileBackendFields;profileBackendFields();if(save&&form)save.onclick=async()=>{const feedback=document.querySelector('[data-profile-feedback]');const label=document.querySelector('[data-profile-label]')?.value.trim()||'';if(!label){feedback.textContent='Display name is required.';return}const body={label,backend:backend?.value||'windows',model:document.querySelector('[data-profile-model]')?.value||'',reasoning_effort:document.querySelector('[data-profile-effort]')?.value||'',enabled:Boolean(document.querySelector('[data-profile-enabled]')?.checked)};const name=document.querySelector('[data-profile-name]')?.value.trim();const home=document.querySelector('[data-profile-home]')?.value.trim();if(name)body.name=name;if(home)body.codex_home=home;if(body.backend==='api'){body.base_url=document.querySelector('[data-profile-base-url]')?.value.trim()||'';body.auth_reference=document.querySelector('[data-profile-auth-reference]')?.value.trim()||''}feedback.textContent='Saving…';try{await get('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});form.hidden=true;feedback.textContent='Profile saved.';await refresh()}catch(error){feedback.textContent=error.message||'Profile save failed.'}};document.querySelectorAll('[data-profile-label-save]').forEach(button=>button.onclick=async()=>{const row=button.closest('[data-profile-row]');const feedback=row?.querySelector('[data-profile-row-feedback]');const label=row?.querySelector('[data-profile-label-edit]')?.value.trim()||'';feedback.textContent='Saving…';try{await get(`/api/accounts/${encodeURIComponent(button.dataset.profileId)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({label})});await refresh()}catch(error){feedback.textContent=error.message||'Profile update failed.'}});document.querySelectorAll('[data-profile-enabled]').forEach(button=>button.onclick=async()=>{const row=button.closest('[data-profile-row]');const feedback=row?.querySelector('[data-profile-row-feedback]');const enabled=button.textContent.trim()!=='Enable';feedback.textContent='Saving…';try{await get(`/api/accounts/${encodeURIComponent(button.dataset.profileId)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});await refresh()}catch(error){feedback.textContent=error.message||'Profile update failed.'}});document.querySelectorAll('[data-profile-remove]').forEach(button=>button.onclick=async()=>{if(button.disabled||!window.confirm('Remove profile metadata? Provider-native state will be retained.'))return;const row=button.closest('[data-profile-row]');const feedback=row?.querySelector('[data-profile-row-feedback]');feedback.textContent='Removing…';try{await get(`/api/accounts/${encodeURIComponent(button.dataset.profileId)}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:true})});await refresh()}catch(error){feedback.textContent=error.message||'Profile removal failed.'}});document.querySelectorAll('[data-profile-auth]').forEach(button=>button.onclick=async()=>{const action=button.dataset.profileAuth;if(action==='logout'&&!window.confirm('Log out this provider profile?'))return;const row=button.closest('[data-profile-row]');const feedback=row?.querySelector('[data-profile-row-feedback]');feedback.textContent='Working…';try{const payload=await get(`/api/accounts/${encodeURIComponent(button.dataset.profileId)}/auth`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,confirm:action==='logout'})});feedback.textContent=payload.message||payload.status||'Authentication status updated.';if(action!=='authenticate'&&action!=='reauthenticate')await refresh()}catch(error){feedback.textContent=error.message||'Authentication action failed.'}})}"""
 SCRIPT += LIVE_EXECUTOR_SCRIPT
 SCRIPT += """const executorAddEventFromStream=executorAddEvent;executorAddEvent=(value,eventName)=>{const payload=executorObject(value);if((eventName==='complete'||eventName==='failed')&&payload.sequence==null&&payload.cursor!=null&&Array.isArray(payload.events)){executorSetSnapshot(payload);return}executorAddEventFromStream(value,eventName)};"""
+SCRIPT += """document.addEventListener('change',event=>{const target=event.target;if(!(target instanceof HTMLSelectElement))return;const card=target.closest('.card[data-account]');if(!card)return;if(target.matches('[data-model]')&&card._providerModels){renderCapabilities(card,card._providerModels,true);return}if(!target.matches('[data-backend]'))return;const feedback=card.querySelector('[data-capability-feedback]');feedback.textContent='Loading provider capabilities…';get(`/api/accounts/${encodeURIComponent(card.dataset.account)}/models?backend=${encodeURIComponent(target.value)}`).then(payload=>{card._providerCapabilities=payload.capabilities||{};card._providerModels=payload.models||[];const model=card.querySelector('[data-model]');if(model){model.innerHTML=options(card._providerModels,'',payload.provider_label?`${payload.provider_label} default`:'Provider default');model.value=''}renderCapabilities(card,card._providerModels,true)}).catch(error=>{feedback.textContent=error.message||'Capabilities unavailable for this provider.'})});"""
+SCRIPT += """const dashboardFetch=window.fetch.bind(window);window.fetch=(input,init)=>{if(typeof input==='string'&&input==='/api/accounts')input='/api/accounts?refresh=1';return dashboardFetch(input,init)};"""
 SCRIPT += """const executorTokenAmount=value=>{const direct=executorNumber(value);if(direct!=null)return direct;const object=executorObject(value);for(const key of ['totalTokens','total_tokens','tokens','value']){const amount=executorNumber(object[key]);if(amount!=null)return amount}return null};executorTokenText=value=>{const usage=executorObject(value);const total=executorTokenAmount(usage.totalTokens??usage.total??usage.tokens);const last=executorTokenAmount(usage.lastTokens??usage.last??usage.recent);if(total==null&&last==null)return 'Unknown';const parts=[];if(total!=null)parts.push(`total ${total.toLocaleString()}`);if(last!=null)parts.push(`last ${last.toLocaleString()}`);return parts.join(' · ')};const executorRenderMetaFromSnapshot=executorRenderMeta;executorRenderMeta=()=>{const snapshot=executorLive.snapshot||{};const started=executorDate(snapshot.started_at);const completed=executorDate(snapshot.completed_at);if(started!=null)executorLive.startedAt=started;if(completed!=null)executorLive.endedAt=completed;else if(executorText(snapshot.state,'IDLE').toUpperCase()==='WORKING')executorLive.endedAt=null;executorRenderMetaFromSnapshot()};const executorAddEventWithTimes=executorAddEvent;executorAddEvent=(value,eventName)=>{const event=executorObject(value);if(event.kind==='turn'&&event.state==='started'){executorLive.startedAt=executorDate(event.timestamp);executorLive.endedAt=null;if(executorLive.snapshot)executorLive.snapshot=Object.assign({},executorLive.snapshot,{started_at:event.timestamp,completed_at:null})}executorAddEventWithTimes(value,eventName)};"""
 SCRIPT += """function executorSyncServerTimes(){const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();const started=executorDate(snapshot.started_at);const ended=executorDate(snapshot.ended_at||snapshot.completed_at);if(started!=null)executorLive.startedAt=started;if(state==='WORKING')executorLive.endedAt=null;else if(ended!=null)executorLive.endedAt=ended;else if(executorLive.startedAt!=null&&Number.isFinite(Number(snapshot.elapsed_seconds)))executorLive.endedAt=executorLive.startedAt+Math.max(0,Number(snapshot.elapsed_seconds))*1000}const executorRenderMetaServerTruthBase=executorRenderMeta;executorRenderMeta=()=>{executorSyncServerTimes();executorRenderMetaServerTruthBase();const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();const reason=['STALE','DISCONNECTED'].includes(state)?executorText(snapshot.stale_reason,'Executor activity is no longer live.'):'';const status=document.getElementById('executor-status');if(status)status.textContent=`${state} · ${reason||executorLive.connection}`};const executorSetSnapshotServerTruthBase=executorSetSnapshot;executorSetSnapshot=value=>{executorSetSnapshotServerTruthBase(value);executorSyncServerTimes();executorRenderMeta()};function executorRecordLateEvent(event){const sequence=executorNumber(event.sequence);if(sequence==null||sequence<=executorLive.cursor)return;executorLive.cursor=sequence;executorUpdateMetaFromEvent(event);if(executorLive.clearedAt==null||sequence>executorLive.clearedAt){executorLive.rows.push(event);executorLive.rows=executorLive.rows.slice(-EXECUTOR_MAX_ROWS)}executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{cursor:sequence});executorRender()}const executorAddEventServerTruthBase=executorAddEvent;executorAddEvent=(value,eventName)=>{const event=executorObject(value);const snapshot=executorLive.snapshot||{};const currentState=executorText(snapshot.state,'IDLE').toUpperCase();const sameRun=!event.run_id||!snapshot.run_id||event.run_id===snapshot.run_id;if(['COMPLETE','FAILED','STALE','DISCONNECTED'].includes(currentState)&&sameRun&&event.kind==='turn'&&event.state==='started'){executorRecordLateEvent(event);return}if(event.run_id&&snapshot.run_id&&event.run_id!==snapshot.run_id){executorLive.snapshot=Object.assign({},snapshot,{run_id:event.run_id,request_id:event.request_id||null,state:'IDLE',started_at:null,ended_at:null,completed_at:null,elapsed_seconds:null});executorLive.startedAt=null;executorLive.endedAt=null}executorAddEventServerTruthBase(value,eventName);if(event.kind==='run'&&['completed','complete','failed','failure','cancelled','canceled'].includes(event.state)){const terminalState=['completed','complete'].includes(event.state)?'COMPLETE':'FAILED';const detail=executorObject(event.detail);const ended=executorDate(detail.ended_at)||executorDate(event.timestamp);const started=executorDate(detail.started_at);executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{state:terminalState,started_at:started==null?executorLive.snapshot?.started_at:detail.started_at,ended_at:detail.ended_at||executorLive.snapshot?.ended_at||event.timestamp,completed_at:ended==null?executorLive.snapshot?.completed_at:event.timestamp});if(started!=null)executorLive.startedAt=started;if(ended!=null)executorLive.endedAt=ended}executorSyncServerTimes();executorRenderMeta()};setInterval(()=>{const state=executorText(executorLive.snapshot?.state,'IDLE').toUpperCase();if(state!=='WORKING')executorRenderMeta()},1000);"""
 
@@ -702,7 +1177,11 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, service.status())
                 return
             if method == "GET" and path == "/api/accounts":
-                self._send(200, {"schema_version": 1, "accounts": service.accounts()})
+                refresh = urllib.parse.parse_qs(parsed.query).get("refresh", ["0"])[0].casefold() in {"1", "true", "yes"}
+                self._send(200, {"schema_version": 1, "accounts": service.accounts(force=refresh)})
+                return
+            if method == "POST" and path == "/api/accounts":
+                self._send(201, service.create_profile(self._body()))
                 return
             if method == "GET" and path == "/api/live-executor":
                 self._send(200, service.live_executor_snapshot())
@@ -715,13 +1194,26 @@ class _Handler(BaseHTTPRequestHandler):
                 name, suffix = match.groups()
                 validate_account_name(name)
                 if method == "GET" and suffix == "models":
-                    self._send(200, service.models(name))
+                    requested_backend = urllib.parse.parse_qs(parsed.query).get("backend", [None])[0]
+                    self._send(200, service.models(name, requested_backend))
                     return
                 if method == "GET" and suffix == "usage":
                     self._send(200, service.usage(name))
                     return
+                if method == "GET" and suffix == "auth":
+                    self._send(200, service.auth_status(name))
+                    return
                 if method in {"POST", "PATCH"} and suffix == "settings":
                     self._send(200, service.save_settings(name, self._body()))
+                    return
+                if method == "POST" and suffix == "auth":
+                    self._send(200, service.auth_action(name, self._body()))
+                    return
+                if method == "PATCH" and suffix is None:
+                    self._send(200, service.update_profile(name, self._body()))
+                    return
+                if method == "DELETE" and suffix is None:
+                    self._send(200, service.remove_profile(name, self._body()))
                     return
             if method == "POST" and path == "/api/roles/assign":
                 self._send(200, service.assign(self._body()))
@@ -743,6 +1235,9 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_PATCH(self) -> None:
         self._dispatch("PATCH")
+
+    def do_DELETE(self) -> None:
+        self._dispatch("DELETE")
 
 
 class _HTTPServer(ThreadingHTTPServer):

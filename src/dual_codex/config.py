@@ -8,10 +8,15 @@ import tomllib
 
 
 SUPPORTED_ROLES = ("orchestrator", "architect", "reviewer", "executor")
-SUPPORTED_BACKENDS = ("app_server", "windows", "antigravity")
+SUPPORTED_BACKENDS = ("app_server", "windows", "antigravity", "api")
+SUPPORTED_PROVIDER_TYPES = ("codex", "gemini", "api")
+SUPPORTED_ADAPTER_TYPES = ("codex_cli", "antigravity_cli", "openai_compatible")
+SUPPORTED_AUTH_MODES = ("provider_native", "environment", "none")
 _ACCOUNT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 _ROLE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 _SETTING_VALUE = re.compile(r"^[^\x00-\x1f\x7f]{0,200}$")
+_ENV_REFERENCE = re.compile(r"^env:[A-Za-z_][A-Za-z0-9_]*$")
+_ANTIGRAVITY_VARIANT = re.compile(r"^(?P<base>.+)-(?P<variant>low|medium|high|thinking)$", re.IGNORECASE)
 
 
 class ConfigError(ValueError):
@@ -25,9 +30,20 @@ class AccountConfig:
     codex_home: Path
     model: str
     reasoning_effort: str
+    runtime_model: str = ""
+    fixed_mode: str = ""
     backend: str = "windows"
     service_tier: str = ""
     network_access: bool = False
+    provider_type: str = "codex"
+    adapter_type: str = "codex_cli"
+    auth_mode: str = "provider_native"
+    auth_reference: str = ""
+    state_root: Path | None = None
+    base_url: str = ""
+    available_models: tuple[str, ...] = ()
+    supported_reasoning_efforts: tuple[str, ...] = ()
+    enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -36,11 +52,22 @@ class AgentConfig:
     model: str
     reasoning_effort: str
     sandbox: str
+    runtime_model: str = ""
+    fixed_mode: str = ""
     account_name: str = ""
     label: str = ""
     backend: str = "windows"
     service_tier: str = ""
     network_access: bool = False
+    provider_type: str = "codex"
+    adapter_type: str = "codex_cli"
+    auth_mode: str = "provider_native"
+    auth_reference: str = ""
+    state_root: Path | None = None
+    base_url: str = ""
+    available_models: tuple[str, ...] = ()
+    supported_reasoning_efforts: tuple[str, ...] = ()
+    enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -87,6 +114,8 @@ class OrchestratorConfig:
             raise ConfigError(
                 f"Role '{role}' refers to unknown account '{account_name}'."
             )
+        if not account.enabled:
+            raise ConfigError(f"Role '{role}' refers to disabled account '{account_name}'.")
         return account
 
     def agent_for_role(self, role: str) -> AgentConfig:
@@ -97,11 +126,22 @@ class OrchestratorConfig:
             model=account.model,
             reasoning_effort=account.reasoning_effort,
             sandbox=sandbox,
+            runtime_model=account.runtime_model,
+            fixed_mode=account.fixed_mode,
             account_name=account.name,
             label=account.label,
             backend=account.backend,
             service_tier=account.service_tier,
             network_access=account.network_access,
+            provider_type=account.provider_type,
+            adapter_type=account.adapter_type,
+            auth_mode=account.auth_mode,
+            auth_reference=account.auth_reference,
+            state_root=account.state_root,
+            base_url=account.base_url,
+            available_models=account.available_models,
+            supported_reasoning_efforts=account.supported_reasoning_efforts,
+            enabled=account.enabled,
         )
 
 
@@ -136,15 +176,46 @@ def validate_setting_value(value: str, field: str) -> str:
     return value
 
 
+def validate_auth_reference(value: str) -> str:
+    value = validate_setting_value(value, "auth_reference")
+    if value and not _ENV_REFERENCE.fullmatch(value):
+        raise ConfigError("API credentials must use an env:VARIABLE reference.")
+    return value
+
+
+def normalize_antigravity_model_reference(
+    model: str,
+    reasoning_effort: str,
+    runtime_model: str = "",
+    fixed_mode: str = "",
+) -> tuple[str, str, str, str]:
+    """Migrate a combined agy model slug without guessing provider metadata."""
+    selected = str(model or "").strip()
+    runtime = str(runtime_model or "").strip() or selected
+    effort = str(reasoning_effort or "").strip()
+    fixed = str(fixed_mode or "").strip()
+    match = _ANTIGRAVITY_VARIANT.fullmatch(selected) if selected else None
+    if match:
+        selected = match.group("base")
+        runtime = runtime or str(model).strip()
+        variant = match.group("variant").lower()
+        if variant in {"low", "medium", "high"}:
+            effort = variant
+        if variant == "thinking":
+            effort = ""
+            fixed = fixed or "Thinking"
+    return selected, effort, runtime, fixed
+
+
 def _path(raw: Any, base: Path) -> Path:
     value = Path(str(raw)).expanduser()
     return value if value.is_absolute() else (base / value).resolve()
 
 
 def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
-    if "codex_home" not in raw:
-        raise ConfigError(f"Account '{name}' is missing codex_home.")
     backend = str(raw.get("backend", "windows")).strip() or "windows"
+    if "codex_home" not in raw and backend != "api":
+        raise ConfigError(f"Account '{name}' is missing codex_home.")
     if backend not in SUPPORTED_BACKENDS:
         raise ConfigError(
             f"Account '{name}' has unsupported backend '{backend}'. "
@@ -153,15 +224,64 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
     network_access = raw.get("network_access", False)
     if not isinstance(network_access, bool):
         raise ConfigError(f"Account '{name}' network_access must be a boolean.")
+    enabled = raw.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise ConfigError(f"Account '{name}' enabled must be a boolean.")
+    default_provider = "gemini" if backend == "antigravity" else "api" if backend == "api" else "codex"
+    default_adapter = "antigravity_cli" if backend == "antigravity" else "openai_compatible" if backend == "api" else "codex_cli"
+    provider_type = str(raw.get("provider_type", default_provider)).strip() or default_provider
+    adapter_type = str(raw.get("adapter_type", default_adapter)).strip() or default_adapter
+    auth_mode = str(raw.get("auth_mode", "environment" if backend == "api" else "provider_native")).strip() or "provider_native"
+    if provider_type not in SUPPORTED_PROVIDER_TYPES:
+        raise ConfigError(f"Account '{name}' has unsupported provider_type '{provider_type}'.")
+    if adapter_type not in SUPPORTED_ADAPTER_TYPES:
+        raise ConfigError(f"Account '{name}' has unsupported adapter_type '{adapter_type}'.")
+    if auth_mode not in SUPPORTED_AUTH_MODES:
+        raise ConfigError(f"Account '{name}' has unsupported auth_mode '{auth_mode}'.")
+    raw_models = raw.get("available_models", raw.get("models", []))
+    if isinstance(raw_models, str):
+        raw_models = [item.strip() for item in raw_models.split(",") if item.strip()]
+    if not isinstance(raw_models, list) or any(not isinstance(item, str) for item in raw_models):
+        raise ConfigError(f"Account '{name}' available_models must be a list of strings.")
+    available_models = tuple(validate_setting_value(item, "available_models") for item in raw_models if item.strip())
+    raw_efforts = raw.get("supported_reasoning_efforts", raw.get("effort_levels", []))
+    if isinstance(raw_efforts, str):
+        raw_efforts = [item.strip() for item in raw_efforts.split(",") if item.strip()]
+    if not isinstance(raw_efforts, list) or any(not isinstance(item, str) for item in raw_efforts):
+        raise ConfigError(f"Account '{name}' supported_reasoning_efforts must be a list of strings.")
+    supported_reasoning_efforts = tuple(validate_setting_value(item, "supported_reasoning_efforts") for item in raw_efforts if item.strip())
+    state_root = raw.get("state_root")
+    state_path = _path(state_root, base) if state_root else None
+    auth_reference = validate_auth_reference(raw.get("auth_reference", "")) if backend == "api" else validate_setting_value(raw.get("auth_reference", ""), "auth_reference")
+    model = validate_setting_value(raw.get("model", ""), "model")
+    has_reasoning_setting = "reasoning_effort" in raw
+    reasoning_effort = validate_setting_value(raw.get("reasoning_effort", "" if backend == "api" else "high"), "reasoning_effort")
+    runtime_model = validate_setting_value(raw.get("runtime_model", ""), "runtime_model")
+    fixed_mode = validate_setting_value(raw.get("fixed_mode", ""), "fixed_mode")
+    if backend == "antigravity":
+        model, reasoning_effort, runtime_model, fixed_mode = normalize_antigravity_model_reference(
+            model, reasoning_effort, runtime_model, fixed_mode
+        )
     return AccountConfig(
         name=validate_account_name(name),
         label=str(raw.get("label", "")).strip(),
-        codex_home=_path(raw["codex_home"], base),
-        model=validate_setting_value(raw.get("model", ""), "model"),
-        reasoning_effort=validate_setting_value(raw.get("reasoning_effort", "high"), "reasoning_effort") or "high",
+        codex_home=_path(raw.get("codex_home", raw.get("state_root", f".dual-codex-profiles/{name}")), base),
+        model=model,
+        reasoning_effort=reasoning_effort or ("" if backend == "api" or (backend == "antigravity" and (fixed_mode or has_reasoning_setting)) else "high"),
+        runtime_model=runtime_model,
+        fixed_mode=fixed_mode,
         backend=backend,
         service_tier=validate_setting_value(raw.get("service_tier", ""), "service_tier"),
         network_access=network_access,
+        provider_type=provider_type,
+        adapter_type=adapter_type,
+        auth_mode=auth_mode,
+        auth_reference=auth_reference,
+        state_root=state_path,
+        base_url=validate_setting_value(raw.get("base_url", ""), "base_url"),
+        available_models=available_models,
+        supported_reasoning_efforts=supported_reasoning_efforts,
+        enabled=enabled,
     )
 
 

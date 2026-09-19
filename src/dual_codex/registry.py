@@ -19,6 +19,7 @@ from .config import (
     is_legacy_raw,
     load_raw_config,
     validate_account_name,
+    validate_auth_reference,
     validate_setting_value,
     validate_role_name,
 )
@@ -95,9 +96,20 @@ def _registry_block(accounts: Mapping[str, AccountConfig], roles: Mapping[str, s
                 f"codex_home = {_toml_string(str(account.codex_home))}",
                 f"model = {_toml_string(account.model)}",
                 f"reasoning_effort = {_toml_string(account.reasoning_effort)}",
+                f"runtime_model = {_toml_string(account.runtime_model)}",
+                f"fixed_mode = {_toml_string(account.fixed_mode)}",
                 f"backend = {_toml_string(account.backend)}",
                 f"service_tier = {_toml_string(account.service_tier)}",
                 f"network_access = {'true' if account.network_access else 'false'}",
+                f"provider_type = {_toml_string(account.provider_type)}",
+                f"adapter_type = {_toml_string(account.adapter_type)}",
+                f"auth_mode = {_toml_string(account.auth_mode)}",
+                f"auth_reference = {_toml_string(account.auth_reference)}",
+                f"state_root = {_toml_string(str(account.state_root))}" if account.state_root else "",
+                f"base_url = {_toml_string(account.base_url)}",
+                f"available_models = {json.dumps(list(account.available_models), ensure_ascii=False)}",
+                f"supported_reasoning_efforts = {json.dumps(list(account.supported_reasoning_efforts), ensure_ascii=False)}",
+                f"enabled = {'true' if account.enabled else 'false'}",
                 "",
             ]
         )
@@ -162,19 +174,38 @@ def _agent_for_status(account: AccountConfig):
         codex_home=account.codex_home,
         model=account.model,
         reasoning_effort=account.reasoning_effort,
+        runtime_model=account.runtime_model,
+        fixed_mode=account.fixed_mode,
         sandbox="read-only",
         account_name=account.name,
         label=account.label,
         backend=account.backend,
         service_tier=account.service_tier,
         network_access=account.network_access,
+        provider_type=account.provider_type,
+        adapter_type=account.adapter_type,
+        auth_mode=account.auth_mode,
+        auth_reference=account.auth_reference,
+        state_root=account.state_root,
+        base_url=account.base_url,
+        available_models=account.available_models,
+        supported_reasoning_efforts=account.supported_reasoning_efforts,
+        enabled=account.enabled,
     )
 
 
 def login_status(config: OrchestratorConfig, account: AccountConfig) -> str:
     """Check login status without reading or displaying authentication data."""
+    if not account.enabled:
+        return "DISABLED"
     if account.backend == "antigravity":
         return antigravity_status(config.antigravity_command, cwd=config.project_root)
+    if account.backend == "api":
+        reference = account.auth_reference.strip()
+        if reference.startswith("env:"):
+            name = reference[4:]
+            return "OK" if name and os.environ.get(name) else "NOT CONFIGURED"
+        return "NOT CONFIGURED"
     if shutil.which(config.codex_command) is None and not Path(config.codex_command).exists():
         return "UNKNOWN"
     try:
@@ -214,9 +245,28 @@ def _run_login(config: OrchestratorConfig, account: AccountConfig) -> None:
 
 def _resolve_home(config: OrchestratorConfig, value: str | None, name: str) -> Path:
     if value is None:
-        return (Path.home() / "CodexProfiles" / name).resolve()
-    home = Path(value).expanduser()
-    return home if home.is_absolute() else (config.config_path.parent / home).resolve()
+        home = Path.home() / "CodexProfiles" / name
+    else:
+        raw = str(value).strip()
+        if not raw or any(ord(char) < 32 for char in raw):
+            raise ConfigError("CODEX_HOME must be a non-empty safe path.")
+        home = Path(raw).expanduser()
+        if not home.is_absolute():
+            home = config.config_path.parent / home
+    home = home.resolve()
+    protected = {
+        config.config_path.parent.resolve(),
+        config.repository.resolve(),
+        Path.home().resolve(),
+    }
+    if home in protected:
+        raise ConfigError("CODEX_HOME must not point at the repository, config directory, or user home.")
+    for existing_name, existing in config.accounts.items():
+        if existing.codex_home.resolve() == home:
+            raise ConfigError(
+                f"CODEX_HOME is already assigned to account '{existing_name}'."
+            )
+    return home
 
 
 def add_account(
@@ -226,8 +276,20 @@ def add_account(
     label: str = "",
     codex_home: str | None = None,
     model: str = "",
-    reasoning_effort: str = "high",
+    reasoning_effort: str = "",
+    runtime_model: str = "",
+    fixed_mode: str = "",
+    backend: str = "windows",
+    provider_type: str | None = None,
+    adapter_type: str | None = None,
+    auth_mode: str | None = None,
+    auth_reference: str = "",
+    base_url: str = "",
+    available_models: Iterable[str] = (),
+    supported_reasoning_efforts: Iterable[str] = (),
     roles: list[str] | None = None,
+    enabled: bool = True,
+    authenticate: bool = True,
     output: OutputFn = print,
 ) -> AccountConfig:
     if config.legacy:
@@ -236,6 +298,19 @@ def add_account(
     if name in config.accounts:
         raise ConfigError(f"Account '{name}' is already registered.")
     requested_roles = [validate_role_name(role) for role in (roles or [])]
+    if backend not in SUPPORTED_BACKENDS:
+        raise ConfigError("backend must be one of: " + ", ".join(SUPPORTED_BACKENDS) + ".")
+    default_provider = "gemini" if backend == "antigravity" else "api" if backend == "api" else "codex"
+    default_adapter = "antigravity_cli" if backend == "antigravity" else "openai_compatible" if backend == "api" else "codex_cli"
+    provider_type = (provider_type or default_provider).strip()
+    adapter_type = (adapter_type or default_adapter).strip()
+    auth_mode = (auth_mode or ("environment" if backend == "api" else "provider_native")).strip()
+    if provider_type not in {"codex", "gemini", "api"} or adapter_type not in {"codex_cli", "antigravity_cli", "openai_compatible"}:
+        raise ConfigError("Unsupported provider or adapter type.")
+    if backend == "api":
+        auth_reference = validate_auth_reference(auth_reference)
+    if not isinstance(enabled, bool):
+        raise ConfigError("enabled must be a boolean.")
     home = _resolve_home(config, codex_home, name)
     if (home / "auth.json").exists():
         raise ConfigError(
@@ -245,19 +320,40 @@ def add_account(
 
     account = AccountConfig(
         name=name,
-        label=label.strip(),
+        label=validate_setting_value(label, "label"),
         codex_home=home,
-        model=model.strip(),
-        reasoning_effort=reasoning_effort.strip() or "high",
-        backend="windows",
+        model=validate_setting_value(model, "model"),
+        reasoning_effort=(
+            validate_setting_value(reasoning_effort, "reasoning_effort")
+            or ("" if backend == "api" else "high")
+        ),
+        runtime_model=validate_setting_value(runtime_model, "runtime_model"),
+        fixed_mode=validate_setting_value(fixed_mode, "fixed_mode"),
+        backend=backend,
         service_tier="",
         network_access=False,
+        provider_type=provider_type,
+        adapter_type=adapter_type,
+        auth_mode=auth_mode,
+        auth_reference=auth_reference if backend == "api" else validate_setting_value(auth_reference, "auth_reference"),
+        base_url=validate_setting_value(base_url, "base_url"),
+        available_models=tuple(validate_setting_value(value, "available_models") for value in available_models),
+        supported_reasoning_efforts=tuple(validate_setting_value(value, "supported_reasoning_efforts") for value in supported_reasoning_efforts),
+        enabled=enabled,
     )
     output(f"Account: {account.name}")
     output(f"Label: {account.label or '(none)'}")
-    output(f"Authenticating with CODEX_HOME: {abbreviate_path(account.codex_home)}")
-    ensure_codex_profile(account.codex_home)
-    _run_login(config, account)
+    if backend in {"windows", "app_server"}:
+        output(
+            f"Preparing CODEX_HOME: {abbreviate_path(account.codex_home)}"
+            if not authenticate
+            else f"Authenticating with CODEX_HOME: {abbreviate_path(account.codex_home)}"
+        )
+        ensure_codex_profile(account.codex_home)
+    else:
+        output(f"Registering {provider_type} profile without copying provider credentials.")
+    if backend in {"windows", "app_server"} and authenticate:
+        _run_login(config, account)
 
     accounts = dict(config.accounts)
     accounts[name] = account
@@ -294,6 +390,24 @@ def login_account(
     _run_login(config, account)
 
 
+def logout_account(config: OrchestratorConfig, name: str) -> str:
+    """Remove provider-native Codex credentials from exactly one profile."""
+    if config.legacy:
+        raise ConfigError("Run 'dual-codex migrate-config' before using account logout.")
+    account = config.accounts.get(validate_account_name(name))
+    if account is None:
+        raise ConfigError(f"Unknown account '{name}'.")
+    if account.backend not in {"windows", "app_server"}:
+        raise ConfigError("Logout is only supported for Codex CLI profiles.")
+    result = run_command(
+        [config.codex_command, "logout"],
+        cwd=config.project_root,
+        env=codex_environment(_agent_for_status(account)),
+        check=False,
+    )
+    return "OK" if result.returncode == 0 else "FAILED"
+
+
 def rename_account(config: OrchestratorConfig, old_name: str, new_name: str) -> None:
     if config.legacy:
         raise ConfigError("Run 'dual-codex migrate-config' before renaming accounts.")
@@ -311,9 +425,20 @@ def rename_account(config: OrchestratorConfig, old_name: str, new_name: str) -> 
         codex_home=old.codex_home,
         model=old.model,
         reasoning_effort=old.reasoning_effort,
+        runtime_model=old.runtime_model,
+        fixed_mode=old.fixed_mode,
         backend=old.backend,
         service_tier=old.service_tier,
         network_access=old.network_access,
+        provider_type=old.provider_type,
+        adapter_type=old.adapter_type,
+        auth_mode=old.auth_mode,
+        auth_reference=old.auth_reference,
+        state_root=old.state_root,
+        base_url=old.base_url,
+        available_models=old.available_models,
+        supported_reasoning_efforts=old.supported_reasoning_efforts,
+        enabled=old.enabled,
     )
     roles = {
         role: new_name if account == old_name else account
@@ -332,13 +457,24 @@ def label_account(config: OrchestratorConfig, name: str, label: str) -> None:
     accounts = dict(config.accounts)
     accounts[name] = AccountConfig(
         name=account.name,
-        label=label.strip(),
+        label=validate_setting_value(label, "label"),
         codex_home=account.codex_home,
         model=account.model,
         reasoning_effort=account.reasoning_effort,
+        runtime_model=account.runtime_model,
+        fixed_mode=account.fixed_mode,
         backend=account.backend,
         service_tier=account.service_tier,
         network_access=account.network_access,
+        provider_type=account.provider_type,
+        adapter_type=account.adapter_type,
+        auth_mode=account.auth_mode,
+        auth_reference=account.auth_reference,
+        state_root=account.state_root,
+        base_url=account.base_url,
+        available_models=account.available_models,
+        supported_reasoning_efforts=account.supported_reasoning_efforts,
+        enabled=account.enabled,
     )
     write_registry_config(config.config_path, accounts, config.roles)
 
@@ -384,8 +520,19 @@ def update_account_settings(
     *,
     model: str | None = None,
     reasoning_effort: str | None = None,
+    runtime_model: str | None = None,
+    fixed_mode: str | None = None,
     service_tier: str | None = None,
     backend: str | None = None,
+    provider_type: str | None = None,
+    adapter_type: str | None = None,
+    auth_mode: str | None = None,
+    auth_reference: str | None = None,
+    state_root: str | None = None,
+    base_url: str | None = None,
+    available_models: tuple[str, ...] | list[str] | None = None,
+    supported_reasoning_efforts: tuple[str, ...] | list[str] | None = None,
+    enabled: bool | None = None,
 ) -> AccountConfig:
     """Persist validated future-turn settings without touching profile credentials."""
     if config.legacy:
@@ -399,16 +546,29 @@ def update_account_settings(
         raise ConfigError(
             "backend must be one of: " + ", ".join(SUPPORTED_BACKENDS) + "."
         )
+    new_auth_reference = account.auth_reference if auth_reference is None else validate_setting_value(auth_reference, "auth_reference")
+    if new_backend == "api":
+        new_auth_reference = validate_auth_reference(new_auth_reference)
+    new_model = account.model if model is None else validate_setting_value(model, "model")
+    new_fixed_mode = account.fixed_mode if fixed_mode is None else validate_setting_value(fixed_mode, "fixed_mode")
+    if reasoning_effort is None:
+        new_reasoning_effort = account.reasoning_effort
+    else:
+        requested_effort = validate_setting_value(reasoning_effort, "reasoning_effort")
+        if requested_effort:
+            new_reasoning_effort = requested_effort
+        elif new_backend == "api" or (new_backend == "antigravity" and (new_fixed_mode or not new_model)):
+            new_reasoning_effort = ""
+        else:
+            new_reasoning_effort = "high"
     updated = AccountConfig(
         name=account.name,
         label=account.label,
         codex_home=account.codex_home,
-        model=account.model if model is None else validate_setting_value(model, "model"),
-        reasoning_effort=(
-            account.reasoning_effort
-            if reasoning_effort is None
-            else (validate_setting_value(reasoning_effort, "reasoning_effort") or "high")
-        ),
+        model=new_model,
+        reasoning_effort=new_reasoning_effort,
+        runtime_model=(account.runtime_model if runtime_model is None else validate_setting_value(runtime_model, "runtime_model")),
+        fixed_mode=new_fixed_mode,
         backend=new_backend,
         service_tier=(
             account.service_tier
@@ -416,10 +576,31 @@ def update_account_settings(
             else validate_setting_value(service_tier, "service_tier")
         ),
         network_access=account.network_access,
+        provider_type=account.provider_type if provider_type is None else str(provider_type).strip(),
+        adapter_type=account.adapter_type if adapter_type is None else str(adapter_type).strip(),
+        auth_mode=account.auth_mode if auth_mode is None else str(auth_mode).strip(),
+        auth_reference=new_auth_reference,
+        state_root=account.state_root if state_root is None else Path(state_root).expanduser().resolve(),
+        base_url=account.base_url if base_url is None else validate_setting_value(base_url, "base_url"),
+        available_models=account.available_models if available_models is None else tuple(validate_setting_value(value, "available_models") for value in available_models),
+        supported_reasoning_efforts=account.supported_reasoning_efforts if supported_reasoning_efforts is None else tuple(validate_setting_value(value, "supported_reasoning_efforts") for value in supported_reasoning_efforts),
+        enabled=account.enabled if enabled is None else bool(enabled),
     )
     accounts = dict(config.accounts)
     accounts[name] = updated
     write_registry_config(config.config_path, accounts, config.roles)
+    return updated
+
+
+def set_account_enabled(config: OrchestratorConfig, name: str, enabled: bool) -> AccountConfig:
+    """Enable or disable a profile without touching provider-native state."""
+    if config.legacy:
+        raise ConfigError("Run 'dual-codex migrate-config' before changing accounts.")
+    name = validate_account_name(name)
+    account = config.accounts.get(name)
+    if account is None:
+        raise ConfigError(f"Unknown account '{name}'.")
+    updated = update_account_settings(config, name, enabled=bool(enabled))
     return updated
 
 
@@ -568,9 +749,20 @@ def migrate_legacy_config(
             codex_home=legacy_architect.codex_home,
             model=legacy_architect.model,
             reasoning_effort=legacy_architect.reasoning_effort,
+            runtime_model=legacy_architect.runtime_model,
+            fixed_mode=legacy_architect.fixed_mode,
             backend=legacy_architect.backend,
             service_tier=legacy_architect.service_tier,
             network_access=legacy_architect.network_access,
+            provider_type=legacy_architect.provider_type,
+            adapter_type=legacy_architect.adapter_type,
+            auth_mode=legacy_architect.auth_mode,
+            auth_reference=legacy_architect.auth_reference,
+            state_root=legacy_architect.state_root,
+            base_url=legacy_architect.base_url,
+            available_models=legacy_architect.available_models,
+            supported_reasoning_efforts=legacy_architect.supported_reasoning_efforts,
+            enabled=legacy_architect.enabled,
         ),
         executor_name: AccountConfig(
             name=executor_name,
@@ -578,9 +770,20 @@ def migrate_legacy_config(
             codex_home=legacy_executor.codex_home,
             model=legacy_executor.model,
             reasoning_effort=legacy_executor.reasoning_effort,
+            runtime_model=legacy_executor.runtime_model,
+            fixed_mode=legacy_executor.fixed_mode,
             backend=legacy_executor.backend,
             service_tier=legacy_executor.service_tier,
             network_access=legacy_executor.network_access,
+            provider_type=legacy_executor.provider_type,
+            adapter_type=legacy_executor.adapter_type,
+            auth_mode=legacy_executor.auth_mode,
+            auth_reference=legacy_executor.auth_reference,
+            state_root=legacy_executor.state_root,
+            base_url=legacy_executor.base_url,
+            available_models=legacy_executor.available_models,
+            supported_reasoning_efforts=legacy_executor.supported_reasoning_efforts,
+            enabled=legacy_executor.enabled,
         ),
     }
     roles = {

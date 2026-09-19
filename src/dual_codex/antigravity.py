@@ -156,9 +156,10 @@ def build_command(
             result.extend(["--add-dir", str(artifact_dir)])
     if schema_path is not None:
         result.extend(["--json-schema", str(schema_path.resolve())])
-    if agent.model:
-        result.extend(["--model", agent.model])
-    if agent.reasoning_effort:
+    runtime_model = getattr(agent, "runtime_model", "") or agent.model
+    if runtime_model:
+        result.extend(["--model", runtime_model])
+    if agent.reasoning_effort and not getattr(agent, "fixed_mode", ""):
         result.extend(["--effort", agent.reasoning_effort])
     if timeout_seconds is not None and timeout_seconds > 0:
         result.extend(["--print-timeout", f"{timeout_seconds:g}s"])
@@ -236,6 +237,10 @@ def run_antigravity(
     timeout_seconds = _timeout_seconds(config)
     metadata: dict[str, Any] = {
         "executor_provider": "antigravity",
+        "logical_model": agent.model,
+        "runtime_model": getattr(agent, "runtime_model", "") or agent.model,
+        "reasoning_effort": agent.reasoning_effort or "provider-default",
+        "fixed_mode": getattr(agent, "fixed_mode", ""),
         "antigravity_protocol": "stream-json",
         "antigravity_conversation_id": "",
         "antigravity_terminal_status": "",

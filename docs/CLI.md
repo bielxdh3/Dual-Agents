@@ -81,13 +81,32 @@ recebe acesso ao credential store; o broker deve ser chamado pelo control
 plane confiavel no contexto normal do host.
 
 `dual-codex dashboard` serve uma interface Dual Agents local em `127.0.0.1` (porta livre
-por padrão) e abre o navegador, salvo com `--no-open`. O painel usa chamadas
-estruturadas do App Server por conta e degrada métodos ausentes para
-`Unknown`/`Not available`; não há endpoint genérico de shell ou filesystem.
-Modelos são carregados de `model/list`, `model = ""` é explicitamente o
-default herdado, e alterações de model/reasoning/service tier são persistidas
-atomicamente para turnos futuros em `config.toml`. A thread atual nunca é
-alterada silenciosamente.
+por padrão) e abre o navegador, salvo com `--no-open`. O painel usa capacidades
+do provider selecionado: `model/list` para Codex App Server, o catálogo local
+`agy models` para Antigravity/Gemini e capacidades declaradas para API
+OpenAI-compatible. O catálogo Antigravity agrupa variantes de esforço em um
+modelo lógico e preserva o slug exato para a invocação; modos únicos como
+`Thinking` ficam fixos, sem alternativas inventadas. `model = ""` significa
+default do provider (modelo e esforço herdados), e as alterações
+de model/reasoning/service tier são persistidas atomicamente para turnos futuros
+em `config.toml`. A thread atual nunca é alterada silenciosamente.
+
+A seção **Profiles / Accounts** gerencia metadados de contas diretamente no
+dashboard: criar, renomear, habilitar/desabilitar e remover o registro sem apagar
+o estado do provider. Perfis Codex usam `CODEX_HOME` isolado e expõem ações
+provider-native de status, autenticação, reautenticação e logout; o usuário
+conclui manualmente qualquer navegador ou MFA iniciado pelo CLI.
+
+Perfis API usam `auth_reference = "env:VARIAVEL"` e nunca armazenam a chave no
+TOML ou no dashboard. HTTPS é obrigatório para endpoints remotos; HTTP é aceito
+somente em loopback para testes. O adapter envia o modelo/esforço selecionados
+ao endpoint `/chat/completions`. O role `executor` continua exigindo
+Antigravity/Gemini por política de segurança do produto.
+
+A remoção de uma conta altera apenas o registro por padrão. `--delete-profile`
+é uma ação explícita sobre o diretório local controlado pelo perfil e pode
+remover o `auth.json` mantido naquele `CODEX_HOME`; keyrings e credenciais
+externas não são tocados.
 
 ### Live Executor
 

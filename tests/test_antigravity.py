@@ -127,7 +127,30 @@ class AntigravityTransportTests(unittest.TestCase):
         self.assertIn(str(self.instruction_root), command)
         self.assertNotIn(r"C:\CodexGlobal", command)
         self.assertIn("--json-schema", command)
+        self.assertIn("--model", command)
+        self.assertIn("gemini-3.8-flash-high", command)
+        self.assertIn("--effort", command)
+        self.assertIn("high", command)
         self.assertNotIn("--dangerously-skip-permissions", command)
+
+    def test_command_uses_exact_runtime_slug_for_fixed_mode(self) -> None:
+        agent = AgentConfig(
+            codex_home=Path("C:/CodexProfiles/executor"),
+            model="claude-sonnet-4-6",
+            runtime_model="claude-sonnet-4-6",
+            reasoning_effort="",
+            fixed_mode="Thinking",
+            sandbox="workspace-write",
+            account_name="executor",
+            backend="antigravity",
+        )
+        command = build_command(
+            command="agy",
+            agent=agent,
+            repository=Path("C:/workspace/project"),
+        )
+        self.assertIn("claude-sonnet-4-6", command)
+        self.assertNotIn("--effort", command)
 
     def test_followup_reuses_conversation_without_rebinding_project(self) -> None:
         command = build_command(

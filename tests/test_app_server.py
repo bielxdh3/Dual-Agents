@@ -236,6 +236,7 @@ class AppServerTests(unittest.TestCase):
                     ],
                 },
             )
+            self.assertEqual(fake_processes[0].turn_params[0]["effort"], "high")
             self.assertTrue(fake_processes[0].thread_params[0].get("experimentalRawEvents"))
             self.assertEqual(fake_processes[0].turn_params[0]["cwd"], str(repository))
             journal_path = Path(first.metadata["live_event_journal"])

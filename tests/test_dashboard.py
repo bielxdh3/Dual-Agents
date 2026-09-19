@@ -24,6 +24,7 @@ from dual_codex.dashboard import (
     _live_event_name,
 )
 from dual_codex.live_events import LiveEventJournal
+from dual_codex.providers import provider_default_label
 
 
 class DashboardTests(unittest.TestCase):
@@ -77,6 +78,57 @@ executor = "secondary"
         self.assertEqual(reloaded.accounts["primary"].reasoning_effort, "medium")
         self.assertEqual(reloaded.accounts["primary"].service_tier, "fast")
         self.assertNotIn(b"\xef\xbb\xbf", self.config_path.read_bytes()[:3])
+
+    def test_profile_management_crud_is_metadata_only_and_immediate(self) -> None:
+        service = DashboardService(self.config)
+        home = Path(self.temp.name) / "profiles" / "codex-secondary"
+        created = service.create_profile(
+            {
+                "label": "Codex Secundário",
+                "backend": "windows",
+                "codex_home": str(home),
+                "model": "gpt-5.6-luna",
+                "reasoning_effort": "high",
+                "enabled": True,
+            }
+        )
+        self.assertEqual(created["profile"]["display_name"], "Codex Secundário")
+        self.assertIn("codex-secundario", load_config(self.config_path).accounts)
+        self.assertTrue((home / "config.toml").exists())
+        self.assertEqual(
+            service.update_profile("codex-secundario", {"label": "Codex B", "enabled": False})["profile"]["display_name"],
+            "Codex B",
+        )
+        self.assertFalse(load_config(self.config_path).accounts["codex-secundario"].enabled)
+        with self.assertRaises(DashboardError):
+            service.create_profile(
+                {"label": "Collision", "backend": "windows", "codex_home": str(home / ".." / "codex-secondary")}
+            )
+        removed = service.remove_profile("codex-secundario", {"confirm": True})
+        self.assertTrue(removed["metadata_removed"])
+        self.assertFalse(removed["provider_state_deleted"])
+        self.assertTrue(home.exists())
+        self.assertNotIn("codex-secundario", load_config(self.config_path).accounts)
+
+    def test_profile_auth_action_uses_selected_codex_home_without_exposing_output(self) -> None:
+        service = DashboardService(self.config)
+        home = Path(self.temp.name) / "profiles" / "codex-b"
+        service.create_profile({"label": "Codex B", "name": "codex-b", "backend": "windows", "codex_home": str(home)})
+        observed: list[Path] = []
+
+        def fake_login(config, name, **_kwargs):
+            observed.append(config.accounts[name].codex_home)
+
+        with patch("dual_codex.dashboard.login_account", side_effect=fake_login), patch(
+            "dual_codex.dashboard.login_status", return_value="OK"
+        ):
+            started = service.auth_action("codex-b", {"action": "authenticate"})
+            service._auth_jobs["codex-b"].join(timeout=2)
+            status = service.auth_status("codex-b")
+        self.assertEqual(started["status"], "Authentication in progress")
+        self.assertEqual(observed, [home])
+        self.assertEqual(status["status"], "Authenticated")
+        self.assertNotIn("token", json.dumps(status).lower())
 
     def test_current_thread_scope_is_explicitly_rejected(self) -> None:
         with self.assertRaises(ValueError):
@@ -146,10 +198,13 @@ const capabilityHelper = globalThis.dualCodexDashboardCapabilities;
 const models = [
   {id: 'model-a', is_default: true, default_reasoning: 'medium', reasoning_efforts: ['low', 'medium'], default_service_tier: 'fast', service_tiers: [{id: 'fast', name: 'Fast'}]},
   {id: 'model-b', is_default: false, default_reasoning: 'max', reasoning_efforts: ['high', 'max'], default_service_tier: 'premium', service_tiers: [{id: 'premium', name: 'Premium'}]},
+  {id: 'fixed', is_default: false, fixed_mode: 'Thinking', reasoning_efforts: [], service_tiers: []},
 ];
 console.log(JSON.stringify({
   changed: capabilityHelper.reconcileCapabilitySelection(models, 'model-b', 'medium', 'fast'),
   inherit: capabilityHelper.reconcileCapabilitySelection(models, '', 'ultra', 'fast'),
+  fixed: capabilityHelper.reconcileCapabilitySelection(models, 'fixed', 'high', '', {effort_levels: ['low', 'medium', 'high']}),
+  providerDefault: capabilityHelper.reconcileCapabilitySelection(models, '', 'high', '', {effort_levels: []}),
   missingDefault: capabilityHelper.reconcileCapabilitySelection(models.map(model => ({...model, is_default: false})), '', 'high', 'fast'),
 }));
 """
@@ -163,6 +218,11 @@ console.log(JSON.stringify({
         self.assertEqual(payload["inherit"]["selected_model"], "model-a")
         self.assertEqual(payload["inherit"]["reasoning_value"], "medium")
         self.assertFalse(payload["inherit"]["reasoning_disabled"])
+        self.assertEqual(payload["fixed"]["reasoning_efforts"], [])
+        self.assertEqual(payload["fixed"]["fixed_mode"], "Thinking")
+        self.assertTrue(payload["fixed"]["reasoning_disabled"])
+        self.assertEqual(payload["fixed"]["reasoning_value"], "")
+        self.assertTrue(payload["providerDefault"]["reasoning_disabled"])
         self.assertIsNone(payload["missingDefault"]["selected_model"])
         self.assertTrue(payload["missingDefault"]["reasoning_disabled"])
 
@@ -186,6 +246,85 @@ console.log(JSON.stringify({
                     {"model": "model-b", "reasoning_effort": "high", "service_tier": "fast"},
                 )
 
+    def test_backend_preview_refreshes_provider_capabilities(self) -> None:
+        account = self.config.accounts["primary"]
+        self.config.accounts["primary"] = replace(
+            account,
+            base_url="https://api.example.test/v1",
+            auth_reference="env:TEST_PROVIDER_KEY",
+            available_models=("api-model",),
+            supported_reasoning_efforts=("low",),
+        )
+        service = DashboardService(self.config)
+        preview = service.models("primary", "api")
+        self.assertEqual(preview["provider"], "api")
+        self.assertEqual([row["id"] for row in preview["models"]], ["api-model"])
+        self.assertEqual(preview["capabilities"]["effort_levels"], ["low"])
+
+        server = DashboardServer(self.config)
+        thread = server.serve_in_thread()
+        try:
+            with urlopen(server.url + "api/accounts/primary/models?backend=api", timeout=3) as response:
+                payload = json.loads(response.read())
+            self.assertEqual(response.status, 200)
+            self.assertEqual(payload["provider"], "api")
+            self.assertEqual(payload["models"][0]["id"], "api-model")
+        finally:
+            server.httpd.shutdown()
+            server.httpd.server_close()
+            thread.join(timeout=3)
+
+    def test_frontend_has_provider_specific_default_labels(self) -> None:
+        self.assertEqual(provider_default_label("codex", "app_server"), "Inherit Codex default")
+        self.assertEqual(provider_default_label("gemini", "antigravity"), "Inherit Antigravity default")
+        self.assertIn("Provider default", SCRIPT)
+        self.assertIn("PROFILES / ACCOUNTS", HTML)
+        self.assertIn("Add profile", HTML)
+        self.assertIn("data-profile-auth", SCRIPT)
+        self.assertIn("Remove metadata", SCRIPT)
+
+    def test_antigravity_dashboard_exposes_one_logical_row_per_catalog_family(self) -> None:
+        account = replace(
+            self.config.accounts["primary"],
+            backend="antigravity",
+            provider_type="gemini",
+            adapter_type="antigravity_cli",
+            model="",
+            reasoning_effort="high",
+        )
+        config = replace(self.config, accounts={**self.config.accounts, "primary": account})
+        service = DashboardService(config)
+        catalog = "gemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.8-flash-low\tGemini 3.8 Flash (Low)\nclaude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)\n"
+        with patch("dual_codex.providers.subprocess.run") as run:
+            run.return_value = type("Result", (), {"stdout": catalog, "stderr": "", "returncode": 0})()
+            with patch("dual_codex.providers.antigravity_status", return_value="OK"):
+                payload = service.models("primary")
+        self.assertEqual([row["id"] for row in payload["models"]], ["gemini-3.8-flash", "claude-sonnet-4-6"])
+        self.assertEqual(payload["models"][0]["reasoning_efforts"], ["low", "high"])
+        self.assertEqual(payload["models"][1]["fixed_mode"], "Thinking")
+
+    def test_antigravity_fixed_model_save_persists_runtime_mapping(self) -> None:
+        account = replace(
+            self.config.accounts["primary"],
+            backend="antigravity",
+            provider_type="gemini",
+            adapter_type="antigravity_cli",
+            model="gemini-3.8-flash",
+            reasoning_effort="high",
+        )
+        config = replace(self.config, accounts={**self.config.accounts, "primary": account})
+        service = DashboardService(config)
+        catalog = "gemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.8-flash-low\tGemini 3.8 Flash (Low)\nclaude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)\n"
+        with patch("dual_codex.providers.subprocess.run") as run:
+            run.return_value = type("Result", (), {"stdout": catalog, "stderr": "", "returncode": 0})()
+            with patch("dual_codex.providers.antigravity_status", return_value="OK"):
+                service.save_settings("primary", {"model": "claude-sonnet-4-6", "scope": "future_turns"})
+        saved = load_config(self.config_path).accounts["primary"]
+        self.assertEqual(saved.model, "claude-sonnet-4-6")
+        self.assertEqual(saved.runtime_model, "claude-sonnet-4-6")
+        self.assertEqual(saved.fixed_mode, "Thinking")
+        self.assertEqual(saved.reasoning_effort, "")
+
     def test_server_smoke_and_security_boundary(self) -> None:
         server = DashboardServer(self.config)
         thread = server.serve_in_thread()
@@ -201,7 +340,9 @@ console.log(JSON.stringify({
             with urlopen(server.url + "api/accounts", timeout=3) as response:
                 accounts = json.loads(response.read())
             self.assertEqual(accounts["accounts"][0]["name"], "primary")
-            self.assertNotIn("auth", json.dumps(accounts).lower())
+            rendered_accounts = json.dumps(accounts).lower()
+            self.assertNotIn("auth.json", rendered_accounts)
+            self.assertNotIn("placeholder-secret", rendered_accounts)
 
             connection = http.client.HTTPConnection("127.0.0.1", server.httpd.server_address[1], timeout=3)
             connection.request("GET", "/api/accounts/primary/settings")
@@ -214,6 +355,62 @@ console.log(JSON.stringify({
             connection.endheaders()
             self.assertEqual(connection.getresponse().status, 403)
             connection.close()
+        finally:
+            server.httpd.shutdown()
+            server.httpd.server_close()
+            thread.join(timeout=3)
+
+    def test_profile_management_http_routes_persist_safe_metadata(self) -> None:
+        server = DashboardServer(self.config)
+        thread = server.serve_in_thread()
+        try:
+            request = Request(
+                server.url + "api/accounts",
+                data=json.dumps(
+                    {
+                        "name": "codex-b",
+                        "label": "Codex B",
+                        "backend": "windows",
+                        "codex_home": str(Path(self.temp.name) / "profiles" / "codex-b"),
+                        "enabled": True,
+                    }
+                ).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urlopen(request, timeout=3) as response:
+                created = json.loads(response.read())
+            self.assertEqual(response.status, 201)
+            self.assertEqual(created["profile"]["id"], "codex-b")
+
+            with urlopen(server.url + "api/accounts/codex-b/auth", timeout=3) as response:
+                auth = json.loads(response.read())
+            self.assertEqual(response.status, 200)
+            self.assertIn("status", auth)
+            self.assertNotIn("auth.json", json.dumps(auth).lower())
+
+            request = Request(
+                server.url + "api/accounts/codex-b",
+                data=b'{"label":"Codex B renamed"}',
+                headers={"Content-Type": "application/json"},
+                method="PATCH",
+            )
+            with urlopen(request, timeout=3) as response:
+                updated = json.loads(response.read())
+            self.assertEqual(response.status, 200)
+            self.assertEqual(updated["profile"]["display_name"], "Codex B renamed")
+
+            request = Request(
+                server.url + "api/accounts/codex-b",
+                data=b'{"confirm":true}',
+                headers={"Content-Type": "application/json"},
+                method="DELETE",
+            )
+            with urlopen(request, timeout=3) as response:
+                removed = json.loads(response.read())
+            self.assertEqual(response.status, 200)
+            self.assertTrue(removed["metadata_removed"])
+            self.assertFalse(removed["provider_state_deleted"])
         finally:
             server.httpd.shutdown()
             server.httpd.server_close()
@@ -263,6 +460,7 @@ console.log(JSON.stringify({
         self.assertEqual(account["usage"]["summary"]["lifetimeTokens"], 123)
         self.assertTrue(account["capabilities"]["service_tier"])
         self.assertEqual(account["runtime_state"], "Idle")
+        self.assertNotIn("email", json.dumps(account).lower())
 
     def test_live_executor_snapshot_is_path_derived_and_bounded(self) -> None:
         service = DashboardService(self.config)
