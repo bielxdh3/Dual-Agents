@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 import json
 import hashlib
@@ -1161,6 +1161,12 @@ class DelegationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             repository = _make_repository(root)
+            instruction_root = root / "synthetic-instructions"
+            (instruction_root / "skills").mkdir(parents=True)
+            (instruction_root / "AGENTS.md").write_text(
+                "# Synthetic test instructions\n",
+                encoding="utf-8",
+            )
             mock_python = root / "mock codex.py"
             mock_cmd = root / "mock codex.cmd"
             mock_python.write_text(
@@ -1206,25 +1212,25 @@ class DelegationTests(unittest.TestCase):
             request_file = root / "request.json"
             result_file = root / "result.json"
             request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
-            completed = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "dual_codex.cli",
-                    "--config",
-                    str(config_path),
-                    "delegate",
-                    "--request-file",
-                    str(request_file),
-                    "--result-file",
-                    str(result_file),
-                ],
-                cwd=Path.cwd(),
-                text=True,
-                capture_output=True,
-            )
-            self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertIn("DUAL_CODEX_RESULT", completed.stdout)
+            output = StringIO()
+            errors = StringIO()
+            with patch(
+                "dual_codex.antigravity._CANONICAL_INSTRUCTIONS_ROOT",
+                instruction_root,
+            ), redirect_stdout(output), redirect_stderr(errors):
+                exit_code = main(
+                    [
+                        "--config",
+                        str(config_path),
+                        "delegate",
+                        "--request-file",
+                        str(request_file),
+                        "--result-file",
+                        str(result_file),
+                    ]
+                )
+            self.assertEqual(exit_code, 0, errors.getvalue())
+            self.assertIn("DUAL_CODEX_RESULT", output.getvalue())
             self.assertEqual(json.loads(result_file.read_text(encoding="utf-8"))["status"], "completed")
 
 

@@ -93,6 +93,22 @@ def _workspace_probe_command(root: Path) -> Path:
 
 
 class AntigravityTransportTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._instruction_temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._instruction_temp.cleanup)
+        self.instruction_root = Path(self._instruction_temp.name)
+        (self.instruction_root / "AGENTS.md").write_text(
+            "# Synthetic test instructions\n",
+            encoding="utf-8",
+        )
+        (self.instruction_root / "skills").mkdir()
+        self._instruction_patch = patch(
+            "dual_codex.antigravity._CANONICAL_INSTRUCTIONS_ROOT",
+            self.instruction_root,
+        )
+        self._instruction_patch.start()
+        self.addCleanup(self._instruction_patch.stop)
+
     def test_command_uses_stream_protocol_without_permission_bypass(self) -> None:
         command = build_command(
             command="agy",
@@ -108,7 +124,8 @@ class AntigravityTransportTests(unittest.TestCase):
         self.assertIn("accept-edits", command)
         self.assertIn("--new-project", command)
         self.assertIn("--add-dir", command)
-        self.assertIn(r"C:\CodexGlobal", command)
+        self.assertIn(str(self.instruction_root), command)
+        self.assertNotIn(r"C:\CodexGlobal", command)
         self.assertIn("--json-schema", command)
         self.assertNotIn("--dangerously-skip-permissions", command)
 
@@ -196,7 +213,8 @@ class AntigravityTransportTests(unittest.TestCase):
             self.assertIn("--new-project", result.command)
             self.assertIn(str(artifact_dir.resolve()), result.command)
             self.assertNotIn(str(root.resolve()), result.command)
-            self.assertIn(r"C:\CodexGlobal", result.command)
+            self.assertIn(str(self.instruction_root), result.command)
+            self.assertNotIn(r"C:\CodexGlobal", result.command)
 
     def test_missing_workspace_fails_before_child_launch(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
