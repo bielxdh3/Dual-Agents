@@ -501,6 +501,8 @@ class TerminalSession:
     viewer_process_start_identity: str = ""
     viewer_epoch: str = ""
     visible_required: bool = False
+    target_model: str = ""
+    target_reasoning: str = ""
 
     @classmethod
     def from_record(cls, raw: dict[str, Any]) -> "TerminalSession":
@@ -534,6 +536,8 @@ class TerminalSession:
             viewer_process_start_identity=str(raw.get("viewer_process_start_identity", "")),
             viewer_epoch=str(raw.get("viewer_epoch", "")),
             visible_required=bool(raw.get("visible_required", False)),
+            target_model=str(raw.get("target_model", "")),
+            target_reasoning=str(raw.get("target_reasoning", "")),
         )
 
     def as_dict(self) -> dict[str, Any]:
@@ -565,6 +569,8 @@ class TerminalSession:
             "viewer_process_start_identity": self.viewer_process_start_identity,
             "viewer_epoch": self.viewer_epoch,
             "visible_required": self.visible_required,
+            "target_model": self.target_model,
+            "target_reasoning": self.target_reasoning,
         }
 
 
@@ -585,6 +591,7 @@ def interactive_command_args(
     sandbox: str,
     approval_policy: str,
     model: str = "",
+    reasoning_effort: str = "",
 ) -> list[str]:
     if sandbox not in {"read-only", "workspace-write"}:
         raise TerminalError(f"Unsupported sandbox '{sandbox}'.")
@@ -593,6 +600,8 @@ def interactive_command_args(
     args = ["--no-alt-screen", "--cd", str(repository), "--sandbox", sandbox, "-a", approval_policy]
     if model:
         args.extend(["--model", model])
+    if reasoning_effort:
+        args.extend(["-c", f'model_reasoning_effort="{reasoning_effort}"'])
     return args
 
 
@@ -1496,6 +1505,7 @@ class TerminalManager:
             "--cwd", str(repository), "--codex-command", self.config.codex_command,
             "--sandbox", agent.sandbox, "--approval-policy", approval_policy,
             "--model", agent.model,
+            "--reasoning-effort", agent.reasoning_effort,
             "--process-epoch", process_epoch,
         ]
         if resolved_add_dirs:
@@ -1525,6 +1535,7 @@ class TerminalManager:
         session = TerminalSession(
             session_id=session_id, account=agent.account_name, label=agent.label,
             role=role, repository=repository, codex_home=agent.codex_home,
+            target_model=agent.model, target_reasoning=agent.reasoning_effort,
             pipe=pipe, pid=process.pid, started_at=datetime.now(timezone.utc).isoformat(),
             log_file=log_file, session_file=str(record_path.resolve()), add_dirs=resolved_add_dirs,
             process_started_at=process_started_at,
@@ -1585,6 +1596,10 @@ class TerminalManager:
                     raise TerminalError(
                         f"Existing terminal session '{session_id}' account or CODEX_HOME identity mismatch."
                     )
+                if agent is not None and session.target_model and session.target_model != agent.model:
+                    raise TerminalError(f"Existing terminal session '{session_id}' model identity mismatch.")
+                if agent is not None and session.target_reasoning and session.target_reasoning != agent.reasoning_effort:
+                    raise TerminalError(f"Existing terminal session '{session_id}' reasoning identity mismatch.")
                 requested = {Path(item).resolve() for item in kwargs.get("add_dirs", ())}
                 available = {Path(item).resolve() for item in session.add_dirs}
                 if not requested.issubset(available):
@@ -1634,6 +1649,10 @@ class TerminalManager:
             raise TerminalError("Strict reuse-existing refused: repository identity mismatch.")
         if not same_path(session.codex_home, agent.codex_home):
             raise TerminalError("Strict reuse-existing refused: CODEX_HOME identity mismatch.")
+        if getattr(session, "target_model", "") and session.target_model != agent.model:
+            raise TerminalError("Strict reuse-existing refused: model identity mismatch.")
+        if getattr(session, "target_reasoning", "") and session.target_reasoning != agent.reasoning_effort:
+            raise TerminalError("Strict reuse-existing refused: reasoning identity mismatch.")
         if role != "executor" or agent.backend != "windows":
             raise TerminalError("Strict reuse-existing refused: only the native Windows Executor TUI is eligible.")
         canonical_dir = executor_task_artifact_dir(self.config)

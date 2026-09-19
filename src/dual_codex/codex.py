@@ -80,6 +80,14 @@ def run_codex_exec(
     )
 
 
+def _annotate_provider_result(result: CommandResult, agent: AgentConfig, role: str) -> CommandResult:
+    result.metadata.setdefault("profile_id", agent.account_name)
+    result.metadata.setdefault("provider", agent.provider_type)
+    result.metadata.setdefault("adapter", agent.adapter_type)
+    result.metadata.setdefault("role", role)
+    return result
+
+
 def run_codex_for_role(
     *,
     config,
@@ -98,12 +106,29 @@ def run_codex_for_role(
         raise ValueError(
             "Dual Agents requires Antigravity/Gemini as the Executor backend; no fallback is permitted."
         )
+    if agent.backend == "api":
+        if role == "executor":
+            raise ValueError(
+                "API profiles are not enabled for the Executor role; Antigravity/Gemini remains the active Executor backend."
+            )
+        from .providers import api_adapter
+
+        return _annotate_provider_result(api_adapter().run(
+            agent=agent,
+            repository=repository,
+            prompt=prompt,
+            output_path=output_path,
+            config=config,
+        ), agent, role)
     if agent.backend == "antigravity":
         if role != "executor":
             raise ValueError("Antigravity backend is reserved for the Executor role.")
         from .antigravity import run_antigravity
+        from .providers import resolve_antigravity_agent
 
-        return run_antigravity(
+        agent = resolve_antigravity_agent(config, agent)
+
+        return _annotate_provider_result(run_antigravity(
             command=getattr(config, "antigravity_command", "agy"),
             agent=agent,
             repository=repository,
@@ -112,7 +137,7 @@ def run_codex_for_role(
             schema_path=schema_path,
             config=config,
             progress=progress,
-        )
+        ), agent, role)
     if agent.backend == "app_server":
         from .terminal import session_id_for
 
@@ -132,7 +157,7 @@ def run_codex_for_role(
             raise CommandError(
                 f"Codex {role} failed through the configured App Server backend: {result.stderr}"
             )
-        return result
+        return _annotate_provider_result(result, agent, role)
     if agent.backend != "windows":
         raise ValueError(f"Unsupported Codex backend '{agent.backend}'.")
     from .terminal import session_id_for
@@ -150,7 +175,7 @@ def run_codex_for_role(
         raise CommandError(
             f"Codex {role} failed through the configured Windows terminal backend: {result.stderr}"
         )
-    return result
+    return _annotate_provider_result(result, agent, role)
 
 
 def run_codex_terminal(

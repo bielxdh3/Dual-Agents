@@ -15,6 +15,7 @@ const codexCommand = values.get("--codex-command") || "codex";
 const sandbox = values.get("--sandbox") || "read-only";
 const approvalPolicy = values.get("--approval-policy") || "on-request";
 const model = values.get("--model") || "";
+const reasoningEffort = values.get("--reasoning-effort") || "";
 const addDir = values.get("--add-dir") || "";
 
 if (!/^[A-Za-z0-9_-]{1,96}$/.test(sessionId || "")) throw new Error("invalid session id");
@@ -45,6 +46,7 @@ const launchArgs = [
   "apps",
 ];
 if (model) launchArgs.push("--model", model);
+if (reasoningEffort) launchArgs.push("-c", `model_reasoning_effort="${reasoningEffort}"`);
 if (addDir) launchArgs.push("--add-dir", addDir);
 const launchLine = launchArgs.map(quoteCmdArg).join(" ");
 const output = [];

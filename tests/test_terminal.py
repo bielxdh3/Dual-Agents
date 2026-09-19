@@ -1613,6 +1613,8 @@ function idleScreen(model) {{
                 pid=123,
                 started_at="now",
                 log_file=sessions / "biel4-reuse.pty.log",
+                target_model="gpt-5.6-sol",
+                target_reasoning="high",
             )
             (sessions / "biel4-reuse.json").write_text(json.dumps(session.as_dict()), encoding="utf-8")
             agent = AgentConfig(
@@ -1645,6 +1647,22 @@ function idleScreen(model) {{
             )
             self.assertEqual(first.session_id, second.session_id)
             self.assertEqual(first.pid, second.pid)
+            mismatch = AgentConfig(
+                codex_home=session.codex_home,
+                model="different-model",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="biel4",
+                label="Executor",
+            )
+            with self.assertRaisesRegex(TerminalError, "model identity mismatch"):
+                manager.ensure(
+                    session_id=session.session_id,
+                    agent=mismatch,
+                    role="executor",
+                    repository=repository,
+                    add_dirs=(),
+                )
 
     def test_persistent_ensure_rejects_session_bound_to_another_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

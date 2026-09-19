@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import redirect_stdout
 from io import StringIO
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ from dual_codex.registry import (
     AccountConfig,
     add_account,
     ensure_codex_profile,
+    logout_account,
     migrate_legacy_config,
     remove_account,
     rename_account,
@@ -30,6 +32,26 @@ def _write_registry(path: Path, *, command: str = "missing-codex") -> None:
 
 
 class RegistryTests(unittest.TestCase):
+    def test_logout_uses_selected_codex_home_without_exposing_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.toml"
+            _write_registry(path, command="missing-codex")
+            config = load_config(path)
+            captured: dict[str, object] = {}
+
+            def fake_run(command, *, cwd, env, check):
+                captured.update(command=command, cwd=cwd, env=env, check=check)
+                from dual_codex.process import CommandResult
+
+                return CommandResult(list(command), 0, "native output", "secret stderr")
+
+            with patch("dual_codex.registry.run_command", side_effect=fake_run):
+                self.assertEqual(logout_account(config, "secondary"), "OK")
+            self.assertEqual(captured["command"], ["missing-codex", "logout"])
+            self.assertEqual(captured["env"]["CODEX_HOME"], str(config.accounts["secondary"].codex_home))
+            self.assertNotIn("OPENAI_API_KEY", captured["env"])
+            self.assertNotIn("CODEX_API_KEY", captured["env"])
+
     def test_loads_three_accounts_and_reviewer_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "config.toml"
@@ -111,6 +133,62 @@ class RegistryTests(unittest.TestCase):
             updated = load_config(path)
             self.assertNotIn("third", updated.roles.values())
             self.assertTrue((new_home / "config.toml").exists())
+
+    def test_metadata_only_profile_creation_rejects_duplicate_canonical_home(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.toml"
+            _write_registry(path)
+            config = load_config(path)
+            new_home = Path(temp) / "profiles" / "third"
+            with patch("dual_codex.registry._run_login") as login:
+                add_account(
+                    config,
+                    "third",
+                    label="Third",
+                    codex_home=str(new_home),
+                    authenticate=False,
+                    enabled=False,
+                    output=lambda _message: None,
+                )
+                login.assert_not_called()
+            updated = load_config(path)
+            self.assertFalse(updated.accounts["third"].enabled)
+            self.assertEqual(updated.accounts["third"].codex_home, new_home.resolve())
+            with self.assertRaises(ConfigError):
+                add_account(
+                    updated,
+                    "duplicate",
+                    label="Duplicate",
+                    codex_home=str(new_home / ".." / "third"),
+                    authenticate=False,
+                    output=lambda _message: None,
+                )
+
+    @unittest.skipUnless(os.name == "nt", "Windows short-name aliases are platform-specific")
+    def test_duplicate_codex_home_rejects_windows_short_alias(self) -> None:
+        import ctypes
+
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.toml"
+            _write_registry(path)
+            existing_home = Path(temp) / "profiles" / "primary account"
+            existing_home.mkdir(parents=True)
+            config = load_config(path)
+            buffer = ctypes.create_unicode_buffer(32768)
+            length = ctypes.windll.kernel32.GetShortPathNameW(
+                str(existing_home), buffer, len(buffer)
+            )
+            if not length or Path(buffer.value) == existing_home:
+                self.skipTest("Windows volume does not expose a distinct short-name alias")
+            with self.assertRaises(ConfigError):
+                add_account(
+                    config,
+                    "short-alias",
+                    label="Short alias",
+                    codex_home=buffer.value,
+                    authenticate=False,
+                    output=lambda _message: None,
+                )
 
     def test_remove_requires_unassignment_and_keeps_profile_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

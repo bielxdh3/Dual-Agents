@@ -31,6 +31,7 @@ from .registry import (
     remove_account,
     rename_account,
     roles_for_account,
+    set_account_enabled,
     swap_roles,
     unassign_role,
 )
@@ -244,7 +245,15 @@ def _parser() -> argparse.ArgumentParser:
     add.add_argument("--label")
     add.add_argument("--codex-home")
     add.add_argument("--model", default="")
-    add.add_argument("--reasoning-effort", default="high")
+    add.add_argument("--reasoning-effort", default="")
+    add.add_argument("--backend", choices=("app_server", "windows", "antigravity", "api"), default="windows")
+    add.add_argument("--provider-type")
+    add.add_argument("--adapter-type")
+    add.add_argument("--auth-mode")
+    add.add_argument("--auth-reference", default="")
+    add.add_argument("--base-url", default="")
+    add.add_argument("--available-model", action="append", default=[])
+    add.add_argument("--supported-effort", action="append", dest="supported_reasoning_efforts", default=[])
     add.add_argument("--role", action="append", dest="roles")
     login = account_sub.add_parser("login", help="Authenticate an existing account")
     login.add_argument("name")
@@ -260,6 +269,10 @@ def _parser() -> argparse.ArgumentParser:
     remove.add_argument("name")
     remove.add_argument("--delete-profile", action="store_true")
     remove.add_argument("--confirm-delete", action="store_true")
+    enable = account_sub.add_parser("enable", help="Enable a saved provider profile")
+    enable.add_argument("name")
+    disable = account_sub.add_parser("disable", help="Disable a saved provider profile")
+    disable.add_argument("name")
 
     role = sub.add_parser("role", help="Manage role assignments")
     role_sub = role.add_subparsers(dest="role_command", required=True)
@@ -344,6 +357,9 @@ def _status_payload(config) -> dict:
                 "name": name,
                 "label": account.label,
                 "backend": account.backend,
+                "provider": account.provider_type,
+                "adapter": account.adapter_type,
+                "profile_isolation": bool(account.backend in {"windows", "app_server", "api"}),
                 "codex_home": abbreviate_path(account.codex_home),
                 "login": login_status(config, account),
                 "roles": roles_for_account(config.roles, name),
@@ -426,6 +442,14 @@ def _account_command(args, config) -> None:
             codex_home=args.codex_home,
             model=args.model,
             reasoning_effort=args.reasoning_effort,
+            backend=args.backend,
+            provider_type=args.provider_type,
+            adapter_type=args.adapter_type,
+            auth_mode=args.auth_mode,
+            auth_reference=args.auth_reference,
+            base_url=args.base_url,
+            available_models=args.available_model,
+            supported_reasoning_efforts=args.supported_reasoning_efforts,
             roles=args.roles,
         )
         print(f"Registered account '{name}'.")
@@ -450,6 +474,9 @@ def _account_command(args, config) -> None:
             confirm_delete=args.confirm_delete,
         )
         print(f"Removed account '{args.name}' from the registry.")
+    elif args.account_command in {"enable", "disable"}:
+        updated = set_account_enabled(config, args.name, args.account_command == "enable")
+        print(f"Profile '{updated.name}' {'enabled' if updated.enabled else 'disabled'}.")
 
 
 def _role_command(args, config) -> None:
@@ -479,11 +506,22 @@ def _account_agent(config, account_name: str, role: str) -> AgentConfig:
         model=account.model,
         reasoning_effort=account.reasoning_effort,
         sandbox="workspace-write" if role == "executor" else "read-only",
+        runtime_model=account.runtime_model,
+        fixed_mode=account.fixed_mode,
         account_name=account.name,
         label=account.label,
         backend=account.backend,
         service_tier=account.service_tier,
         network_access=account.network_access,
+        provider_type=account.provider_type,
+        adapter_type=account.adapter_type,
+        auth_mode=account.auth_mode,
+        auth_reference=account.auth_reference,
+        state_root=account.state_root,
+        base_url=account.base_url,
+        available_models=account.available_models,
+        supported_reasoning_efforts=account.supported_reasoning_efforts,
+        enabled=account.enabled,
     )
 
 

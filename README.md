@@ -89,14 +89,26 @@ executa o login somente nesse perfil e verifica o status depois. Tambem e
 possivel informar `--codex-home`, `--model`, `--reasoning-effort` e repetir
 `--role` para uma atribuicao explicita.
 
+Perfis API nao executam login local nem copiam chaves. Registre uma referencia
+de ambiente e as capacidades declaradas pelo adapter:
+
+```powershell
+dual-codex account add api-openai --backend api `
+  --base-url "https://api.example.invalid/v1" `
+  --auth-reference "env:DUAL_CODEX_API_KEY" `
+  --available-model "model-id"
+```
+
 ## Comandos CLI
 
 ```text
-dual-codex account add [name] [--label LABEL] [--codex-home PATH]
+dual-codex account add [name] [--label LABEL] [--codex-home PATH] [--backend BACKEND]
 dual-codex account login NAME [--yes]
 dual-codex account list
 dual-codex account rename OLD-NAME NEW-NAME
 dual-codex account label NAME LABEL
+dual-codex account enable NAME
+dual-codex account disable NAME
 dual-codex account remove NAME [--delete-profile] [--confirm-delete]
 
 dual-codex role list
@@ -184,22 +196,51 @@ substituidos pelos perfis locais de cada maquina.
 `dual-codex dashboard` inicia o painel Dual Agents em `127.0.0.1` e abre o
 navegador; use `--no-open` para apenas imprimir a URL ou `--port` para fixar
 uma porta. O painel consulta o App Server por processo/`CODEX_HOME` isolado e
-mostra contas, roles, backend, status do `agy`, modelos, reasoning, Fast ou
-outro service tier, rate limits, uso e thread persistente quando disponíveis.
+mostra perfis, roles, provider/backend, status do `agy`, modelos, reasoning,
+Fast ou outro service tier, rate limits, uso e thread persistente quando
+disponíveis.
 
-O campo `model = ""` significa **Inherit Codex default**. O modelo efetivo só
-é exibido quando descoberto pelo catálogo/eventos instalados; nunca é inferido
-como Sol ou qualquer outro valor. Alterações do painel são validadas e salvas
-atomicamente para turnos futuros; a thread persistente atual não é alterada
-silenciosamente. Métricas ou métodos não suportados aparecem como `Unknown` ou
-`Not available`.
+O campo `model = ""` usa o default do provider selecionado: **Inherit Codex
+default** para Codex, **Inherit Antigravity default** para Gemini e **Provider
+default** para adapters API. O modelo efetivo só é exibido quando descoberto
+pelo catálogo/eventos instalados; nunca é inferido como Sol ou outro valor.
+Alterações do painel são validadas e salvas atomicamente para turnos futuros;
+a thread persistente atual não é alterada silenciosamente. Métricas ou métodos
+não suportados aparecem como `Unknown` ou `Not available`.
 
 Os controles de reasoning e service tier/Fast acompanham imediatamente o
-modelo selecionado e usam o modelo anunciado como default quando `model = ""`.
-Opções incompatíveis são ajustadas no formulário com aviso, sem alterar a
-configuração até `Save`. Cada conta também pode manter vários roles; o editor
+modelo selecionado. Com `model = ""`, o provider controla modelo e esforço; o
+dashboard não inventa opções específicas de um modelo desconhecido. Opções
+incompatíveis são ajustadas no formulário com aviso, sem alterar a configuração
+até `Save`. Cada conta também pode manter vários roles; o editor
 por checkboxes aplica o conjunto completo em uma operação atômica e transfere
 roles globais para a conta escolhida quando necessário.
+
+A seção **Profiles / Accounts** permite criar, renomear, habilitar/desabilitar e
+remover somente o registro de perfis, com validação de `CODEX_HOME` e sem copiar
+credenciais. Para Codex, os botões **Authenticate**, **Re-authenticate** e
+**Logout** executam apenas o CLI nativo dentro do `CODEX_HOME` selecionado; a
+conclusão de navegador, conta ou MFA deve ser feita manualmente pelo usuário.
+
+### Perfis API
+
+Perfis com `backend = "api"` usam o adapter OpenAI-compatible. Configure apenas
+`auth_reference = "env:NOME_DA_VARIAVEL"`; a chave nunca é escrita no TOML,
+no dashboard ou nos logs. `base_url` aceita HTTPS remoto e HTTP somente para
+servidores loopback de teste. `available_models` e
+`supported_reasoning_efforts` são a declaração explícita de capacidades; uma
+lista de esforços vazia não exibe um controle de reasoning.
+
+O runtime `agy` 1.2.7 não anuncia uma flag de perfil/state-root. Assim, vários
+registros Gemini podem coexistir, mas a autenticação Gemini continua
+provider-managed e não é declarada como isolada até que o runtime ofereça esse
+mecanismo. Codex continua isolado por `CODEX_HOME`.
+
+Remover uma conta remove apenas o registro Dual Agents por padrão. A opção
+explícita `--delete-profile` remove somente o diretório local de perfil que o
+registro controla e pode remover o `auth.json` mantido naquele `CODEX_HOME`;
+isso exige confirmação explícita. A operação não toca keyrings nem credenciais
+provider-native fora do diretório controlado.
 
 ### Live Executor
 
@@ -305,8 +346,15 @@ antigravity_command = "C:/Users/USER/AppData/Local/agy/bin/agy.exe"
 
 [accounts.secondary]
 backend = "antigravity"
-model = "gemini-3.8-flash-high"
+model = "gemini-3.8-flash"
+reasoning_effort = "high"
 ```
+
+O catálogo `agy models` é normalizado no adapter: variantes como
+`gemini-3.8-flash-high`, `-medium` e `-low` aparecem como um único modelo com
+esforços reais. Modelos fixos como `Claude Sonnet 4.6 (Thinking)` exibem apenas
+`Thinking (fixed)`. O mapeamento salvo mantém o slug exato do runtime; uma
+variante ausente falha de forma explícita e nunca faz downgrade silencioso.
 
 Os backends Codex existentes permanecem apenas para compatibilidade do Architect
 e dos comandos legados. O fluxo `delegate` exige `backend = "antigravity"` no

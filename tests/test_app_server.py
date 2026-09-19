@@ -26,6 +26,7 @@ from dual_codex.app_server import (
 from dual_codex.codex import _report_from_message
 from dual_codex.config import AgentConfig, OrchestratorConfig
 from dual_codex.live_events import read_journal
+from dual_codex.paths import same_path
 from dual_codex.process import executor_npm_cache
 
 
@@ -224,20 +225,16 @@ class AppServerTests(unittest.TestCase):
             self.assertEqual(second.metadata["task_transport"], "app_server")
             self.assertEqual(len(fake_processes), 1)
             self.assertEqual(fake_processes[0].prompts, ["short", long_prompt])
-            self.assertEqual(
-                fake_processes[0].turn_params[0]["sandboxPolicy"],
-                {
-                    "type": "workspaceWrite",
-                    "networkAccess": False,
-                    "writableRoots": [
-                        str(repository),
-                        str(repository / ".git"),
-                        str(expected_cache),
-                    ],
-                },
-            )
+            policy = fake_processes[0].turn_params[0]["sandboxPolicy"]
+            self.assertEqual(policy["type"], "workspaceWrite")
+            self.assertFalse(policy["networkAccess"])
+            expected_roots = [repository, repository / ".git", expected_cache]
+            self.assertEqual(len(policy["writableRoots"]), len(expected_roots))
+            for actual, expected in zip(policy["writableRoots"], expected_roots):
+                self.assertTrue(same_path(actual, expected), (actual, expected))
+            self.assertEqual(fake_processes[0].turn_params[0]["effort"], "high")
             self.assertTrue(fake_processes[0].thread_params[0].get("experimentalRawEvents"))
-            self.assertEqual(fake_processes[0].turn_params[0]["cwd"], str(repository))
+            self.assertTrue(same_path(fake_processes[0].turn_params[0]["cwd"], repository))
             journal_path = Path(first.metadata["live_event_journal"])
             deadline = time.monotonic() + 1
             journal_events = read_journal(journal_path)
@@ -426,8 +423,10 @@ class AppServerTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             policy = fake.turn_params[0]["sandboxPolicy"]
             self.assertTrue(policy["networkAccess"])
-            self.assertEqual(policy["writableRoots"][:2], [str(repository), str(repository / ".git")])
-            self.assertEqual(policy["writableRoots"][2], str(expected_cache))
+            expected_roots = [repository, repository / ".git", expected_cache]
+            self.assertEqual(len(policy["writableRoots"]), len(expected_roots))
+            for actual, expected in zip(policy["writableRoots"], expected_roots):
+                self.assertTrue(same_path(actual, expected), (actual, expected))
             for process in list(_PROCESSES.values()):
                 process.close()
             _PROCESSES.clear()
