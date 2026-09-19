@@ -13,6 +13,7 @@ from dual_codex.app_server import (
     AppServerError,
     _PROCESSES,
     _app_server_command,
+    _load_thread_mapping,
     _mapping_path,
     _normalise_report,
     _process_key,
@@ -70,6 +71,8 @@ class _FakeProcess:
         self.thread_params: list[dict] = []
         self.thread_id = "thread-probe"
         self.turn_number = 0
+        self.windows_sandbox = None
+        self.windows_sandbox_readiness = "ready"
 
     def poll(self):
         return self.returncode
@@ -125,6 +128,11 @@ class _FakeProcess:
             self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"turn": {"id": turn_id}}})
             self._emit({"jsonrpc": "2.0", "method": "turn/started", "params": {"threadId": self.thread_id, "turn": {"id": turn_id}}})
             self._emit({"jsonrpc": "2.0", "method": "turn/completed", "params": {"threadId": self.thread_id, "turn": {"id": turn_id, "status": "completed", "items": [{"type": "agentMessage", "text": json.dumps(report)}]}}})
+        elif method == "config/read":
+            windows = None if self.windows_sandbox is None else {"sandbox": self.windows_sandbox}
+            self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"config": {"windows": windows}, "origins": {}}})
+        elif method == "windowsSandbox/readiness":
+            self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"status": self.windows_sandbox_readiness}})
 
 
 def _config(root: Path) -> OrchestratorConfig:
@@ -251,10 +259,127 @@ class AppServerTests(unittest.TestCase):
         self.assertFalse(disabled["networkAccess"])
         self.assertTrue(enabled["networkAccess"])
 
-    def test_headless_app_server_forces_unelevated_windows_sandbox(self) -> None:
+    def test_headless_app_server_does_not_override_profile_windows_sandbox(self) -> None:
         command = _app_server_command(_config(Path("C:/dual-codex-test")))
-        self.assertIn("-c", command)
-        self.assertIn('windows.sandbox="unelevated"', command)
+        self.assertNotIn("-c", command)
+        self.assertNotIn("windows.sandbox", command)
+
+    def test_explicit_elevated_profile_is_preserved_and_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="biel4",
+                backend="app_server",
+            )
+            fake = _FakeProcess()
+            fake.windows_sandbox = "elevated"
+            with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                result = run_codex_app_server(
+                    config=_config(root),
+                    agent=agent,
+                    repository=repository,
+                    prompt="probe",
+                    output_path=root / "result.json",
+                    session_id="elevated-session",
+                )
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.metadata["app_server_windows_sandbox"], "elevated")
+            self.assertEqual(result.metadata["app_server_windows_sandbox_readiness"], "ready")
+            self.assertEqual(result.metadata["app_server_role"], "executor")
+            self.assertEqual(result.metadata["app_server_approval_policy"], "never")
+            self.assertEqual(result.metadata["app_server_sandbox_policy"], "workspace-write")
+            self.assertNotIn("danger-full-access", result.command)
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+
+    def test_missing_windows_sandbox_setting_is_explicitly_unmodified(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="biel4",
+                backend="app_server",
+            )
+            fake = _FakeProcess()
+            with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                result = run_codex_app_server(
+                    config=_config(root),
+                    agent=agent,
+                    repository=repository,
+                    prompt="probe",
+                    output_path=root / "result.json",
+                    session_id="default-session",
+                )
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.metadata["app_server_windows_sandbox"], "unspecified")
+            self.assertEqual(result.metadata["app_server_windows_sandbox_readiness"], "not_checked")
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+
+    def test_unprovisioned_elevated_sandbox_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="biel4",
+                backend="app_server",
+            )
+            fake = _FakeProcess()
+            fake.windows_sandbox = "elevated"
+            fake.windows_sandbox_readiness = "notConfigured"
+            with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                result = run_codex_app_server(
+                    config=_config(root),
+                    agent=agent,
+                    repository=repository,
+                    prompt="probe",
+                    output_path=root / "result.json",
+                    session_id="blocked-session",
+                )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("not provisioned", result.stderr)
+            self.assertIn("codex sandbox setup --elevated --current-user", result.stderr)
+            self.assertNotIn("unelevated", result.stderr)
+            self.assertNotIn("danger-full-access", result.stderr)
+
+    def test_mapping_is_invalidated_when_windows_sandbox_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="biel4",
+                backend="app_server",
+            )
+            _save_thread_mapping(config, agent, repository, "old-thread", windows_sandbox="elevated")
+            self.assertIsNone(
+                _load_thread_mapping(config, agent, repository, windows_sandbox="unelevated")
+            )
+            self.assertFalse(_mapping_path(config, agent, repository).exists())
 
     def test_process_key_is_scoped_to_repository(self) -> None:
         config = _config(Path("C:/dual-codex-test"))

@@ -20,6 +20,20 @@
         }
       }
     },
-    "remaining_issues": {"type": "array", "items": {"type": "string"}}
+    "remaining_issues": {"type": "array", "items": {"type": "string"}},
+    "memory_updates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "subject", "content", "evidence"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["decision", "architecture", "workflow", "constraint", "discovery"]},
+          "subject": {"type": "string", "minLength": 1},
+          "content": {"type": "string", "minLength": 1},
+          "evidence": {"type": "string", "minLength": 1}
+        }
+      }
+    }
   }
 }

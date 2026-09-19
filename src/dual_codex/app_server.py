@@ -27,23 +27,31 @@ class AppServerError(RuntimeError):
 
 
 _EVENT_PUBLICATION_QUEUE_SIZE = 64
-_HEADLESS_WINDOWS_SANDBOX_OVERRIDE = 'windows.sandbox="unelevated"'
 _HEADLESS_RAW_EVENTS_VERSION = "responses-raw-v1"
+_WINDOWS_SANDBOX_MODES = {"elevated", "unelevated"}
+
+
+def _profile_config_identity(agent: AgentConfig) -> str:
+    """Invalidate persistent App Server processes when profile config changes."""
+
+    import hashlib
+
+    path = agent.codex_home.expanduser() / "config.toml"
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return "missing"
 
 
 def _app_server_command(config: OrchestratorConfig) -> list[str]:
     """Build the non-interactive App Server command.
 
-    The Windows ``elevated`` sandbox implementation starts a UAC/setup helper
-    when a turn first executes a command. An App Server launched on stdio has
-    no UAC ceremony, so use the ACL-based implementation for this transport
-    only. The configured account backend and normal Windows/TUI path are not
-    changed.
+    The account-isolated ``CODEX_HOME`` owns the effective Windows sandbox
+    configuration. Do not inject a transport-specific override here: doing so
+    would silently weaken an explicitly provisioned elevated profile.
     """
 
     command = [config.codex_command, "app-server", "--stdio"]
-    if os.name == "nt":
-        command.extend(["-c", _HEADLESS_WINDOWS_SANDBOX_OVERRIDE])
     return command
 
 
@@ -147,6 +155,13 @@ def _error_message(response: dict[str, Any]) -> str:
     if isinstance(error, dict):
         return _json_error(str(error.get("message") or error))
     return _json_error(str(error or "App Server request failed."))
+
+
+def _windows_sandbox_setup_command(agent: AgentConfig) -> str:
+    return (
+        "codex sandbox setup --elevated --current-user --codex-home "
+        f'"{agent.codex_home.expanduser().resolve()}"'
+    )
 
 
 def _raw_response_item_evidence(item: Any) -> dict[str, Any] | None:
@@ -274,6 +289,8 @@ class _AppServerProcess:
         ] = queue.Queue(maxsize=_EVENT_PUBLICATION_QUEUE_SIZE)
         self._event_publication_stop = threading.Event()
         self._closed = False
+        self.windows_sandbox = ""
+        self.windows_sandbox_readiness = "not_checked"
         command = _app_server_command(config)
         process_args = _prepare_command([str(item) for item in command])
         env = codex_environment(agent)
@@ -308,6 +325,7 @@ class _AppServerProcess:
             if "error" in response:
                 raise AppServerError(f"App Server initialize failed: {_error_message(response)}")
             self.notify("initialized")
+            self.windows_sandbox, self.windows_sandbox_readiness = self._verify_windows_sandbox()
         except Exception:
             self.close()
             raise
@@ -323,6 +341,57 @@ class _AppServerProcess:
     @property
     def events(self) -> list[dict[str, Any]]:
         return list(self._events)
+
+    def _verify_windows_sandbox(self) -> tuple[str, str]:
+        """Read the effective profile policy and gate elevated provisioning.
+
+        ``config/read`` and ``windowsSandbox/readiness`` are App Server APIs;
+        no local ACL probing or implicit sandbox downgrade is attempted.
+        """
+
+        if os.name != "nt":
+            return "", "not_applicable"
+        response = self.request(
+            "config/read",
+            {"cwd": str(self.repository), "includeLayers": False},
+            timeout=self.config.app_server_initialize_timeout,
+        )
+        if "error" in response:
+            raise AppServerError(
+                "Unable to verify the effective Windows sandbox policy: "
+                + _error_message(response)
+            )
+        result = response.get("result")
+        effective = result.get("config") if isinstance(result, Mapping) else None
+        windows = effective.get("windows") if isinstance(effective, Mapping) else None
+        mode = windows.get("sandbox") if isinstance(windows, Mapping) else None
+        if mode is None:
+            # No explicit setting is intentionally left to Codex defaults and
+            # recorded as such; the adapter never supplies a fallback value.
+            return "unspecified", "not_checked"
+        if not isinstance(mode, str) or mode not in _WINDOWS_SANDBOX_MODES:
+            raise AppServerError(f"Unsupported effective Windows sandbox policy: {mode!r}.")
+        if mode != "elevated":
+            return mode, "not_required"
+        readiness = self.request(
+            "windowsSandbox/readiness",
+            None,
+            timeout=self.config.app_server_initialize_timeout,
+        )
+        if "error" in readiness:
+            raise AppServerError(
+                "Unable to verify elevated Windows sandbox provisioning: "
+                + _error_message(readiness)
+            )
+        readiness_result = readiness.get("result")
+        status = readiness_result.get("status") if isinstance(readiness_result, Mapping) else None
+        if status != "ready":
+            raise AppServerError(
+                "Elevated Windows sandbox is not provisioned "
+                f"(readiness={status or 'unknown'}). Run the official command "
+                f"from an administrative terminal: {_windows_sandbox_setup_command(self.agent)}"
+            )
+        return mode, "ready"
 
     def set_event_context(self, journal: LiveEventJournal | None, **context: str) -> None:
         with self._lock:
@@ -553,7 +622,12 @@ class _AppServerProcess:
             params["model"] = self.agent.model
         if self.agent.service_tier:
             params["serviceTier"] = self.agent.service_tier
-        stored = _load_thread_mapping(self.config, self.agent, repository)
+        stored = _load_thread_mapping(
+            self.config,
+            self.agent,
+            repository,
+            windows_sandbox=self.windows_sandbox,
+        )
         if stored:
             response = self.request(
                 "thread/resume",
@@ -571,7 +645,13 @@ class _AppServerProcess:
         thread_id = thread.get("id") if isinstance(thread, dict) else None
         if not isinstance(thread_id, str) or not thread_id:
             raise AppServerError("App Server thread/start returned no thread ID.")
-        _save_thread_mapping(self.config, self.agent, repository, thread_id)
+        _save_thread_mapping(
+            self.config,
+            self.agent,
+            repository,
+            thread_id,
+            windows_sandbox=self.windows_sandbox,
+        )
         return thread_id, False
 
     def thread_id_for(self, repository: Path) -> tuple[str, bool]:
@@ -758,20 +838,21 @@ class _AppServerProcess:
 
 
 _PROCESS_LOCK = threading.RLock()
-_PROCESSES: dict[tuple[str, str, str, str, str], _AppServerProcess] = {}
+_PROCESSES: dict[tuple[str, str, str, str, str, str], _AppServerProcess] = {}
 
 
 def _process_key(
     agent: AgentConfig,
     config: OrchestratorConfig,
     repository: Path | None = None,
-) -> tuple[str, str, str, str, str]:
+) -> tuple[str, str, str, str, str, str]:
     return (
         agent.account_name,
         str(agent.codex_home.expanduser().resolve()),
         str(Path(config.codex_command).resolve()),
         str(bool(agent.network_access)),
         str(repository.expanduser().resolve()) if repository is not None else "",
+        _profile_config_identity(agent),
     )
 
 
@@ -823,25 +904,40 @@ def _mapping_path(config: OrchestratorConfig, agent: AgentConfig, repository: Pa
     return config.runs_dir / "app-server-sessions" / (hashlib.sha256(key).hexdigest() + ".json")
 
 
-def _load_thread_mapping(config: OrchestratorConfig, agent: AgentConfig, repository: Path) -> str | None:
+def _load_thread_mapping(
+    config: OrchestratorConfig,
+    agent: AgentConfig,
+    repository: Path,
+    *,
+    windows_sandbox: str = "",
+) -> str | None:
     path = _mapping_path(config, agent, repository)
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError):
         return None
+    expected_windows_sandbox = windows_sandbox if os.name == "nt" else ""
     if (
         value.get("repository") != str(repository.resolve())
         or value.get("account") != agent.account_name
         or value.get("codex_home") != str(agent.codex_home.resolve())
-        or value.get("headless_windows_sandbox") != ("unelevated" if os.name == "nt" else "")
+        or value.get("windows_sandbox") != expected_windows_sandbox
         or value.get("headless_raw_events") != (_HEADLESS_RAW_EVENTS_VERSION if os.name == "nt" else "")
     ):
+        _delete_thread_mapping(config, agent, repository)
         return None
     thread_id = value.get("thread_id")
     return thread_id if isinstance(thread_id, str) and thread_id else None
 
 
-def _save_thread_mapping(config: OrchestratorConfig, agent: AgentConfig, repository: Path, thread_id: str) -> None:
+def _save_thread_mapping(
+    config: OrchestratorConfig,
+    agent: AgentConfig,
+    repository: Path,
+    thread_id: str,
+    *,
+    windows_sandbox: str = "",
+) -> None:
     path = _mapping_path(config, agent, repository)
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(
@@ -851,7 +947,7 @@ def _save_thread_mapping(config: OrchestratorConfig, agent: AgentConfig, reposit
             "codex_home": str(agent.codex_home.resolve()),
             "repository": str(repository.resolve()),
             "thread_id": thread_id,
-            "headless_windows_sandbox": "unelevated" if os.name == "nt" else "",
+            "windows_sandbox": windows_sandbox if os.name == "nt" else "",
             "headless_raw_events": _HEADLESS_RAW_EVENTS_VERSION if os.name == "nt" else "",
         },
     )
@@ -899,8 +995,12 @@ def run_codex_app_server(
         "task_sha256": task_sha256,
         "app_server_backend": agent.backend,
         "app_server_account": agent.account_name,
+        "app_server_role": role,
         "app_server_repository": str(repository.resolve()),
-        "app_server_sandbox_override": _HEADLESS_WINDOWS_SANDBOX_OVERRIDE if os.name == "nt" else "",
+        "app_server_windows_sandbox": "",
+        "app_server_windows_sandbox_readiness": "not_checked",
+        "app_server_sandbox_policy": agent.sandbox,
+        "app_server_approval_policy": "never" if agent.sandbox == "workspace-write" else "on-request",
         "app_server_raw_events": os.name == "nt",
         "app_server_tui": False,
         "app_server_fallback": False,
@@ -962,6 +1062,8 @@ def run_codex_app_server(
         output_path.write_text(_normalise_report(assistant), encoding="utf-8")
         metadata.update(
             {
+                "app_server_windows_sandbox": getattr(process, "windows_sandbox", ""),
+                "app_server_windows_sandbox_readiness": getattr(process, "windows_sandbox_readiness", "not_checked"),
                 "app_server_thread_id": thread_id,
                 "app_server_turn_id": turn["turn_id"],
                 "app_server_thread_resumed": str(resumed).lower(),

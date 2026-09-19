@@ -1571,13 +1571,26 @@ class TerminalManager:
         if _record_path(self.config, session_id).exists():
             current = self.status(session_id)
             if current.get("state") == "running":
+                session = self._load(session_id)
+                requested_repository = Path(kwargs["repository"]).expanduser().resolve()
+                if not same_path(session.repository, requested_repository):
+                    raise TerminalError(
+                        f"Existing terminal session '{session_id}' repository identity mismatch."
+                    )
+                agent = kwargs.get("agent")
+                if agent is not None and (
+                    session.account != agent.account_name
+                    or not same_path(session.codex_home, agent.codex_home)
+                ):
+                    raise TerminalError(
+                        f"Existing terminal session '{session_id}' account or CODEX_HOME identity mismatch."
+                    )
                 requested = {Path(item).resolve() for item in kwargs.get("add_dirs", ())}
-                available = {Path(item).resolve() for item in self._load(session_id).add_dirs}
+                available = {Path(item).resolve() for item in session.add_dirs}
                 if not requested.issubset(available):
                     raise TerminalError(
                         f"Existing terminal session '{session_id}' was not started with the required task transport directory."
                     )
-                session = self._load(session_id)
                 if visible:
                     session = self._ensure_visible_viewer(session)
                 self.wait_until_ready(

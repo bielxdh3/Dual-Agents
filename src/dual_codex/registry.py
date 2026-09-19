@@ -13,6 +13,7 @@ from .config import (
     AccountConfig,
     ConfigError,
     OrchestratorConfig,
+    SUPPORTED_BACKENDS,
     SUPPORTED_ROLES,
     _account,
     is_legacy_raw,
@@ -21,6 +22,7 @@ from .config import (
     validate_setting_value,
     validate_role_name,
 )
+from .antigravity import antigravity_status
 from .process import codex_environment, run_command
 
 
@@ -171,6 +173,8 @@ def _agent_for_status(account: AccountConfig):
 
 def login_status(config: OrchestratorConfig, account: AccountConfig) -> str:
     """Check login status without reading or displaying authentication data."""
+    if account.backend == "antigravity":
+        return antigravity_status(config.antigravity_command, cwd=config.project_root)
     if shutil.which(config.codex_command) is None and not Path(config.codex_command).exists():
         return "UNKNOWN"
     try:
@@ -192,6 +196,11 @@ def _verify_login(config: OrchestratorConfig, account: AccountConfig) -> None:
 
 
 def _run_login(config: OrchestratorConfig, account: AccountConfig) -> None:
+    if account.backend == "antigravity":
+        raise RuntimeError(
+            "Antigravity authentication is managed by the installed agy CLI; "
+            "use its interactive login flow instead of Codex login."
+        )
     try:
         run_command(
             [config.codex_command, "login"],
@@ -386,8 +395,10 @@ def update_account_settings(
     if account is None:
         raise ConfigError(f"Unknown account '{name}'.")
     new_backend = account.backend if backend is None else str(backend).strip()
-    if new_backend not in {"app_server", "windows"}:
-        raise ConfigError("backend must be 'app_server' or 'windows'.")
+    if new_backend not in SUPPORTED_BACKENDS:
+        raise ConfigError(
+            "backend must be one of: " + ", ".join(SUPPORTED_BACKENDS) + "."
+        )
     updated = AccountConfig(
         name=account.name,
         label=account.label,

@@ -1,4 +1,4 @@
-# Referencia CLI
+# Referencia CLI — Dual Agents
 
 ## Delegacao
 
@@ -29,7 +29,12 @@ Opcoes adicionais:
 
 O comando imprime transicoes `[1/5]` a `[5/5]`, duracao, repositorio resolvido,
 diretorio da execucao e uma linha final `DUAL_CODEX_RESULT` com JSON compacto.
-O stdout/stderr do Codex nao e repassado ao usuario; logs de diagnostico sao
+O resultado persistido tambem registra o campo `repository` com o mesmo caminho
+canonico usado para o Git e para o processo Executor.
+O `delegate` exige que o role `executor` use o `agy` Antigravity/Gemini
+configurado; se o probe de versao falhar ou outro backend estiver configurado,
+a delegacao falha fechado sem fallback. O stdout/stderr do Executor nao e
+repassado ao usuario; logs de diagnostico sao
 sanitizados no diretorio da execucao.
 
 ## Schemas
@@ -75,7 +80,7 @@ force-push, merge, release, tag, deploy ou mutacao destrutiva. O App Server nao
 recebe acesso ao credential store; o broker deve ser chamado pelo control
 plane confiavel no contexto normal do host.
 
-`dual-codex dashboard` serve uma interface local em `127.0.0.1` (porta livre
+`dual-codex dashboard` serve uma interface Dual Agents local em `127.0.0.1` (porta livre
 por padrão) e abre o navegador, salvo com `--no-open`. O painel usa chamadas
 estruturadas do App Server por conta e degrada métodos ausentes para
 `Unknown`/`Not available`; não há endpoint genérico de shell ou filesystem.
@@ -87,7 +92,7 @@ alterada silenciosamente.
 ### Live Executor
 
 A aba `EXECUTOR LIVE` observa o Executor real por meio do journal JSONL escrito
-pela delegacao/App Server. O dashboard nao inicia um App Server proprio para
+pela delegacao/Antigravity. O dashboard nao inicia um processo `agy` proprio para
 essa tela. O journal e escolhido no servidor a partir de `runs_dir`, da conta e
 role `executor` e da identidade do repositorio; nenhum caminho de arquivo vindo
 do navegador e aceito.

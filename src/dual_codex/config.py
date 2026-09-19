@@ -8,7 +8,7 @@ import tomllib
 
 
 SUPPORTED_ROLES = ("orchestrator", "architect", "reviewer", "executor")
-SUPPORTED_BACKENDS = ("app_server", "windows")
+SUPPORTED_BACKENDS = ("app_server", "windows", "antigravity")
 _ACCOUNT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 _ROLE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 _SETTING_VALUE = re.compile(r"^[^\x00-\x1f\x7f]{0,200}$")
@@ -55,6 +55,7 @@ class OrchestratorConfig:
     project_root: Path
     config_path: Path
     legacy: bool = False
+    antigravity_command: str = "agy"
     node_command: str = "node"
     terminal_readiness_timeout: float = 60.0
     terminal_turn_start_timeout: float = 15.0
@@ -274,6 +275,10 @@ def load_config(path: Path) -> OrchestratorConfig:
         project_root=Path(__file__).resolve().parents[2],
         config_path=path,
         legacy=legacy,
+        antigravity_command=(
+            validate_setting_value(orch.get("antigravity_command", "agy"), "antigravity_command")
+            or "agy"
+        ),
         node_command=str(orch.get("node_command", "node")).strip() or "node",
         terminal_readiness_timeout=terminal_readiness_timeout,
         terminal_turn_start_timeout=terminal_turn_start_timeout,

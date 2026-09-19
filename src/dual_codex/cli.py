@@ -11,6 +11,7 @@ import time
 from uuid import uuid4
 
 from .config import AgentConfig, ConfigError, SUPPORTED_ROLES, load_config
+from .antigravity import antigravity_status
 from .delegation import delegate
 from .doctor import run_doctor
 from .git import ensure_git_repository, status_porcelain
@@ -314,6 +315,19 @@ def _codex_details(config) -> tuple[str, str]:
         return executable or config.codex_command, "unknown"
 
 
+def _antigravity_details(config) -> tuple[str, str, str]:
+    command = config.antigravity_command
+    executable = shutil.which(command)
+    if executable is None and not Path(command).exists():
+        return command, "unknown", "NOT FOUND"
+    try:
+        result = run_command([command, "--version"], cwd=config.project_root, check=False)
+        version = _one_line(result.stdout or result.stderr).splitlines()[0] if (result.stdout or result.stderr) else "unknown"
+    except OSError:
+        version = "unknown"
+    return executable or command, version, antigravity_status(command, cwd=config.project_root)
+
+
 def _git_state(config) -> str:
     try:
         ensure_git_repository(config.repository)
@@ -349,6 +363,7 @@ def _status_payload(config) -> dict:
     except ConfigError as exc:
         executor_status = {"name": "", "label": "", "login": "UNASSIGNED", "error": str(exc)}
     codex_path, version = _codex_details(config)
+    antigravity_path, antigravity_version, antigravity_login = _antigravity_details(config)
     return {
         "schema_version": 1,
         "accounts": accounts,
@@ -357,6 +372,11 @@ def _status_payload(config) -> dict:
         "repository": str(config.repository),
         "git_state": _git_state(config),
         "codex_cli": {"path": codex_path, "version": version},
+        "antigravity_cli": {
+            "path": antigravity_path,
+            "version": antigravity_version,
+            "status": antigravity_login,
+        },
         "config": str(config.config_path),
     }
 
@@ -365,7 +385,7 @@ def _show_status(config, *, json_output: bool = False) -> None:
     if json_output:
         print(json.dumps(_status_payload(config), ensure_ascii=False, indent=2), flush=True)
         return
-    print("Dual Codex Status")
+    print("Dual Agents Status")
     print()
     _display_account_table(config)
     codex_path, version = _codex_details(config)
@@ -374,6 +394,10 @@ def _show_status(config, *, json_output: bool = False) -> None:
     print(f"Git state: {_git_state(config)}")
     print(f"Codex CLI: {codex_path}")
     print(f"Codex CLI version: {version}")
+    antigravity_path, antigravity_version, antigravity_login = _antigravity_details(config)
+    print(f"Antigravity CLI: {antigravity_path}")
+    print(f"Antigravity CLI version: {antigravity_version}")
+    print(f"Antigravity Executor status: {antigravity_login}")
     print(f"Config: {config.config_path}")
     if config.legacy:
         print("Warning: legacy [architect]/[executor] configuration detected; run dual-codex migrate-config.")

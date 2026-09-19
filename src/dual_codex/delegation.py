@@ -15,6 +15,7 @@ from uuid import uuid4
 from .codex import run_codex_exec as _run_codex_exec_legacy
 from .codex import run_codex_app_server
 from .codex import run_codex_terminal
+from .antigravity import antigravity_status, run_antigravity
 from .config import ConfigError, OrchestratorConfig
 from .git import ensure_git_repository, head_revision, status_and_diff, status_porcelain
 from .live_events import LiveEventJournal, repository_identity
@@ -23,6 +24,7 @@ from .process import CommandResult
 from .registry import login_status
 from .report import (
     EXECUTOR_REPORT_FIELDS,
+    EXECUTOR_REPORT_OPTIONAL_FIELDS,
     atomic_write_json,
     dump_json,
     normalise_executor_report,
@@ -33,6 +35,22 @@ def run_codex_exec(**kwargs):
     """Select the configured structured backend while preserving the TUI seam."""
     config = kwargs.get("config")
     agent = kwargs.get("agent")
+    if agent is not None and agent.backend == "antigravity":
+        if kwargs.get("reuse_existing"):
+            raise DelegationError("Antigravity does not support native TUI reuse.")
+        return run_antigravity(
+            command=getattr(config, "antigravity_command", "agy"),
+            agent=agent,
+            repository=kwargs["repository"],
+            prompt=kwargs["prompt"],
+            output_path=kwargs["output_path"],
+            schema_path=kwargs.get("schema_path"),
+            config=config,
+            conversation_id=kwargs.get("conversation_id", ""),
+            task_artifact_path=kwargs.get("task_artifact_path"),
+            task_sha256=kwargs.get("task_sha256", ""),
+            progress=kwargs.get("progress"),
+        )
     if kwargs.get("reuse_existing") and agent is not None and agent.backend != "windows":
         raise DelegationError("Strict reuse-existing requires a registered native Windows Executor TUI.")
     if agent is not None and agent.backend == "app_server":
@@ -151,6 +169,7 @@ class DelegationRequest:
     max_correction_cycles: int
     authorization: MissionAuthorization
     parent_request_id: str | None = None
+    antigravity_conversation_id: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -165,6 +184,7 @@ class DelegationRequest:
             "max_correction_cycles": self.max_correction_cycles,
             "authorization": self.authorization.as_dict(),
             **({"parent_request_id": self.parent_request_id} if self.parent_request_id else {}),
+            **({"antigravity_conversation_id": self.antigravity_conversation_id} if self.antigravity_conversation_id else {}),
         }
 
 
@@ -208,7 +228,7 @@ def _safe_diff(value: str) -> str:
                 for marker in ("auth.json", ".env", "credentials", "secret")
             )
             if redact_section:
-                lines.append("diff section redacted by Dual Codex\n")
+                lines.append("diff section redacted by Dual Agents\n")
                 continue
         if not redact_section:
             lines.append(line)
@@ -288,6 +308,7 @@ def parse_request(
         "max_correction_cycles",
         "authorization",
         "parent_request_id",
+        "antigravity_conversation_id",
     }
     unknown = sorted(set(raw) - allowed)
     if unknown:
@@ -303,7 +324,7 @@ def parse_request(
         raise InvalidRequestError(
             f"Unknown delegation action '{action}'; supported actions: implement, correct."
         )
-    repository_value = repository_override or raw.get("repository")
+    repository_value = repository_override if repository_override is not None else raw.get("repository")
     if not isinstance(repository_value, str) or not repository_value.strip():
         raise InvalidRequestError(
             "A target repository is required in the request or through --repository."
@@ -340,6 +361,14 @@ def parse_request(
         if not isinstance(parent_request_id, str) or not _REQUEST_ID.fullmatch(parent_request_id.strip()):
             raise InvalidRequestError("Request field 'parent_request_id' is invalid.")
         parent_request_id = parent_request_id.strip()
+    conversation_id = raw.get("antigravity_conversation_id", "")
+    if not isinstance(conversation_id, str) or len(conversation_id) > 500 or any(
+        char in conversation_id for char in "\r\n"
+    ):
+        raise InvalidRequestError(
+            "Request field 'antigravity_conversation_id' must be a single-line string of at most 500 characters."
+        )
+    conversation_id = conversation_id.strip()
     if action == "correct":
         if not parent_request_id:
             raise InvalidRequestError("Correct requests must link to a parent_request_id.")
@@ -357,6 +386,7 @@ def parse_request(
         max_correction_cycles=max_cycles,
         authorization=authorization,
         parent_request_id=parent_request_id,
+        antigravity_conversation_id=conversation_id,
     )
 
 
@@ -589,6 +619,7 @@ def _result(
     started_at: str,
     finished_at: str,
     summary: str,
+    repository: str = "",
     executor_account: str = "",
     executor_label: str = "",
     executor_sandbox: str = "",
@@ -598,6 +629,7 @@ def _result(
     commands_run: list[str] | None = None,
     tests: list[Any] | None = None,
     remaining_issues: list[str] | None = None,
+    memory_updates: list[dict[str, Any]] | None = None,
     git_status: str = "",
     diff_file: str = "",
     run_directory: str = "",
@@ -608,6 +640,13 @@ def _result(
     app_server_thread_id: str = "",
     app_server_turn_id: str = "",
     app_server_process_id: str = "",
+    executor_windows_sandbox: str = "",
+    executor_windows_sandbox_readiness: str = "",
+    executor_approval_policy: str = "",
+    executor_role: str = "",
+    executor_provider: str = "",
+    antigravity_conversation_id: str = "",
+    antigravity_terminal_status: str = "",
     task_transport: str = "",
     task_artifact: str = "",
     task_sha256: str = "",
@@ -628,10 +667,12 @@ def _result(
             "started_at": started_at,
             "finished_at": finished_at,
             "summary": summary,
+            "repository": repository,
             "files_changed": files_changed or [],
             "commands_run": commands_run or [],
             "tests": tests or [],
             "remaining_issues": remaining_issues or [],
+            "memory_updates": memory_updates or [],
             "git_status": git_status,
             "diff_file": diff_file,
             "run_directory": run_directory,
@@ -642,6 +683,13 @@ def _result(
             "app_server_thread_id": app_server_thread_id,
             "app_server_turn_id": app_server_turn_id,
             "app_server_process_id": app_server_process_id,
+            "executor_windows_sandbox": executor_windows_sandbox,
+            "executor_windows_sandbox_readiness": executor_windows_sandbox_readiness,
+            "executor_approval_policy": executor_approval_policy,
+            "executor_role": executor_role,
+            "executor_provider": executor_provider,
+            "antigravity_conversation_id": antigravity_conversation_id,
+            "antigravity_terminal_status": antigravity_terminal_status,
             "task_transport": task_transport,
             "task_artifact": task_artifact,
             "task_sha256": task_sha256,
@@ -696,7 +744,7 @@ def _write_task_artifact(
     artifact_path = artifact_dir / f"{run_dir.name}.md"
     task = sanitize_text(request.task)
     lines = [
-        "# Dual Codex executor task artifact",
+        "# Dual Agents Antigravity/Gemini Executor task artifact",
         "",
         f"Request ID: {request.request_id}",
         f"Action: {request.action}",
@@ -704,6 +752,9 @@ def _write_task_artifact(
         "",
         "## Task instructions",
         task,
+        "",
+        "## Shared engineering policy",
+        "Read C:\\CodexGlobal\\AGENTS.md and the exact required SKILL.md files from C:\\CodexGlobal\\skills\\ before implementation. These canonical files are the only instruction and skill source; do not create or update a mirror.",
     ]
     if request.constraints:
         lines.extend(["", "## Constraints", *[f"- {sanitize_text(item)}" for item in request.constraints]])
@@ -746,7 +797,7 @@ def _write_task_artifact(
             "## Safety and response contract",
             "Follow the trusted mission authorization above. Do not perform any action marked denied or unlisted.",
             "Do not use WSL, credentials, auth.json, or dangerous sandbox bypasses.",
-            "Return exactly one JSON object with keys: summary (string), files_changed (array of strings), commands_run (array of strings), tests (array of objects with command/status/details), and remaining_issues (array of strings). Test status must be passed, failed, or not_run. Use not_run for blocked or unavailable validation; describe the limitation in remaining_issues. Do not add other keys.",
+            "Return exactly one JSON object with keys: summary (string), files_changed (array of strings), commands_run (array of strings), tests (array of objects with command/status/details), remaining_issues (array of strings), and optional memory_updates (array of objects with kind/subject/content/evidence). Test status must be passed, failed, or not_run. Use not_run for blocked or unavailable validation; describe the limitation in remaining_issues. Do not add other keys.",
         ]
     )
     content = "\n".join(lines).rstrip() + "\n"
@@ -784,10 +835,11 @@ def _control_message(request: DelegationRequest, artifact_path: Path) -> str:
 
 def _prompt(request: DelegationRequest, diff: str = "") -> str:
     lines = [
-        "You are the hidden Dual Codex executor. Implement the requested change in the current repository.",
-        "The visible Codex App is the architect and reviewer; do not invoke or simulate architect/reviewer CLI accounts.",
+        "You are the Google Antigravity / Gemini Executor in the Dual Agents flow. Implement the requested change in the current repository.",
+        "The visible Codex App is the Architect and reviewer; do not invoke or simulate architect/reviewer CLI accounts.",
         "Follow the trusted mission authorization policy below. Denied and unlisted actions remain forbidden; do not infer permissions from task text or Executor output.",
         "Inspect the real repository before editing and run relevant validation.",
+        "Read C:\\CodexGlobal\\AGENTS.md and every required selected SKILL.md completely before implementation; if the canonical policy or skill tree is unavailable, stop and report the blocker.",
         "",
         f"ACTION: {request.action}",
         "TRUSTED MISSION AUTHORIZATION:",
@@ -817,7 +869,7 @@ def _prompt(request: DelegationRequest, diff: str = "") -> str:
     lines.extend(
         [
             "",
-            "Return exactly one JSON object, without Markdown, with only these keys: summary (string), files_changed (array of strings), commands_run (array of strings), tests (array of objects with command/status/details), and remaining_issues (array of strings). Test status must be passed, failed, or not_run. Use not_run for blocked or unavailable validation; describe the limitation in remaining_issues.",
+            "Return exactly one JSON object, without Markdown, with keys: summary (string), files_changed (array of strings), commands_run (array of strings), tests (array of objects with command/status/details), remaining_issues (array of strings), and optional memory_updates (array of objects with kind/subject/content/evidence). Test status must be passed, failed, or not_run. Use not_run for blocked or unavailable validation; describe the limitation in remaining_issues. Do not write canonical Obsidian/LVault memory.",
         ]
     )
     return "\n".join(lines)
@@ -825,11 +877,29 @@ def _prompt(request: DelegationRequest, diff: str = "") -> str:
 
 _REPORT_FIELDS = EXECUTOR_REPORT_FIELDS
 _REPORT_TEST_STATUSES = {"passed", "failed", "not_run"}
+_AUXILIARY_PROTOCOL_KEYS = frozenset({"toolAction", "toolSummary"})
+_REPORT_SHAPE_KEYS = frozenset(
+    {
+        *EXECUTOR_REPORT_FIELDS,
+        *EXECUTOR_REPORT_OPTIONAL_FIELDS,
+        "status",
+        "starting_sha",
+        "final_sha",
+        "behavior_changed",
+        "validations_run",
+        "validations_not_run",
+        "remaining_limitations",
+        "next_plan_tree_item",
+        "push_result",
+        "remote_result",
+        "pr_result",
+    }
+)
 
 
 def _validate_executor_report(value: Mapping[str, Any]) -> str:
     missing = sorted(_REPORT_FIELDS - set(value))
-    extra = sorted(set(value) - _REPORT_FIELDS)
+    extra = sorted(set(value) - (_REPORT_FIELDS | EXECUTOR_REPORT_OPTIONAL_FIELDS))
     if missing or extra:
         details = []
         if missing:
@@ -855,7 +925,65 @@ def _validate_executor_report(value: Mapping[str, Any]) -> str:
             return f"tests[{index}] fields must be strings"
         if test["status"] not in _REPORT_TEST_STATUSES:
             return f"tests[{index}] has unsupported status '{test['status']}'"
+    if "memory_updates" in value:
+        updates = value["memory_updates"]
+        if not isinstance(updates, list):
+            return "memory_updates must be an array"
+        allowed_kinds = {"decision", "architecture", "workflow", "constraint", "discovery"}
+        for index, update in enumerate(updates):
+            if not isinstance(update, Mapping) or set(update) != {"kind", "subject", "content", "evidence"}:
+                return (
+                    f"memory_updates[{index}] must contain only kind, subject, content and evidence"
+                )
+            if not all(isinstance(update[field], str) and update[field].strip() for field in update):
+                return f"memory_updates[{index}] fields must be non-empty strings"
+            if update["kind"] not in allowed_kinds:
+                return f"memory_updates[{index}] has unsupported kind '{update['kind']}'"
     return ""
+
+
+def _looks_like_executor_report(value: Mapping[str, Any]) -> bool:
+    """Distinguish report-shaped JSON from unrelated protocol metadata."""
+
+    return bool(set(value) & _REPORT_SHAPE_KEYS)
+
+
+def _decode_concatenated_json(raw_text: str) -> tuple[list[Any], str]:
+    """Decode JSON values embedded in a stream response.
+
+    Antigravity can repeat the terminal report in its response text and may
+    append a non-report tool metadata object.  Decode each complete value so
+    equivalent reports can be deduplicated without accepting malformed
+    report-shaped JSON.  Human text around the values is intentionally ignored.
+    """
+
+    decoder = json.JSONDecoder()
+    values: list[Any] = []
+    cursor = 0
+    while cursor < len(raw_text):
+        match = re.search(r"[\[{]", raw_text[cursor:])
+        if match is None:
+            break
+        start = cursor + match.start()
+        try:
+            value, end = decoder.raw_decode(raw_text, start)
+        except json.JSONDecodeError as exc:
+            # A JSON-looking object after a valid value is a real protocol
+            # candidate; fail closed instead of silently dropping it.  Braces
+            # used as ordinary prose (for example, ``{placeholder}``) are not.
+            tail = raw_text[start + 1 :].lstrip()
+            looks_json = raw_text[start] == "{" and (not tail or tail[0] in '\"}')
+            looks_json = looks_json or (
+                raw_text[start] == "["
+                and (not tail or tail[0] in '\"{[]-0123456789ntf')
+            )
+            if values and looks_json:
+                return values, f"{exc}"
+            cursor = start + 1
+            continue
+        values.append(value)
+        cursor = end
+    return values, ""
 
 
 def _read_report(path: Path) -> tuple[dict[str, Any] | None, str]:
@@ -865,20 +993,65 @@ def _read_report(path: Path) -> tuple[dict[str, Any] | None, str]:
         raw_text = path.read_text(encoding="utf-8-sig", errors="replace")
     except OSError as exc:
         return None, f"Executor report could not be read: {exc}"
+    parse_error = ""
     try:
         raw = json.loads(raw_text)
+        values: list[Any] = [raw]
     except (UnicodeError, json.JSONDecodeError) as exc:
-        _write_text(path.with_suffix(".invalid.log"), raw_text)
-        return None, f"Executor report is not valid JSON: {exc}"
-    if not isinstance(raw, dict):
+        values, parse_error = _decode_concatenated_json(raw_text)
+        if parse_error:
+            _write_text(path.with_suffix(".invalid.log"), raw_text)
+            return None, f"Executor report is not valid JSON: {parse_error}"
+        if not values:
+            _write_text(path.with_suffix(".invalid.log"), raw_text)
+            return None, f"Executor report is not valid JSON: {exc}"
+
+    if len(values) == 1 and not isinstance(values[0], dict):
         return None, "Executor report must be a JSON object."
-    sanitized = normalise_executor_report(sanitize_value(raw))
-    validation_error = _validate_executor_report(sanitized)
-    if validation_error:
+
+    reports: list[dict[str, Any]] = []
+    schema_errors: list[str] = []
+    unclassified_values = False
+    for value in values:
+        if not isinstance(value, dict):
+            # Arrays and scalars cannot be authoritative executor reports.
+            unclassified_values = True
+            continue
+        sanitized_value = sanitize_value(value)
+        value_keys = set(sanitized_value)
+        auxiliary_keys = value_keys & _AUXILIARY_PROTOCOL_KEYS
+        candidate_value = {
+            key: item
+            for key, item in sanitized_value.items()
+            if key not in _AUXILIARY_PROTOCOL_KEYS
+        }
+        sanitized = normalise_executor_report(candidate_value)
+        validation_error = _validate_executor_report(sanitized)
+        if not validation_error:
+            reports.append(sanitized)
+        elif _looks_like_executor_report(sanitized):
+            schema_errors.append(validation_error)
+        elif not (auxiliary_keys and value_keys.issubset(_AUXILIARY_PROTOCOL_KEYS)):
+            # Unknown structured JSON is not silently accepted beside a valid
+            # report. Only the narrow, known tool metadata shape is ignorable.
+            unclassified_values = True
+
+    if schema_errors:
         _write_text(path.with_suffix(".invalid.log"), raw_text)
-        return None, f"Executor report schema validation failed: {validation_error}."
-    atomic_write_json(path, sanitized)
-    return sanitized, ""
+        return None, f"Executor report schema validation failed: {schema_errors[0]}."
+    if unclassified_values:
+        _write_text(path.with_suffix(".invalid.log"), raw_text)
+        return None, "Executor report contains unclassified structured JSON."
+    if not reports:
+        _write_text(path.with_suffix(".invalid.log"), raw_text)
+        return None, "Executor report did not contain a valid structured report."
+
+    canonical = reports[0]
+    if any(report != canonical for report in reports[1:]):
+        _write_text(path.with_suffix(".invalid.log"), raw_text)
+        return None, "Executor report contains conflicting structured JSON results."
+    atomic_write_json(path, canonical)
+    return canonical, ""
 
 
 def _report_list(report: Mapping[str, Any], name: str) -> list[Any]:
@@ -1053,6 +1226,7 @@ def _failed_outcome(
     status: str,
     summary: str,
     error: str,
+    repository: str = "",
     executor_account: str = "",
     executor_label: str = "",
     executor_sandbox: str = "",
@@ -1069,6 +1243,7 @@ def _failed_outcome(
             started_at=started_at,
             finished_at=finished_at,
             summary=summary,
+            repository=repository,
             executor_account=executor_account,
             executor_label=executor_label,
             executor_sandbox=executor_sandbox,
@@ -1158,6 +1333,7 @@ def delegate(
                 status="executor_unavailable",
                 summary="The executor role is unassigned.",
                 error=str(exc),
+                repository=str(request.repository),
                 parent_request_id=request.parent_request_id,
                 reuse_existing=reuse_existing,
             )
@@ -1165,19 +1341,43 @@ def delegate(
         executor_label = agent.label
         executor_sandbox = agent.sandbox
         _emit(output, started, f"[2/5] Resolving executor account: {executor_account}")
-        if login_status(config, config.account_for_role("executor")) != "OK":
+        if agent.backend != "antigravity":
             return _failed_outcome(
                 result_file=result_file,
                 request_id=request_id,
                 started_at=started_at,
                 started=started,
                 status="executor_unavailable",
-                summary="The executor role is not logged in or cannot be reached.",
-                error=f"Codex login status failed for account '{executor_account}'.",
+                summary="Dual Agents requires Antigravity/Gemini as the Executor backend.",
+                error=(
+                    f"Configured Executor backend '{agent.backend}' is not Antigravity; "
+                    "no Codex Executor fallback is permitted."
+                ),
                 executor_account=executor_account,
                 executor_label=executor_label,
                 executor_sandbox=executor_sandbox,
                 parent_request_id=request.parent_request_id,
+                repository=str(request.repository),
+                reuse_existing=reuse_existing,
+            )
+        antigravity_command = getattr(config, "antigravity_command", "agy")
+        if antigravity_status(antigravity_command, cwd=config.project_root) != "OK":
+            return _failed_outcome(
+                result_file=result_file,
+                request_id=request_id,
+                started_at=started_at,
+                started=started,
+                status="executor_unavailable",
+                summary="The Antigravity/Gemini Executor is unavailable or cannot be reached.",
+                error=(
+                    "Antigravity executable is unavailable or failed its version probe: "
+                    f"{antigravity_command}"
+                ),
+                executor_account=executor_account,
+                executor_label=executor_label,
+                executor_sandbox=executor_sandbox,
+                parent_request_id=request.parent_request_id,
+                repository=str(request.repository),
                 reuse_existing=reuse_existing,
             )
         output(f"Target repository: {request.repository}")
@@ -1233,6 +1433,7 @@ def delegate(
                 request_id=request.request_id,
                 run_id=run_dir.name,
                 role="executor",
+                conversation_id=request.antigravity_conversation_id,
                 progress=lambda message: _emit(output, started, f"[3/5] {message}"),
                 reuse_existing=reuse_existing,
             )
@@ -1276,6 +1477,7 @@ def delegate(
                 started_at=started_at,
                 finished_at=finished_at,
                 summary=summary,
+                repository=str(request.repository),
                 executor_account=executor_account,
                 executor_label=executor_label,
                 executor_sandbox=executor_sandbox,
@@ -1285,6 +1487,7 @@ def delegate(
                 commands_run=_report_list(report or {}, "commands_run"),
                 tests=_report_list(report or {}, "tests"),
                 remaining_issues=remaining_issues,
+                memory_updates=_report_list(report or {}, "memory_updates"),
                 git_status=git_status,
                 diff_file=diff_file,
                 run_directory=str(run_dir),
@@ -1295,6 +1498,24 @@ def delegate(
                 app_server_thread_id=command_result.metadata.get("app_server_thread_id", ""),
                 app_server_turn_id=command_result.metadata.get("app_server_turn_id", ""),
                 app_server_process_id=command_result.metadata.get("app_server_process_id", ""),
+                executor_windows_sandbox=command_result.metadata.get("app_server_windows_sandbox", ""),
+                executor_windows_sandbox_readiness=command_result.metadata.get(
+                    "app_server_windows_sandbox_readiness", ""
+                ),
+                executor_approval_policy=command_result.metadata.get("app_server_approval_policy", ""),
+                executor_role=command_result.metadata.get(
+                    "app_server_role",
+                    "executor"
+                    if command_result.metadata.get("executor_provider") == "antigravity"
+                    else "",
+                ),
+                executor_provider=command_result.metadata.get("executor_provider", ""),
+                antigravity_conversation_id=command_result.metadata.get(
+                    "antigravity_conversation_id", ""
+                ),
+                antigravity_terminal_status=command_result.metadata.get(
+                    "antigravity_terminal_status", ""
+                ),
                 task_transport=command_result.metadata.get("task_transport", "file"),
                 task_artifact=command_result.metadata.get("task_artifact", str(task_artifact)),
                 task_sha256=command_result.metadata.get("task_sha256", task_sha256),
@@ -1340,6 +1561,7 @@ def delegate(
             executor_label=executor_label,
             executor_sandbox=executor_sandbox,
             parent_request_id=request.parent_request_id,
+            repository=str(request.repository),
             reuse_existing=reuse_existing,
         )
     except (ConfigError, DelegationError, OSError, ValueError) as exc:
@@ -1362,5 +1584,6 @@ def delegate(
             executor_label=executor_label,
             executor_sandbox=executor_sandbox,
             parent_request_id=request.parent_request_id,
+            repository=str(request.repository),
             reuse_existing=reuse_existing,
         )

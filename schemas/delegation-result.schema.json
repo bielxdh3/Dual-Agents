@@ -33,6 +33,7 @@
     "started_at": {"type": "string"},
     "finished_at": {"type": "string"},
     "summary": {"type": "string"},
+    "repository": {"type": "string"},
     "files_changed": {"type": "array", "items": {"type": "string"}},
     "commands_run": {"type": "array", "items": {"type": "string"}},
     "tests": {
@@ -49,6 +50,20 @@
       }
     },
     "remaining_issues": {"type": "array", "items": {"type": "string"}},
+    "memory_updates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "subject", "content", "evidence"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["decision", "architecture", "workflow", "constraint", "discovery"]},
+          "subject": {"type": "string", "minLength": 1},
+          "content": {"type": "string", "minLength": 1},
+          "evidence": {"type": "string", "minLength": 1}
+        }
+      }
+    },
     "git_status": {"type": "string"},
     "diff_file": {"type": "string"},
     "run_directory": {"type": "string"},
@@ -96,6 +111,13 @@
     "app_server_thread_id": {"type": "string"},
     "app_server_turn_id": {"type": "string"},
     "app_server_process_id": {"type": "string"},
+    "executor_windows_sandbox": {"type": "string", "enum": ["", "unspecified", "elevated", "unelevated"]},
+    "executor_windows_sandbox_readiness": {"type": "string", "enum": ["", "not_checked", "not_required", "not_applicable", "ready", "notConfigured", "updateRequired"]},
+    "executor_approval_policy": {"type": "string", "enum": ["", "never", "on-request"]},
+    "executor_role": {"type": "string"},
+    "executor_provider": {"type": "string", "enum": ["", "antigravity"]},
+    "antigravity_conversation_id": {"type": "string"},
+    "antigravity_terminal_status": {"type": "string"},
     "error": {"type": "string"}
   },
   "allOf": [

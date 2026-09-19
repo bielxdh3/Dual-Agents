@@ -7,6 +7,7 @@ runs_dir = "runs"
 max_correction_cycles = 1
 require_clean_git = true
 codex_command = "codex"
+antigravity_command = "C:/Users/USER/AppData/Local/agy/bin/agy.exe"
 node_command = "node"
 terminal_readiness_timeout = 60
 terminal_turn_start_timeout = 15
@@ -31,12 +32,12 @@ backend = "windows"
 network_access = false
 
 [accounts.secondary]
-label = "Secondary account"
+label = "Antigravity / Gemini Executor"
 codex_home = "C:/Users/USER/CodexProfiles/executor"
 model = ""
 reasoning_effort = "high"
 service_tier = ""
-backend = "app_server"
+backend = "antigravity"
 network_access = false
 
 [roles]
