@@ -24,6 +24,7 @@ from dual_codex.dashboard import (
     _live_event_name,
 )
 from dual_codex.live_events import LiveEventJournal
+from dual_codex.paths import same_path
 from dual_codex.providers import provider_default_label
 
 
@@ -126,7 +127,8 @@ executor = "secondary"
             service._auth_jobs["codex-b"].join(timeout=2)
             status = service.auth_status("codex-b")
         self.assertEqual(started["status"], "Authentication in progress")
-        self.assertEqual(observed, [home])
+        self.assertEqual(len(observed), 1)
+        self.assertTrue(same_path(observed[0], home), (observed[0], home))
         self.assertEqual(status["status"], "Authenticated")
         self.assertNotIn("token", json.dumps(status).lower())
 

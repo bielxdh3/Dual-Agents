@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import redirect_stdout
 from io import StringIO
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -159,6 +160,32 @@ class RegistryTests(unittest.TestCase):
                     "duplicate",
                     label="Duplicate",
                     codex_home=str(new_home / ".." / "third"),
+                    authenticate=False,
+                    output=lambda _message: None,
+                )
+
+    @unittest.skipUnless(os.name == "nt", "Windows short-name aliases are platform-specific")
+    def test_duplicate_codex_home_rejects_windows_short_alias(self) -> None:
+        import ctypes
+
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.toml"
+            _write_registry(path)
+            existing_home = Path(temp) / "profiles" / "primary account"
+            existing_home.mkdir(parents=True)
+            config = load_config(path)
+            buffer = ctypes.create_unicode_buffer(32768)
+            length = ctypes.windll.kernel32.GetShortPathNameW(
+                str(existing_home), buffer, len(buffer)
+            )
+            if not length or Path(buffer.value) == existing_home:
+                self.skipTest("Windows volume does not expose a distinct short-name alias")
+            with self.assertRaises(ConfigError):
+                add_account(
+                    config,
+                    "short-alias",
+                    label="Short alias",
+                    codex_home=buffer.value,
                     authenticate=False,
                     output=lambda _message: None,
                 )
