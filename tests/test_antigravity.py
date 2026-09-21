@@ -48,6 +48,20 @@ def _mock_command(root: Path) -> Path:
                 "if 'cancel' in text:",
                 "    print(json.dumps({'event':'result','result':{'status':'CANCELED','error':'cancelled by mock'}}), flush=True)",
                 "    raise SystemExit(1)",
+                "if 'fallback' in text:",
+                "    report = {'summary':'fallback response','files_changed':[],'commands_run':[],'tests':[],'remaining_issues':[]}",
+                "    print(json.dumps({'event':'result','result':{'status':'SUCCESS','conversation_id':'fallback-conversation','structured_output':'','response':json.dumps(report)}}), flush=True)",
+                "    raise SystemExit(0)",
+                "if 'whitespace' in text:",
+                "    report = {'summary':'whitespace fallback','files_changed':[],'commands_run':[],'tests':[],'remaining_issues':[]}",
+                "    print(json.dumps({'event':'result','result':{'status':'SUCCESS','conversation_id':'whitespace-conversation','structured_output':' \\t\\n','response':json.dumps(report)}}), flush=True)",
+                "    raise SystemExit(0)",
+                "if 'blank' in text:",
+                "    print(json.dumps({'event':'result','result':{'status':'SUCCESS','conversation_id':'blank-conversation','structured_output':' \\t','response':'\\n'}}), flush=True)",
+                "    raise SystemExit(0)",
+                "if 'list' in text:",
+                "    print(json.dumps({'event':'result','result':{'status':'SUCCESS','conversation_id':'list-conversation','structured_output':[{'summary':'list'}],'response':''}}), flush=True)",
+                "    raise SystemExit(0)",
                 "if 'structured' in text:",
                 "    structured_report = {'summary':'structured complete','files_changed':['hello.txt'],'commands_run':[],'tests':[{'command':'view_file hello.txt','status':'passed','details':'FINAL'}],'remaining_issues':[],'memory_updates':[]}",
                 "    response = json.dumps(structured_report) + json.dumps({'commands_run':[],'files_changed':['hello.txt'],'memory_updates':[],'remaining_issues':[],'summary':'structured complete','tests':[],'toolAction':'Finishing task','toolSummary':'Submit task completion report'})",
@@ -92,6 +106,28 @@ def _workspace_probe_command(root: Path) -> Path:
     return wrapper
 
 
+def _no_result_command(root: Path) -> Path:
+    script = root / "mock no result.py"
+    script.write_text(
+        "\n".join(
+            [
+                "import sys",
+                "if sys.argv[1:] == ['--version']:",
+                "    print('agy 1.2.7')",
+                "    raise SystemExit(0)",
+                "sys.stdin.readline()",
+                "print('transport closed before result', file=sys.stderr, flush=True)",
+                "raise SystemExit(7)",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    wrapper = root / "mock no result.cmd"
+    wrapper.write_text(f'@echo off\n"{sys.executable}" "{script}" %*\n', encoding="utf-8")
+    return wrapper
+
+
 class AntigravityTransportTests(unittest.TestCase):
     def setUp(self) -> None:
         self._instruction_temp = tempfile.TemporaryDirectory()
@@ -124,7 +160,7 @@ class AntigravityTransportTests(unittest.TestCase):
         self.assertIn("accept-edits", command)
         self.assertIn("--new-project", command)
         self.assertIn("--add-dir", command)
-        self.assertIn(str(self.instruction_root), command)
+        self.assertNotIn(str(self.instruction_root), command)
         self.assertNotIn(r"C:\CodexGlobal", command)
         self.assertIn("--json-schema", command)
         self.assertIn("--model", command)
@@ -183,6 +219,13 @@ class AntigravityTransportTests(unittest.TestCase):
             self.assertEqual(result.metadata["antigravity_terminal_status"], "SUCCESS")
             self.assertEqual(result.metadata["antigravity_conversation_id"], "mock-conversation")
             self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["summary"], "mock complete")
+            diagnostics = Path(result.metadata["antigravity_diagnostics_path"])
+            self.assertTrue(diagnostics.is_file())
+            evidence = json.loads(diagnostics.read_text(encoding="utf-8"))
+            self.assertTrue(evidence["init_observed"])
+            self.assertTrue(evidence["result_observed"])
+            self.assertIn("result", evidence["event_names"])
+            self.assertTrue(evidence["environment"]["sanitized"])
 
     def test_structured_output_is_authoritative_over_auxiliary_response_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -203,6 +246,84 @@ class AntigravityTransportTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.metadata["antigravity_result_source"], "structured_output")
             self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["summary"], "structured complete")
+
+    def test_blank_structured_output_falls_back_to_nonblank_response(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            output = root / "report.json"
+            result = run_antigravity(
+                command=str(_mock_command(root)),
+                agent=_agent(),
+                repository=repository,
+                prompt="fallback",
+                output_path=output,
+                config=SimpleNamespace(antigravity_turn_timeout=5),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.metadata["antigravity_result_source"], "response")
+            self.assertFalse(result.metadata["antigravity_result_shape"]["structured_output"]["nonblank"])
+            self.assertTrue(result.metadata["antigravity_result_shape"]["response"]["nonblank"])
+            self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["summary"], "fallback response")
+
+    def test_whitespace_structured_output_falls_back_to_nonblank_response(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            output = root / "report.json"
+            result = run_antigravity(
+                command=str(_mock_command(root)),
+                agent=_agent(),
+                repository=repository,
+                prompt="whitespace",
+                output_path=output,
+                config=SimpleNamespace(antigravity_turn_timeout=5),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.metadata["antigravity_result_source"], "response")
+            self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["summary"], "whitespace fallback")
+
+    def test_both_blank_success_is_malformed_without_overwriting_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            output = root / "report.json"
+            output.write_text('{"existing":true}', encoding="utf-8")
+            result = run_antigravity(
+                command=str(_mock_command(root)),
+                agent=_agent(),
+                repository=repository,
+                prompt="blank",
+                output_path=output,
+                config=SimpleNamespace(antigravity_turn_timeout=5),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.metadata["antigravity_terminal_status"], "MALFORMED")
+            self.assertFalse(result.metadata["antigravity_result_shape"]["structured_output"]["nonblank"])
+            self.assertFalse(result.metadata["antigravity_result_shape"]["response"]["nonblank"])
+            self.assertNotIn("antigravity_result_source", result.metadata)
+            self.assertEqual(output.read_text(encoding="utf-8"), '{"existing":true}')
+
+    def test_list_structured_output_remains_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            output = root / "report.json"
+            result = run_antigravity(
+                command=str(_mock_command(root)),
+                agent=_agent(),
+                repository=repository,
+                prompt="list",
+                output_path=output,
+                config=SimpleNamespace(antigravity_turn_timeout=5),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.metadata["antigravity_result_source"], "structured_output")
+            self.assertEqual(json.loads(output.read_text(encoding="utf-8"))[0]["summary"], "list")
 
     def test_explicit_workspace_reaches_child_cwd_and_artifact_access(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -236,7 +357,7 @@ class AntigravityTransportTests(unittest.TestCase):
             self.assertIn("--new-project", result.command)
             self.assertIn(str(artifact_dir.resolve()), result.command)
             self.assertNotIn(str(root.resolve()), result.command)
-            self.assertIn(str(self.instruction_root), result.command)
+            self.assertNotIn(str(self.instruction_root), result.command)
             self.assertNotIn(r"C:\CodexGlobal", result.command)
 
     def test_missing_workspace_fails_before_child_launch(self) -> None:
@@ -258,6 +379,37 @@ class AntigravityTransportTests(unittest.TestCase):
             self.assertEqual(result.metadata["antigravity_terminal_status"], "WORKSPACE_UNAVAILABLE")
             self.assertIn("does not exist", result.stderr)
             popen.assert_not_called()
+            diagnostics = Path(result.metadata["antigravity_diagnostics_path"])
+            evidence = json.loads(diagnostics.read_text(encoding="utf-8"))
+            self.assertEqual(evidence["terminal_classification"], "WORKSPACE_UNAVAILABLE")
+            self.assertFalse(evidence["result_observed"])
+
+    def test_no_result_persists_bounded_transport_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            output = root / "implementation.json"
+            result = run_antigravity(
+                command=str(_no_result_command(root)),
+                agent=_agent(),
+                repository=repository,
+                prompt="no result",
+                output_path=output,
+                config=SimpleNamespace(antigravity_turn_timeout=5),
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.metadata["antigravity_terminal_status"], "PREMATURE_CLOSE")
+            self.assertFalse(result.metadata["antigravity_result_observed"])
+            self.assertFalse(output.exists())
+            diagnostics = Path(result.metadata["antigravity_diagnostics_path"])
+            evidence = json.loads(diagnostics.read_text(encoding="utf-8"))
+            self.assertEqual(evidence["terminal_classification"], "PREMATURE_CLOSE")
+            self.assertFalse(evidence["result_observed"])
+            self.assertEqual(evidence["conversation_id"], "")
+            self.assertIn("transport closed before result", evidence["stderr_tail"])
+            self.assertLessEqual(len(evidence["event_names"]), 128)
 
     def test_malformed_and_error_terminal_events_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

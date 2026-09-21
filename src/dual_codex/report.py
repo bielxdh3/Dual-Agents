@@ -194,6 +194,7 @@ def render_markdown(
     implementation: dict[str, Any],
     review: dict[str, Any],
     correction_cycles: int,
+    phase_provenance: list[dict[str, Any]] | None = None,
 ) -> str:
     lines = [
         "# Dual Codex Run Report",
@@ -224,4 +225,19 @@ def render_markdown(
                 "",
             ]
         )
+    if phase_provenance:
+        lines.extend(["## Configured actor routing", ""])
+        for item in phase_provenance:
+            lines.append(
+                "- {phase}: actor `{actor}` / provider `{provider}` / backend `{backend}` "
+                "/ transport `{transport}` / configured_actor=`{configured}`".format(
+                    phase=item.get("phase", item.get("role", "unknown")),
+                    actor=item.get("actor_id", item.get("profile_id", "unknown")),
+                    provider=item.get("provider", "unknown"),
+                    backend=item.get("backend", "unknown"),
+                    transport=item.get("delegation_transport", "unknown"),
+                    configured=str(bool(item.get("configured_actor", False))).lower(),
+                )
+            )
+        lines.append("")
     return "\n".join(lines).rstrip() + "\n"

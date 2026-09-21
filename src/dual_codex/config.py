@@ -44,6 +44,7 @@ class AccountConfig:
     available_models: tuple[str, ...] = ()
     supported_reasoning_efforts: tuple[str, ...] = ()
     enabled: bool = True
+    fallback_roles: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,7 @@ class OrchestratorConfig:
     live_event_journal_max_records: int = 2000
     live_event_journal_max_record_bytes: int = 65536
     live_event_journal_max_detail_bytes: int = 16384
+    fallback_enabled: bool = False
 
     @property
     def architect(self) -> AgentConfig:
@@ -227,6 +229,16 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
     enabled = raw.get("enabled", True)
     if not isinstance(enabled, bool):
         raise ConfigError(f"Account '{name}' enabled must be a boolean.")
+    raw_fallback_roles = raw.get("fallback_roles", [])
+    if isinstance(raw_fallback_roles, str):
+        raw_fallback_roles = [item.strip() for item in raw_fallback_roles.split(",") if item.strip()]
+    if not isinstance(raw_fallback_roles, list) or any(not isinstance(item, str) for item in raw_fallback_roles):
+        raise ConfigError(f"Account '{name}' fallback_roles must be a list of role names.")
+    fallback_roles: list[str] = []
+    for item in raw_fallback_roles:
+        role = validate_role_name(item)
+        if role not in fallback_roles:
+            fallback_roles.append(role)
     default_provider = "gemini" if backend == "antigravity" else "api" if backend == "api" else "codex"
     default_adapter = "antigravity_cli" if backend == "antigravity" else "openai_compatible" if backend == "api" else "codex_cli"
     provider_type = str(raw.get("provider_type", default_provider)).strip() or default_provider
@@ -282,6 +294,7 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
         available_models=available_models,
         supported_reasoning_efforts=supported_reasoning_efforts,
         enabled=enabled,
+        fallback_roles=tuple(fallback_roles),
     )
 
 
@@ -311,6 +324,9 @@ def load_config(path: Path) -> OrchestratorConfig:
 
     repository = _path(orch["repository"], base)
     runs_dir = _path(orch.get("runs_dir", "runs"), base)
+    fallback_enabled = orch.get("fallback_enabled", False)
+    if not isinstance(fallback_enabled, bool):
+        raise ConfigError("fallback_enabled must be a boolean.")
 
     legacy = is_legacy_raw(raw)
     accounts: dict[str, AccountConfig] = {}
@@ -410,4 +426,5 @@ def load_config(path: Path) -> OrchestratorConfig:
         live_event_journal_max_records=live_event_journal_max_records,
         live_event_journal_max_record_bytes=live_event_journal_max_record_bytes,
         live_event_journal_max_detail_bytes=live_event_journal_max_detail_bytes,
+        fallback_enabled=fallback_enabled,
     )

@@ -1,10 +1,9 @@
 # Integracao Dual Agents com o Codex App
 
 O Codex App permanece como interface conversacional, Architect e autoridade de
-revisao. O role `executor` usa exclusivamente o Google Antigravity/Gemini pelo
-`agy` headless com `stream-json`; o fluxo ativo nao faz fallback para um
-Executor Codex. Os backends Codex existentes permanecem somente para
-compatibilidade do Architect e de comandos legados.
+revisao. O role `executor` resolve o perfil configurado: Antigravity/Gemini
+ou Codex App Server. Fallback automatico e opcional, desativado por padrao,
+e so considera perfis explicitamente autorizados para o role.
 
 ## Fluxo diario
 
@@ -19,10 +18,19 @@ compatibilidade do Architect e de comandos legados.
    `correct` ligado por `parent_request_id`. Nao ha correcao automatica sem
    essa evidencia.
 
+Quando o fluxo completo `dual-codex run` e usado, cada fase resolve o ator
+novamente a partir de `[roles]` no momento da chamada. Architect e Reviewer
+seguem os perfis configurados (inclusive quando compartilham o mesmo
+perfil); Executor tambem pode ser um perfil Codex App Server. A execucao grava
+`provenance.json` e a secao `Configured actor routing` do relatorio com
+`actor_id`, provider, backend, transporte, `configured_actor=true`,
+`primary_actor`, `actual_actor` e `fallback_used`. Nenhuma fase configurada e
+satisfeita por um worker generico ou por uma API de subagente nativo.
+
 O App deve consultar `status --json` antes de delegar quando precisar confirmar
 role, label, repositorio, Git, a versao do Codex e a versao/status do `agy`.
-Delegacao e recusada se o executor nao estiver configurado como `antigravity`,
-se o `agy` nao passar o probe de versao ou se a arvore canonica
+Delegacao e recusada se o backend nao suportar o role, se o `agy` nao passar o
+probe de versao quando aplicavel ou se a arvore canonica
 `C:\\CodexGlobal\\AGENTS.md` / `C:\\CodexGlobal\\skills` estiver indisponivel.
 
 ## Pedido minimo
@@ -71,9 +79,9 @@ Draft PR nao inclui merge, release, tag ou deploy.
 
 No App Server, a politica `windows.sandbox` vem exclusivamente do `config.toml`
 do `CODEX_HOME` da conta. O adapter nao injeta `unelevated` nem usa
-`danger-full-access` como fallback. Em Windows, ele consulta `config/read` e,
-quando a politica efetiva e `elevated`, consulta `windowsSandbox/readiness`; um
-estado diferente de `ready` encerra a delegacao com instrucoes para executar,
+`danger-full-access` como fallback. Em uma delegacao Codex `workspace-write`,
+ele consulta `config/read` e `windowsSandbox/readiness`; um estado diferente de
+`ready` encerra a delegacao antes do turno, com instrucoes para executar,
 em terminal administrativo, `codex sandbox setup --elevated --current-user
 --codex-home "<CODEX_HOME>"`. Sem configuracao explicita, o valor permanece
 `unspecified` e o default do Codex e preservado, sem provisioning automatico.

@@ -12,8 +12,10 @@ import threading
 import time
 from typing import Any, Callable, Mapping
 
+from .bootstrap import BOOTSTRAP_MARKER, CANONICAL_INSTRUCTIONS_ROOT
 from .config import AgentConfig, OrchestratorConfig
 from .live_events import LiveEventJournal
+from .paths import path_identity_key
 from .process import CommandResult, _prepare_command, codex_environment, executor_npm_cache
 from .report import (
     atomic_write_json,
@@ -31,6 +33,80 @@ _HEADLESS_RAW_EVENTS_VERSION = "responses-raw-v1"
 _WINDOWS_SANDBOX_MODES = {"elevated", "unelevated"}
 
 
+def _canonical_workspace_roots(*roots: Path) -> list[str]:
+    """Return deduplicated, absolute runtime roots for one managed request."""
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in roots:
+        root = value.expanduser().resolve(strict=False)
+        key = path_identity_key(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(str(root))
+    return result
+
+
+def _thread_binding(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract sanitized cwd/root identity from a thread response."""
+
+    result = response.get("result")
+    if not isinstance(result, Mapping):
+        return {}
+    thread = result.get("thread")
+    thread = thread if isinstance(thread, Mapping) else {}
+    environments = thread.get("environments")
+    sanitized_environments: list[dict[str, Any]] = []
+    if isinstance(environments, list):
+        for environment in environments:
+            if not isinstance(environment, Mapping):
+                continue
+            roots = environment.get("runtimeWorkspaceRoots")
+            sanitized_environments.append(
+                {
+                    "environmentId": str(environment.get("environmentId", "")),
+                    "cwd": str(environment.get("cwd", "")),
+                    "runtimeWorkspaceRoots": [str(root) for root in roots] if isinstance(roots, list) else [],
+                }
+            )
+    roots = result.get("runtimeWorkspaceRoots")
+    return {
+        "cwd": str(result.get("cwd", "")),
+        "runtimeWorkspaceRoots": [str(root) for root in roots] if isinstance(roots, list) else [],
+        "environments": sanitized_environments,
+    }
+
+
+def _validate_thread_binding(response: Mapping[str, Any], repository: Path) -> dict[str, Any]:
+    """Fail closed unless the App Server confirms the managed repository binding."""
+
+    expected = _canonical_workspace_roots(repository)
+    binding = _thread_binding(response)
+    returned_roots = binding.get("runtimeWorkspaceRoots")
+    if not isinstance(returned_roots, list) or len(returned_roots) != len(expected):
+        raise AppServerError("App Server did not return runtimeWorkspaceRoots for the managed repository.")
+    if any(path_identity_key(actual) != path_identity_key(wanted) for actual, wanted in zip(returned_roots, expected)):
+        raise AppServerError("App Server returned runtimeWorkspaceRoots for a different repository.")
+    if path_identity_key(binding.get("cwd", "")) != path_identity_key(expected[0]):
+        raise AppServerError("App Server returned a different thread cwd than the managed repository.")
+    environments = binding.get("environments")
+    if not isinstance(environments, list) or not environments:
+        raise AppServerError("App Server did not return an environment binding for the managed repository.")
+    matching = [
+        environment
+        for environment in environments
+        if isinstance(environment, Mapping)
+        and path_identity_key(environment.get("cwd", "")) == path_identity_key(expected[0])
+        and [path_identity_key(root) for root in environment.get("runtimeWorkspaceRoots", [])] == [
+            path_identity_key(expected[0])
+        ]
+    ]
+    if not matching:
+        raise AppServerError("App Server environment roots do not match the managed repository.")
+    return binding
+
+
 def _profile_config_identity(agent: AgentConfig) -> str:
     """Invalidate persistent App Server processes when profile config changes."""
 
@@ -46,9 +122,10 @@ def _profile_config_identity(agent: AgentConfig) -> str:
 def _app_server_command(config: OrchestratorConfig) -> list[str]:
     """Build the non-interactive App Server command.
 
-    The account-isolated ``CODEX_HOME`` owns the effective Windows sandbox
-    configuration. Do not inject a transport-specific override here: doing so
-    would silently weaken an explicitly provisioned elevated profile.
+    The account-isolated CODEX_HOME owns the effective Windows sandbox
+    configuration. Omitting --code-mode-host keeps the normal process-owned
+    local CodeMode host; the isolated child environment prevents desktop
+    bridge state from selecting a foreign host.
     """
 
     command = [config.codex_command, "app-server", "--stdio"]
@@ -271,11 +348,13 @@ class _AppServerProcess:
         agent: AgentConfig,
         repository: Path,
         progress: Callable[[str], None] | None,
+        require_workspace_ready: bool = False,
     ) -> None:
         self.config = config
         self.agent = agent
         self.repository = repository.resolve()
         self.progress = progress
+        self.require_workspace_ready = require_workspace_ready
         self._lock = threading.RLock()
         self._next_id = 0
         self._messages: queue.Queue[str | None] = queue.Queue()
@@ -291,9 +370,20 @@ class _AppServerProcess:
         self._closed = False
         self.windows_sandbox = ""
         self.windows_sandbox_readiness = "not_checked"
+        self.initialize_params: dict[str, Any] = {
+            "clientInfo": {
+                "name": "dual-codex",
+                "version": "1",
+            },
+            "capabilities": {"experimentalApi": True},
+        }
+        self.initialize_response: dict[str, Any] = {}
+        self.last_thread_request: dict[str, Any] = {}
+        self.last_thread_binding: dict[str, Any] = {}
+        self.request_methods: list[str] = []
         command = _app_server_command(config)
         process_args = _prepare_command([str(item) for item in command])
-        env = codex_environment(agent)
+        env = codex_environment(agent, isolate_desktop_bridge=True)
         self.process = subprocess.Popen(
             process_args,
             cwd=repository,
@@ -313,19 +403,16 @@ class _AppServerProcess:
         try:
             response = self.request(
                 "initialize",
-                {
-                    "clientInfo": {
-                        "name": "dual-codex",
-                        "version": "1",
-                    },
-                    "capabilities": {"experimentalApi": True},
-                },
+                self.initialize_params,
                 timeout=config.app_server_initialize_timeout,
             )
             if "error" in response:
                 raise AppServerError(f"App Server initialize failed: {_error_message(response)}")
+            self.initialize_response = response.get("result", {}) if isinstance(response.get("result"), dict) else {}
             self.notify("initialized")
-            self.windows_sandbox, self.windows_sandbox_readiness = self._verify_windows_sandbox()
+            self.windows_sandbox, self.windows_sandbox_readiness = self._verify_windows_sandbox(
+                require_workspace_ready=require_workspace_ready
+            )
         except Exception:
             self.close()
             raise
@@ -342,7 +429,7 @@ class _AppServerProcess:
     def events(self) -> list[dict[str, Any]]:
         return list(self._events)
 
-    def _verify_windows_sandbox(self) -> tuple[str, str]:
+    def _verify_windows_sandbox(self, *, require_workspace_ready: bool = False) -> tuple[str, str]:
         """Read the effective profile policy and gate elevated provisioning.
 
         ``config/read`` and ``windowsSandbox/readiness`` are App Server APIs;
@@ -368,10 +455,12 @@ class _AppServerProcess:
         if mode is None:
             # No explicit setting is intentionally left to Codex defaults and
             # recorded as such; the adapter never supplies a fallback value.
+            if require_workspace_ready:
+                raise AppServerError("WINDOWS_SANDBOX_NOT_CONFIGURED: workspace-write Codex Executor requires a configured Windows sandbox.")
             return "unspecified", "not_checked"
         if not isinstance(mode, str) or mode not in _WINDOWS_SANDBOX_MODES:
             raise AppServerError(f"Unsupported effective Windows sandbox policy: {mode!r}.")
-        if mode != "elevated":
+        if mode != "elevated" and not require_workspace_ready:
             return mode, "not_required"
         readiness = self.request(
             "windowsSandbox/readiness",
@@ -387,7 +476,7 @@ class _AppServerProcess:
         status = readiness_result.get("status") if isinstance(readiness_result, Mapping) else None
         if status != "ready":
             raise AppServerError(
-                "Elevated Windows sandbox is not provisioned "
+                "WINDOWS_SANDBOX_NOT_READY: Windows sandbox is not ready (not provisioned) "
                 f"(readiness={status or 'unknown'}). Run the official command "
                 f"from an administrative terminal: {_windows_sandbox_setup_command(self.agent)}"
             )
@@ -573,6 +662,9 @@ class _AppServerProcess:
 
     def request(self, method: str, params: dict[str, Any] | None, *, timeout: float) -> dict[str, Any]:
         with self._lock:
+            request_methods = getattr(self, "request_methods", None)
+            if request_methods is not None:
+                request_methods.append(method)
             self._next_id += 1
             request_id = self._next_id
             message: dict[str, Any] = {"jsonrpc": "2.0", "id": request_id, "method": method}
@@ -609,8 +701,11 @@ class _AppServerProcess:
         return self._next_message(timeout)
 
     def _thread_id_for_unlocked(self, repository: Path) -> tuple[str, bool]:
+        repository = repository.resolve(strict=False)
+        runtime_workspace_roots = _canonical_workspace_roots(repository)
         params: dict[str, Any] = {
             "cwd": str(repository),
+            "runtimeWorkspaceRoots": runtime_workspace_roots,
             "sandbox": self.agent.sandbox,
             "approvalPolicy": "never" if self.agent.sandbox == "workspace-write" else "on-request",
             # The raw Responses stream is the App Server equivalent of the
@@ -635,23 +730,20 @@ class _AppServerProcess:
                 timeout=self.config.app_server_thread_timeout,
             )
             if "error" not in response:
+                self.last_thread_request = dict(params)
+                self.last_thread_binding = _validate_thread_binding(response, repository)
                 return stored, True
             if not _is_stale_thread_error(response):
                 raise AppServerError(f"App Server thread/resume failed: {_error_message(response)}")
+        self.last_thread_request = dict(params)
         response = self.request("thread/start", params, timeout=self.config.app_server_thread_timeout)
         if "error" in response:
             raise AppServerError(f"App Server thread/start failed: {_error_message(response)}")
+        self.last_thread_binding = _validate_thread_binding(response, repository)
         thread = response.get("result", {}).get("thread", {})
         thread_id = thread.get("id") if isinstance(thread, dict) else None
         if not isinstance(thread_id, str) or not thread_id:
             raise AppServerError("App Server thread/start returned no thread ID.")
-        _save_thread_mapping(
-            self.config,
-            self.agent,
-            repository,
-            thread_id,
-            windows_sandbox=self.windows_sandbox,
-        )
         return thread_id, False
 
     def thread_id_for(self, repository: Path) -> tuple[str, bool]:
@@ -756,9 +848,22 @@ class _AppServerProcess:
                 "App Server completed turn with missing custom-tool output for call ids: "
                 + ", ".join(missing_custom_outputs)
             )
+        # A fresh thread has no durable rollout until its first turn is
+        # accepted. Persist only materialized threads so a later invocation
+        # cannot resume the unmaterialized id returned by thread/start.
+        _save_thread_mapping(
+            self.config,
+            self.agent,
+            repository,
+            thread_id,
+            windows_sandbox=self.windows_sandbox,
+        )
         return {
             "thread_id": thread_id,
             "turn_id": turn_id,
+            "request_order": list(self.request_methods),
+            "thread_request": dict(self.last_thread_request),
+            "thread_binding": dict(self.last_thread_binding),
             "assistant": assistant,
             "event_count": len(self._events),
             "turn_started": started,
@@ -838,14 +943,14 @@ class _AppServerProcess:
 
 
 _PROCESS_LOCK = threading.RLock()
-_PROCESSES: dict[tuple[str, str, str, str, str, str], _AppServerProcess] = {}
+_PROCESSES: dict[tuple[str, str, str, str, str, str, str], _AppServerProcess] = {}
 
 
 def _process_key(
     agent: AgentConfig,
     config: OrchestratorConfig,
     repository: Path | None = None,
-) -> tuple[str, str, str, str, str, str]:
+) -> tuple[str, str, str, str, str, str, str]:
     return (
         agent.account_name,
         str(agent.codex_home.expanduser().resolve()),
@@ -853,6 +958,7 @@ def _process_key(
         str(bool(agent.network_access)),
         str(repository.expanduser().resolve()) if repository is not None else "",
         _profile_config_identity(agent),
+        agent.sandbox,
     )
 
 
@@ -861,6 +967,7 @@ def _get_process(
     agent: AgentConfig,
     repository: Path,
     progress: Callable[[str], None] | None,
+    require_workspace_ready: bool = False,
 ) -> _AppServerProcess:
     key = _process_key(agent, config, repository)
     with _PROCESS_LOCK:
@@ -870,7 +977,13 @@ def _get_process(
             return process
         if process is not None:
             process.close()
-        process = _AppServerProcess(config=config, agent=agent, repository=repository, progress=progress)
+        process = _AppServerProcess(
+            config=config,
+            agent=agent,
+            repository=repository,
+            progress=progress,
+            require_workspace_ready=require_workspace_ready,
+        )
         _PROCESSES[key] = process
         return process
 
@@ -985,10 +1098,28 @@ def run_codex_app_server(
     request_id: str = "",
     run_id: str = "",
     role: str = "executor",
+    configured_actor: bool = False,
+    require_workspace_ready: bool = False,
     progress: Callable[[str], None] | None = None,
 ) -> CommandResult:
     command = _app_server_command(config)
     metadata: dict[str, Any] = {
+        "phase": role,
+        "role": role,
+        "actor_id": agent.account_name,
+        "profile_id": agent.account_name,
+        "configured_actor": bool(configured_actor),
+        "provider": agent.provider_type,
+        "adapter": agent.adapter_type,
+        "backend": agent.backend,
+        "model": agent.model,
+        "runtime_model": agent.runtime_model or agent.model,
+        "reasoning_effort": agent.reasoning_effort or "provider-default",
+        "delegation_transport": "app_server",
+        "fallback_used": False,
+        "canonical_bootstrap_required": BOOTSTRAP_MARKER in prompt,
+        "canonical_instructions_root": str(CANONICAL_INSTRUCTIONS_ROOT) if BOOTSTRAP_MARKER in prompt else "",
+        "canonical_bootstrap_source": "machine-wide" if BOOTSTRAP_MARKER in prompt else "",
         "app_server_session_id": session_id,
         "task_transport": "app_server",
         "task_artifact": str(task_artifact_path.resolve()) if task_artifact_path else "",
@@ -997,6 +1128,11 @@ def run_codex_app_server(
         "app_server_account": agent.account_name,
         "app_server_role": role,
         "app_server_repository": str(repository.resolve()),
+        "app_server_thread_cwd": str(repository.resolve()),
+        "app_server_runtime_workspace_roots": _canonical_workspace_roots(repository),
+        "app_server_environment_roots": [],
+        "app_server_thread_binding": {},
+        "app_server_experimental_api": True,
         "app_server_windows_sandbox": "",
         "app_server_windows_sandbox_readiness": "not_checked",
         "app_server_sandbox_policy": agent.sandbox,
@@ -1026,7 +1162,13 @@ def run_codex_app_server(
         journal = None
     process: _AppServerProcess | None = None
     try:
-        process = _get_process(config, agent, repository, progress)
+        process = _get_process(
+            config,
+            agent,
+            repository,
+            progress,
+            require_workspace_ready=require_workspace_ready,
+        )
         run_with_context = getattr(process, "run_turn_with_context", None)
         if callable(run_with_context):
             turn = run_with_context(
@@ -1069,14 +1211,33 @@ def run_codex_app_server(
                 "app_server_thread_resumed": str(resumed).lower(),
                 "app_server_process_id": str(process.pid),
                 "app_server_event_count": str(turn["event_count"]),
+                "app_server_request_order": turn.get("request_order", []),
                 "app_server_tool_executions": turn.get("tool_executions", []),
                 "app_server_custom_tool_outputs": turn.get("custom_tool_outputs", []),
+                "app_server_thread_request": turn.get("thread_request", {}),
+                "app_server_thread_binding": turn.get("thread_binding", {}),
+                "app_server_thread_cwd": turn.get("thread_binding", {}).get("cwd", str(repository.resolve())),
+                "app_server_runtime_workspace_roots": turn.get("thread_binding", {}).get(
+                    "runtimeWorkspaceRoots", _canonical_workspace_roots(repository)
+                ),
+                "app_server_environment_roots": turn.get("thread_binding", {}).get("environments", []),
             }
         )
         return CommandResult(command, 0, assistant, _sanitize_stderr(process.stderr_tail), metadata)
     except (AppServerError, OSError, ValueError) as exc:
         if process is not None:
             _discard_process(process)
+        text = str(exc).casefold()
+        if "not_configured" in text:
+            metadata["availability_failure_class"] = "profile_readiness_unavailable"
+        elif "not_ready" in text or "readiness=" in text:
+            metadata["availability_failure_class"] = "profile_readiness_unavailable"
+        elif isinstance(exc, OSError):
+            metadata["availability_failure_class"] = "process_unavailable"
+        elif "authentication" in text or "login" in text:
+            metadata["availability_failure_class"] = "authentication_unavailable"
+        else:
+            metadata["availability_failure_class"] = "provider_runtime_unavailable"
         return CommandResult(command, 1, "", _sanitize_stderr(str(exc)), metadata)
 
 
