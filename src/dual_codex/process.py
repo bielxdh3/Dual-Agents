@@ -151,7 +151,23 @@ def _run_with_progress(
     return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
 
-def codex_environment(agent: AgentConfig) -> dict[str, str]:
+_DESKTOP_BRIDGE_ENV_KEYS = (
+    "CODEX_INTERNAL_ORIGINATOR_OVERRIDE",
+    "CODEX_MCP_NODE_PATH",
+    "CODEX_APP_TOOLS_PIPE_PATH",
+    "CODEX_PERMISSION_PROFILE",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "CODEX_SHELL",
+    "CODEX_CI",
+)
+
+
+def codex_environment(
+    agent: AgentConfig,
+    *,
+    isolate_desktop_bridge: bool = False,
+) -> dict[str, str]:
     env = os.environ.copy()
     env["CODEX_HOME"] = str(agent.codex_home)
     # The Codex child creates this scoped cache when it needs it.  Environment
@@ -160,6 +176,9 @@ def codex_environment(agent: AgentConfig) -> dict[str, str]:
     env["NPM_CONFIG_CACHE"] = str(executor_npm_cache(agent))
     for name in ("OPENAI_API_KEY", "CODEX_API_KEY", "AZURE_OPENAI_API_KEY"):
         env.pop(name, None)
+    if isolate_desktop_bridge:
+        for name in _DESKTOP_BRIDGE_ENV_KEYS:
+            env.pop(name, None)
     return env
 
 

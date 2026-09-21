@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import json
 import os
@@ -110,6 +110,7 @@ def _registry_block(accounts: Mapping[str, AccountConfig], roles: Mapping[str, s
                 f"available_models = {json.dumps(list(account.available_models), ensure_ascii=False)}",
                 f"supported_reasoning_efforts = {json.dumps(list(account.supported_reasoning_efforts), ensure_ascii=False)}",
                 f"enabled = {'true' if account.enabled else 'false'}",
+                f"fallback_roles = {json.dumps(list(account.fallback_roles), ensure_ascii=False)}",
                 "",
             ]
         )
@@ -142,6 +143,34 @@ def write_registry_config(
     preserved = _without_managed_sections(original)
     prefix = f"{preserved}\n\n" if preserved else ""
     _atomic_write(path, prefix + _registry_block(accounts, roles))
+
+
+def set_fallback_enabled(config: OrchestratorConfig, enabled: bool) -> bool:
+    """Persist the global, explicit fallback switch without rewriting other settings."""
+    if config.legacy:
+        raise ConfigError("Run 'dual-codex migrate-config' before changing fallback settings.")
+    if not isinstance(enabled, bool):
+        raise ConfigError("fallback_enabled must be a boolean.")
+    original = config.config_path.read_bytes().decode("utf-8-sig")
+    lines = original.splitlines()
+    section_start = next((i for i, line in enumerate(lines) if _SECTION.match(line) and _SECTION.match(line).group(1).strip() == "orchestrator"), None)
+    if section_start is None:
+        raise ConfigError("Missing [orchestrator] configuration.")
+    section_end = len(lines)
+    for i in range(section_start + 1, len(lines)):
+        match = _SECTION.match(lines[i])
+        if match:
+            section_end = i
+            break
+    replacement = f"fallback_enabled = {'true' if enabled else 'false'}"
+    for i in range(section_start + 1, section_end):
+        if re.match(r"^\s*fallback_enabled\s*=", lines[i]):
+            lines[i] = replacement
+            break
+    else:
+        lines.insert(section_start + 1, replacement)
+    _atomic_write(config.config_path, "\n".join(lines).rstrip() + "\n")
+    return enabled
 
 
 def _profile_config_text(path: Path) -> str:
@@ -288,6 +317,7 @@ def add_account(
     available_models: Iterable[str] = (),
     supported_reasoning_efforts: Iterable[str] = (),
     roles: list[str] | None = None,
+    fallback_roles: list[str] | None = None,
     enabled: bool = True,
     authenticate: bool = True,
     output: OutputFn = print,
@@ -340,6 +370,7 @@ def add_account(
         available_models=tuple(validate_setting_value(value, "available_models") for value in available_models),
         supported_reasoning_efforts=tuple(validate_setting_value(value, "supported_reasoning_efforts") for value in supported_reasoning_efforts),
         enabled=enabled,
+        fallback_roles=tuple(dict.fromkeys(validate_role_name(role) for role in (fallback_roles or []))),
     )
     output(f"Account: {account.name}")
     output(f"Label: {account.label or '(none)'}")
@@ -419,27 +450,7 @@ def rename_account(config: OrchestratorConfig, old_name: str, new_name: str) -> 
         raise ConfigError(f"Account '{new_name}' is already registered.")
     accounts = dict(config.accounts)
     old = accounts.pop(old_name)
-    accounts[new_name] = AccountConfig(
-        name=new_name,
-        label=old.label,
-        codex_home=old.codex_home,
-        model=old.model,
-        reasoning_effort=old.reasoning_effort,
-        runtime_model=old.runtime_model,
-        fixed_mode=old.fixed_mode,
-        backend=old.backend,
-        service_tier=old.service_tier,
-        network_access=old.network_access,
-        provider_type=old.provider_type,
-        adapter_type=old.adapter_type,
-        auth_mode=old.auth_mode,
-        auth_reference=old.auth_reference,
-        state_root=old.state_root,
-        base_url=old.base_url,
-        available_models=old.available_models,
-        supported_reasoning_efforts=old.supported_reasoning_efforts,
-        enabled=old.enabled,
-    )
+    accounts[new_name] = replace(old, name=new_name)
     roles = {
         role: new_name if account == old_name else account
         for role, account in config.roles.items()
@@ -455,27 +466,7 @@ def label_account(config: OrchestratorConfig, name: str, label: str) -> None:
     if account is None:
         raise ConfigError(f"Unknown account '{name}'.")
     accounts = dict(config.accounts)
-    accounts[name] = AccountConfig(
-        name=account.name,
-        label=validate_setting_value(label, "label"),
-        codex_home=account.codex_home,
-        model=account.model,
-        reasoning_effort=account.reasoning_effort,
-        runtime_model=account.runtime_model,
-        fixed_mode=account.fixed_mode,
-        backend=account.backend,
-        service_tier=account.service_tier,
-        network_access=account.network_access,
-        provider_type=account.provider_type,
-        adapter_type=account.adapter_type,
-        auth_mode=account.auth_mode,
-        auth_reference=account.auth_reference,
-        state_root=account.state_root,
-        base_url=account.base_url,
-        available_models=account.available_models,
-        supported_reasoning_efforts=account.supported_reasoning_efforts,
-        enabled=account.enabled,
-    )
+    accounts[name] = replace(account, label=validate_setting_value(label, "label"))
     write_registry_config(config.config_path, accounts, config.roles)
 
 
@@ -533,6 +524,7 @@ def update_account_settings(
     available_models: tuple[str, ...] | list[str] | None = None,
     supported_reasoning_efforts: tuple[str, ...] | list[str] | None = None,
     enabled: bool | None = None,
+    fallback_roles: tuple[str, ...] | list[str] | None = None,
 ) -> AccountConfig:
     """Persist validated future-turn settings without touching profile credentials."""
     if config.legacy:
@@ -561,21 +553,18 @@ def update_account_settings(
             new_reasoning_effort = ""
         else:
             new_reasoning_effort = "high"
-    updated = AccountConfig(
-        name=account.name,
-        label=account.label,
-        codex_home=account.codex_home,
+    if fallback_roles is None:
+        new_fallback_roles = account.fallback_roles
+    else:
+        new_fallback_roles = tuple(dict.fromkeys(validate_role_name(role) for role in fallback_roles))
+    updated = replace(
+        account,
         model=new_model,
         reasoning_effort=new_reasoning_effort,
         runtime_model=(account.runtime_model if runtime_model is None else validate_setting_value(runtime_model, "runtime_model")),
         fixed_mode=new_fixed_mode,
         backend=new_backend,
-        service_tier=(
-            account.service_tier
-            if service_tier is None
-            else validate_setting_value(service_tier, "service_tier")
-        ),
-        network_access=account.network_access,
+        service_tier=(account.service_tier if service_tier is None else validate_setting_value(service_tier, "service_tier")),
         provider_type=account.provider_type if provider_type is None else str(provider_type).strip(),
         adapter_type=account.adapter_type if adapter_type is None else str(adapter_type).strip(),
         auth_mode=account.auth_mode if auth_mode is None else str(auth_mode).strip(),
@@ -585,6 +574,7 @@ def update_account_settings(
         available_models=account.available_models if available_models is None else tuple(validate_setting_value(value, "available_models") for value in available_models),
         supported_reasoning_efforts=account.supported_reasoning_efforts if supported_reasoning_efforts is None else tuple(validate_setting_value(value, "supported_reasoning_efforts") for value in supported_reasoning_efforts),
         enabled=account.enabled if enabled is None else bool(enabled),
+        fallback_roles=new_fallback_roles,
     )
     accounts = dict(config.accounts)
     accounts[name] = updated

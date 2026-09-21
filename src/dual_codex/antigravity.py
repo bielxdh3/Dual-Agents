@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import shutil
 import subprocess
 import threading
@@ -19,6 +20,7 @@ import time
 from typing import Any, Callable
 
 from .config import AgentConfig
+from .bootstrap import CANONICAL_INSTRUCTIONS_ROOT, canonical_instructions_root
 from .process import CommandResult, _prepare_command
 
 
@@ -34,13 +36,98 @@ _TERMINAL_STATUSES = {
 _SUCCESS_STATUS = "SUCCESS"
 _HEARTBEAT_SECONDS = 15.0
 _SHUTDOWN_TIMEOUT_SECONDS = 5.0
-_CANONICAL_INSTRUCTIONS_ROOT = Path(r"C:\CodexGlobal")
+_CANONICAL_INSTRUCTIONS_ROOT = CANONICAL_INSTRUCTIONS_ROOT
+_DIAGNOSTIC_EVENT_LIMIT = 128
+_DIAGNOSTIC_TAIL_CHARS = 4000
+_DIAGNOSTIC_TEXT = re.compile(
+    r"(?i)(?:authorization\s*:\s*bearer\s+|\b(?:token|api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\b\s*[:=])[^\s,}]+"
+)
+_DIAGNOSTIC_AUTH_PATH = re.compile(r"(?i)(?:[A-Za-z]:)?[^\r\n\s\"']*auth\.json")
 
 
 @dataclass(frozen=True)
 class _StreamItem:
     source: str
     line: str | None
+
+
+def _sanitize_diagnostic(value: Any, *, limit: int = _DIAGNOSTIC_TAIL_CHARS) -> str:
+    text = _DIAGNOSTIC_AUTH_PATH.sub("[REDACTED_AUTH_PATH]", str(value))
+    text = _DIAGNOSTIC_TEXT.sub("[REDACTED_SECRET]", text)
+    return text[-limit:]
+
+
+def _diagnostic_path(output_path: Path) -> Path:
+    return output_path.with_name(f"{output_path.stem}.antigravity-transport.json")
+
+
+def _persist_transport_diagnostics(
+    *,
+    output_path: Path,
+    metadata: dict[str, Any],
+    command: list[str],
+    returncode: int | None,
+    terminal_status: str,
+    protocol_error: str = "",
+    stdout_lines: list[str] | None = None,
+    stderr_lines: list[str] | None = None,
+    event_names: list[str] | None = None,
+    event_summaries: list[dict[str, Any]] | None = None,
+    init_observed: bool = False,
+    result_observed: bool = False,
+    conversation_id: str = "",
+    timed_out: bool = False,
+    startup_failure: bool = False,
+) -> None:
+    """Persist bounded, non-secret transport evidence for every attempt."""
+
+    path = _diagnostic_path(output_path)
+    payload = {
+        "schema_version": 1,
+        "command": [_sanitize_diagnostic(item, limit=1000) for item in command],
+        "cwd": str(metadata.get("antigravity_cwd", "")),
+        "repository": str(metadata.get("antigravity_repository", "")),
+        "profile": {
+            "actor_id": str(metadata.get("actor_id", metadata.get("account", ""))),
+            "provider": str(metadata.get("provider", metadata.get("executor_provider", "antigravity"))),
+            "model": str(metadata.get("runtime_model", metadata.get("logical_model", ""))),
+            "reasoning": str(metadata.get("reasoning_effort", "")),
+        },
+        "task_artifact": str(metadata.get("task_artifact", "")),
+        "task_sha256": str(metadata.get("task_sha256", "")),
+        "returncode": returncode,
+        "terminal_classification": terminal_status or "NO_RESULT",
+        "event_count": int(metadata.get("antigravity_event_count", 0)),
+        "event_names": list((event_names or [])[:_DIAGNOSTIC_EVENT_LIMIT]),
+        "init_observed": bool(init_observed),
+        "result_observed": bool(result_observed),
+        "conversation_id": _sanitize_diagnostic(conversation_id, limit=256),
+        "stderr_tail": _sanitize_diagnostic("".join(stderr_lines or [])),
+        "stdout_event_summary": list((event_summaries or [])[:_DIAGNOSTIC_EVENT_LIMIT]),
+        "protocol_error": _sanitize_diagnostic(protocol_error),
+        "timeout": bool(timed_out),
+        "startup_failure": bool(startup_failure),
+        "environment": {
+            "sanitized": True,
+            "codex_home_forwarded": False,
+            "api_keys_forwarded": False,
+        },
+        "canonical_bootstrap": {
+            "required": bool(metadata.get("canonical_bootstrap_required", False)),
+            "source": str(metadata.get("canonical_bootstrap_source", "")),
+            "source_path": str(metadata.get("canonical_instructions_root", "")),
+        },
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.tmp")
+        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(path)
+        metadata["antigravity_diagnostics_path"] = str(path)
+        metadata["antigravity_diagnostics_persisted"] = True
+    except OSError as exc:
+        metadata["antigravity_diagnostics_persisted"] = False
+        metadata["antigravity_diagnostics_error"] = _sanitize_diagnostic(exc, limit=1000)
 
 
 def _environment() -> dict[str, str]:
@@ -82,12 +169,9 @@ def antigravity_status(command: str, *, cwd: Path | None = None) -> str:
 
 
 def _canonical_instructions_root() -> Path:
-    root = _CANONICAL_INSTRUCTIONS_ROOT
-    if not (root / "AGENTS.md").is_file():
-        raise FileNotFoundError(f"Canonical instruction file is unavailable: {root / 'AGENTS.md'}")
-    if not (root / "skills").is_dir():
-        raise FileNotFoundError(f"Canonical skill tree is unavailable: {root / 'skills'}")
-    return root
+    # Keep the patchable seam used by transport tests while sharing the same
+    # fail-closed validation contract as Codex profile transports.
+    return canonical_instructions_root(_CANONICAL_INSTRUCTIONS_ROOT)
 
 
 def _event_message(prompt: str) -> str:
@@ -121,10 +205,9 @@ def build_command(
     independently of the process cwd, which can leave the orchestrator's
     project as the primary workspace.  ``accept-edits`` preserves the
     existing workspace-write role without using the dangerous permission
-    bypass.  The canonical policy tree is added as a separate read scope so
-    the Executor can satisfy the required global bootstrap without granting
-    access to the orchestrator checkout.  Permission requests are never
-    answered by this adapter; an unattended request therefore fails closed.
+    bypass. Canonical bootstrap content is supplied through the per-run
+    artifact bound to ``repository``; the machine-wide policy tree is never
+    granted as a writable root.
     """
 
     repository = repository.expanduser().resolve()
@@ -142,9 +225,6 @@ def build_command(
     else:
         result.append("--new-project")
     result.extend(["--add-dir", str(repository)])
-    canonical_root = _canonical_instructions_root()
-    if canonical_root != repository:
-        result.extend(["--add-dir", str(canonical_root)])
     if task_artifact_path is not None:
         artifact = task_artifact_path.expanduser().resolve()
         if not artifact.is_file():
@@ -211,10 +291,26 @@ def _timeout_seconds(config: Any | None) -> float:
 
 def _response_text(response: Any) -> str | None:
     if isinstance(response, str):
-        return response
+        return response if response.strip() else None
     if isinstance(response, (dict, list)):
         return json.dumps(response, ensure_ascii=False)
     return None
+
+
+def _result_field_shape(result: dict[str, Any]) -> dict[str, Any]:
+    shape: dict[str, Any] = {}
+    for field in ("structured_output", "response"):
+        if field not in result:
+            shape[field] = {"present": False}
+            continue
+        value = result[field]
+        item: dict[str, Any] = {"present": True, "type": type(value).__name__}
+        if isinstance(value, str):
+            item.update({"nonblank": bool(value.strip()), "length": len(value)})
+        elif isinstance(value, (dict, list)):
+            item["length"] = len(value)
+        shape[field] = item
+    return shape
 
 
 def run_antigravity(
@@ -236,6 +332,9 @@ def run_antigravity(
     repository = repository.expanduser().resolve()
     timeout_seconds = _timeout_seconds(config)
     metadata: dict[str, Any] = {
+        "actor_id": agent.account_name,
+        "provider": agent.provider_type or "gemini",
+        "backend": agent.backend or "antigravity",
         "executor_provider": "antigravity",
         "logical_model": agent.model,
         "runtime_model": getattr(agent, "runtime_model", "") or agent.model,
@@ -245,15 +344,27 @@ def run_antigravity(
         "antigravity_conversation_id": "",
         "antigravity_terminal_status": "",
         "antigravity_event_count": 0,
+        "antigravity_init_observed": False,
+        "antigravity_result_observed": False,
         "antigravity_repository": str(repository),
         "antigravity_cwd": str(repository),
         "task_transport": "file" if task_artifact_path is not None else "inline",
         "task_artifact": str(task_artifact_path.expanduser().resolve()) if task_artifact_path is not None else "",
         "task_sha256": task_sha256,
         "reuse_existing": False,
+        "canonical_bootstrap_required": True,
+        "canonical_bootstrap_source": "machine-wide",
     }
     if not repository.is_dir():
         metadata["antigravity_terminal_status"] = "WORKSPACE_UNAVAILABLE"
+        _persist_transport_diagnostics(
+            output_path=output_path,
+            metadata=metadata,
+            command=[str(command)],
+            returncode=1,
+            terminal_status="WORKSPACE_UNAVAILABLE",
+            protocol_error=f"Antigravity workspace does not exist or is not a directory: {repository}",
+        )
         return CommandResult(
             [str(command)],
             1,
@@ -265,6 +376,14 @@ def run_antigravity(
         artifact = task_artifact_path.expanduser().resolve()
         if not artifact.is_file():
             metadata["antigravity_terminal_status"] = "TASK_ARTIFACT_UNAVAILABLE"
+            _persist_transport_diagnostics(
+                output_path=output_path,
+                metadata=metadata,
+                command=[str(command)],
+                returncode=1,
+                terminal_status="TASK_ARTIFACT_UNAVAILABLE",
+                protocol_error=f"Task artifact does not exist: {artifact}",
+            )
             return CommandResult(
                 [str(command)],
                 1,
@@ -273,9 +392,18 @@ def run_antigravity(
                 metadata,
             )
     try:
-        _canonical_instructions_root()
+        canonical_root = _canonical_instructions_root()
+        metadata["canonical_instructions_root"] = str(canonical_root)
     except OSError as exc:
         metadata["antigravity_terminal_status"] = "INSTRUCTIONS_UNAVAILABLE"
+        _persist_transport_diagnostics(
+            output_path=output_path,
+            metadata=metadata,
+            command=[str(command)],
+            returncode=1,
+            terminal_status="INSTRUCTIONS_UNAVAILABLE",
+            protocol_error=str(exc),
+        )
         return CommandResult(
             [str(command)],
             1,
@@ -308,6 +436,15 @@ def run_antigravity(
         )
     except (OSError, ValueError) as exc:
         metadata["antigravity_terminal_status"] = "STARTUP_ERROR"
+        _persist_transport_diagnostics(
+            output_path=output_path,
+            metadata=metadata,
+            command=display_command,
+            returncode=1,
+            terminal_status="STARTUP_ERROR",
+            protocol_error=str(exc),
+            startup_failure=True,
+        )
         return CommandResult(display_command, 1, "", str(exc), metadata)
 
     events: queue.Queue[_StreamItem] = queue.Queue()
@@ -335,6 +472,11 @@ def run_antigravity(
     response: str | None = None
     response_source = ""
     protocol_error = ""
+    event_names: list[str] = []
+    event_summaries: list[dict[str, Any]] = []
+    init_observed = False
+    result_observed = False
+    timed_out = False
     stdout_closed = False
     started = time.monotonic()
     last_progress = started
@@ -347,6 +489,7 @@ def run_antigravity(
             if time.monotonic() - started >= timeout_seconds:
                 terminal_status = "TIMEOUT"
                 protocol_error = f"Antigravity turn timed out after {timeout_seconds:g}s."
+                timed_out = True
                 break
             try:
                 item = events.get(timeout=1.0)
@@ -383,7 +526,12 @@ def run_antigravity(
                 break
             metadata["antigravity_event_count"] += 1
             event_name = event["event"]
+            if len(event_names) < _DIAGNOSTIC_EVENT_LIMIT:
+                event_names.append(event_name)
+                event_summaries.append({"event": event_name})
             if event_name == "init":
+                init_observed = True
+                metadata["antigravity_init_observed"] = True
                 value = event.get("conversation_id")
                 if isinstance(value, str):
                     conversation = value
@@ -399,6 +547,14 @@ def run_antigravity(
                 continue
 
             result = event.get("result")
+            result_observed = True
+            metadata["antigravity_result_observed"] = True
+            if event_summaries:
+                event_summaries[-1]["result_shape"] = (
+                    _result_field_shape(result) if isinstance(result, dict) else {"result": {"type": type(result).__name__}}
+                )
+                if isinstance(result, dict):
+                    event_summaries[-1]["status"] = result.get("status")
             if not isinstance(result, dict):
                 terminal_status = "MALFORMED"
                 protocol_error = "Antigravity result event did not contain an object result."
@@ -409,6 +565,7 @@ def run_antigravity(
                 protocol_error = f"Antigravity returned an unsupported terminal status: {status!r}."
                 break
             terminal_status = status.upper()
+            metadata["antigravity_result_shape"] = _result_field_shape(result)
             value = result.get("conversation_id")
             if isinstance(value, str):
                 conversation = value
@@ -418,10 +575,11 @@ def run_antigravity(
                 response_source = "structured_output"
             else:
                 response = _response_text(result.get("response"))
-                response_source = "response"
+                if response is not None:
+                    response_source = "response"
             if terminal_status == _SUCCESS_STATUS and response is None:
                 terminal_status = "MALFORMED"
-                protocol_error = "Antigravity SUCCESS result did not contain a text or object response."
+                protocol_error = "Antigravity SUCCESS result did not contain nonblank structured_output or response."
                 break
             if terminal_status != _SUCCESS_STATUS:
                 error = result.get("error")
@@ -453,6 +611,22 @@ def run_antigravity(
         metadata["antigravity_conversation_id"] = conversation
         metadata["antigravity_terminal_status"] = terminal_status
         metadata["antigravity_result_source"] = response_source
+        _persist_transport_diagnostics(
+            output_path=output_path,
+            metadata=metadata,
+            command=display_command,
+            returncode=returncode,
+            terminal_status=terminal_status,
+            protocol_error=protocol_error,
+            stdout_lines=stdout_lines,
+            stderr_lines=stderr_lines,
+            event_names=event_names,
+            event_summaries=event_summaries,
+            init_observed=init_observed,
+            result_observed=result_observed,
+            conversation_id=conversation,
+            timed_out=timed_out,
+        )
         return CommandResult(
             display_command,
             0,
@@ -468,4 +642,20 @@ def run_antigravity(
     stderr = "".join(stderr_lines)
     if protocol_error:
         stderr = f"{protocol_error}\n{stderr}" if stderr else protocol_error
+    _persist_transport_diagnostics(
+        output_path=output_path,
+        metadata=metadata,
+        command=display_command,
+        returncode=returncode,
+        terminal_status=metadata["antigravity_terminal_status"],
+        protocol_error=protocol_error,
+        stdout_lines=stdout_lines,
+        stderr_lines=stderr_lines,
+        event_names=event_names,
+        event_summaries=event_summaries,
+        init_observed=init_observed,
+        result_observed=result_observed,
+        conversation_id=conversation,
+        timed_out=timed_out,
+    )
     return CommandResult(display_command, returncode, "".join(stdout_lines), stderr, metadata)

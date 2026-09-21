@@ -37,6 +37,7 @@ from .registry import (
     rename_account,
     roles_for_account,
     set_account_enabled,
+    set_fallback_enabled,
     set_roles_for_account,
     update_account_settings,
 )
@@ -129,6 +130,21 @@ def _agent_for_account(account: Any) -> AgentConfig:
         supported_reasoning_efforts=account.supported_reasoning_efforts,
         enabled=account.enabled,
     )
+
+
+def _windows_readiness(account: Any) -> str | None:
+    if account.backend != "app_server" or str(account.provider_type).casefold() != "codex":
+        return None
+    try:
+        import tomllib
+        config_path = account.codex_home / "config.toml"
+        raw = tomllib.loads(config_path.read_bytes().decode("utf-8-sig")) if config_path.exists() else {}
+        mode = ((raw.get("windows") or {}).get("sandbox") if isinstance(raw.get("windows"), dict) else None)
+    except (OSError, ValueError, TypeError):
+        mode = None
+    if mode in {"unelevated", "elevated"}:
+        return "Ready" if mode == "unelevated" else "Configured; probe required"
+    return "Not configured"
 
 
 def _model_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -273,6 +289,8 @@ class DashboardService:
             "backend": account.backend,
             "state_root": abbreviate_path(account.codex_home),
             "enabled": account.enabled,
+            "fallback_roles": list(account.fallback_roles),
+            "windows_sandbox_readiness": _windows_readiness(account),
             "auth_status": _auth_status_label(raw),
             "auth_actions": self._auth_actions(account),
         }
@@ -345,6 +363,8 @@ class DashboardService:
             "stable_key": account.name,
             "label": account.label,
             "roles": roles_for_account(self.config.roles, account.name),
+            "fallback_roles": list(account.fallback_roles),
+            "windows_sandbox_readiness": _windows_readiness(account),
             "backend": account.backend,
             "provider": provider,
             "provider_label": provider_name,
@@ -536,6 +556,7 @@ class DashboardService:
             "name", "label", "backend", "codex_home", "model", "reasoning_effort",
             "enabled", "base_url", "auth_reference", "available_models",
             "supported_reasoning_efforts", "runtime_model", "fixed_mode",
+            "fallback_roles",
         }
         unknown = sorted(set(body) - allowed)
         if unknown:
@@ -561,6 +582,9 @@ class DashboardService:
                 values = body[field]
                 if not isinstance(values, (list, tuple)) or any(not isinstance(value, str) for value in values):
                     raise DashboardError(f"{field} must be a list of strings.")
+        fallback_roles = body.get("fallback_roles", [])
+        if not isinstance(fallback_roles, list) or any(not isinstance(value, str) for value in fallback_roles):
+            raise DashboardError("fallback_roles must be a list of role names.")
         try:
             created = add_account(
                 self.config,
@@ -576,6 +600,7 @@ class DashboardService:
                 base_url=body.get("base_url", "") or "",
                 available_models=body.get("available_models", ()) or (),
                 supported_reasoning_efforts=body.get("supported_reasoning_efforts", ()) or (),
+                fallback_roles=fallback_roles,
                 enabled=enabled,
                 authenticate=False,
                 output=lambda _message: None,
@@ -596,7 +621,7 @@ class DashboardService:
     def update_profile(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(body, dict):
             raise DashboardError("Profile update body must be a JSON object.")
-        allowed = {"label", "display_name", "new_name", "enabled"}
+        allowed = {"label", "display_name", "new_name", "enabled", "fallback_roles"}
         unknown = sorted(set(body) - allowed)
         if unknown:
             raise DashboardError(f"Unknown profile field(s): {', '.join(unknown)}.")
@@ -621,7 +646,15 @@ class DashboardService:
             if not isinstance(body["enabled"], bool):
                 raise DashboardError("enabled must be a boolean.")
             set_account_enabled(self.config, current_name, body["enabled"])
-        if not (set(body) & {"label", "display_name", "new_name", "enabled"}):
+        if "fallback_roles" in body:
+            roles = body["fallback_roles"]
+            if not isinstance(roles, list) or any(not isinstance(role, str) for role in roles):
+                raise DashboardError("fallback_roles must be a list of role names.")
+            try:
+                update_account_settings(self.config, current_name, fallback_roles=roles)
+            except ConfigError as exc:
+                raise DashboardError(str(exc)) from exc
+        if not (set(body) & {"label", "display_name", "new_name", "enabled", "fallback_roles"}):
             raise DashboardError("Profile update requires a display name, profile ID, or enabled value.")
         self._reload()
         with self._lock:
@@ -769,6 +802,7 @@ class DashboardService:
             "repository": str(self.repository),
             "git_state": git_state,
             "executor_account": self.config.roles.get("executor", ""),
+            "fallback_enabled": self.config.fallback_enabled,
             "app_server_health": app_server_health,
             "last_refresh": _now(),
             "config": str(self.config.config_path),
@@ -989,6 +1023,17 @@ class DashboardService:
             "message": "Roles updated",
         }
 
+    def set_fallback(self, body: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(body, dict) or set(body) != {"enabled"} or not isinstance(body["enabled"], bool):
+            raise DashboardError("Fallback settings require exactly a boolean enabled field.")
+        set_fallback_enabled(self.config, body["enabled"])
+        self._reload()
+        return {
+            "schema_version": 1,
+            "fallback_enabled": self.config.fallback_enabled,
+            "message": "Automatic configured-actor fallback updated for future dispatches.",
+        }
+
 
 HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1021,7 +1066,7 @@ function options(items,current,inherit){let out=inherit?`<option value="">${esc(
  function capabilityOptions(state){const efforts=state.fixed_mode?`<option value="" selected>${esc(state.fixed_mode)} (fixed)</option>`:state.reasoning_efforts.length?state.reasoning_efforts.map(value=>`<option value="${esc(value)}" ${value===state.reasoning_value?'selected':''}>${esc(value)}</option>`).join(''):'<option value="">Capabilities unavailable</option>';const tiers='<option value="" '+(!state.service_tier_value?'selected':'')+'>Default / OFF</option>'+state.service_tiers.map(tier=>`<option value="${esc(tier.id)}" ${tier.id===state.service_tier_value?'selected':''}>${esc(tier.name||tier.id)}</option>`).join('');return {efforts,tiers}}
 function renderCapabilities(card,models,announce){const model=card.querySelector('[data-model]').value;const effort=card.querySelector('[data-effort]');const tier=card.querySelector('[data-tier]');const state=reconcileCapabilitySelection(models,model,effort.value,tier.value,card._providerCapabilities||{});const options=capabilityOptions(state);effort.innerHTML=options.efforts;effort.value=state.reasoning_value;effort.disabled=state.reasoning_disabled;tier.innerHTML=options.tiers;tier.value=state.service_tier_value;tier.disabled=state.service_tier_disabled;const feedback=card.querySelector('[data-capability-feedback]');if(announce||state.message)feedback.textContent=state.message||'Capabilities match the selected provider.';return state}
 const ROLE_NAMES=['orchestrator','architect','reviewer','executor'];
-function roleEditor(a){const assigned=new Set(a.roles||[]);return `<fieldset class="role-editor"><legend>Roles</legend><div class="role-options">${ROLE_NAMES.map(role=>`<label class="check"><input type="checkbox" data-role value="${role}" ${assigned.has(role)?'checked':''}>${role}</label>`).join('')}</div><small>Reviewer falls back to Architect when unassigned.</small></fieldset>`}
+function roleEditor(a){const assigned=new Set(a.roles||[]);const fallback=new Set(a.fallback_roles||[]);return `<fieldset class="role-editor"><legend>Primary role assignment</legend><div class="role-options">${ROLE_NAMES.map(role=>`<label class="check"><input type="checkbox" data-primary-role value="${role}" ${assigned.has(role)?'checked':''}>${role}</label>`).join('')}</div><legend>Fallback eligibility</legend><div class="role-options">${ROLE_NAMES.filter(role=>role!=='orchestrator').map(role=>`<label class="check"><input type="checkbox" data-fallback-role value="${role}" ${fallback.has(role)?'checked':''}>${role}</label>`).join('')}</div><small>Fallback is only used when the global switch is enabled and the primary actor is unavailable.</small></fieldset>`}
 function card(a){const model=a.configured.model||'';const providerCapabilities=a.capabilities||{};const state=reconcileCapabilitySelection(a.models,model,a.configured.reasoning_effort,a.configured.service_tier,providerCapabilities);const capabilityOptionsForCard=capabilityOptions(state);const usage=a.usage?.summary?.lifetimeTokens;const thread=a.thread;const isExecutor=(a.roles||[]).includes('executor');const backendOptions=isExecutor?`<option value="${esc(a.backend)}" selected>${esc(a.provider_label||a.backend)}</option>`:`<option value="app_server" ${a.backend==='app_server'?'selected':''}>Codex App Server</option><option value="windows" ${a.backend==='windows'?'selected':''}>Codex Native Windows TUI</option><option value="antigravity" ${a.backend==='antigravity'?'selected':''}>Antigravity / Gemini</option><option value="api" ${a.backend==='api'?'selected':''}>API / OpenAI-compatible</option>`;const defaultLabel=a.configured.model?'':(a.configured.model_label||'Provider default');return `<article class="card" data-account="${esc(a.name)}" data-provider="${esc(a.provider||'unknown')}"><div class="card-head"><div><h3>${esc(a.label||a.name)}</h3><div class="sub">${esc(a.name)} · ${esc(a.provider_label||a.backend)} · ${esc(a.codex_home)}</div><div class="sub">Roles: ${esc((a.roles||[]).join(', ')||'none')} · Runtime: ${esc(a.runtime_state)}</div></div>${pill(a.runtime_state)}</div><div class="control">${roleEditor(a)}<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite">No role changes yet.</span><button class="button secondary" data-roles-save>Apply roles</button></div></div><div class="grid"><div class="field"><label>Configured model</label><output>${esc(a.configured.model_label)}</output></div><div class="field"><label>Effective model</label><output>${esc(a.effective.model||'Unknown')}</output></div><div class="field"><label>Configured reasoning</label><output>${esc(a.configured.reasoning_effort||'Provider default')}</output></div><div class="field"><label>Effective reasoning</label><output>${esc(a.effective.reasoning_effort||'Unknown')}</output></div><div class="field"><label>Fast requested / tier</label><output>${esc(a.configured.service_tier||'OFF / default')}</output></div><div class="field"><label>Effective service tier</label><output>${esc(a.effective.service_tier||'Unknown')}</output></div></div><div class="control"><div class="field"><label>Save for future turns</label><select data-model>${options(a.models,model,defaultLabel||'Provider default')}</select><small>Empty means inherit the selected provider default. Current thread is not changed.</small></div><div class="grid"><div class="field"><label>Reasoning / effort</label><select data-effort ${state.reasoning_disabled?'disabled':''}>${capabilityOptionsForCard.efforts}</select></div><div class="field"><label>Service tier / Fast</label><select data-tier ${state.service_tier_disabled?'disabled':''}>${capabilityOptionsForCard.tiers}</select></div><div class="field"><label>Backend / provider</label><select data-backend ${isExecutor?'disabled':''}>${backendOptions}</select></div></div><div class="feedback" data-capability-feedback aria-live="polite">${esc(state.message||'Capabilities match the selected provider.')}</div><div class="save-row"><span class="feedback" data-feedback>Settings are future-turn only.</span><button class="button" data-save>Save settings</button></div></div><div class="control"><div class="metric-label">Usage / rate-limit capacity</div><div class="bars">${(a.rate_limits||[]).map(bar).join('')||'<span class="hint">Not available</span>'}</div><div class="sub" style="margin-top:9px">Lifetime tokens: ${fmtTokens(usage)}</div>${thread?`<div class="thread"><div class="metric-label">Persistent thread</div><div class="value">${esc(thread.name||thread.id||'Unknown')}</div><div class="sub">${esc(thread.status||'Unknown')} · token usage ${a.token_usage?'available':'Not available'}</div></div>`:'<div class="thread sub">Persistent thread: Not available</div>'}</div>${a.profile?.isolation_note?`<div class="hint">${esc(a.profile.isolation_note)}</div>`:''}${a.last_error?`<div class="error">Provider: ${esc(a.last_error)}</div>`:''}</article>`}
  async function refresh(notice){const [s,as]=await Promise.all([get('/api/status'),get('/api/accounts')]);const healthy=as.accounts.some(a=>a.capabilities&&((a.capabilities.app_server&&!a.last_error)||a.runtime_state==='Connected'||a.runtime_state==='Configured'));$('#health').textContent=`Providers: ${healthy?'available':s.app_server_health}`;$('#summary').innerHTML=[['Dual Agents',s.dual_codex_version],['Codex CLI',s.codex_cli.version],['Repository',s.repository],['Git',s.git_state]].map(x=>`<div class="stat"><div class="label">${x[0]}</div><strong>${esc(x[1])}</strong></div>`).join('');renderProfiles(as.accounts);$('#accounts').innerHTML=as.accounts.map(card).join('')||'<div class="empty">No profiles configured.</div>';document.querySelectorAll('.card[data-account]').forEach(node=>{const account=as.accounts.find(row=>row.name===node.dataset.account);node._providerCapabilities=account?.capabilities||{};node._providerModels=account?.models||[];});$('#updated').textContent=`Updated ${new Date().toLocaleTimeString()}`;bindProfileManager();document.querySelectorAll('[data-model]').forEach(select=>select.addEventListener('change',()=>renderCapabilities(select.closest('.card'),select.closest('.card')._providerModels||[],true)));document.querySelectorAll('[data-backend]').forEach(select=>select.addEventListener('change',()=>{const card=select.closest('.card');const account=as.accounts.find(row=>row.name===card.dataset.account);if(account){card._providerCapabilities=account.capabilities||{};card._providerModels=account.models||[];renderCapabilities(card,card._providerModels,true)}}));document.querySelectorAll('[data-save]').forEach(btn=>btn.addEventListener('click',async()=>{const c=btn.closest('.card');const f=c.querySelector('[data-feedback]');f.textContent='Saving…';const body={model:c.querySelector('[data-model]').value,backend:c.querySelector('[data-backend]').value,scope:'future_turns'};const effort=c.querySelector('[data-effort]');const tier=c.querySelector('[data-tier]');if(effort.disabled){const selected=(c._providerModels||[]).find(row=>row&&row.id===body.model);if(selected&&selected.fixed_mode)body.reasoning_effort='';}else body.reasoning_effort=effort.value;if(!tier.disabled)body.service_tier=tier.value;try{await get(`/api/accounts/${encodeURIComponent(c.dataset.account)}/settings`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});f.textContent='Saved for future turns; current thread unchanged.';await refresh()}catch(e){f.textContent=e.message}}));document.querySelectorAll('[data-roles-save]').forEach(btn=>btn.addEventListener('click',async()=>{const c=btn.closest('.card');const f=c.querySelector('[data-role-feedback]');const roles=[...c.querySelectorAll('[data-role]:checked')].map(input=>input.value);f.textContent='Applying…';try{await get('/api/roles/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:c.dataset.account,roles})});await refresh({account:c.dataset.account,message:'Roles updated'});const updated=document.querySelector(`[data-account="${c.dataset.account}"] [data-role-feedback]`);if(updated)updated.textContent='Roles updated';}catch(err){f.textContent=err.message}}))}
 $('#refresh').addEventListener('click',()=>refresh().catch(e=>$('#accounts').innerHTML=`<div class="empty">${esc(e.message)}</div>`));refresh().catch(e=>{$('#health').textContent='Unavailable';$('#accounts').innerHTML=`<div class="empty">${esc(e.message)}</div>`});"""
@@ -1035,6 +1080,11 @@ SCRIPT += """const dashboardFetch=window.fetch.bind(window);window.fetch=(input,
 SCRIPT += """const executorTokenAmount=value=>{const direct=executorNumber(value);if(direct!=null)return direct;const object=executorObject(value);for(const key of ['totalTokens','total_tokens','tokens','value']){const amount=executorNumber(object[key]);if(amount!=null)return amount}return null};executorTokenText=value=>{const usage=executorObject(value);const total=executorTokenAmount(usage.totalTokens??usage.total??usage.tokens);const last=executorTokenAmount(usage.lastTokens??usage.last??usage.recent);if(total==null&&last==null)return 'Unknown';const parts=[];if(total!=null)parts.push(`total ${total.toLocaleString()}`);if(last!=null)parts.push(`last ${last.toLocaleString()}`);return parts.join(' · ')};const executorRenderMetaFromSnapshot=executorRenderMeta;executorRenderMeta=()=>{const snapshot=executorLive.snapshot||{};const started=executorDate(snapshot.started_at);const completed=executorDate(snapshot.completed_at);if(started!=null)executorLive.startedAt=started;if(completed!=null)executorLive.endedAt=completed;else if(executorText(snapshot.state,'IDLE').toUpperCase()==='WORKING')executorLive.endedAt=null;executorRenderMetaFromSnapshot()};const executorAddEventWithTimes=executorAddEvent;executorAddEvent=(value,eventName)=>{const event=executorObject(value);if(event.kind==='turn'&&event.state==='started'){executorLive.startedAt=executorDate(event.timestamp);executorLive.endedAt=null;if(executorLive.snapshot)executorLive.snapshot=Object.assign({},executorLive.snapshot,{started_at:event.timestamp,completed_at:null})}executorAddEventWithTimes(value,eventName)};"""
 SCRIPT += """function executorSyncServerTimes(){const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();const started=executorDate(snapshot.started_at);const ended=executorDate(snapshot.ended_at||snapshot.completed_at);if(started!=null)executorLive.startedAt=started;if(state==='WORKING')executorLive.endedAt=null;else if(ended!=null)executorLive.endedAt=ended;else if(executorLive.startedAt!=null&&Number.isFinite(Number(snapshot.elapsed_seconds)))executorLive.endedAt=executorLive.startedAt+Math.max(0,Number(snapshot.elapsed_seconds))*1000}const executorRenderMetaServerTruthBase=executorRenderMeta;executorRenderMeta=()=>{executorSyncServerTimes();executorRenderMetaServerTruthBase();const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();const reason=['STALE','DISCONNECTED'].includes(state)?executorText(snapshot.stale_reason,'Executor activity is no longer live.'):'';const status=document.getElementById('executor-status');if(status)status.textContent=`${state} · ${reason||executorLive.connection}`};const executorSetSnapshotServerTruthBase=executorSetSnapshot;executorSetSnapshot=value=>{executorSetSnapshotServerTruthBase(value);executorSyncServerTimes();executorRenderMeta()};function executorRecordLateEvent(event){const sequence=executorNumber(event.sequence);if(sequence==null||sequence<=executorLive.cursor)return;executorLive.cursor=sequence;executorUpdateMetaFromEvent(event);if(executorLive.clearedAt==null||sequence>executorLive.clearedAt){executorLive.rows.push(event);executorLive.rows=executorLive.rows.slice(-EXECUTOR_MAX_ROWS)}executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{cursor:sequence});executorRender()}const executorAddEventServerTruthBase=executorAddEvent;executorAddEvent=(value,eventName)=>{const event=executorObject(value);const snapshot=executorLive.snapshot||{};const currentState=executorText(snapshot.state,'IDLE').toUpperCase();const sameRun=!event.run_id||!snapshot.run_id||event.run_id===snapshot.run_id;if(['COMPLETE','FAILED','STALE','DISCONNECTED'].includes(currentState)&&sameRun&&event.kind==='turn'&&event.state==='started'){executorRecordLateEvent(event);return}if(event.run_id&&snapshot.run_id&&event.run_id!==snapshot.run_id){executorLive.snapshot=Object.assign({},snapshot,{run_id:event.run_id,request_id:event.request_id||null,state:'IDLE',started_at:null,ended_at:null,completed_at:null,elapsed_seconds:null});executorLive.startedAt=null;executorLive.endedAt=null}executorAddEventServerTruthBase(value,eventName);if(event.kind==='run'&&['completed','complete','failed','failure','cancelled','canceled'].includes(event.state)){const terminalState=['completed','complete'].includes(event.state)?'COMPLETE':'FAILED';const detail=executorObject(event.detail);const ended=executorDate(detail.ended_at)||executorDate(event.timestamp);const started=executorDate(detail.started_at);executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{state:terminalState,started_at:started==null?executorLive.snapshot?.started_at:detail.started_at,ended_at:detail.ended_at||executorLive.snapshot?.ended_at||event.timestamp,completed_at:ended==null?executorLive.snapshot?.completed_at:event.timestamp});if(started!=null)executorLive.startedAt=started;if(ended!=null)executorLive.endedAt=ended}executorSyncServerTimes();executorRenderMeta()};setInterval(()=>{const state=executorText(executorLive.snapshot?.state,'IDLE').toUpperCase();if(state!=='WORKING')executorRenderMeta()},1000);"""
 
+
+HTML = HTML.replace('<div class="save-row"><button id="add-profile"', '<div class="save-row"><label class="check"><input id="fallback-enabled" type="checkbox"> Enable automatic configured-actor fallback</label><button id="add-profile"')
+SCRIPT = SCRIPT.replace("c.querySelectorAll('[data-role]:checked')", "c.querySelectorAll('[data-primary-role]:checked')")
+SCRIPT = SCRIPT.replace("const healthy=as.accounts.some", "const fallbackToggle=document.getElementById('fallback-enabled');if(fallbackToggle)fallbackToggle.checked=Boolean(s.fallback_enabled);const healthy=as.accounts.some")
+SCRIPT += """document.addEventListener('change',event=>{if(event.target.id!=='fallback-enabled')return;get('/api/fallback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:event.target.checked})}).catch(error=>{event.target.checked=!event.target.checked;window.alert(error.message||'Fallback setting failed.')})});document.addEventListener('click',async event=>{const button=event.target.closest?.('[data-roles-save]');if(!button)return;event.stopImmediatePropagation();const card=button.closest('.card');const feedback=card?.querySelector('[data-role-feedback]');const roles=[...card.querySelectorAll('[data-primary-role]:checked')].map(input=>input.value);const fallback_roles=[...card.querySelectorAll('[data-fallback-role]:checked')].map(input=>input.value);feedback.textContent='Applying…';try{await get('/api/roles/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:card.dataset.account,roles})});await get(`/api/accounts/${encodeURIComponent(card.dataset.account)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fallback_roles})});await refresh();}catch(error){feedback.textContent=error.message||'Role settings failed.'}},true);"""
 
 class _Handler(BaseHTTPRequestHandler):
     server: "_HTTPServer"
@@ -1220,6 +1270,9 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             if method == "POST" and path == "/api/roles/set":
                 self._send(200, service.set_roles(self._body()))
+                return
+            if method == "POST" and path == "/api/fallback":
+                self._send(200, service.set_fallback(self._body()))
                 return
             self._send(405 if method == "GET" else 404, {"error": "Route or method not supported."})
         except (DashboardError, ConfigError, ValueError) as exc:

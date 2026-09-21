@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import ctypes
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -12,6 +12,8 @@ import time
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
+from .bootstrap import canonical_instructions_root
+from .codex import classify_actor_failure, configured_actor_provenance
 from .codex import run_codex_exec as _run_codex_exec_legacy
 from .codex import run_codex_app_server
 from .codex import run_codex_terminal
@@ -20,7 +22,7 @@ from .config import ConfigError, OrchestratorConfig
 from .git import ensure_git_repository, head_revision, status_and_diff, status_porcelain
 from .live_events import LiveEventJournal, repository_identity
 from .paths import path_identity_key
-from .process import CommandResult
+from .process import CommandError, CommandResult
 from .registry import login_status
 from .report import (
     EXECUTOR_REPORT_FIELDS,
@@ -33,6 +35,12 @@ from .report import (
 
 def run_codex_exec(**kwargs):
     """Select the configured structured backend while preserving the TUI seam."""
+    requested_role = kwargs.get("role", "executor")
+    if requested_role != "executor":
+        raise DelegationError(
+            "The executor delegation adapter cannot satisfy a configured non-executor role; "
+            "no native or implicit fallback is permitted."
+        )
     config = kwargs.get("config")
     agent = kwargs.get("agent")
     if agent is not None and agent.backend == "antigravity":
@@ -58,6 +66,7 @@ def run_codex_exec(**kwargs):
         app_server_kwargs.pop("schema_path", None)
         app_server_kwargs.pop("check", None)
         app_server_kwargs.pop("reuse_existing", None)
+        app_server_kwargs.pop("conversation_id", None)
         from .terminal import session_id_for
 
         app_server_kwargs["session_id"] = session_id_for(
@@ -67,6 +76,9 @@ def run_codex_exec(**kwargs):
         app_server_kwargs["request_id"] = kwargs.get("request_id", "")
         app_server_kwargs["run_id"] = kwargs.get("run_id", app_server_kwargs["session_id"])
         app_server_kwargs["role"] = kwargs.get("role", "executor")
+        app_server_kwargs["require_workspace_ready"] = (
+            kwargs.get("role", "executor") == "executor" and kwargs["agent"].sandbox == "workspace-write"
+        )
         return run_codex_app_server(**app_server_kwargs)
     if agent is None or agent.backend != "windows":
         raise DelegationError(
@@ -645,6 +657,24 @@ def _result(
     executor_approval_policy: str = "",
     executor_role: str = "",
     executor_provider: str = "",
+    executor_actor_id: str = "",
+    executor_configured_actor: bool = False,
+    executor_adapter: str = "",
+    executor_backend: str = "",
+    executor_model: str = "",
+    executor_reasoning_effort: str = "",
+    primary_actor: str = "",
+    actual_actor: str = "",
+    fallback_enabled: bool = False,
+    fallback_used: bool = False,
+    failed_actor: str = "",
+    fallback_actor: str = "",
+    fallback_reason: str = "",
+    fallback_failure_class: str = "",
+    executor_state_root_identity: str = "",
+    canonical_instructions_root: str = "",
+    canonical_bootstrap_required: bool = False,
+    delegation_transport: str = "",
     antigravity_conversation_id: str = "",
     antigravity_terminal_status: str = "",
     task_transport: str = "",
@@ -688,6 +718,24 @@ def _result(
             "executor_approval_policy": executor_approval_policy,
             "executor_role": executor_role,
             "executor_provider": executor_provider,
+            "executor_actor_id": executor_actor_id,
+            "executor_configured_actor": executor_configured_actor,
+            "executor_adapter": executor_adapter,
+            "executor_backend": executor_backend,
+            "executor_model": executor_model,
+            "executor_reasoning_effort": executor_reasoning_effort,
+            "primary_actor": primary_actor,
+            "actual_actor": actual_actor,
+            "fallback_enabled": fallback_enabled,
+            "fallback_used": fallback_used,
+            "failed_actor": failed_actor,
+            "fallback_actor": fallback_actor,
+            "fallback_reason": fallback_reason,
+            "fallback_failure_class": fallback_failure_class,
+            "executor_state_root_identity": executor_state_root_identity,
+            "canonical_instructions_root": canonical_instructions_root,
+            "canonical_bootstrap_required": canonical_bootstrap_required,
+            "delegation_transport": delegation_transport,
             "antigravity_conversation_id": antigravity_conversation_id,
             "antigravity_terminal_status": antigravity_terminal_status,
             "task_transport": task_transport,
@@ -1247,6 +1295,8 @@ def _failed_outcome(
             executor_account=executor_account,
             executor_label=executor_label,
             executor_sandbox=executor_sandbox,
+            primary_actor=executor_account,
+            actual_actor=executor_account,
             exit_code=exit_code,
             parent_request_id=parent_request_id,
             reuse_existing=reuse_existing,
@@ -1341,17 +1391,16 @@ def delegate(
         executor_label = agent.label
         executor_sandbox = agent.sandbox
         _emit(output, started, f"[2/5] Resolving executor account: {executor_account}")
-        if agent.backend != "antigravity":
+        if agent.backend not in {"antigravity", "app_server"}:
             return _failed_outcome(
                 result_file=result_file,
                 request_id=request_id,
                 started_at=started_at,
                 started=started,
                 status="executor_unavailable",
-                summary="Dual Agents requires Antigravity/Gemini as the Executor backend.",
+                summary="Configured Executor backend is not eligible for workspace-write dispatch.",
                 error=(
-                    f"Configured Executor backend '{agent.backend}' is not Antigravity; "
-                    "no Codex Executor fallback is permitted."
+                    f"Configured Executor backend '{agent.backend}' is not eligible for Executor dispatch."
                 ),
                 executor_account=executor_account,
                 executor_label=executor_label,
@@ -1361,7 +1410,7 @@ def delegate(
                 reuse_existing=reuse_existing,
             )
         antigravity_command = getattr(config, "antigravity_command", "agy")
-        if antigravity_status(antigravity_command, cwd=config.project_root) != "OK":
+        if agent.backend == "antigravity" and antigravity_status(antigravity_command, cwd=config.project_root) != "OK":
             return _failed_outcome(
                 result_file=result_file,
                 request_id=request_id,
@@ -1420,23 +1469,95 @@ def delegate(
                 f"[3/5] Starting executor: {executor_account} (sandbox={executor_sandbox})",
             )
             report_path = run_dir / "executor-report.json"
-            command_result: CommandResult = run_codex_exec(
-                config=config,
-                agent=agent,
-                repository=request.repository,
-                prompt=executor_prompt,
-                output_path=report_path,
-                schema_path=config.project_root / "schemas" / "delegation-report.schema.json",
-                check=False,
-                task_artifact_path=task_artifact,
-                task_sha256=task_sha256,
-                request_id=request.request_id,
-                run_id=run_dir.name,
-                role="executor",
-                conversation_id=request.antigravity_conversation_id,
-                progress=lambda message: _emit(output, started, f"[3/5] {message}"),
-                reuse_existing=reuse_existing,
+            def _run_executor_once(selected_config, selected_agent) -> CommandResult:
+                try:
+                    return run_codex_exec(
+                        config=selected_config,
+                        agent=selected_agent,
+                        repository=request.repository,
+                        prompt=executor_prompt,
+                        output_path=report_path,
+                        schema_path=config.project_root / "schemas" / "delegation-report.schema.json",
+                        check=False,
+                        task_artifact_path=task_artifact,
+                        task_sha256=task_sha256,
+                        request_id=request.request_id,
+                        run_id=run_dir.name,
+                        role="executor",
+                        conversation_id=request.antigravity_conversation_id,
+                        progress=lambda message: _emit(output, started, f"[3/5] {message}"),
+                        reuse_existing=reuse_existing,
+                    )
+                except (OSError, CommandError) as exc:
+                    return CommandResult(
+                        [selected_agent.backend],
+                        1,
+                        "",
+                        sanitize_text(str(exc)),
+                        {"availability_failure_class": "process_unavailable" if isinstance(exc, OSError) else "provider_runtime_unavailable"},
+                    )
+
+            command_result = _run_executor_once(config, agent)
+            primary_actor = agent.account_name
+            fallback_enabled = bool(getattr(config, "fallback_enabled", False))
+            fallback_used = False
+            failed_actor = ""
+            fallback_reason = ""
+            fallback_failure_class = ""
+            failure_class = classify_actor_failure(command_result, backend=agent.backend)
+            if command_result.returncode != 0 and failure_class and fallback_enabled:
+                candidates = [
+                    account_name for account_name in sorted(config.accounts)
+                    if account_name != primary_actor
+                    and config.accounts[account_name].enabled
+                    and "executor" in config.accounts[account_name].fallback_roles
+                    and config.accounts[account_name].backend in {"antigravity", "app_server"}
+                ]
+                if candidates:
+                    failed_actor = primary_actor
+                    fallback_reason = command_result.stderr[:500]
+                    fallback_failure_class = failure_class
+                    fallback_name = candidates[0]
+                    fallback_config = replace(config, roles={**config.roles, "executor": fallback_name})
+                    fallback_agent = fallback_config.agent_for_role("executor")
+                    command_result = _run_executor_once(fallback_config, fallback_agent)
+                    fallback_used = True
+                    agent = fallback_agent
+                    executor_account = agent.account_name
+                    executor_label = agent.label
+                    executor_sandbox = agent.sandbox
+            command_result.metadata.update({
+                "primary_actor": primary_actor,
+                "actual_actor": agent.account_name,
+                "fallback_enabled": fallback_enabled,
+                "fallback_used": fallback_used,
+                "failed_actor": failed_actor,
+                "fallback_actor": agent.account_name if fallback_used else "",
+                "fallback_reason": fallback_reason,
+                "fallback_failure_class": fallback_failure_class,
+            })
+            try:
+                canonical_root = canonical_instructions_root()
+            except OSError:
+                canonical_root = None
+            command_result.metadata.update(
+                configured_actor_provenance(
+                    agent=agent,
+                    role="executor",
+                    repository=request.repository,
+                    canonical_root=canonical_root,
+                )
             )
+            command_result.metadata.update({
+                "primary_actor": primary_actor,
+                "actual_actor": agent.account_name,
+                "fallback_enabled": fallback_enabled,
+                "fallback_used": fallback_used,
+                "failed_actor": failed_actor,
+                "fallback_actor": agent.account_name if fallback_used else "",
+                "fallback_reason": fallback_reason,
+                "fallback_failure_class": fallback_failure_class,
+            })
             stdout_path = run_dir / "executor.stdout.log"
             stderr_path = run_dir / "executor.stderr.log"
             _write_text(stdout_path, command_result.stdout)
@@ -1509,7 +1630,29 @@ def delegate(
                     if command_result.metadata.get("executor_provider") == "antigravity"
                     else "",
                 ),
-                executor_provider=command_result.metadata.get("executor_provider", ""),
+                executor_provider=command_result.metadata.get("executor_provider", "")
+                or command_result.metadata.get("provider", "")
+                or ("antigravity" if agent.backend == "antigravity" else ""),
+                executor_actor_id=command_result.metadata.get("actor_id", executor_account),
+                executor_configured_actor=bool(command_result.metadata.get("configured_actor", False)),
+                executor_adapter=command_result.metadata.get("adapter", ""),
+                executor_backend=command_result.metadata.get("backend", agent.backend),
+                executor_model=command_result.metadata.get("model", agent.model),
+                executor_reasoning_effort=command_result.metadata.get("reasoning_effort", agent.reasoning_effort),
+                primary_actor=command_result.metadata.get("primary_actor", executor_account),
+                actual_actor=command_result.metadata.get("actual_actor", executor_account),
+                fallback_enabled=bool(command_result.metadata.get("fallback_enabled", False)),
+                fallback_used=bool(command_result.metadata.get("fallback_used", False)),
+                failed_actor=command_result.metadata.get("failed_actor", ""),
+                fallback_actor=command_result.metadata.get("fallback_actor", ""),
+                fallback_reason=command_result.metadata.get("fallback_reason", ""),
+                fallback_failure_class=command_result.metadata.get("fallback_failure_class", ""),
+                executor_state_root_identity=command_result.metadata.get("state_root_identity", ""),
+                canonical_instructions_root=command_result.metadata.get("canonical_instructions_root", ""),
+                canonical_bootstrap_required=bool(
+                    command_result.metadata.get("canonical_bootstrap_required", False)
+                ),
+                delegation_transport=command_result.metadata.get("delegation_transport", "antigravity"),
                 antigravity_conversation_id=command_result.metadata.get(
                     "antigravity_conversation_id", ""
                 ),

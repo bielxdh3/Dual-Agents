@@ -12,6 +12,30 @@ from dual_codex.process import CommandResult
 
 
 class OrchestratorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Hosted Windows runners do not provide the developer machine's
+        # machine-wide policy tree.  Keep production resolution strict while
+        # giving this orchestration test an explicit, isolated policy fixture.
+        self._instructions = tempfile.TemporaryDirectory()
+        self.addCleanup(self._instructions.cleanup)
+        instruction_root = Path(self._instructions.name)
+        (instruction_root / "AGENTS.md").write_text(
+            "# canonical test policy\n",
+            encoding="utf-8",
+        )
+        skills_root = instruction_root / "skills"
+        skills_root.mkdir()
+        for name in ("memory", "ponytail", "project-phase-review", "project-security-review"):
+            skill_root = skills_root / name
+            skill_root.mkdir()
+            (skill_root / "SKILL.md").write_text(f"# {name}\n", encoding="utf-8")
+        self._bootstrap_patch = patch(
+            "dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT",
+            instruction_root,
+        )
+        self._bootstrap_patch.start()
+        self.addCleanup(self._bootstrap_patch.stop)
+
     def test_mission_dispatches_architect_and_app_server_executor_by_config(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

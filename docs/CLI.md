@@ -18,7 +18,7 @@ Selecao do repositorio, em ordem deterministica:
 1. `--repository`, quando informado;
 2. `repository` no pedido JSON;
 3. nenhum alvo: a delegacao e recusada. O `repository` da configuracao serve
-   para `status`, `doctor` e o fluxo legado `run`, mas nao e um fallback
+   para `status`, `doctor` e o fluxo completo `run`, mas nao e um fallback
    silencioso para `delegate`.
 
 Opcoes adicionais:
@@ -31,11 +31,12 @@ O comando imprime transicoes `[1/5]` a `[5/5]`, duracao, repositorio resolvido,
 diretorio da execucao e uma linha final `DUAL_CODEX_RESULT` com JSON compacto.
 O resultado persistido tambem registra o campo `repository` com o mesmo caminho
 canonico usado para o Git e para o processo Executor.
-O `delegate` exige que o role `executor` use o `agy` Antigravity/Gemini
-configurado; se o probe de versao falhar ou outro backend estiver configurado,
-a delegacao falha fechado sem fallback. O stdout/stderr do Executor nao e
-repassado ao usuario; logs de diagnostico sao
-sanitizados no diretorio da execucao.
+O `delegate` aceita o backend configurado para o role `executor`, incluindo
+Codex App Server e Antigravity/Gemini. Fallback automatico permanece desligado
+por padrao; quando habilitado, somente perfis com `fallback_roles = ["executor"]`
+podem ser considerados e no maximo um candidato e tentado. O stdout/stderr do
+Executor nao e repassado ao usuario; logs de diagnostico sao sanitizados no
+diretorio da execucao.
 
 ## Schemas
 
@@ -55,6 +56,11 @@ autorizada separadamente. Um pedido `correct` tambem exige
 O resultado pode ter `completed`, `failed`, `invalid_request`,
 `executor_unavailable` ou `cancelled`. Ele aponta para o report do executor, o
 stderr sanitizado, o estado do Git e o diff preservado.
+
+`dual-codex run` resolve Architect, Executor e Reviewer a partir de `[roles]`
+em cada fase. A execucao registra `provenance.json`; a identidade do perfil e
+o backend configurados sao vinculados ao transporte antes da chamada e nao
+podem ser substituidos pelo texto da tarefa.
 
 ## Operacoes existentes
 

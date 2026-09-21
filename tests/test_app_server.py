@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 from dual_codex.app_server import (
     AppServerError,
     _PROCESSES,
+    _canonical_workspace_roots,
     _app_server_command,
     _load_thread_mapping,
     _mapping_path,
@@ -27,7 +28,7 @@ from dual_codex.codex import _report_from_message
 from dual_codex.config import AgentConfig, OrchestratorConfig
 from dual_codex.live_events import read_journal
 from dual_codex.paths import same_path
-from dual_codex.process import executor_npm_cache
+from dual_codex.process import codex_environment, executor_npm_cache
 
 
 class _FakeStdout:
@@ -68,10 +69,15 @@ class _FakeProcess:
         self.stdin = _FakeStdin(self)
         self.returncode = None
         self.prompts: list[str] = []
+        self.initialize_params: list[dict] = []
         self.turn_params: list[dict] = []
         self.thread_params: list[dict] = []
+        self.request_order: list[str] = []
         self.thread_id = "thread-probe"
         self.turn_number = 0
+        self.start_error = False
+        self.resume_error = False
+        self.response_roots_override: list[str] | None = None
         self.windows_sandbox = None
         self.windows_sandbox_readiness = "ready"
 
@@ -95,7 +101,10 @@ class _FakeProcess:
     def handle(self, message: dict) -> None:
         method = message.get("method")
         request_id = message.get("id")
+        if request_id is not None:
+            self.request_order.append(method)
         if method == "initialize":
+            self.initialize_params.append(message["params"])
             self._emit(
                 {
                     "jsonrpc": "2.0",
@@ -110,9 +119,63 @@ class _FakeProcess:
             )
         elif method == "thread/start":
             self.thread_params.append(message["params"])
-            self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"thread": {"id": self.thread_id}}})
+            repository = message["params"]["cwd"]
+            if self.start_error:
+                self._emit({"jsonrpc": "2.0", "id": request_id, "error": {"message": "thread start failed"}})
+                return
+            roots = self.response_roots_override or [repository]
+            self._emit(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "thread": {
+                            "id": self.thread_id,
+                            "environments": [
+                                {
+                                    "environmentId": "local",
+                                    "cwd": repository,
+                                    "runtimeWorkspaceRoots": roots,
+                                }
+                            ],
+                        },
+                        "cwd": repository,
+                        "runtimeWorkspaceRoots": roots,
+                    },
+                }
+            )
         elif method == "thread/resume":
-            self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"thread": {"id": self.thread_id}}})
+            repository = message["params"]["cwd"]
+            if self.resume_error:
+                self._emit(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {"message": "no rollout found for thread id"},
+                    }
+                )
+                return
+            roots = self.response_roots_override or [repository]
+            self._emit(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "thread": {
+                            "id": self.thread_id,
+                            "environments": [
+                                {
+                                    "environmentId": "local",
+                                    "cwd": repository,
+                                    "runtimeWorkspaceRoots": roots,
+                                }
+                            ],
+                        },
+                        "cwd": repository,
+                        "runtimeWorkspaceRoots": roots,
+                    },
+                }
+            )
         elif method == "turn/start":
             self.turn_number += 1
             turn_id = f"turn-{self.turn_number}"
@@ -166,7 +229,7 @@ class AppServerTests(unittest.TestCase):
             config = _config(root)
             agent = AgentConfig(
                 codex_home=root / "profile",
-                model="",
+                model="gpt-5.6-luna",
                 reasoning_effort="high",
                 sandbox="workspace-write",
                 account_name="biel4",
@@ -182,6 +245,20 @@ class AppServerTests(unittest.TestCase):
                 fake_processes.append(fake)
                 self.assertNotIn("OPENAI_API_KEY", kwargs["env"])
                 self.assertNotIn("CODEX_API_KEY", kwargs["env"])
+                for key in (
+                    "CODEX_INTERNAL_ORIGINATOR_OVERRIDE",
+                    "CODEX_MCP_NODE_PATH",
+                    "CODEX_APP_TOOLS_PIPE_PATH",
+                    "CODEX_PERMISSION_PROFILE",
+                    "CODEX_SESSION_ID",
+                    "CODEX_THREAD_ID",
+                    "CODEX_SHELL",
+                    "CODEX_CI",
+                ):
+                    self.assertNotIn(key, kwargs["env"])
+                self.assertEqual(kwargs["env"]["CODEX_HOME"], str(agent.codex_home))
+                self.assertIn("PATH", kwargs["env"])
+                self.assertTrue(any(key.casefold() == "systemroot" for key in kwargs["env"]))
                 return fake
 
             long_prompt = "x" * 2201
@@ -191,6 +268,14 @@ class AppServerTests(unittest.TestCase):
                     "OPENAI_API_KEY": "secret",
                     "CODEX_API_KEY": "secret",
                     "LOCALAPPDATA": str(root / "localappdata"),
+                    "CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "desktop",
+                    "CODEX_MCP_NODE_PATH": "desktop-node",
+                    "CODEX_APP_TOOLS_PIPE_PATH": "desktop-pipe",
+                    "CODEX_PERMISSION_PROFILE": "desktop-profile",
+                    "CODEX_SESSION_ID": "desktop-session",
+                    "CODEX_THREAD_ID": "desktop-thread",
+                    "CODEX_SHELL": "desktop-shell",
+                    "CODEX_CI": "1",
                 },
             ), patch(
                 "dual_codex.app_server.subprocess.Popen", side_effect=create
@@ -218,6 +303,10 @@ class AppServerTests(unittest.TestCase):
 
             self.assertEqual(first.returncode, 0)
             self.assertEqual(second.returncode, 0)
+            self.assertEqual(
+                first.command,
+                ["codex", "app-server", "--stdio"],
+            )
             self.assertEqual(first.metadata["app_server_thread_id"], "thread-probe")
             self.assertEqual(second.metadata["app_server_thread_id"], "thread-probe")
             self.assertEqual(first.metadata["app_server_turn_id"], "turn-1")
@@ -225,6 +314,32 @@ class AppServerTests(unittest.TestCase):
             self.assertEqual(second.metadata["task_transport"], "app_server")
             self.assertEqual(len(fake_processes), 1)
             self.assertEqual(fake_processes[0].prompts, ["short", long_prompt])
+            lifecycle_requests = [
+                method
+                for method in fake_processes[0].request_order
+                if method in {"initialize", "thread/start", "thread/resume", "turn/start"}
+            ]
+            self.assertEqual(
+                lifecycle_requests,
+                ["initialize", "thread/start", "turn/start", "thread/resume", "turn/start"],
+            )
+            self.assertEqual(fake_processes[0].turn_params[0]["threadId"], "thread-probe")
+            initialize = fake_processes[0].initialize_params[0]
+            self.assertTrue(initialize["capabilities"]["experimentalApi"])
+            thread = fake_processes[0].thread_params[0]
+            self.assertEqual(thread["cwd"], str(repository.resolve()))
+            self.assertEqual(thread["runtimeWorkspaceRoots"], [str(repository.resolve())])
+            self.assertEqual(first.metadata["app_server_thread_cwd"], str(repository.resolve()))
+            self.assertEqual(first.metadata["app_server_runtime_workspace_roots"], [str(repository.resolve())])
+            self.assertEqual(
+                first.metadata["app_server_environment_roots"][0]["runtimeWorkspaceRoots"],
+                [str(repository.resolve())],
+            )
+            self.assertEqual(thread["sandbox"], "workspace-write")
+            self.assertEqual(thread["approvalPolicy"], "never")
+            self.assertEqual(thread["model"], "gpt-5.6-luna")
+            self.assertNotIn("tool_mode", thread)
+            self.assertNotIn("use_responses_lite", thread)
             policy = fake_processes[0].turn_params[0]["sandboxPolicy"]
             self.assertEqual(policy["type"], "workspaceWrite")
             self.assertFalse(policy["networkAccess"])
@@ -233,8 +348,12 @@ class AppServerTests(unittest.TestCase):
             for actual, expected in zip(policy["writableRoots"], expected_roots):
                 self.assertTrue(same_path(actual, expected), (actual, expected))
             self.assertEqual(fake_processes[0].turn_params[0]["effort"], "high")
+            self.assertEqual(fake_processes[0].turn_params[0]["model"], "gpt-5.6-luna")
+            self.assertNotIn("tool_mode", fake_processes[0].turn_params[0])
+            self.assertNotIn("use_responses_lite", fake_processes[0].turn_params[0])
             self.assertTrue(fake_processes[0].thread_params[0].get("experimentalRawEvents"))
             self.assertTrue(same_path(fake_processes[0].turn_params[0]["cwd"], repository))
+            self.assertNotIn("runtimeWorkspaceRoots", fake_processes[0].turn_params[0])
             journal_path = Path(first.metadata["live_event_journal"])
             deadline = time.monotonic() + 1
             journal_events = read_journal(journal_path)
@@ -249,6 +368,130 @@ class AppServerTests(unittest.TestCase):
             self.assertTrue(all(event.thread_id == "thread-probe" for event in journal_events))
             self.assertTrue(all(event.turn_id in {"turn-1", "turn-2"} for event in journal_events))
 
+    def test_runtime_workspace_roots_are_canonical_and_deduplicated(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            self.assertEqual(_canonical_workspace_roots(root, root / "."), [str(root)])
+
+    def test_fresh_thread_is_not_persisted_until_first_turn_materializes_rollout(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-5.6-luna",
+                reasoning_effort="max",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+            )
+            fake = _FakeProcess()
+            with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                process = _AppServerProcess(config=config, agent=agent, repository=repository, progress=None)
+                try:
+                    thread_id, resumed = process.thread_id_for(repository)
+                    self.assertEqual(thread_id, "thread-probe")
+                    self.assertFalse(resumed)
+                    self.assertFalse(_mapping_path(config, agent, repository).exists())
+                    self.assertEqual(
+                        [method for method in fake.request_order if method in {"initialize", "thread/start", "thread/resume", "turn/start"}],
+                        ["initialize", "thread/start"],
+                    )
+                finally:
+                    process.close()
+
+    def test_fresh_root_binding_mismatch_stops_before_turn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-5.6-luna",
+                reasoning_effort="max",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+            )
+            fake = _FakeProcess()
+            fake.response_roots_override = [str(root / "foreign")]
+            with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                result = run_codex_app_server(
+                    config=_config(root),
+                    agent=agent,
+                    repository=repository,
+                    prompt="probe",
+                    output_path=root / "result.json",
+                    session_id="root-mismatch",
+                )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("different repository", result.stderr)
+            self.assertEqual(fake.turn_params, [])
+
+    def test_thread_start_failure_stops_before_turn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-5.6-luna",
+                reasoning_effort="max",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+            )
+            fake = _FakeProcess()
+            fake.start_error = True
+            with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                result = run_codex_app_server(
+                    config=_config(root),
+                    agent=agent,
+                    repository=repository,
+                    prompt="probe",
+                    output_path=root / "result.json",
+                    session_id="start-failure",
+                )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("thread/start failed", result.stderr)
+            self.assertEqual(fake.turn_params, [])
+
+    def test_existing_unmaterialized_thread_fails_closed_without_new_thread(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-5.6-luna",
+                reasoning_effort="max",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+            )
+            _save_thread_mapping(config, agent, repository, "unmaterialized-thread", windows_sandbox="unspecified")
+            fake = _FakeProcess()
+            fake.resume_error = True
+            with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                result = run_codex_app_server(
+                    config=config,
+                    agent=agent,
+                    repository=repository,
+                    prompt="probe",
+                    output_path=root / "result.json",
+                    session_id="unmaterialized-resume",
+                )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("no rollout found", result.stderr)
+            self.assertEqual(fake.turn_params, [])
+            self.assertNotIn("thread/start", fake.request_order)
+            self.assertFalse(_mapping_path(config, agent, repository).exists())
+
     def test_network_access_is_explicit_and_fail_closed(self) -> None:
         repository = Path("C:/repo")
         disabled = _workspace_write_sandbox_policy(repository)
@@ -258,8 +501,32 @@ class AppServerTests(unittest.TestCase):
 
     def test_headless_app_server_does_not_override_profile_windows_sandbox(self) -> None:
         command = _app_server_command(_config(Path("C:/dual-codex-test")))
+        self.assertEqual(
+            command,
+            ["codex", "app-server", "--stdio"],
+        )
+        self.assertNotIn("--disable", command)
+        self.assertNotIn("code_mode_host", command)
+        self.assertNotIn("--code-mode-host", command)
         self.assertNotIn("-c", command)
         self.assertNotIn("windows.sandbox", command)
+
+    def test_default_codex_environment_keeps_desktop_bridge_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            agent = AgentConfig(
+                codex_home=Path(temp) / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="interactive",
+            )
+            with patch.dict(
+                "os.environ",
+                {"CODEX_INTERNAL_ORIGINATOR_OVERRIDE": "desktop"},
+                clear=False,
+            ):
+                environment = codex_environment(agent)
+            self.assertEqual(environment["CODEX_INTERNAL_ORIGINATOR_OVERRIDE"], "desktop")
 
     def test_explicit_elevated_profile_is_preserved_and_recorded(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
