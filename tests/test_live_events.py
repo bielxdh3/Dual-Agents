@@ -201,41 +201,47 @@ class LiveEventTests(unittest.TestCase):
             self.assertEqual([event.sequence for event in journal.read()], list(range(1, 21)))
 
     def test_cross_process_writers_share_the_journal_lock(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            runtime_root = root / "runs"
-            path = runtime_root / "shared.jsonl"
-            context = multiprocessing.get_context("spawn")
-            processes = [
-                context.Process(
-                    target=_cross_process_writer,
-                    args=(
-                        (
-                            str(runtime_root)
-                            if os.name != "nt" or index % 2 == 0
-                            else "\\\\?\\" + str(runtime_root)
+        for _ in range(3):
+            with tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                runtime_root = root / "runs"
+                path = runtime_root / "shared.jsonl"
+                context = multiprocessing.get_context("spawn")
+                processes = [
+                    context.Process(
+                        target=_cross_process_writer,
+                        args=(
+                            (
+                                str(runtime_root)
+                                if os.name != "nt" or index % 2 == 0
+                                else "\\\\?\\" + str(runtime_root)
+                            ),
+                            (
+                                str(path)
+                                if os.name != "nt" or index in (0, 3)
+                                else "\\\\?\\" + str(path)
+                            ),
+                            index,
                         ),
-                        (
-                            str(path)
-                            if os.name != "nt" or index in (0, 3)
-                            else "\\\\?\\" + str(path)
-                        ),
-                        index,
-                    ),
-                )
-                for index in range(4)
-            ]
-            for process in processes:
-                process.start()
-            for process in processes:
-                process.join(20)
-                self.assertEqual(process.exitcode, 0)
-            events = read_journal(path, max_records=20, max_record_bytes=1024)
-            self.assertEqual([event.sequence for event in events], list(range(1, 5)))
-            lock_path = path.with_name(path.name + ".lock")
-            if lock_path.exists():
-                lock_path.unlink()
-            self.assertFalse(list(runtime_root.glob("*.tmp-*")))
+                    )
+                    for index in range(4)
+                ]
+                for process in processes:
+                    process.start()
+                for process in processes:
+                    process.join(20)
+                    try:
+                        self.assertFalse(process.is_alive())
+                        self.assertEqual(process.exitcode, 0)
+                    finally:
+                        if not process.is_alive():
+                            process.close()
+                events = read_journal(path, max_records=20, max_record_bytes=1024)
+                self.assertEqual([event.sequence for event in events], list(range(1, 5)))
+                lock_path = path.with_name(path.name + ".lock")
+                if lock_path.exists():
+                    lock_path.unlink()
+                self.assertFalse(list(runtime_root.glob("*.tmp-*")))
 
     def test_account_repository_identity_and_runtime_root_containment(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
