@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-coverage-20260830",
+  "parent_request_id": "prompt-arena-i18n-formatting-fix-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated App Server/headless path. Work in E:\\Prompt Arena-live-telemetry-i18n on branch completion/windows-qa-live-telemetry-i18n at current HEAD 6d38f018b51fa58400d22e73e4af0747b9e124ab. Preserve E:\\Prompt Arena and E:\\Prompt Arena-pr28 untouched. A focused source audit found a real acceptance gap: many static user-facing strings in src/App.tsx and src/advanced-arena-view.tsx are passed through translate/StateMessage/MetricCard/AdvancedStateMessage but have no PT-BR resource entry, so the required complete pt-BR surface is not true. The live monitor also renders only a bare current repetition instead of an explicit sample X/Y and does not clearly distinguish the current sample denominator from competitor totals. Close only these evidence-backed gaps. First inspect the current files and existing translation structure. Add the missing centralized PT_BR_MESSAGES entries with natural Brazilian Portuguese for every user-facing static string currently sent through the translation path in App.tsx, advanced-arena-view.tsx, and related UI helpers; also route any static visible labels in those files that bypass translate through the existing translation helper. Do not translate model/provider/runtime names, benchmark/profile IDs, paths, protocol identifiers, raw user benchmark content, or untrusted response/error data. Preserve the existing English fallback and do not add a translation framework or scattered locale ternaries. Add a focused automated coverage test that fails when literal translation calls used by the shipped UI are absent from the centralized resource, while ignoring dynamic identifiers and test fixtures. In the live Arena monitor, show current sample as X/Y using the real total, show repetition X/Y when distinct, and show competitor accumulated time versus Arena wall time with honest unavailable states; keep sequential execution and blind-mode hiding of identity-sensitive model, timing, speed, token, cost, and runtime data. Add behavior tests for the new denominator/visibility semantics without snapshots. Do not invent TTFT/resource/cost values when the runtime has none. Do not modify backend architecture, packaging configuration, unrelated UI, generated artifacts, or protected worktrees. Stage only the intended source/test files and create one normal local commit with a concise message. Run npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check serially; do not push, tag, release, deploy, merge, amend, rebase, or reset. The installed/native/human QA boundary remains pending and must not be claimed as passed.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI, fallback backend, or danger-full-access.",
+    "Original E:\\Prompt Arena and PR #28 worktree must remain unchanged.",
+    "Keep the patch minimal and repository-native; no new dependencies and no translation-platform rewrite.",
+    "Do not leak or persist secrets, prompts, responses, credentials, or untrusted HTML.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, or reset."
+  ],
+  "review_findings": [
+    {
+      "title": "Incomplete PT-BR resource coverage",
+      "details": "A literal-call audit of App.tsx found 109 visible strings absent from i18n.ts; advanced-arena-view.tsx has additional visible labels. Existing exact-key fallback leaves these in English in PT-BR, contradicting the prompt's complete user-facing localization requirement."
+    },
+    {
+      "title": "Live monitor denominator clarity",
+      "details": "ArenaExecutionMonitor currently displays a current repetition without the total sample count/repetition denominator and only an accumulated competitor time. The prompt requires explicit current sample X/Y, competitor total, Arena total, and honest blind visibility."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

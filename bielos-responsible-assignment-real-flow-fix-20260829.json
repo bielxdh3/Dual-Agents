@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-real-flow-fix-20260829",
+  "action": "implement",
+  "repository": "E:/BielOS",
+  "task": "Implement the smallest safe correction for the confirmed post-publication BielOS Core OWNER to MEMBER project responsible-assignment failure. Architect evidence at published HEAD f3bc2b565f42fd4fe48e818b1a59003085bb59b2: production audit records from 2026-08-29 14:46-14:48 show multiple core-project-access-set requests with valid Cloudflare Access but no CORE_PROJECT_ACCESS_GRANTED/CHANGED audit; the production database has one active OWNER and one active MEMBER, zero active SecurityElevation rows, and only an older expired FEATURE_PERMISSION_CHANGE elevation. This narrows the observed failure to the server-action boundary before ProjectAccess mutation, most concretely the required PROJECT_OWNER_ACCESS_CHANGE elevation path; prior tests directly exercised setCoreProjectAccessRecord and therefore bypassed both the browser form/server-action contract and elevation. Independently inspect the complete current flow in the visible repository: CoreProjectAdminControls forms on both project list and detail, canonical active user option values, accessLevel serialization, actions.ts Server Action parsing and redirects/revalidation, getCurrentSession/Cloudflare/CSRF/elevation guards, access-service transaction, read-back and reload. Do not assume this evidence is the only defect: confirm the narrowest fault boundary from source and add the smallest coherent code correction that makes the supported OWNER flow with a valid PROJECT_OWNER_ACCESS_CHANGE elevation actually apply the selected active MEMBER and requested project role, persist canonical ProjectAccess, show it after redirect/re-render, and retain it after full reload. Preserve fail-closed Cloudflare Access, CSRF, session, authorization, scoped elevation, persisted actor re-check, target-user active check, project isolation, serializable locking, audit redaction, and last-active-owner protection. Do not remove or weaken elevation. Do not merely add success/error messaging. Exercise the same browser form/action contract in focused regression coverage, including canonical member id and role submission, valid elevation allowing mutation, missing or expired elevation rejecting it, persisted and re-rendered read-back, invalid/nonexistent target, unauthorized actor, last-owner protection, and no false-success. If a true browser/component integration layer is practical using existing dependencies, prefer a focused test; otherwise create the narrowest action-contract adapter/test without broad infrastructure. Keep the patch repo-native and minimal; no dependency additions and no unrelated changes.",
+  "constraints": [
+    "Read and honor E:/BielOS/AGENTS.md, C:/CodexGlobal/AGENTS.md, E:/BielOS/.agents/skills/bielos-core-identity-implementation/SKILL.md, E:/BielOS/.agents/skills/bielos-security-review/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "Biel 4 is Executor only; do not issue an Architect review or acceptance verdict.",
+    "Use only the configured Biel4 App Server/headless executor with task_transport=app_server; do not use native subagents, create_thread, TUI fallback, codex exec, or another backend.",
+    "The target worktree is intentionally dirty. Preserve all unrelated WIP paths and do not reset, clean, stash-drop, amend, rebase, or rewrite user work.",
+    "Do not commit, push, open/update PRs, merge, tag, release, deploy, rebuild/restart production, mutate Cloudflare/DNS, or perform destructive database actions.",
+    "Do not read or expose .env contents, credentials, cookies, session tokens, JWTs, passwords, recovery codes, raw identifiers, private logs, or database dumps.",
+    "Run focused implementation-side validation and git diff --check; report exact commands and failures. Stop after local correction evidence."
+  ],
+  "context_files": [
+    "E:/BielOS/AGENTS.md",
+    "C:/CodexGlobal/AGENTS.md",
+    "E:/BielOS/.agents/skills/bielos-core-identity-implementation/SKILL.md",
+    "E:/BielOS/.agents/skills/bielos-security-review/SKILL.md",
+    "C:/CodexGlobal/skills/ponytail/SKILL.md",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-admin-controls.tsx",
+    "E:/BielOS/apps/hub/src/app/core/projects/actions.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/access-service.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/read-service.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/[projectId]/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/projects/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-panel.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-actions.ts",
+    "E:/BielOS/packages/auth/src/administration.ts",
+    "E:/BielOS/packages/auth/src/elevation-scopes.ts",
+    "E:/BielOS/apps/hub/src/app/core/integration/project-access.db.test.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-admin-controls.test.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-panel.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

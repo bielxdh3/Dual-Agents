@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-finish-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T16:52:43.081442+00:00",
+  "finished_at": "2026-08-22T16:53:54.801987+00:00",
+  "summary": "Completed and committed Phase 12 Android companion changes as 669efce.",
+  "files_changed": [
+    ".gitignore",
+    "README.md",
+    "android/app/src/main/java/com/aip/companion/MainActivity.kt",
+    "android/app/src/main/java/com/aip/companion/Protocol.kt",
+    "android/app/src/main/java/com/aip/companion/SecureStore.kt",
+    "android/app/src/test/java/com/aip/companion/ProtocolTest.kt",
+    "docs/CORRECTIVE_GAP_MATRIX.md",
+    "docs/KNOWN_LIMITATIONS.md",
+    "docs/PHASE_12_ANDROID_IMPLEMENTATION.md",
+    "docs/PHASE_12_ANDROID_SPEC.md",
+    "docs/ROADMAP.md"
+  ],
+  "commands_run": [
+    "git diff --check",
+    "android/gradlew.bat testDebugUnitTest",
+    "git commit -m \"feat: complete phase 12 android companion\"",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff errors."
+    },
+    {
+      "command": "testDebugUnitTest",
+      "status": "not_run",
+      "details": "Java 17/JAVA_HOME unavailable."
+    },
+    {
+      "command": "lintDebug",
+      "status": "not_run",
+      "details": "Java 17/Android SDK unavailable."
+    },
+    {
+      "command": "assembleDebug",
+      "status": "not_run",
+      "details": "Java 17/Android SDK unavailable."
+    },
+    {
+      "command": "SHA-256 app-debug.apk",
+      "status": "not_run",
+      "details": "APK was not built."
+    }
+  ],
+  "remaining_issues": [
+    "Generated android/.kotlin/ could not be removed because destructive filesystem commands were blocked; it is now ignored and untracked.",
+    "Requested Android validation and APK hash remain unavailable in this executor.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T165243Z-aip-phase12-android-finish-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T165243Z-aip-phase12-android-finish-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T165243Z-aip-phase12-android-finish-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T165243Z-aip-phase12-android-finish-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a63-9209-7be2-8af4-08b9c61c3fa5",
+  "app_server_turn_id": "01a02a63-92c0-7d41-ad35-483266c0b8e6",
+  "app_server_process_id": "4988",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T165243Z-aip-phase12-android-finish-20260822.md",
+  "task_sha256": "55ed61149e2227be9dd0a8ad71ab3892b1a743ad346352860c244c15b839bc57",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

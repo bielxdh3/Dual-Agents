@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-ui-voices-label-fix-20260830",
+  "action": "correct",
+  "parent_request_id": "ia-voz-ui-voices-correction-20260830",
+  "repository": "C:/IA DE VOZ",
+  "task": "Make the active audio inventory and upload status use the same friendly profile presentation label as the top header and voice selector. In particular, a legacy profile must display Existing Voice (migrada) plus its short disambiguator wherever the user is told which profile receives audio. Preserve persisted display_name/voice_id and all data/security behavior. Add one focused assertion if needed. Run py_compile, all tests, build_ui smoke and git diff --check. No real data workflows, dependency changes, git metadata changes, commit or push.",
+  "constraints": [
+    "Canonical biel4 App Server/headless Executor only; no native subagents, create_thread, alternate backend, TUI, or direct fallback.",
+    "Edit only app.py and focused tests; do not mutate real audio/profile data.",
+    "No destructive action or dependency install."
+  ],
+  "context_files": [
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/tests/test_phase4_audio_upload.py"
+  ],
+  "review_findings": [
+    {"title":"Inventory label is inconsistent","details":"audio_inventory still renders the raw persisted display_name while the active header/selector use the friendly migrated/disambiguated label. Align the user-facing label without changing storage."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

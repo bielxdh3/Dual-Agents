@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-acceptance-retry-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-native-local-20260829-pr",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are BL4/biel4, the only implementation Executor, through the configured App Server/headless transport. A prior validation turn built the clean isolated clone E:\\Prompt Arena-native-local-20260829-pr at exact HEAD f3048a61f45cdb6b29f362444f3d32646edf4943 but timed out before returning its report. Continue from that clone without touching E:\\Prompt Arena and without source edits. First verify branch/SHA and that src-tauri/target/release/prompt-arena.exe plus src-tauri/target/release/prompt-arena-worker.exe exist; if a source diff is only line-ending churn from tooling, normalize it and prove semantic source is unchanged. Add the cargo bin directory to PATH. Install tauri-driver with cargo install tauri-driver --locked if missing; install the matching WebView2 driver tool with cargo install --git https://github.com/chippers/msedgedriver-tool if missing; invoke msedgedriver-tool to obtain a driver matching the installed Edge/WebView2 runtime. Capture where.exe tauri-driver, tauri-driver --version, where.exe msedgedriver, msedgedriver --version, node --version, rustc --version, Edge executable/ProductVersion, WebView2 registry version, and RemoteDebuggingAllowed policy values without changing registry policy. Then run the already-built real app through node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe. Do not substitute browser-only tests, mocks, fallback drivers, TUI/native_tui, or a different executor. Preserve and verify the complete real chain: Tauri WebView UI, bridge/invoke, Rust command, app-owned worker sidecar, persistence, close/reopen, and persisted run after reopen. Capture exact stdout/stderr, marker NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED, persisted run_id, absolute exe/worker paths, exact SHA, and provenance in your final report. If RemoteDebuggingAllowed is explicitly disabled, fail closed and classify that runtime blocker without changing policy. If the local smoke passes, classify hosted Windows DevToolsActivePort failures as CI_HOSTED_WINDOWS_WEBDRIVER_POLICY_LIMITATION and do not modify source. If it fails, report the exact local runtime/driver error and make no harness change unless a directly proven defect is found. No push, merge, tag, release, deploy, or commit is authorized for this validation-only retry. Return a detailed report even when the smoke fails.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; prove executor_account/role/thread/turn/transport, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never.",
+    "Use the isolated clone only and preserve the original WIP. Do not alter registry policy or weaken assertions.",
+    "No merge, tag, release, deploy, force-push, browser-only fallback, TUI/native_tui, or native subagents."
+  ],
+  "context_files": [
+    ".github/workflows/native-ui.yml",
+    "scripts/native-ui-smoke.mjs",
+    "src-tauri/tauri.conf.json",
+    "src-tauri/src/lib.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "operation": "create_branch",
+  "mission_id": "aip-systemic-ux-generation-closure-20260830",
+  "authorization_reference": "aip-systemic-ux-generation-closure-20260830",
+  "repository": "E:/AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "remote": "origin",
+  "branch": "fix/systemic-desktop-ux-and-generation",
+  "expected_remote_state": "absent",
+  "expected_base_sha": "c8dcbcd128e4f2babc2d4ebe27259f28529cef81",
+  "new_sha": "3ac35a2b190d8472efb918d2fae8fe2f27d118f7",
+  "authorization": {
+    "allowed_actions": ["create_branch", "normal_push", "draft_pr_create", "draft_pr_update", "merge"]
+  }
+}

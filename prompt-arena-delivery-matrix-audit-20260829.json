@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-delivery-matrix-audit-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are BL4/biel4 through the configured App Server/headless transport. Work on E:\\Prompt Arena-pr28-bl4 at branch validation/native-tauri-acceptance, HEAD 5aa76dd6e62a760c8481340dd5014cbfe7c6a23f. Perform a read-only audit of ROADMAP.md, docs/DELIVERY_MATRIX.md, current TypeScript/Rust UI, tests, workflows, and package evidence. Then update ONLY docs/DELIVERY_MATRIX.md so it truthfully reflects the current implementation and user-facing surfaces. Correct stale claims that Advanced Arena (regressions/tournaments/calibration), model library operations (Ollama/LM Studio/llama.cpp/GGUF), and external BYOK history/configuration are not wired when code and tests show bounded implementation; keep their native QA/security/publication gates IN PROGRESS where evidence is missing. Add/maintain an explicit artifact/native-QA column if needed. Record PR #28 native evidence precisely: workflow 33233256324 Linux native UI passed, Windows failed at real tauri-driver session creation with DevToolsActivePort file doesn't exist after UDF/capability fixes; do not claim Windows acceptance. Record CI 33233256205 frontend/Rust checks green and packaging run 33213307890 evidence only as documented. Preserve all incomplete and blocked statuses, do not mark any phase COMPLETE, and do not rewrite ROADMAP.md. Create one normal documentation commit. Run actual validation available: git diff --check and any bounded markdown/consistency check; do not push, merge, release, tag, or deploy. Return exact report and machine-readable metadata proving biel4 App Server/headless, elevated ready sandbox, executor role, commit SHA.",
+  "constraints": [
+    "BL4/biel4 App Server/headless is the only allowed implementation Executor; fail closed if provenance is not proven.",
+    "Only docs/DELIVERY_MATRIX.md may change; no product source, tests, workflow, ROADMAP, or package artifacts.",
+    "Do not convert implementation or automated tests into native acceptance; retain explicit native QA and artifact status.",
+    "No merge, tag, release, deploy, force-push, or public release. Keep PR #28 draft."
+  ],
+  "context_files": [
+    "ROADMAP.md",
+    "docs/DELIVERY_MATRIX.md",
+    "src/advanced-arena.ts",
+    "src/advanced-arena-view.tsx",
+    "src/model-library.ts",
+    "src-tauri/src/model_library.rs",
+    "src/provider-foundation.ts",
+    "src-tauri/src/external_providers.rs",
+    "src/App.tsx",
+    ".github/workflows/native-ui.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/package.yml"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

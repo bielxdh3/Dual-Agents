@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-delete-confirmation-20260830",
+  "action": "correct",
+  "parent_request_id": "ia-voz-ui-voices-label-fix-20260830",
+  "repository": "C:/IA DE VOZ",
+  "task": "Simplify the delete-voice confirmation UX. The UI must ask only for the literal word DELETE; remove all user-facing voice_id instructions and do not require the ID. Preserve the existing active-profile/stale-callback, path, reparse and data-safety protections. The delete handler must accept only case-insensitive trimmed DELETE (no IDs, no alternate phrases), and keep refusing any other value. Update focused tests and labels/status text accordingly. Run py_compile, all profile/upload tests, build_ui smoke and git diff --check. Do not delete any real profile/audio data during validation, do not run migration/preparation/training/generation, do not change dependencies or .git metadata, and do not commit/push in the Executor task.",
+  "constraints": [
+    "Canonical biel4 App Server/headless Executor only; no native subagents, create_thread, alternate backend, TUI or direct fallback.",
+    "Edit only app.py and focused tests; preserve all real voice/profile/audio data.",
+    "No destructive action, dependency install, commit or push."
+  ],
+  "context_files": [
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/tests/test_phase2_profiles.py",
+    "C:/IA DE VOZ/tests/test_phase4_audio_upload.py"
+  ],
+  "review_findings": [
+    {"title":"Delete confirmation is too technical","details":"The current label asks the user to type a voice_id or DELETE <voice_id>. Replace it with a single simple DELETE confirmation while keeping strict rejection of all other input."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

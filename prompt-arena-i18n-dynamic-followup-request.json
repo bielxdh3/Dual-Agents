@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-dynamic-followup-20260830",
+  "parent_request_id": "prompt-arena-i18n-coverage-commit-transport-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated App Server/headless path. Review the existing committed patch at 75178ac60a998c3bdaec3b7522dfb7b919ef2e94; do not redo or broaden prior work. A focused BL3 review found a second, bounded PT-BR completeness gap in controlled static/finite outputs passed through translate: conditional branch strings higher is better, lower is better, logical processor, logical processors, Cancelled, attempt, profile revision, profile revisions, objective pass, objective fail, and Order have no exact PT_BR resource; Arena telemetry state running is also missing an exact resource. Controlled helper outputs still missing exact PT_BR resources include Queued and Cancelled operation states, Ready for blind review, Locked and read-only, No eligible responses, Evaluation unavailable, Not scored, Quantization not reported, and Metadata match only. Audit other finite controlled labels returned by helpers used inside translate (model operation/status and capability labels, blind-evaluation labels, hardware labels, BYOK labels) and add only missing centralized PT_BR entries, preserving model/provider/runtime names and identifiers. For finite model download/removal capability messages, localize the explanatory text while preserving Ollama, LM Studio, llama.cpp, hashes, paths, IDs, and other raw/dynamic data; do not translate untrusted response/error/user content and do not invent interpolation or a new i18n framework. Improve scripts/ui-contracts.test.mjs so its focused coverage assertion also catches literal result strings in translate conditional branches (while ignoring condition discriminants, dynamic identifiers, helper-return values, and test fixtures), or add an equivalent dependency-free focused assertion. Keep English fallback and locale formatting. Preserve blind-mode hiding and all Arena behavior from the prior commit. Do not change backend architecture, packaging configuration, unrelated UI, generated artifacts, or protected worktrees. Run npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check serially. Verify only intended source/test/i18n files changed, then create exactly one normal local commit with message fix: close dynamic PT-BR coverage gaps. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use an alternate execution path. Report structured provenance including executor account, role, App Server transport, workspace-write sandbox, Windows sandbox mode/readiness, approval policy, branch, exact commit, tests, resource audit, and protected-worktree status. Installed/native/human QA remains pending and must not be claimed as passed.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI, fallback backend, or danger-full-access.",
+    "Review 75178ac in place; this is a bounded follow-up for finite translation outputs, not a duplicate implementation.",
+    "Original E:\\Prompt Arena, source E:\\Prompt Arena-live-telemetry-i18n, and PR #28 worktree must remain unchanged.",
+    "Do not translate model/provider/runtime names, benchmark/profile IDs, hashes, paths, raw user content, or untrusted errors.",
+    "Keep the patch minimal and repository-native; no new dependencies and no translation-platform rewrite.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, or reset."
+  ],
+  "review_findings": [
+    {
+      "title": "Finite dynamic PT-BR resource gaps",
+      "details": "The committed direct-literal coverage patch passes 111 tests, but AST review of translate conditional branches and finite helper outputs found exact keys that still fall back to English in PT-BR. The missing list is bounded in the task text; preserve raw/dynamic identity-bearing values and add centralized resources only."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\scripts\\ui-contracts.test.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\byok-ui.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

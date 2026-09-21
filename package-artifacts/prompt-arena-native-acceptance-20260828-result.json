@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-acceptance-20260828",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T21:55:14.162378+00:00",
+  "finished_at": "2026-08-28T21:56:05.022004+00:00",
+  "summary": "Blocked and failed closed: CODEX_HOME, session/thread, workspace, and visible BL4 constraints matched, but turn_id provenance was unavailable. No repository work or native acceptance was performed.",
+  "files_changed": [],
+  "commands_run": [
+    "Read-only process metadata check"
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck",
+      "status": "not_run",
+      "details": "Blocked by unavailable turn_id provenance."
+    },
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Blocked by unavailable turn_id provenance."
+    },
+    {
+      "command": "npm run build",
+      "status": "not_run",
+      "details": "Blocked by unavailable turn_id provenance."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+      "status": "not_run",
+      "details": "Blocked by unavailable turn_id provenance."
+    },
+    {
+      "command": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "not_run",
+      "details": "Blocked by unavailable turn_id provenance."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "not_run",
+      "details": "Blocked by unavailable turn_id provenance."
+    }
+  ],
+  "remaining_issues": [
+    "The canonical BL4 app_server session did not expose turn_id metadata required by the task, so native acceptance, security review, publication check, and closeout were not attempted."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215514Z-prompt-arena-native-acceptance-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215514Z-prompt-arena-native-acceptance-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215514Z-prompt-arena-native-acceptance-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215514Z-prompt-arena-native-acceptance-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04a43-d35d-72d2-b67b-c13dab282a0d",
+  "app_server_turn_id": "01a04a5e-b20b-76e1-82a4-40113ddd6e33",
+  "app_server_process_id": "21636",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T215514Z-prompt-arena-native-acceptance-20260828.md",
+  "task_sha256": "1fdea12e160a6537779b3bd7e92c67607e54f3f9c3857c9e6d8032c3840dc234",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

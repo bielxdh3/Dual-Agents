@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-docs-test-count-103-fresh-20260830",
+  "parent_request_id": "prompt-arena-blind-lock-retry-correction-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T03:19:07.538710+00:00",
+  "finished_at": "2026-08-30T03:20:16.270408+00:00",
+  "summary": "Updated the two documentation evidence records to 17 files and 103 tests. Preserved all other changes; no source/test edits, commit, remote action, or protected-worktree access.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "rg -n -C 1 \"17 files, (102|103) tests\" docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "git diff --unified=0 -- docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "git status --short",
+    "git diff --check"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only LF-to-CRLF warnings."
+    },
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Documentation-only correction; relied on the independently rerun current-checkout provenance supplied in the request: 17 files, 103 tests."
+    }
+  ],
+  "remaining_issues": [
+    "Pre-existing uncommitted source/test changes remain untouched.",
+    "Canonical provenance: BL4/biel4 Executor, App Server/headless, Windows elevated readiness ready, approval never."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n M src/App.tsx\n M src/model-library.test.ts\n M src/model-library.ts\n M src/results-ui.test.ts\n M src/results-ui.ts\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T031907Z-prompt-arena-docs-test-count-103-fresh-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T031907Z-prompt-arena-docs-test-count-103-fresh-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T031907Z-prompt-arena-docs-test-count-103-fresh-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T031907Z-prompt-arena-docs-test-count-103-fresh-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a050ad-9550-7ce0-acde-0e3b5c34f567",
+  "app_server_turn_id": "01a050ad-95f0-7dc1-9bc0-3fff82b5864d",
+  "app_server_process_id": "9984",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T031907Z-prompt-arena-docs-test-count-103-fresh-20260830.md",
+  "task_sha256": "a95047662dc1e4f6d0bbdfc5394568bfa883c74b5dc88b5eca9384414b0a37c9",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

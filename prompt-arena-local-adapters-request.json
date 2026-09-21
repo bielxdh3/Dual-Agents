@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-local-adapters-20260830",
+  "parent_request_id": "prompt-arena-package-docs-followup-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated Dual Codex App Server/headless path. Continue the single Prompt Arena completion task; do not duplicate or reapply the already-reviewed telemetry/i18n patch. Work in the existing canonical standalone clone E:\\Prompt Arena-live-telemetry-i18n-commit2 on branch completion/windows-qa-live-telemetry-i18n at exact current HEAD 1edcdc22da8550b041031f588f9ba8a4805d532e (source implementation base 5c5de64d749674a01c31a722945c90357dfb0c2d). Preserve E:\\Prompt Arena, E:\\Prompt Arena-live-telemetry-i18n, and E:\\Prompt Arena-pr28, including the known six-file source WIP and PR#28 native-ui-smoke WIP. Implement only the concrete missing product requirement currently recorded in docs/DELIVERY_MATRIX.md: wire real local LM Studio and llama.cpp runtime adapters for discovered profiles, using the existing RuntimeProvider/execute_once_with_provider path and existing loopback/security primitives. Prefer a small shared/refactored local HTTP/SSE transport over copying an Ollama client; preserve Ollama behavior and all current controls. The adapters must explicitly select their runtime (no silent fallback), accept the already-modeled backend/endpoint/path/profile fields, and execute through the normal run plan. Support the OpenAI-compatible local contract used by LM Studio and llama.cpp: loopback-only HTTP endpoint validation, model listing at /v1/models, chat generation/streaming at /v1/chat/completions with bounded response/error handling, SSE data parsing including [DONE], final text/finish reason/tool-call mapping as supported, authoritative usage when returned, cancellation/error propagation, and capability negotiation. If an endpoint/protocol feature is not supported, return a typed explicit error; do not fabricate timing or token metrics. Wire Rust RuntimeRegistry and RunPlan validation/configuration and TypeScript run-plan/profile normalization so discovered LM Studio/llama.cpp profiles are accepted and endpoint/runtime reach the executor while manual Ollama profiles remain unchanged. Keep sequential fairness, blind-mode identity/timing/metrics/error redaction, no credentials, no network listener, no broad refactor, and no unrelated P1-P7 changes. Add focused Rust mock-loopback tests for both provider model-list and chat-stream/usage/error/cancellation behavior and focused TypeScript tests for runtime acceptance/endpoint propagation; update existing tests rather than weakening assertions. Run cargo fmt, focused Rust tests, full cargo test --manifest-path src-tauri/Cargo.toml --all-targets, npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check serially. Update docs/DELIVERY_MATRIX.md only if implementation evidence supports changing the adapter row from MISSING_IMPLEMENTATION; retain PENDING_HUMAN_QA, BLOCKED_EXTERNAL_RUNTIME, MSI/Linux/remote CI and other honest gates. Do not claim installed visual/native/full-Tauri Arena or authenticated human QA. Stage only implementation/tests and justified matrix changes, then create exactly one normal local commit with concise message feat: wire local OpenAI-compatible adapters. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use an alternate backend/path. Return full structured provenance including executor account biel4, executor role, App Server transport/IDs, workspace-write sandbox, Windows sandbox elevated and readiness ready, approval never, exact base/new SHA, changed files, commands/results, and remaining human/external gates. If any required provenance field cannot be proven, stop without accepting or publishing the implementation and report PROMPT_ARENA_BLOCKED_BY_PROVENANCE.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI/native_tui, fallback backend, alternate account, or danger-full-access.",
+    "Do not modify or reset E:\\Prompt Arena, E:\\Prompt Arena-live-telemetry-i18n, or E:\\Prompt Arena-pr28; preserve their existing WIP exactly.",
+    "Do not rework the already-reviewed telemetry/i18n files unless a concrete adapter integration defect requires a minimal change and is reported.",
+    "Loopback-only, no credentials, bounded transport, explicit runtime selection, typed errors, no fabricated metrics, and no silent fallback are mandatory.",
+    "Run the requested tests serially and never weaken existing security or product assertions.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, or reset. Create at most one normal local commit."
+  ],
+  "review_findings": [
+    {"title":"Missing LM Studio/llama.cpp execution","details":"docs/DELIVERY_MATRIX.md records that catalog/discovery exists but live LM Studio and llama.cpp runtime execution is not wired; this is the bounded product gap for this request.","severity":"blocking"},
+    {"title":"Rust runtime registry is Ollama-only","details":"src-tauri/src/orchestration.rs RuntimeRegistry accepts only ollama and execute_once_with_provider streams every run, so discovered non-Ollama profiles cannot execute.","severity":"blocking"},
+    {"title":"TypeScript run plan rejects non-Ollama","details":"src/run-plan.ts normalizeProfile rejects non-ollama profiles and buildRunPlan always emits the default Ollama runtime configuration.","severity":"blocking"},
+    {"title":"Reuse existing catalog/security primitives","details":"src-tauri/src/model_library.rs already validates loopback endpoints and catalogs LM Studio/llama.cpp through /v1/models; the implementation must reuse these controls rather than copy or weaken them.","severity":"important"}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\runtime.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\orchestration.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\ollama.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\model_library.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\run-plan.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\Cargo.toml",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-docs-update-20260829",
+  "parent_request_id": "prompt-arena-package-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:04:23.879778+00:00",
+  "finished_at": "2026-08-30T02:06:18.971748+00:00",
+  "summary": "Updated only the two requested documentation files. Verified checkout HEAD 99485dec0f3f096b62fbe665c0085d8e7786579f and preserved source HEAD 838d952 as distinct. Recorded the twice-attempted NSIS blocker, omitted current package evidence, preserved historical 57f02b3 evidence, and added phase/publication verdicts. No source, generated, history, remote, or release changes occurred. Provenance: biel4 Executor, App Server/headless, workspace-write, Windows elevated, readiness ready, approval never.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "Read required AGENTS.md and skill files",
+    "git status --short; git branch --show-current; git rev-parse HEAD; git log -4 --oneline --decorate",
+    "Read both evidence documents and current package/QA claims",
+    "Applied documentation-only patch",
+    "rg validation for HEADs, package blocker, test evidence, QA statuses, verdicts, and historical artifact wording",
+    "git diff --check; git status --short; git diff --name-only; git diff --stat"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only expected Git line-ending warnings."
+    },
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Documentation-only correction; existing evidence records 17 files and 100 tests passed at checkout 99485de."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "not_run",
+      "details": "Documentation-only correction; existing pass remains recorded."
+    },
+    {
+      "command": "npm run build",
+      "status": "not_run",
+      "details": "Documentation-only correction; existing pass remains recorded."
+    },
+    {
+      "command": "package:artifacts, verify:package, and NSIS smoke",
+      "status": "not_run",
+      "details": "No fresh package existed after the two NSIS attempts failed before bundling with STATUS_IN_PAGE_ERROR."
+    }
+  ],
+  "remaining_issues": [
+    "Fresh exact-source-HEAD NSIS remains PENDING_AUTOMATED_NATIVE_QA and blocked by Rust STATUS_IN_PAGE_ERROR (0xc0000006); no current artifact, checksum, sidecar, or install/launch/restart/uninstall evidence exists.",
+    "PENDING_HUMAN_QA, BLOCKED_EXTERNAL_RUNTIME, MSI blocked locally, Linux CI pending, and remote CI unconfirmed remain explicitly recorded.",
+    "Phase verdict is `Approved with reservations`; publication verdict is `Create a sanitized public copy`. Historical internal usernames, absolute paths, and operational provenance must be redacted before public sharing.",
+    "The exact two-file diff is intentionally left unstaged; no documentation commit was attempted because history modification was out of scope."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T020424Z-prompt-arena-package-docs-update-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T020424Z-prompt-arena-package-docs-update-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T020424Z-prompt-arena-package-docs-update-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T020424Z-prompt-arena-package-docs-update-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a05069-2b9c-7ae1-ace9-3d09b78c05d0",
+  "app_server_process_id": "22588",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T020424Z-prompt-arena-package-docs-update-20260829.md",
+  "task_sha256": "eed30170b0aebea4402dd1949ac66c32dcb9a9f0beba066b1a0f9dc17d8567ed",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

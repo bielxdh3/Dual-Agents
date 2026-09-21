@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p1-p7-gap-audit-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T14:45:23.967729+00:00",
+  "finished_at": "2026-08-29T14:49:37.980152+00:00",
+  "summary": "Read-only P1-P7 phase-gap audit. Verdict: Approved with reservations. No repository or remote mutation. The canonical roadmap is root ROADMAP.md; requested docs/ROADMAP.md is absent. HEAD 3233896eaaf1cd734d728704a42c1ef2d0b7f3c5 is clean and aligned with origin; the local PR range from f3048a61f45cdb6b29f362444f3d32646edf4943 contains only the native-driver workflow and DELIVERY_MATRIX documentation. Recorded native evidence is at docs/DELIVERY_MATRIX.md:40-49; remote CI was not independently queried.\n\n| Phase | Implemented evidence | Still-open acceptance gate | Code now? / blocker |\n|---|---|---|---|\n| P1 | src/arena-runner.ts, src/App.tsx, arena-runner tests; matrix:13-21; roadmap:23-40 | Native two/three-competitor smoke, live event timing, close/tray recovery, reopen/export. Linux run 33233256324 passed its recorded full chain; Windows remains blocked by the hosted/local limitations in matrix:42-47. | No safe code change; native/runtime and human QA are required. |\n| P2 | Official packs, deterministic materialization, verifiers, repetition summaries, and persistence; matrix:17-23; roadmap:42-64 | Native reopen/export plus Docker-boundary smoke; Docker is unavailable and host fallback is prohibited. | No; external Docker and native QA prerequisite. |\n| P3 | Typed Ollama/LM Studio/llama.cpp discovery, profiles, Ollama pull, managed GGUF operations, hardware/recommendations; matrix:24-28; roadmap:66-77; SECURITY:23-28,88-98 | Real Ollama, LM Studio, llama.cpp/GGUF discovery and operation review, plus native/security/publication gates. | No; requires real runtimes and human/native QA. |\n| P4 | Bounded Advanced Arena calibration/tournament artifacts, validation, save/reopen UI, and tests; matrix:30-31; roadmap:79-88; SECURITY:30-35,139-143 | Native save/reopen/disagreement review and official benchmark-version judge integration, which remains unsupported. | No; native/human QA and explicit judge-integration scope are missing. |\n| P5 | Typed providers, secure OS credential boundary, consent/cost gates, generation, and sanitized history; matrix:32; roadmap:90-102; SECURITY:37-44,147-152 | Native secure configuration, real provider calls, history/export/log review, security and publication gates. | No; requires secure provider/native accessibility and human review; CI must not call paid APIs. |\n| P6 | Appearance, accessibility foundations, diagnostics, summaries, bounded exports/cleanup; matrix:33; roadmap:104-112; SECURITY:17-21,144-146 | Full accessibility/native review and installed Windows visual QA. | No; external installed-app and human accessibility QA. |\n| P7 | Windows NSIS and Linux DEB/AppImage packaging/smoke passed in run 33213307890; matrix:34-36,49; roadmap:114-135. MSI produced zero artifacts. | WiX/MSI availability and installed Windows/package QA plus remaining publication/security gates. | No product-code change; external WiX-capable runner and installed QA are required. |\n\nSingle safe next delegation: P7 packaging and clean-install/manual QA using the existing artifacts and explicit roadmap acceptance criteria, with a WiX-capable environment for the unresolved MSI outcome. No automatic product implementation can be safely selected for P1-P6 without an external prerequisite or explicit phase scope. Security review found no new confirmed finding; existing fail-closed controls, no-host-fallback Docker boundary, residual filesystem TOCTOU caveats, unsupported judge/lifecycle controls, and no-secrets rule remain documented at SECURITY.md:160,167-203. Publication review verdict: Full-history verification still required; no publication action was taken. Provenance metadata: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4/biel4 Executor\",\"task_transport\":\"App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"turn_id\":\"not exposed by Executor transport\",\"session_id\":\"01a04b96-5081-7d13-9440-9d24c5daab27\",\"workspace\":\"E:\\\\Prompt Arena-pr28-bl4\",\"workspace_write\":\"workspace-write\",\"windows.sandbox\":\"elevated (control-plane asserted)\",\"readiness\":\"ready (control-plane asserted)\",\"approval\":\"never\"}.",
+  "files_changed": [],
+  "commands_run": [
+    "Get-Content -LiteralPath C:\\CodexGlobal\\AGENTS.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\ponytail\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md -Raw",
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git log -8 --oneline --decorate",
+    "git diff --stat/name-status origin/validation/native-tauri-acceptance...HEAD",
+    "git diff --stat/name-status f3048a61f45cdb6b29f362444f3d32646edf4943..HEAD",
+    "git branch --all --no-color",
+    "Get-Content ROADMAP.md, docs/DELIVERY_MATRIX.md, docs/SECURITY.md, .github/workflows/native-ui.yml, .github/workflows/ci.yml, .github/workflows/package.yml, and scripts/native-ui-smoke.mjs with line numbers",
+    "rg -n for phase statuses, evidence run IDs, classifications, Docker/MSI/security controls",
+    "PowerShell bounded P1-P7 consistency audit"
+  ],
+  "tests": [
+    {
+      "command": "PowerShell bounded P1-P7 consistency audit",
+      "status": "passed",
+      "details": "Working tree clean; ROADMAP P1-P7 are IN PROGRESS; incomplete final verdict is present; the seven-column matrix has no COMPLETE status; PR-local scope is limited to the native-driver workflow and delivery matrix; required evidence run IDs are present."
+    },
+    {
+      "command": "PR-local scope audit: git diff --name-status f3048a61f45cdb6b29f362444f3d32646edf4943..HEAD",
+      "status": "passed",
+      "details": "Only .github/workflows/native-driver-toolchain.yml and docs/DELIVERY_MATRIX.md are in the local PR range; no source or test changes were found there."
+    },
+    {
+      "command": "Application, unit, and native test suites",
+      "status": "not_run",
+      "details": "This was a read-only evidence audit; existing automated and native evidence was inspected rather than rerun."
+    }
+  ],
+  "remaining_issues": [
+    "docs/ROADMAP.md does not exist in this checkout; the audit used the repository's root ROADMAP.md.",
+    "Windows native acceptance remains unproven; Docker, real local-runtime QA, official judge integration, secure provider/native accessibility, WiX/MSI, and installed Windows visual QA remain external or human gates.",
+    "Remote CI run results were recorded from repository documentation but were not independently queried in this read-only turn.",
+    "The real thread_id was available from the Executor environment, but turn_id is not exposed by the configured Executor transport."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T144524Z-prompt-arena-p1-p7-gap-audit-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T144524Z-prompt-arena-p1-p7-gap-audit-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T144524Z-prompt-arena-p1-p7-gap-audit-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T144524Z-prompt-arena-p1-p7-gap-audit-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04dfb-862b-7211-8e58-a2f05502c12a",
+  "app_server_process_id": "21228",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T144524Z-prompt-arena-p1-p7-gap-audit-20260829.md",
+  "task_sha256": "c6eb7f65835211065ee012aadf3bcdfb86d8f66eec8802d127dedc14b91ce304",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

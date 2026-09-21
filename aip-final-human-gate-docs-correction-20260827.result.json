@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-final-human-gate-docs-correction-20260827",
+  "parent_request_id": "aip-final-human-gate-docs-20260827",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T22:28:32.744431+00:00",
+  "finished_at": "2026-08-27T22:31:55.809612+00:00",
+  "summary": "Correção concluída e commit local criado: 403755b. Branch limpa.",
+  "files_changed": [
+    "docs/KNOWN_LIMITATIONS.md",
+    "docs/ROADMAP.md",
+    "docs/V0_1_MANUAL_VALIDATION.md"
+  ],
+  "commands_run": [
+    "git status/diff review",
+    "Focused SHA-256 and status-matrix validation",
+    "git diff --check",
+    "git add and commit",
+    "Final commit-file and clean-worktree verification"
+  ],
+  "tests": [
+    {
+      "command": "Focused documentation validation",
+      "status": "passed",
+      "details": "Installer hashes, CI bundle digest, 19 canonical phase statuses, and pending package review confirmed."
+    },
+    {
+      "command": "Broad product test suites",
+      "status": "not_run",
+      "details": "Intentionally not run per request."
+    }
+  ],
+  "remaining_issues": [
+    "No broad product validation was performed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T222833Z-aip-final-human-gate-docs-correction-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T222833Z-aip-final-human-gate-docs-correction-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T222833Z-aip-final-human-gate-docs-correction-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T222833Z-aip-final-human-gate-docs-correction-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04556-d4b2-71e0-a749-a53c8b3f1d84",
+  "app_server_turn_id": "01a04556-d565-75b2-af50-a3729d934285",
+  "app_server_process_id": "14988",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T222833Z-aip-final-human-gate-docs-correction-20260827.md",
+  "task_sha256": "bab8aeac42025aef9d25843269282649c6972ea39ee859311910d7842cbef740",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

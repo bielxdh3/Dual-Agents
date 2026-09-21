@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-review-correction-20260827",
+  "parent_request_id": "prompt-arena-p2-verification-packs-20260827-finalize",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Address the independent Architect phase/security review findings on completion/verification-packs, using the same canonical BL4. The prior commit 6c1eef94881a1ff1288de4e4d54bc488d3547e95 passed local compile checks but is not yet a complete P2 user-facing slice. Blocking findings: (1) the bridge exposes materializeOfficialPack but there is no registered Rust Tauri command, storage persistence, or App UI flow; implement the end-to-end materialize_official_pack command with deterministic seed, immutable saved materialization/evidence, bounded validation, and a usable Official Packs UI action/state; (2) packs/official are unchanged: add verifier policies and at least one executable/evaluable case per pack, with deterministic procedural materialization metadata; programming/software-engineering must be explicitly docker_required and block without Docker, never host fallback; (3) statistics/uncertainty/tie margins are computed only in frontend memory, so persist the repetition summary/evidence immutably in the Rust evidence store and make reopen/history use it; (4) add focused TypeScript and Rust tests for all new paths, including command registration/persistence, deterministic seeds, verifier policy round trips, Docker-unavailable no-fallback, and bounded regex/schema inputs; (5) ensure Rust/TypeScript OfficialPackExecution shapes agree and verifier policy itself is retained in immutable objective evidence. Preserve the existing P2 changes, fix only these concrete gaps, run npm test/typecheck/build/boundaries and cargo fmt/check/test plus git diff --check, then create a new focused local commit. Keep ROADMAP and DELIVERY_MATRIX honest (P2 IN PROGRESS pending native Tauri QA). No page-transition motion, P3-P7 scope, merge, tag, release, deploy, or public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "all code edits, tests, and commit occur in BL4",
+    "target completion/verification-packs; preserve prior commit and PR #17",
+    "Docker-required execution must never fall back to host",
+    "no paid APIs or secrets; no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/ROADMAP.md", "E:/Prompt Arena/docs/DELIVERY_MATRIX.md", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/official_packs.rs", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/packs/official"],
+  "review_findings": [
+    {"severity": "blocking", "title": "Dead materializeOfficialPack bridge", "details": "src/bridge.ts invokes materialize_official_pack, but no Rust command, invoke registration, persistence method, or UI caller exists."},
+    {"severity": "blocking", "title": "Official packs and procedural evidence remain unchanged", "details": "No packs/official or storage migration changed; packs do not declare the new verifier policies/materialization seed, and programming remains text-only rather than a Docker-required case."},
+    {"severity": "blocking", "title": "Repetition statistics are not persisted", "details": "Arena statistics and uncertainty are derived only in frontend memory; immutable Rust evidence/history does not retain an aggregate repetition summary."},
+    {"severity": "important", "title": "No focused tests for new P2 paths", "details": "The commit changes no test files; add tests for command/persistence, seeds, policy round trips, Docker no-fallback, and bounded verifier inputs."},
+    {"severity": "important", "title": "Verifier policy evidence and pack execution shape", "details": "Retain the policy in immutable objective evidence and align Rust/TypeScript OfficialPackExecution serialization fields."}
+  ],
+  "max_correction_cycles": 0
+}

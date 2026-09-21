@@ -1,0 +1,12 @@
+{
+  "operation": "create_branch",
+  "mission_id": "aip-phase10-push-20260822",
+  "authorization_reference": "aip-phase10-push-20260822",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "repository_full_name": "bielxdh3/AIP",
+  "branch": "feat/phase-10-extension-runtime",
+  "expected_remote_state": "absent",
+  "expected_base_sha": "35ea9a0f630112be20727a54b0b197a2cd710c40",
+  "new_sha": "f2975033ae602c7ef14e1dbcc7d68694f8093ac0",
+  "authorization": {"allowed_actions": ["create_branch"]}
+}

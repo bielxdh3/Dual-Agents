@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-acceptance-final-20260828",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T21:57:48.347857+00:00",
+  "finished_at": "2026-08-28T22:01:45.951334+00:00",
+  "summary": "Read-only diagnostic completed at HEAD 83c05446b2994a11a2ba3af9f1d4e0aac1c3508b. Native startup was evidenced: Vite became ready and prompt-arena.exe launched; the long-running command timed out under the harness. No files changed. Interactive native UI, bridge, sidecar workflow, and restart acceptance remain unverified, so no phase is complete.",
+  "files_changed": [],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "git branch --show-current",
+    "git status --short",
+    "npm run tauri:dev (exit code 124: harness timeout after Vite readiness and prompt-arena.exe launch)",
+    "Get-NetTCPConnection -LocalPort 1420 -State Listen (exit code 1: no listener after timeout)",
+    "Invoke-WebRequest http://localhost:1420/ (exit code 1: connection refused after timeout)",
+    "Get-ChildItem -Force src-tauri/binaries (exit code 0: Windows worker sidecar present)",
+    "npm run typecheck",
+    "npm test",
+    "npm run build",
+    "npm run check:boundaries",
+    "npm run test:boundaries",
+    "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+    "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+    "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+    "git ls-files filename hygiene check",
+    "git ls-files -o --exclude-standard",
+    "git log --all --oneline --decorate -5",
+    "git diff --quiet"
+  ],
+  "tests": [
+    {
+      "command": "Native Tauri startup observation",
+      "status": "passed",
+      "details": "Vite reported ready on localhost:1420 and Cargo launched target\\debug\\prompt-arena.exe before the harness timeout."
+    },
+    {
+      "command": "Native UI and Tauri bridge acceptance",
+      "status": "not_run",
+      "details": "No native window/UI or bridge-driving capability was available; no interactive path was claimed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript typecheck passed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "84 frontend tests passed across 16 files."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production frontend build passed."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Repository boundary check passed."
+    },
+    {
+      "command": "npm run test:boundaries",
+      "status": "passed",
+      "details": "All boundary fixtures passed."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+      "status": "passed",
+      "details": "Rust formatting check passed."
+    },
+    {
+      "command": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "All-target native compile passed."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "106 native tests passed; existing linker-note warning only."
+    },
+    {
+      "command": "Security/publication filename hygiene",
+      "status": "passed",
+      "details": "No tracked sensitive filename matches or non-ignored untracked files were reported; full-history secret verification remains incomplete."
+    }
+  ],
+  "remaining_issues": [
+    "Native UI-driven acceptance remains unverified for core Arena, Benchmarks/Docker block, model library, Advanced Arena, BYOK, and P6 controls.",
+    "Actual Tauri bridge responses, worker-sidecar execution, persisted restart/reopen, and native export flows were not exercised.",
+    "No paid provider or external network call was made, as required.",
+    "Security review is limited to automated boundaries and read-only hygiene checks; native/manual review remains pending.",
+    "Publication check requires fuller Git-history verification before any public exposure."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215748Z-prompt-arena-native-acceptance-final-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215748Z-prompt-arena-native-acceptance-final-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215748Z-prompt-arena-native-acceptance-final-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215748Z-prompt-arena-native-acceptance-final-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04a43-d35d-72d2-b67b-c13dab282a0d",
+  "app_server_turn_id": "01a04a61-0bb5-79e2-9ebf-465a2026a9d9",
+  "app_server_process_id": "23744",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T215748Z-prompt-arena-native-acceptance-final-20260828.md",
+  "task_sha256": "f2183b55d60ad37ef45a52b58ec489d4d274d86e3f67dc3c16ef21f1fd76eb8c",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

@@ -1,0 +1,21 @@
+{
+  "status": "blocked",
+  "operation": "create_branch",
+  "repository": "E:\\AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "mission_id": "aip-phase8-branch-20260820",
+  "branch": "",
+  "pr_number": null,
+  "expected_remote_old_sha": "",
+  "observed_remote_old_sha": "",
+  "expected_remote_state": "",
+  "observed_pre_state": "",
+  "observed_remote_state": "",
+  "requested_new_sha": "",
+  "observed_remote_new_sha": "",
+  "created": false,
+  "fast_forward": false,
+  "remote_state": "not_mutated",
+  "error_classification": "LOCAL_BRANCH_MISMATCH",
+  "detail": "Local branch does not equal the requested new SHA."
+}

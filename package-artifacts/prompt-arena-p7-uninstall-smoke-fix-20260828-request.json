@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-uninstall-smoke-fix-20260828",
+  "parent_request_id": "prompt-arena-p7-windows-smoke-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "On clean completion/desktop-delivery, fix only scripts/verify-package.mjs so Windows smoke waits for the launched executable (and any wrapper process) to terminate after the timeout kill before invoking the NSIS uninstaller. Preserve real launch failures and real uninstall failures; do not weaken the final installed-executable absence check. Add or update a focused test only if feasible within this narrow scope. Do not change packaging metadata, workflow, sandbox, or unrelated files. Run npm typecheck, npm test, npm run build, cargo fmt --check, cargo check, cargo test, and git diff --check. Commit the focused fix if tracked code changes are required. No package build, no push, no merge, no tag, no release, no deploy, and no paid-provider or external network calls.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "completion/desktop-delivery must start clean at 05bd5bb0c6730e663da2d1a9f9bc49c304fb3e0b",
+    "focused correction only; preserve unrelated user work; no generated evidence files committed"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/scripts/verify-package.mjs", "E:/Prompt Arena/scripts/package-artifacts.test.mjs", "E:/Prompt Arena/package.json"],
+  "review_findings": [
+    {
+      "severity": "important",
+      "file": "scripts/verify-package.mjs",
+      "title": "Wait for smoke process termination before uninstall",
+      "details": "launchAndStop calls child.kill() and resolves immediately; the NSIS uninstaller can run while the installed executable still holds a file lock, causing a false or timing-sensitive uninstall failure. Await child exit/close after kill with a bounded fallback before resolving the smoke step; retain error propagation and the installed-executable absence assertion."
+    }
+  ],
+  "max_correction_cycles": 0
+}

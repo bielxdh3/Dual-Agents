@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-bl4-health-after-reset-20260828",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T19:02:50.611192+00:00",
+  "finished_at": "2026-08-28T19:03:42.413405+00:00",
+  "summary": "BL4 health probe passed; working tree is clean on completion/advanced-arena.",
+  "files_changed": [],
+  "commands_run": [
+    "node -e \"const cp=require('node:child_process'); cp.execFileSync('cmd.exe',['/d','/s','/c','exit 0'],{stdio:'inherit'});\"",
+    "node -e \"const cp=require('node:child_process'); cp.execFileSync(process.execPath,['-e','process.exit(0)'],{stdio:'inherit'});\"",
+    "npm run typecheck",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "node child_process cmd gate",
+      "status": "passed",
+      "details": "Exit code 0."
+    },
+    {
+      "command": "node child gate",
+      "status": "passed",
+      "details": "Exit code 0."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "tsc -b --pretty false completed successfully."
+    },
+    {
+      "command": "git status --short --branch",
+      "status": "passed",
+      "details": "Exit code 0; branch completion/advanced-arena; no changed paths."
+    }
+  ],
+  "remaining_issues": [],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T190250Z-prompt-arena-p6-bl4-health-after-reset-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T190250Z-prompt-arena-p6-bl4-health-after-reset-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T190250Z-prompt-arena-p6-bl4-health-after-reset-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T190250Z-prompt-arena-p6-bl4-health-after-reset-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a049c0-e152-78e2-8739-2b5b45bf75a4",
+  "app_server_turn_id": "01a049c0-e1f4-7101-a44c-5d14a9a89e19",
+  "app_server_process_id": "20544",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T190250Z-prompt-arena-p6-bl4-health-after-reset-20260828.md",
+  "task_sha256": "59bcb267afcfae596b4cb28c628baa878fda9111bbc694ca81a8b75c2e317ce9",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes."
+}

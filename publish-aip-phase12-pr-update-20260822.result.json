@@ -1,0 +1,21 @@
+{
+  "status": "completed",
+  "operation": "draft_pr_update",
+  "repository": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\aip-phase10-checkout",
+  "repository_full_name": "bielxdh3/AIP",
+  "mission_id": "aip-phase12-pr-update-20260822",
+  "branch": "",
+  "pr_number": 11,
+  "expected_remote_old_sha": "",
+  "observed_remote_old_sha": "",
+  "expected_remote_state": "",
+  "observed_pre_state": "",
+  "observed_remote_state": "",
+  "requested_new_sha": "",
+  "observed_remote_new_sha": "",
+  "created": false,
+  "fast_forward": false,
+  "remote_state": "updated",
+  "error_classification": "",
+  "detail": "Draft PR metadata was updated and reverified."
+}

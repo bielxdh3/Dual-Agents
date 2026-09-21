@@ -1,0 +1,14 @@
+{
+  "operation": "normal_push",
+  "mission_id": "aip-corrective-push-20260820",
+  "authorization_reference": "aip-corrective-push-20260820",
+  "repository": "E:\\AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "remote": "origin",
+  "branch": "feat/phase-7b-7f-cognitive-core",
+  "expected_remote_old_sha": "ced75a8f71e1a46eeb3098a392e007c5e9852fc6",
+  "new_sha": "bf6d332b92f58fb59cd7ec7b909b271750798f5f",
+  "authorization": {
+    "allowed_actions": ["normal_push"]
+  }
+}

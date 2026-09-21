@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-ui-finalize-20260827",
+  "parent_request_id": "prompt-arena-p3-ui-20260827",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize the preserved P3 command/bridge/UI diff on completion/model-library. Inspect current edits in src-tauri/src/commands.rs, src-tauri/src/lib.rs, src/bridge.ts, src/model-library.ts, and src/App.tsx. Make only the minimal fixes needed for a compiling and usable desktop Model Library: unified catalog discovery for Ollama/LM Studio/llama.cpp, managed GGUF import, persisted operation start/list/get/cancel with progress polling, and confirmation-gated managed removal. Preserve loopback-only endpoints, app-owned relative GGUF paths, no arbitrary filesystem operations, honest browser preview, existing profiles/hardware, and quantization-distinct rows. Run cargo fmt/check/test, npm typecheck, npm test, npm run build, and git diff --check. If the UI diff is materially incomplete, finish only the missing wiring in these files; then create one focused local commit. Do not touch P4/P5/P6/P7, and no merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/model-library; preserve HEAD 81df991 and current intentional dirty P3 UI diff",
+    "loopback-only local discovery; managed root only; no secrets/cloud APIs",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/model-library.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src-tauri/src/model_library.rs", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src-tauri/src/storage.rs"],
+  "review_findings": [{"severity": "blocking", "title": "P3 command/bridge/UI turn timed out", "details": "Preserved changes need focused completion, compile/test/build validation, and one commit before review."}],
+  "max_correction_cycles": 0
+}

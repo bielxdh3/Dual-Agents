@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p1-model-state-20260829",
+  "parent_request_id": "prompt-arena-p0-fixes-correction-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Implement the P1 model download/install availability state fix in the exact current checkout after P0 commit 75bf8266a7af257a028724365f627a31aa28af37. Use only canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md, C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md, C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\index\\SKILL.md, and C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\audit\\SKILL.md before repo actions. Preserve original WIP and other worktrees. Correct marker WINDOWS_QA_FINDING_MODEL_DOWNLOAD_AVAILABILITY_LOGIC_BROKEN. Verify semantics across bridge/types, model-library, Tauri model discovery/operations, and ModelsView rather than blindly changing a label. Discovered records from local runtime lists are installed/available; the primary action must not say Download for an installed artifact. Define a typed pure state/action derivation that distinguishes NOT INSTALLED, DOWNLOADING/QUEUED, INSTALLED, and FAILED using the existing ModelAvailability and persisted ModelOperation data (and any minimal backend field needed if evidence requires it). For NOT INSTALLED expose Download/Install with source, quantization, size, and compatibility/recommendation when known; for DOWNLOADING show progress/speed/ETA when honest and Cancel with stable layout; for INSTALLED expose Use/Create profile, Verify where meaningful, Remove for app-managed GGUF, details, and Update only for a genuinely newer artifact; for FAILED show sanitized error and Retry. Do not invent a remote catalog or falsely mark local records uninstalled: if the current discovery boundary only returns installed local records, make that limitation explicit and ensure installed rows use Use/Create profile while a safe not-installed representation/action is available only when a record is actually marked unavailable/removed or a real catalog source exists. Keep backend download path validation, cancellation, safe removal, and no arbitrary filesystem writes. Add/update pure state-transition tests covering installed Ollama, unavailable/not-installed, queued/running/cancelled/failed/completed operations and action labels. Update ModelsView to use real buttons with stable dimensions and no Download primary for installed records; preserve existing profile registration workflow and i18n keys (PT-BR/English). Run focused model-library tests, frontend typecheck/build, cargo model-library tests if touched, git diff --check, and inspect security/failure paths. Create one normal local commit with message `fix: align model availability actions`. Do not push, merge, tag, release, deploy, or modify unrelated docs/generated artifacts.",
+  "constraints": [
+    "Only source/tests needed for P1 model state may change; no broad P2 redesign in this request.",
+    "Do not invent remote model catalogs or claim a local model is not installed when discovery proves it is present.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "Preserve loopback/path validation, cancellation, safe removal, i18n, blind integrity, and original WIP.",
+    "No push, merge, tag, release, deploy, native TUI, or cloud/provider calls."
+  ],
+  "review_findings": [
+    {
+      "title": "Installed local records currently expose Download unconditionally",
+      "details": "ModelsView computes canDownload = model.backend === ollama for every discovered row, even though Tauri discovery returns local runtime inventory records with availability=available. This creates a Download action for already-installed artifacts."
+    },
+    {
+      "title": "The discovery boundary must remain honest",
+      "details": "Current backend discovery lists local models; it does not provide a remote catalog of not-installed Ollama models. The fix must not fabricate unavailable rows or claim Download coverage without a real source."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\bridge.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\model_library.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\domain.rs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

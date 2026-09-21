@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-model-library-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement the complete P3 Full Model Library slice on a new local branch completion/model-library from current completion/verification-packs HEAD f9091aa5a1a0c20cd8b96e46adf0fa4a9e46112d. Preserve all P1/P2 behavior and do not modify completion/core-arena or PR #17. Deliver user-facing implementation, persistence, tests, and docs, not contracts only. Requirements: (1) unified local model source catalog and discovery for Ollama, LM Studio, and llama.cpp/GGUF using bounded loopback/native probes; show backend-native availability, endpoint/path, model identity, digest/size/family/parameter/quantization/context metadata with unknown values explicit; (2) immutable profile registration must retain backend/source/quantization identity so quantizations are distinct competitors; (3) backend-native model downloads/imports with progress, cancellation, bounded paths, duplicate grouping by digest/content hash, and safe removal limited to officially managed local artifacts with confirmation and no arbitrary filesystem deletion; (4) hardware snapshot and transparent fit recommendations remain truthful across sources; (5) real Models UI lets users discover, search/filter, import/download with progress/cancel, remove managed models safely, register profile revisions for each distinct quantization, and see unavailable/error states without invented catalog data; (6) persist model records/download state/removal evidence in the app-owned SQLite store with immutable hashes and restart/reopen behavior; (7) add focused Rust and TypeScript tests for all adapters, parsing/bounds, source identity, duplicate grouping, download cancellation/progress, safe removal, persistence, and UI state; (8) update ROADMAP.md and docs/DELIVERY_MATRIX.md honestly, leaving P3 IN PROGRESS until native Tauri QA. Use no cloud service and no paid APIs; loopback only for local runtimes. No page-transition motion. Create a focused local commit and report exact files/tests/SHA and full canonical provenance. Do not merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only: account biel4, role Executor/Reviewer, backend app_server, task_transport app_server",
+    "trusted wrapper provenance must be used: CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "no TUI/native_tui/fallback/substitute; fail closed if wrapper provenance is absent",
+    "create completion/model-library from completion/verification-packs at f9091aa5a1a0c20cd8b96e46adf0fa4a9e46112d",
+    "all implementation/tests/commit in this BL4 session",
+    "loopback/local runtimes only; no secrets; no paid external network",
+    "safe removal must never delete arbitrary paths or user files",
+    "no merge, tag, release, deploy, public release, or page-transition motion"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit", "create_branch"]},
+  "context_files": ["E:/Prompt Arena/ROADMAP.md", "E:/Prompt Arena/docs/DELIVERY_MATRIX.md", "E:/Prompt Arena/src/model-library.ts", "E:/Prompt Arena/src/model-library.test.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/ollama.rs", "E:/Prompt Arena/src-tauri/src/hardware.rs", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src-tauri/src/lib.rs"],
+  "review_findings": [],
+  "max_correction_cycles": 0
+}

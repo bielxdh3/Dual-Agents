@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-migration-fix",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Close the already implemented AIP desktop conversation UX architecture diff on branch fix/desktop-conversation-ux-architecture. The previous two Biel4 turns applied the requested implementation but timed out before a report/commit. Do not redesign or broaden scope. Inspect the current dirty tree and fix only the remaining objective validation blocker: the full Rust suite has 153 passed and one failure in database::tests::version_twenty_tool_capabilities_are_repaired_by_forward_migration because re-running forward migrations after deleting schema_migrations >=21 attempts to add conversations.is_pinned a second time. Make migration 0026 and its test/restart behavior safely idempotent while preserving legacy-main history, active-conversation fallback, agent isolation, and the existing isPinned contract. Re-run cargo fmt --check, cargo check, the relevant migration/database tests and the full Rust test suite as time permits; also run the focused desktop Vitest set and TypeScript typecheck if feasible. Inspect the final diff for stale overlay callers, old workspace-tabs, accessibility, and scope/security regressions without unrelated refactors. Once checks are green (or exact blockers recorded), create one local commit containing the complete coherent mission with message `fix: restructure desktop conversation UX`. Do not push, create/update a PR, merge, tag, release, deploy, or build installers. Return a structured report with summary, files_changed, commands_run, tests, commit_sha, and remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor; no native subagents, alternate backend, account, or manual/direct implementation fallback.",
+    "Preserve all existing valid UX, navigation, profile/localization, local-resource, overlay, docs, contract and test changes in the tree. No reset, discard, amend, rebase, squash, force-push or history rewrite.",
+    "Use repository-native SQLite/Rust migration patterns; do not weaken foreign keys, temporary-chat non-persistence, agent isolation, approval gates, runtime-degraded UI or overlay alpha/click-through safeguards. No new dependency.",
+    "Do not expose or commit secrets, credentials, databases, histories, memories, model files, voice samples, exports, backups, private media, authentication files or unnecessary private paths.",
+    "No stable tag, GitHub release, or prerelease."
+  ],
+  "context_files": [
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0026_conversation_organization.sql",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/Overlay.tsx",
+    "E:/AIP/apps/desktop/src/Bubble.tsx",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-state.test.ts",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/agent-navigation.ts",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/docs/ARCHITECTURE.md",
+    "E:/AIP/docs/DATA_MODEL.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

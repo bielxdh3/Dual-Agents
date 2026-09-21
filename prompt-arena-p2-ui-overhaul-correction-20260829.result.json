@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-ui-overhaul-correction-20260829",
+  "parent_request_id": "prompt-arena-p2-ui-overhaul-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T01:22:49.304932+00:00",
+  "finished_at": "2026-08-30T01:26:09.344185+00:00",
+  "summary": "Applied the focused shell overflow correction. Preserved the four-file P2 diff; commit was blocked by linked worktree permissions, so no SHA exists.",
+  "files_changed": [
+    "src/App.tsx",
+    "src/i18n.ts",
+    "src/i18n.test.ts",
+    "src/styles.css"
+  ],
+  "commands_run": [
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "git diff --check",
+    "git status --short",
+    "git add src/App.tsx src/i18n.ts src/i18n.test.ts src/styles.css"
+  ],
+  "tests": [
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "17 test files and 99 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript compilation passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed; Vite emitted only the existing large-chunk warning."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only line-ending warnings."
+    },
+    {
+      "command": "cargo test",
+      "status": "not_run",
+      "details": "Not applicable because no Rust files were touched."
+    }
+  ],
+  "remaining_issues": [
+    "Commit blocked: Git could not create E:/Prompt Arena/.git/worktrees/Prompt-Arena-live-telemetry-i18n/index.lock due to host permissions. No commit SHA.",
+    "Human visual QA remains for desktop/narrow layouts, native select behavior, focus states, disabled/loading states, contrast, and reduced motion.",
+    "Native task/case selects were retained for accessibility; browser-native keyboard and screen-reader behavior still needs human QA.",
+    "Requested product-design skill files were unavailable locally."
+  ],
+  "git_status": " M src/App.tsx\n M src/i18n.test.ts\n M src/i18n.ts\n M src/styles.css\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T012249Z-prompt-arena-p2-ui-overhaul-correction-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T012249Z-prompt-arena-p2-ui-overhaul-correction-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T012249Z-prompt-arena-p2-ui-overhaul-correction-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T012249Z-prompt-arena-p2-ui-overhaul-correction-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a05043-1b80-7791-bee9-682ce301e0b8",
+  "app_server_process_id": "18892",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T012249Z-prompt-arena-p2-ui-overhaul-correction-20260829.md",
+  "task_sha256": "8c06358f9899996fdfe7c4a0e0d64778ca489fa14fb4fbcb70840ac5afe648af",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

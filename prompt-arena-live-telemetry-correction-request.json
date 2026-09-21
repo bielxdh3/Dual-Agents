@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-telemetry-correction-20260829",
+  "action": "correct",
+  "parent_request_id": "prompt-arena-live-telemetry-20260829",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Correct the current Live Arena Telemetry implementation in the isolated worktree. Preserve the existing Phase 1 and telemetry scope, do not implement i18n yet, and do not commit or perform remote operations. Address the review findings below, then run focused validation and return complete provenance metadata (biel4 Executor, App Server/headless, workspace-write, elevated/ready, approval never, thread/turn IDs).",
+  "constraints": [
+    "Do not touch E:\\Prompt Arena or E:\\Prompt Arena-pr28.",
+    "Local mutation only; no commit, push, PR, merge, tag, release, deploy, or settings changes.",
+    "Preserve sequential fairness, immutable evidence, cancellation, process isolation, blind integrity, and no-secret boundaries.",
+    "Do not use coordinate automation or revisit exhausted CDP/UIA paths."
+  ],
+  "review_findings": [
+    {
+      "title": "TypeScript typecheck fails on unused symbols",
+      "details": "npm run typecheck reports src/arena-runner.test.ts(14,3): telemetryMetricsFromExecution is imported but unused, and src/arena-runner.test.ts(186,170): the executeArena callback parameter plan is unused. Remove the unused import and rename/remove the unused parameter without weakening test coverage.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Blind execution must remain anonymous after completion",
+      "details": "ArenaResultsSurface currently initializes blind=false and renders competitor labels and metrics after a request created with blind=true. Ensure blind execution remains identity/metric-hidden until the existing immutable blind-evaluation lock/reveal path completes; do not expose labels, timing, speed, token, cost, resource, rank, or objective identity prematurely. Add a focused test or structural guard if feasible.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Preserve measured telemetry semantics",
+      "details": "Recheck that current sample elapsed time updates while a run is pending, completed metrics are authoritative when available and unavailable otherwise, ETA is deterministic and not fake precision, failures/cancellations are explicit, and persisted/exported fields remain backward compatible and sanitized.",
+      "severity": "important"
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\bridge.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\storage.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

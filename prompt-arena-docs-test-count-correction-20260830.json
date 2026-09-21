@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-docs-test-count-correction-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "As the same canonical BL4 Executor, make a documentation-only evidence correction in the intentionally dirty Prompt Arena worktree. Update docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md so the recorded current npm test result says 17 files and 102 tests, matching the independently rerun current checkout. Preserve all existing gate wording and exact live/package evidence; do not change source/test code, do not commit, and do not touch either protected worktree. Run git diff --check and report provenance plus exact files.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Preserve all existing uncommitted source/test changes; no reset or stash.",
+    "No commit, push, tag, release, deploy, merge, PR, or UI automation."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Current test count evidence",
+      "details": "Independent current-checkout npm test output is 17 files and 102 tests; both evidence documents still record 101.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "parent_request_id": "prompt-arena-model-operation-selection-correction-20260830",
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

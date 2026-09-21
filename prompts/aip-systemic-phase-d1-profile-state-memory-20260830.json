@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-d1-profile-state-memory-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Required skills at top: E:/AIP/.agents/skills/aip-implementation/SKILL.md; E:/AIP/.agents/skills/aip-phase-review/SKILL.md; E:/AIP/.agents/skills/aip-security-review/SKILL.md; E:/AIP/.agents/skills/aip-publication-check/SKILL.md; C:/CodexGlobal/skills/ponytail/SKILL.md (read each fully). Execute only bounded Phase D profile/state/memories work from C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md. Start from branch fix/systemic-desktop-ux-and-generation at HEAD 3801c4e3f5e2e384eb7b480cb6c28426038f921c, clean; preserve all commits and do not reset/discard. Inspect existing ProvisionalAgent contracts/domain/database mapping/migrations, ProfileFields/ProfileForm/OnboardingForm/DatePicker, AgentStateControls, MemoryWorkspace, and their tests. Implement the smallest coherent set of changes for: (1) DatePicker fast year/month navigation with explicit accessible month and year controls, day grid preserved, PT-BR labels, keyboard/outside/escape behavior preserved, and decade jumps without hundreds of clicks; (2) custom pronouns via canonical options plus Personalizado and Owner-entered value, persisted/backward-compatible and not locked to three values; (3) optional Owner-controlled human-specific fields (gender and sexuality, nullable/empty allowed) shown only for human or human-compatible identity, never inferred or required for non-human identities, persisted through an additive SQLite migration and all Rust/TypeScript mappings, with existing protected identity/cognitive boundaries preserved; (4) State page explains Normal/Sem voz/Silencioso and the actual energy/mood/sleep fictional semantics, suspension/wake action meaning and honest limited-effect wording; (5) Memories page explains per-agent scope/influence, uses contextual count (e.g. “0 memórias ativas”), gives selected-category help, and clearly distinguishes durable Owner save from candidate proposal. Keep PT-BR UI/source docs English conventions. Add focused deterministic tests for date jumps/custom pronouns/optional-field persistence and the existing State/Memory guidance where test infrastructure supports. Do not change conversation lifecycle, model picker, generation transport, overlay/window, calendar tool fixtures, or unrelated components. Run pnpm --filter @aip/desktop typecheck, focused profile/state/memory tests, cargo fmt --check, focused database tests, git diff --check, and pnpm secrets:scan. Commit locally with an explanatory message. Do not push, PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues; browser acceptance and installed-Windows behavior remain unclaimed.",
+  "constraints": [
+    "Use only configured Biel4 App Server/headless Executor with elevated/ready Windows sandbox. No native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Keep diff strictly Phase D1; additive migration must preserve old IDs/data and owner-only protected identity semantics.",
+    "Do not amend, rebase, squash, force-push, or publish remotely; preserve unrelated owner work."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0004_phase2_identity.sql",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/profile-localization.ts",
+    "E:/AIP/apps/desktop/src/profile-form.test.tsx",
+    "E:/AIP/apps/desktop/src/cognitive-panel.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

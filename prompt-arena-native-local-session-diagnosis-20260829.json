@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-session-diagnosis-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-native-local-20260829-pr",
+  "task": "Perform a narrowly scoped read-only diagnosis of the failed local Windows native smoke at E:\\Prompt Arena-native-local-20260829-pr. Current product SHA is f3048a61f45cdb6b29f362444f3d32646edf4943; app is src-tauri\\target\\release\\prompt-arena.exe; worker is src-tauri\\target\\release\\prompt-arena-worker.exe; verified tools are .native-tools\\tauri-driver.exe and .native-tools\\msedgedriver.exe from artifact workflow run 33254907801, sourceCommit 55d685fbdbd927a5ab195ab141fa76ea823acf96, EdgeDriver 151.0.4129.101, Edge/WebView2 151.0.4129.107. The prior smoke reached only WebDriver POST /session and failed: session not created from chrome not reachable. Do not edit source, scripts, workflows, docs, policies, manifests, or tests. Do not commit, push, merge, release, tag, deploy, or mutate the original WIP. Do not disable or alter RemoteDebuggingAllowed. Use only the canonical BL4/biel4 App Server/headless transport with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Reproduce or instrument only read-only diagnostics: inspect tauri-driver/msedgedriver help/version and stderr, launch a bounded direct WebDriver session using the existing smoke capabilities if safe, capture child process command lines/exit codes, WebView2/UDF/port state, and exact native-driver response. Distinguish an app/runtime defect from host WebDriver policy limitation. If a safe non-mutating retry reaches the session, stop before any product assertions and report only the session result. Return structured report with exact commands, timestamps, paths, hashes, and provenance metadata. Never claim acceptance or emit the acceptance marker.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; workspace-write, windows.sandbox=elevated, readiness=ready, approval=never are required in the control-plane envelope.",
+    "Read-only diagnostics only: no source, policy, manifest, script, workflow, docs, commit, push, merge, release, tag, deploy, or original-WIP changes.",
+    "Do not disable or alter RemoteDebuggingAllowed; do not use alternate or fallback drivers."
+  ],
+  "context_files": [
+    "scripts/native-ui-smoke.mjs",
+    ".native-tools/manifest.json",
+    ".native-tools/native-ui-smoke-20260829.stdout.log",
+    ".native-tools/native-ui-smoke-20260829.stderr.log",
+    "src-tauri/target/release/prompt-arena.exe",
+    "src-tauri/target/release/prompt-arena-worker.exe"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

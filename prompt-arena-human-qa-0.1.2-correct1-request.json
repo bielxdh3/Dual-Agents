@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-human-qa-0.1.2-correct1",
+  "parent_request_id": "prompt-arena-human-qa-0.1.2-implement",
+  "action": "correct",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "Continue the same scoped mission from the current uncommitted working tree after the prior BL4 turn timed out. Read the complete objective at C:\\Users\\bielx\\.codex\\attachments\\472d0c0f-7aee-4933-935c-26b69ea8f998\\goal-objective.md and finish the implementation in E:\\Prompt Arena-live-telemetry-i18n. You remain BL4 / biel4 Executor only. Do not discard the existing partial changes; correct and complete them with the smallest safe diff. Load the exact mandatory skills and product-design design-qa skill named in the objective before editing. Ensure the global native-control audit covers every remaining user-facing select, including all selects in src/advanced-arena-view.tsx; preserve accessible keyboard/ARIA/focus behavior. Complete centralized contrast tokens and reduced-motion/page-content transitions, the Settings cleanup and status block, structural cost/history layout, PT-BR/English terminology and intuitive criteria form while preserving stored IDs. Add focused tests for new behavior. Run focused tests, typecheck, boundary checks, Rust checks as relevant, and only attempt MSI if WiX is available; never substitute NSIS. Do not use Computer Use/browser automation or claim visual/human acceptance. Do not push, tag, release, deploy, merge, rebase, force-push, or modify repository settings. Commit all intended local changes with a clear message and leave the tree clean; report any validation blocked by the time boundary honestly.",
+  "constraints": [
+    "BL4 executor only; no architect/reviewer simulation and no direct edits by BL3.",
+    "Current tree is intentionally dirty with partial files from the parent request; preserve them and finish rather than resetting.",
+    "No raw/default native select remains in any user-facing path; replace every remaining JSX select with the shared accessible listbox or an equally accessible styled control.",
+    "Do not remove or relocate the visible Settings status block; do remove only redundant Settings explanations and the live-preview sample section.",
+    "Do not claim visual acceptance; human Windows QA remains pending if screenshots/native interaction are unavailable."
+  ],
+  "context_files": [
+    "C:/Users/bielx/.codex/attachments/472d0c0f-7aee-4933-935c-26b69ea8f998/goal-objective.md",
+    "E:/Prompt Arena-live-telemetry-i18n/src/App.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/advanced-arena-view.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/accessible-listbox.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/styles.css",
+    "E:/Prompt Arena-live-telemetry-i18n/src/appearance.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/i18n.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/benchmark-authoring.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/listbox-navigation.ts"
+  ],
+  "review_findings": [
+    {
+      "title": "Previous executor timed out before validation and commit",
+      "details": "The parent App Server turn ran for 601 seconds, returned no structured executor report, and left src/App.tsx, src/advanced-arena-view.tsx, src/appearance.ts, and src/accessible-listbox.tsx uncommitted. Finish and commit the work locally.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Global native select audit is incomplete",
+      "details": "The current tree still contains native JSX selects at advanced-arena-view.tsx lines 532, 540, 594, 634, 680, 694, and 901. Replace all of them with the shared accessible custom listbox, preserving labels and current values.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Centralized styles, i18n, tests, and version/package work are missing",
+      "details": "The current diff has no styles.css or i18n.ts changes, no new tests, no version synchronization to 0.1.2, and no committed MSI/README/hash update. Complete code/static work and validate proportionally; if MSI cannot be built, report the exact blocker and do not fake delivery.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-docs-20260829",
+  "parent_request_id": "prompt-arena-package-localtarget-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Update product evidence docs in the isolated worktree only; do not modify source code or use commits/remote operations. Bring docs/DELIVERY_MATRIX.md up to date for exact reviewed commit be1007f: record the Windows process/UI remediation, Live Arena telemetry implementation and tests, PT-BR/en i18n implementation and tests, independent validation (npm run typecheck, npm test 92 tests including i18n, npm run build, npm run check:boundaries, redirected cargo test 107), and precise status distinctions. Mark native/human Tauri QA as pending, Windows NSIS as blocked by the exact Acesso negado (os error 5) directory-recreation failure with no artifact produced, and MSI/Linux as their existing statuses. Replace stale provenance/package claims that refer to E:\\Prompt Arena or obsolete artifact hashes with current isolated branch/commit and link/mention the canonical BL4 result evidence paths without printing secrets. If docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md is absent, add it with a short checklist for the next fresh-artifact human batch covering launch/no console, overflow/scrollbars/sidebar, PT-BR↔English switching and persistence, live telemetry/blind hiding/failure/cancel/reopen, and package install/restart/uninstall; label all as pending until an artifact exists. Keep documentation factual and compact; do not claim NSIS, installed runtime, or human QA success.",
+  "constraints": [
+    "Canonical biel4 App Server/headless executor with workspace-write, Windows elevated readiness ready, approval never.",
+    "No source changes, no generated artifact claims, no remote publication, no merge/tag/release/deploy.",
+    "Use exact statuses: complete only for evidence-backed local implementation/tests; external/native gates remain pending or blocked."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

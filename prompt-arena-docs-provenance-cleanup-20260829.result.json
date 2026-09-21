@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-docs-provenance-cleanup-20260829",
+  "parent_request_id": "prompt-arena-package-docs-update-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:07:02.992824+00:00",
+  "finished_at": "2026-08-30T02:09:29.640859+00:00",
+  "summary": "Updated only the two evidence docs to remove stale current-checkout SHA wording. Source HEAD 838d952 remains the reviewed target; later documentation-only commits do not change it. No commit or other repository action occurred. Provenance: canonical BL4/biel4 App Server/headless, workspace-write, Windows elevated, readiness ready, approval never.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "Read required AGENTS.md and skill files",
+    "git diff --check",
+    "git status --short",
+    "git diff --name-only",
+    "git diff --stat",
+    "rg marker verification"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only expected line-ending conversion warnings."
+    },
+    {
+      "command": "npm test / npm run typecheck / npm run build",
+      "status": "not_run",
+      "details": "Documentation-only change."
+    },
+    {
+      "command": "Package preparation, verification, and smoke",
+      "status": "not_run",
+      "details": "Outside scope; existing NSIS STATUS_IN_PAGE_ERROR blocker remains documented."
+    }
+  ],
+  "remaining_issues": [
+    "The exact two-file documentation diff remains uncommitted as instructed.",
+    "Fresh NSIS packaging remains blocked by Rust STATUS_IN_PAGE_ERROR; no current artifact, checksum, sidecar, or install smoke evidence exists.",
+    "PENDING_HUMAN_QA, BLOCKED_EXTERNAL_RUNTIME, MSI blocked, Linux CI pending, and remote CI unconfirmed gates remain.",
+    "Publication verdict remains Create a sanitized public copy; internal usernames, absolute paths, and operational provenance require redaction before public sharing."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T020703Z-prompt-arena-docs-provenance-cleanup-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T020703Z-prompt-arena-docs-provenance-cleanup-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T020703Z-prompt-arena-docs-provenance-cleanup-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T020703Z-prompt-arena-docs-provenance-cleanup-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0506b-9929-73d1-b0f3-9fccc93d7aa6",
+  "app_server_process_id": "11480",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T020703Z-prompt-arena-docs-provenance-cleanup-20260829.md",
+  "task_sha256": "8517ca593461b488fcf3c3738550a3974d06fa90ea61be56ba627009e9f02ade",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

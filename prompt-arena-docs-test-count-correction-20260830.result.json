@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-docs-test-count-correction-20260830",
+  "parent_request_id": "prompt-arena-model-operation-selection-correction-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T03:13:34.466488+00:00",
+  "finished_at": "2026-08-30T03:14:07.906489+00:00",
+  "summary": "Corrected the recorded current npm test count from 101 to 102 in both evidence documents. No source/test code or existing gate/live/package wording was changed. Existing uncommitted changes were preserved; no commit or remote action occurred. Provenance: canonical BL4/biel4 Executor, App Server/headless, workspace-write, Windows elevated, readiness ready, approval never.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "rg -n \"17 files, 101 tests|17 files, 102 tests\" docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "git status --short --branch",
+    "git diff --check",
+    "rg -n \"17 files, 102 tests|17 files, 101 tests\" docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff errors; existing line-ending warnings were emitted by Git."
+    },
+    {
+      "command": "Automated tests",
+      "status": "not_run",
+      "details": "Documentation-only correction; source/test validation was not needed."
+    }
+  ],
+  "remaining_issues": [
+    "The worktree remains intentionally dirty with the pre-existing source/test changes; no reset, stash, or commit was performed."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n M src/App.tsx\n M src/model-library.test.ts\n M src/model-library.ts\n M src/results-ui.test.ts\n M src/results-ui.ts\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T031334Z-prompt-arena-docs-test-count-correction-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T031334Z-prompt-arena-docs-test-count-correction-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T031334Z-prompt-arena-docs-test-count-correction-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T031334Z-prompt-arena-docs-test-count-correction-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0509d-f0a3-7e82-8264-6cdcf7ec4446",
+  "app_server_turn_id": "01a050a8-80d1-7ab0-85a3-1393a673d5dc",
+  "app_server_process_id": "21388",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T031334Z-prompt-arena-docs-test-count-correction-20260830.md",
+  "task_sha256": "4c1b2516eaed7dacf35098ebb28e08deaa13d2df2eac2be510aa4edd49f55ccc",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-probe-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Required skills: E:/AIP/.agents/skills/aip-implementation/SKILL.md, E:/AIP/.agents/skills/aip-phase-review/SKILL.md, E:/AIP/.agents/skills/aip-security-review/SKILL.md, E:/AIP/.agents/skills/aip-publication-check/SKILL.md, C:/CodexGlobal/skills/ponytail/SKILL.md. PROVENANCE PROBE ONLY. Read E:/AIP/AGENTS.md and attest that the configured Biel4 App Server Executor can receive this task. Do not call any tools, inspect implementation files, edit, commit, push, PR, merge, tag, release, deploy, or use a fallback. Return exactly one JSON object with summary containing AIP_BIEL4_APP_SERVER_PROBE_OK, files_changed=[], commands_run=[], tests=[], remaining_issues=[].",
+  "constraints": [
+    "Use only configured Biel4 App Server/headless Executor; no native subagents, create_thread, alternate backend, TUI, or direct fallback.",
+    "This probe must leave E:/AIP unchanged."
+  ],
+  "context_files": ["E:/AIP/AGENTS.md"],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

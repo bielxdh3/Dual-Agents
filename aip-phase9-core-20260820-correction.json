@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-core-20260820-correction",
+  "parent_request_id": "aip-phase9-core-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Continue the existing bounded Phase 9 core implementation already present as uncommitted changes on feat/phase-9-supervised-tools. Read E:\\AIP\\AGENTS.md and the required AIP implementation/phase/security/publication skills again, inspect the current diff, and apply only the corrections below. Do not discard the partial implementation and do not broaden into Phase 10+.\n\nThe Architect independently ran cargo check --locked successfully but cargo test --locked --lib failed in four deterministic tests:\n1. database::tests::version_twenty_tool_capabilities_are_repaired_by_forward_migration: after the new migration 0023 was added, the fixture deletes only schema versions 21 and 22, so migration 21 is not replayed because version 23 remains recorded; update the migration test fixture to remove/replay the appropriate forward versions (for example delete versions >= 21) and preserve the expected repaired JSON list.\n2. tools::tests::catalog_and_state_changing_actions_require_owner_confirmation, tools::tests::temporary_chat_safe_mode_and_untrusted_output_fail_closed, and tools::tests::local_workspace_root_move_is_bounded_approved_executed_and_compensated: create_tool_session now returns persistence_failed/Unavailable on the fresh 0023 schema. Trace the exact rusqlite error rather than masking it, fix the migration/schema or Rust path so existing fixture sessions and new workspace_root sessions can be created with valid permissions, and remove any temporary production/test debug println!/eprintln! added while diagnosing. Re-run all three focused tests and the full Rust library suite.\n\nWhile correcting, enforce the originally required safety properties: root validation must reject Windows drive roots/broad/system directories and symlink/junction/reparse roots; each source/destination is revalidated immediately before rename; never follow links or escape the canonical root; bounded relative inputs and metadata-only inspection; no private absolute paths in audit/result payloads. Compensation must be owner/agent scoped and safe if a multi-move operation partially fails (record/rollback only moves whose current paths still match the recorded bounded operation; never delete or overwrite an unexpected destination). Keep the existing safe-mode, temporary-chat, approval/second-confirmation, idempotency/replay, and fixture-vs-real status semantics fail-closed.\n\nDo not make unrelated UI/docs changes in this correction. Required validation before commit: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib (0 failed, 1 optional Ollama ignored is acceptable); pnpm secrets:scan; git diff --check. Commit the corrected Phase 9 core scope with exact message `feat: implement phase 9 supervised local tools`. Do not push, create PR, merge, tag, release, or deploy. Report commands, tests, files, remaining human checks, and final SHA truthfully. If a safety issue cannot be fixed without broadening scope, stop and report it rather than weakening a gate.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents or alternate backend.",
+    "Only local mutation and one scoped local commit are authorized; no remote GitHub mutation or publication.",
+    "Preserve the real local safety boundary, owner/agent isolation, bounded outputs, and explicit fixture-only mocks.",
+    "Remove temporary diagnostic logging before commit and do not print private absolute paths."
+  ],
+  "review_findings": [
+    {
+      "title": "Forward migration test does not replay after migration 0023",
+      "details": "The existing version_twenty_tool_capabilities_are_repaired_by_forward_migration test deletes schema_migrations 21 and 22 but leaves 23 recorded. Reopen therefore skips migration 21 and the expected repaired capabilities JSON remains the legacy operations object. Update the fixture to delete/replay the forward chain without weakening migration behavior.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Tool session creation returns persistence_failed after 0023",
+      "details": "Three focused tool tests return DatabaseError::Unavailable on create_tool_session for both fixture and workspace_root sessions. Find the exact rusqlite/schema cause and fix it; the schema must accept valid catalog permissions and preserve foreign keys. Remove temporary eprintln!/println! diagnostics.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Revalidate root paths and safe compensation before commit",
+      "details": "Review Windows root/system/reparse rejection, immediate source/destination revalidation, and partial multi-move rollback. Do not broaden filesystem access or include private absolute paths in persisted audit/results.",
+      "severity": "important"
+    }
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/database.rs",
+    "apps/desktop/src-tauri/src/tools.rs",
+    "apps/desktop/src-tauri/migrations/0023_phase9_workspace_roots.sql",
+    "docs/PHASE_9_TOOLS_SPEC.md",
+    "docs/CORRECTIVE_GAP_MATRIX.md"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-control-contracts-20260830-correction",
+  "parent_request_id": "prompt-arena-p2-control-contracts-20260830",
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T04:21:28.328268+00:00",
+  "finished_at": "2026-08-30T04:23:37.105224+00:00",
+  "summary": "Applied both scoped P2 corrections at HEAD ad60e86a173f38a4bd40280d82a64d23ed22e602. Listbox triggers now expose label plus selected value/placeholder; Models responsive fallback is covered by a static contract. No backend, blind, or security changes.",
+  "files_changed": [
+    "src/App.tsx",
+    "src/styles.css",
+    "scripts/ui-contracts.test.mjs",
+    "src/listbox-navigation.ts",
+    "src/listbox-navigation.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run src/listbox-navigation.test.ts scripts/ui-contracts.test.mjs",
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "npm run check:boundaries",
+    "git diff --check",
+    "git rev-parse HEAD",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "npx vitest run src/listbox-navigation.test.ts scripts/ui-contracts.test.mjs",
+      "status": "passed",
+      "details": "6 tests passed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "19 test files and 109 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript build check passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed; existing large-chunk warning remains."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Repository boundary check passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed with normal LF-to-CRLF working-copy warnings."
+    }
+  ],
+  "remaining_issues": [
+    "No browser or native visual QA was run; validation remains static/headless as requested.",
+    "Changes remain uncommitted for BL3 review."
+  ],
+  "git_status": " M src/App.tsx\n M src/styles.css\n?? scripts/ui-contracts.test.mjs\n?? src/listbox-navigation.test.ts\n?? src/listbox-navigation.ts\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T042128Z-prompt-arena-p2-control-contracts-20260830-correction\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T042128Z-prompt-arena-p2-control-contracts-20260830-correction",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T042128Z-prompt-arena-p2-control-contracts-20260830-correction\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T042128Z-prompt-arena-p2-control-contracts-20260830-correction\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a050ba-4de9-7700-acdb-1fde982ab13b",
+  "app_server_turn_id": "01a050e6-aa3c-7071-9979-0266b1f8fcf8",
+  "app_server_process_id": "16108",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T042128Z-prompt-arena-p2-control-contracts-20260830-correction.md",
+  "task_sha256": "adab080703e370bb0370513776cb02937cdf618e1a8b1c0361728e398c7a7527",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

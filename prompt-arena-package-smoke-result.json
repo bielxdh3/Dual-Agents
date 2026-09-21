@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-smoke-20260829",
+  "parent_request_id": "prompt-arena-package-local-tools-20260829",
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:49:04.713184+00:00",
+  "finished_at": "2026-08-29T19:49:49.437023+00:00",
+  "summary": "Smoke verification passed at exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a before and after. Checksum validation, clean install, executable launch, restart, and silent uninstall all passed. BL4 provenance: biel4 Executor, App Server/headless, workspace-write, Windows elevated, readiness ready, approval never. No source, docs, history, remote, settings, or package contents changed; no human UI QA is claimed.",
+  "files_changed": [
+    "package-verification.txt"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "npm run verify:package -- --platform windows --smoke",
+    "git rev-parse HEAD",
+    "git status --short --untracked-files=all"
+  ],
+  "tests": [
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum manifest passed; NSIS clean install passed using prompt-arena.exe; installed executable start passed; restart passed; silent uninstall passed. Generated package-verification.txt records Result: passed."
+    }
+  ],
+  "remaining_issues": [
+    "Optional MSI artifact remains unavailable. Native human UI QA remains pending and was not inferred from this automated smoke run."
+  ],
+  "git_status": "?? checksums-sha256.txt\n?? package-verification.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T194904Z-prompt-arena-package-smoke-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T194904Z-prompt-arena-package-smoke-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T194904Z-prompt-arena-package-smoke-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T194904Z-prompt-arena-package-smoke-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ef8-9d5b-7451-8733-b9d0ad9288e4",
+  "app_server_turn_id": "01a04f11-8dbf-7141-b25d-e977641cb8a7",
+  "app_server_process_id": "216",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T194904Z-prompt-arena-package-smoke-20260829.md",
+  "task_sha256": "21c7162a6b075202796b14c3f428977996e78cf9ec74117f7e53125e8f99fda5",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-followup-close-20260828",
+  "parent_request_id": "prompt-arena-p6-followup-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Close the existing partial P6 follow-up diff on completion/product-polish-followup. Do not add new scope or redesign. Inspect only the currently modified files: src-tauri/src/commands.rs, src-tauri/src/lib.rs, src-tauri/src/storage.rs, src/App.tsx, src/appearance.ts, src/appearance.test.ts, and src/bridge.ts. Validate that storage retention is preview-first, age-bounded, limited to derived history tables, exact-confirmation protected, stale-preview protected, transactional, and never deletes immutable source/audit/artifact tables; ensure no orphan or silently lost protected records are created. Validate appearance import/export is versioned, bounded to 8 KiB, normalized, unknown-field safe, local-only, and excludes prompt/response/credential/header data. Run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Fix only minimal defects in the existing diff. If all checks pass, create one focused commit with a truthful ROADMAP update keeping P6 IN PROGRESS pending native Tauri/WebView acceptance, security review, and publication gates. If the diff cannot be made coherent, revert only this partial P6 follow-up diff to clean HEAD c16c995b88683595c36436da03092d326cb7a1dc. No push, merge, tag, release, deploy, public release, page-transition motion, telemetry, cloud calls, paid-provider calls, or P7 changes.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "preserve the current partial diff or safely revert only it; do not reset or clean unrelated work",
+    "no secrets, telemetry, cloud calls, paid-provider calls, page-transition motion, P7 work, merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "E:/Prompt Arena/ROADMAP.md",
+    "E:/Prompt Arena/src-tauri/src/commands.rs",
+    "E:/Prompt Arena/src-tauri/src/lib.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/src/App.tsx",
+    "E:/Prompt Arena/src/appearance.ts",
+    "E:/Prompt Arena/src/appearance.test.ts",
+    "E:/Prompt Arena/src/bridge.ts"
+  ],
+  "review_findings": [
+    {
+      "severity": "blocking",
+      "title": "Previous P6 follow-up turn timed out with a partial diff",
+      "details": "Validate and close only the existing retention and appearance import/export changes. Do not commit until Rust/TypeScript checks and deletion-safety invariants pass; otherwise revert only this follow-up diff."
+    }
+  ],
+  "max_correction_cycles": 0
+}

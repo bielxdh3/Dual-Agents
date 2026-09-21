@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-ci-tooling-audit-drift-review-20260827",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T14:34:53.112034+00:00",
+  "finished_at": "2026-08-27T14:38:05.882781+00:00",
+  "summary": "Read-only review of HEAD 367ff05e1d696f1c48081a444a9666a92c949b14 confirms upstream npm audit metadata drift: the same 3-high accepted advisory set and locked Prisma 6.19.3 path are present, but live prisma.range is >=6.13.0-dev.1 while policy/fixture expect the old upper-bounded range. The commit did not change policy, fixture, lockfile, or workflow. Exact CI remains blocked; narrow next step is to update only the policy and accepted fixture range, then rerun exact CI. No waiver is appropriate. Provenance: account desktop-6nummdh\\bielx; label/role Biel4 App Server Executor / executor; backend/transport and turn/result IDs unavailable; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; CODEX_PROFILE unset; repository=E:/BielOS; request=bielos-ci-tooling-audit-drift-review-20260827; thread=01a0408f-2146-7e43-8e3b-32113ec1a527. Git status: 9 unrelated unstaged WIP paths preserved; no files changed.",
+  "files_changed": [
+    "apps/hub/src/app/core/integration/trusted-browser.db.test.ts",
+    "apps/hub/src/app/gymforge/page.tsx",
+    "docs/auth-hardening.md",
+    "docs/production.md",
+    "docs/security.md",
+    "packages/auth/src/cleanup-sessions.ts",
+    "packages/auth/src/index.ts",
+    "packages/auth/src/rate-limit-config.ts",
+    "packages/auth/src/security.ts"
+  ],
+  "commands_run": [
+    "git status --short",
+    "git show -s --format='%H%n%s%n%ci' 367ff05e1d696f1c48081a444a9666a92c949b14",
+    "git diff 367ff05e1d696f1c48081a444a9666a92c949b14^ 367ff05e1d696f1c48081a444a9666a92c949b14 -- package-lock.json scripts/tooling-audit-policy.mjs scripts/fixtures/tooling-audit/accepted.json .github/workflows/ci.yml",
+    "node scripts/tooling-audit-policy.mjs",
+    "node scripts/tooling-audit-policy.test.mjs",
+    "npm audit --package-lock-only --json",
+    "node scripts/tooling-audit-policy.mjs with accepted fixture override",
+    "node/npm version checks",
+    "git diff --check",
+    "safe App Server environment provenance checks"
+  ],
+  "tests": [
+    {
+      "command": "CI run 33082119121 at the requested exact SHA",
+      "status": "failed",
+      "details": "Provided result: Audit Prisma tooling policy failed only on advisory metadata drift."
+    },
+    {
+      "command": "node scripts/tooling-audit-policy.test.mjs",
+      "status": "passed",
+      "details": "All 5 policy tests passed."
+    },
+    {
+      "command": "tooling-audit-policy.mjs with accepted fixture override",
+      "status": "passed",
+      "details": "Policy and installed tooling versions pass when evaluated against the repository's accepted fixture."
+    },
+    {
+      "command": "npm audit --package-lock-only --json",
+      "status": "failed",
+      "details": "Structured audit data was captured; npm exited 1 for 3 high findings. Counts, paths, severity, via, and fix data match; only prisma.range differs."
+    },
+    {
+      "command": "synthetic policy evaluation with prisma.range >=6.13.0-dev.1",
+      "status": "passed",
+      "details": "Confirmed the current range produces exactly the policy's advisory-metadata drift error."
+    },
+    {
+      "command": "node scripts/tooling-audit-policy.mjs",
+      "status": "not_run",
+      "details": "The script could not invoke npm audit from this sandbox and reported no structured JSON because of the executor child-process limitation."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    }
+  ],
+  "remaining_issues": [
+    "Before publication, update only the expected Prisma vulnerability range in scripts/tooling-audit-policy.mjs and scripts/fixtures/tooling-audit/accepted.json after authorization, then rerun the exact-SHA CI gate; do not alter the lockfile or waive the job.",
+    "Local runtime is Node 24.14.1/npm 11.11.0 while CI specifies Node 22.20.0; direct local npm audit reproduced the same metadata drift, but exact runner-version reproduction is unavailable.",
+    "Backend/transport and turn/result provenance are not exposed by runtime metadata, so they remain unasserted fail-closed."
+  ],
+  "git_status": " M apps/hub/src/app/core/integration/trusted-browser.db.test.ts\n M apps/hub/src/app/gymforge/page.tsx\n M docs/auth-hardening.md\n M docs/production.md\n M docs/security.md\n M packages/auth/src/cleanup-sessions.ts\n M packages/auth/src/index.ts\n M packages/auth/src/rate-limit-config.ts\n M packages/auth/src/security.ts\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T143453Z-bielos-ci-tooling-audit-drift-review-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T143453Z-bielos-ci-tooling-audit-drift-review-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T143453Z-bielos-ci-tooling-audit-drift-review-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T143453Z-bielos-ci-tooling-audit-drift-review-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0408f-2146-7e43-8e3b-32113ec1a527",
+  "app_server_turn_id": "01a043a5-2e0d-7090-9680-9e91701a6f16",
+  "app_server_process_id": "8532",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T143453Z-bielos-ci-tooling-audit-drift-review-20260827.md",
+  "task_sha256": "5962245605cf64e3e7953accfc4eaa1d8fc3ec1ecae8c738dde15a89d7bab632",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

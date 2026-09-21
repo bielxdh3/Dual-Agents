@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-ui-finalize-20260827",
+  "parent_request_id": "prompt-arena-p2-ui-summary-tests-20260827",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize the current P2 UI and summary integration diff on completion/verification-packs. Do not add new scope or rewrite existing work. Run npm test, npm run typecheck, npm run build, npm run check:boundaries, npm run test:boundaries, cargo fmt --all -- --check, cargo check --all-targets, cargo test --all-targets, and git diff --check; fix only concrete compile/test failures. Ensure the materializeOfficialPack UI invokes a registered command, ArenaSummary is actually saved/read through the Tauri bridge, and no dead invoke paths remain. Add a tiny focused test only if a concrete uncovered path blocks confidence. Then create one focused local commit for the UI/summary integration and report exact outcomes, commit SHA, remaining native QA, and canonical wrapper provenance. Keep P2 IN PROGRESS; no P3-P7, motion, merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/verification-packs; preserve b9ac2b4 and current intentional dirty UI/summary diff",
+    "all edits/tests/commit in BL4; no Architect implementation",
+    "no paid APIs or secrets; no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/benchmark-ui.ts", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src-tauri/src/storage.rs"],
+  "review_findings": [{"severity": "blocking", "title": "UI/summary diff timed out before validation and commit", "details": "The current dirty diff adds materialization UI, summary bridge/commands, and persistence integration. Validate this exact diff and commit it."}],
+  "max_correction_cycles": 0
+}

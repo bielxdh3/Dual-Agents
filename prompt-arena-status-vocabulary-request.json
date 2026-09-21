@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-status-vocabulary-20260830",
+  "parent_request_id": "prompt-arena-local-adapters-evidence-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated Dual Codex App Server/headless path. In the existing clean adapter checkout E:\\Prompt Arena-live-telemetry-i18n-commit2, preserve commits 8588a2dd66e386082e153c933b1b55891ac42657 and 494697f425df292c01c7483d25518235b01cc8f9 plus all protected worktrees. Apply only the status-vocabulary correction in docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md: replace every custom PENDING_EXACT_HEAD_REBUILD status marker with the brief's allowed PARTIAL_IMPLEMENTATION status, while retaining clear prose that the recorded NSIS/package evidence is from source HEAD 5c5de64 and a fresh exact-head rebuild at 8588a2d is still required. Do not change implementation, tests, package artifacts, hashes, or any other gate. Run git diff --check and a focused stale-marker scan, stage only the two docs, and create one normal local commit docs: use allowed completion statuses. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use an alternate path. Provenance handling: the authenticated wrapper records executor account biel4, executor role, App Server transport and IDs, workspace-write, Windows sandbox elevated/readiness ready, and approval never; treat wrapper metadata as authoritative and do not self-block on unsupported PowerShell snapshots or protected-worktree dubious ownership. Report those fields. Only if the wrapper itself genuinely lacks a required field should you stop without a commit and report PROMPT_ARENA_BLOCKED_BY_PROVENANCE.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI/native_tui, fallback backend, alternate account, or danger-full-access.",
+    "Only replace the noncanonical status marker in the two docs; preserve all code/tests/package artifacts and honest gate prose.",
+    "Do not push or otherwise publish; create at most one normal local docs commit."
+  ],
+  "review_findings": [
+    {"title":"Noncanonical status marker","details":"PENDING_EXACT_HEAD_REBUILD is not in the allowed completion status vocabulary from the brief. Replace it with PARTIAL_IMPLEMENTATION in both evidence documents while retaining the exact-head rebuild explanation.","severity":"important"}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

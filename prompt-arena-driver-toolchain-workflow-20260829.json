@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-driver-toolchain-workflow-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. Ignore stale Dual Codex/function wording from the supplied prompt; you are BL4/biel4 Executor through the current configured App Server/headless transport. Work in the clean PR #28 checkout E:\\Prompt Arena-pr28-bl4 at branch validation/native-tauri-acceptance and exact HEAD f3048a61f45cdb6b29f362444f3d32646edf4943. Implement the smallest diagnostic CI-only extension needed to acquire a reproducible Windows native WebDriver toolchain for the existing real native-ui smoke. Add one temporary workflow under .github/workflows (prefer native-driver-toolchain.yml) triggered by workflow_dispatch and PR validation, with runs-on windows-latest and a bounded timeout. It must install exactly cargo install tauri-driver --locked and cargo install --git https://github.com/chippers/msedgedriver-tool, invoke the matching-driver tool, locate the actual tauri-driver.exe and msedgedriver.exe without guessing, and fail closed if either is absent. Record tauri-driver --version, msedgedriver --version, source commit, workflow run id, target architecture, UTC timestamp, and SHA-256 for both binaries in a manifest JSON/TXT. Enforce local compatibility for the known Windows host by accepting only EdgeDriver version prefix 151.0.4129 (the fourth component may differ); if the installed runner version has a different first three components, fail the diagnostic rather than generate an incompatible artifact. Upload only the two binaries and manifest with artifact name prompt-arena-windows-native-driver-toolchain-${{ github.sha }}, short retention, and no release/tag/deploy. Do not alter scripts/native-ui-smoke.mjs or product code. Run workflow syntax/format-focused checks available locally, git diff --check, and inspect the final diff. Create one normal commit with message ci: publish Windows native driver toolchain artifact. Do not push from the Executor; return exact commit SHA, changed files, tests, artifact naming, and complete provenance metadata. Preserve all unrelated WIP and fail closed on any provenance ambiguity.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; prove executor_account, role, task_transport, thread/turn, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never.",
+    "Only .github/workflows/native-driver-toolchain.yml may change. No source/product/harness edits, no registry policy changes, no TLS weakening, no browser-only fallback, no TUI/native_tui, no native subagents.",
+    "Commit is authorized; push, merge, release, tag, deploy, and force-push are not authorized in this delegation."
+  ],
+  "context_files": [
+    ".github/workflows/native-ui.yml",
+    "scripts/native-ui-smoke.mjs",
+    "docs/DELIVERY_MATRIX.md",
+    "docs/SECURITY.md"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

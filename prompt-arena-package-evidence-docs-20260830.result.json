@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-evidence-docs-20260830",
+  "parent_request_id": "prompt-arena-package-clean-retry-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:23:46.080131+00:00",
+  "finished_at": "2026-08-30T02:26:05.512165+00:00",
+  "summary": "Updated only the two evidence docs with successful fresh NSIS evidence for source HEAD 838d952, built at checkout f393e9023b2f1d28de27ce34b73eff83f9a2af45. Recorded artifact, bundle, sidecar, checksum, lifecycle smoke, resolved Cargo cleanup blocker, and preserved all human/runtime/MSI/CI/publication reservations. No commit occurred.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "Read AGENTS.md and required skill files",
+    "git rev-parse HEAD",
+    "git status --short",
+    "rg documentation markers",
+    "git diff --check",
+    "git diff --stat and scoped diff inspection"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "npm test / npm run typecheck / npm run build",
+      "status": "not_run",
+      "details": "Documentation-only update; existing evidence remains recorded."
+    },
+    {
+      "command": "NSIS packaging and package smoke",
+      "status": "not_run",
+      "details": "Existing successful evidence was documented; packaging was not rerun."
+    }
+  ],
+  "remaining_issues": [
+    "PENDING_HUMAN_QA remains for visual, accessibility, native-control, and live Arena review.",
+    "Ollama/Docker remain BLOCKED_EXTERNAL_RUNTIME; MSI remains blocked; Linux CI and remote CI remain unconfirmed.",
+    "The pre-existing generated checksums-sha256.txt modification remains untouched; no source or other generated files were changed by this task.",
+    "Historical 57f02b3 package evidence remains historical only."
+  ],
+  "git_status": " M checksums-sha256.txt\n M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T022346Z-prompt-arena-package-evidence-docs-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T022346Z-prompt-arena-package-evidence-docs-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T022346Z-prompt-arena-package-evidence-docs-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T022346Z-prompt-arena-package-evidence-docs-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0507a-e7b6-7663-b49d-fcb81d560ed5",
+  "app_server_process_id": "20668",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T022346Z-prompt-arena-package-evidence-docs-20260830.md",
+  "task_sha256": "0c2c1a8d60f40b1bb0804f47e9890d983336b37eff48e60e2403abbadac00c3c",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

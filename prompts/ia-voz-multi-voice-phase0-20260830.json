@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-multi-voice-phase0-20260830",
+  "action": "implement",
+  "repository": "C:/IA DE VOZ",
+  "task": "Required skills at top: C:/CodexGlobal/skills/ponytail/SKILL.md; C:/CodexGlobal/skills/project-phase-review/SKILL.md; C:/CodexGlobal/skills/project-security-review/SKILL.md. Read each fully and report resolved paths. Execute Phase 0 of C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md only. This is a read-only bootstrap: do not edit, create, move, rename, delete, overwrite, migrate, reprocess, commit, or push anything in C:/IA DE VOZ. Inspect the actual installed application architecture and current legacy single-voice data layout non-destructively. Verify the target workspace path, app launcher, current process/listener state, supported workflows, global speaker-sensitive paths/state, real audio and artifact inventories (counts, sizes, hashes where safe), and migration risks. Verify any applicable local AGENTS.md/AGENTS.override.md files under the target workspace. Produce evidence for mandatory skill attestation and trustworthy provenance fields: account/target account, role, profile/CODEX_HOME, workspace/repository, backend/transport, executor process id, app-server process id, session id, conversation/thread id, turn id, request/result correlation; mark unavailable rather than infer. Return exactly one JSON object containing summary, files_changed, commands_run, tests, and remaining_issues, and include the full Phase 0 evidence/report fields from the mission contract within summary or remaining_issues. Do not start PREPARE DATASET, training, generation, migration, or any destructive action. No remote or publication actions.",
+  "constraints": [
+    "Use only the configured biel4 App Server/headless Executor with its isolated CODEX_HOME; no native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Read-only Phase 0. Preserve all real user audio and artifacts; do not change C:/IA DE VOZ or its running application.",
+    "Do not claim provenance from self-report; use trustworthy control-plane/result metadata and record unavailable fields explicitly.",
+    "No commit, push, PR, merge, release, tag, deployment, publication, dependency changes, or destructive Git/data action."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/INICIAR.bat",
+    "C:/IA DE VOZ/README_PTBR.md",
+    "C:/IA DE VOZ/input_audio",
+    "C:/IA DE VOZ/dataset",
+    "C:/IA DE VOZ/training",
+    "C:/IA DE VOZ/generated",
+    "C:/IA DE VOZ/config",
+    "C:/IA DE VOZ/logs"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

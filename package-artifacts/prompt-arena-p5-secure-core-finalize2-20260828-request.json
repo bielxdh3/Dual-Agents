@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-secure-core-finalize2-20260828",
+  "parent_request_id": "prompt-arena-p5-secure-core-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize only the currently preserved P5 secure-core diff: src-tauri/src/external_providers.rs plus the existing Cargo.toml, commands.rs, lib.rs, and bridge.ts changes. Do not add UI or HTTP execution in this slice. Inspect for compile/security defects, add focused unit tests inside the provider module if missing, then run cargo fmt --all -- --check, cargo check, cargo test, npm run typecheck, npm test, npm run build, and git diff --check from the correct directories. Fix only defects in this P5 secure-core slice. If all pass, commit only these files with a descriptive message and leave the worktree clean. Preserve HEAD ff4ace5 and all prior commits. No plaintext credential fallback, no secret output, no network calls, no reset/clean/discard, no merge/tag/release/deploy.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session with --allow-dirty; preserve existing untracked/module integration",
+    "no direct Architect implementation, no TUI/native_tui/fallback/substitute",
+    "no secret values in logs, errors, tests, exports, snapshots, or reports",
+    "no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/external_providers.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/Cargo.toml"],
+  "review_findings": [{"severity": "blocking", "title": "P5 secure-core integration is preserved but uncommitted", "details": "Validate and commit only the current secure-core slice."}],
+  "max_correction_cycles": 0
+}

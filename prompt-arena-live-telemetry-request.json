@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-telemetry-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Implement the core Live Arena Execution Telemetry phase from sections 11 and 25-27 of C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md in the current isolated product worktree. Inspect the existing Arena runner, bridge, Rust orchestration, persistence, blind-evaluation flow, and the preserved Phase 1 UI changes first. Keep local model execution sequential and do not weaken blind integrity or no-secret boundaries. Build a real active execution monitor rather than only a final-results card: show Arena state, per-competitor/sample status and counters, current sample elapsed time, competitor accumulated time, Arena wall time, deterministic ETA only when enough measured evidence exists, load/TTFT/generation/token metrics when authoritative (otherwise honest unavailable), and sanitized failure/cancellation state. Use the existing Tauri/worker architecture with bounded progress/events or a justified local timer plus measured completion evidence; do not add a hosted service or parallel generation. Persist enough sanitized final telemetry in the existing immutable Arena summary/evidence model so reopen/results/export can reconstruct it without changing immutable raw values. During a blind execution state, use neutral competitor labels and hide identity-sensitive timing/speed/token/cost/resource values until reveal. Add focused behavior tests for progress transitions, elapsed/timing accumulation, token-rate calculation, ETA eligibility, blind visibility, unavailable metrics, cancellation/failure, and persistence compatibility. Keep changes repo-native and minimal; do not implement PT-BR i18n in this phase. Do not touch E:\\Prompt Arena or E:\\Prompt Arena-pr28, and do not commit/push/PR/merge/tag/release/deploy. Run targeted tests/typecheck/build where feasible, but avoid a broad packaging run in this phase. Return a complete structured report including exact provenance metadata (biel4 Executor, App Server/headless, workspace-write, elevated/ready, approval never, thread/turn IDs), files, commands, tests, and remaining issues.",
+  "constraints": [
+    "Preserve the existing sequential fairness policy and immutable evidence semantics.",
+    "Do not expose secrets, prompt/response content in telemetry, or hidden provider credentials.",
+    "Do not weaken cancellation, process isolation, verifier authority, or blind evaluation.",
+    "Do not introduce a hosted service or new dependency unless the existing installed stack cannot support the requirement.",
+    "Local mutation only; no commits or remote operations."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\bridge.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\orchestration.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\storage.rs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

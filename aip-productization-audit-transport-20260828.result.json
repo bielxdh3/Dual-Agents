@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-audit-transport-20260828",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T14:12:49.092538+00:00",
+  "finished_at": "2026-08-28T14:19:18.102442+00:00",
+  "summary": "Read-only Phase A audit at baseline cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4. Worktree is clean; no files changed. Overall result: runtime primitives exist, but installed-facing discoverability is not product-complete. App.tsx mounts Screen Vision, Companion, Gateway, and Cognitive 7B–7F panels only inside the agent-tools details block. App.css sets .agent-tools to display:none, with no later override. They are therefore hidden from installed users and absent from primary navigation, settings, and any capability status center. The requested android.rs does not exist; the effective Rust modules are companion.rs and companion_transport.rs.\n\nCapability audit:\n\nScreen Vision — Backend/runtime: screen_vision.rs provides bounded Windows display enumeration and in-memory capture, deterministic synthetic fixtures, and an optional local executable provider configured by AIP_LOCAL_VISUAL_PROVIDER_PATH. Real capture is Windows-only, limited to 8 MiB and 15 seconds; provider execution is bounded by timeout/output limits. No screenshot persistence or upload. Tauri commands: list_screen_vision_fixtures, list_screen_vision_sessions, list_screen_vision_jobs, list_screen_vision_audit, create_screen_vision_session, preview_screen_vision_job, confirm_screen_vision_job, cancel_screen_vision_job, cleanup_screen_vision_job, and cancel_screen_vision_session. React entry: ScreenVisionControls in App.tsx around lines 5745–6310. It loads records and invokes the command lifecycle correctly, but is mounted only under hidden agent-tools. Prerequisites/status: synthetic fixtures are bundled and deterministic; real display capture is Windows-dependent; the visual model/provider is not bundled and requires an absolute existing .exe at AIP_LOCAL_VISUAL_PROVIDER_PATH. Real execution and provider/model installation remain manual validation. Fixture execution is synthetic, metadata-only, and explicitly labeled. Fail-closed behavior covers temporary chat, safe mode, suspended agents, Owner/privacy confirmation, quotas, fixture validation, resource contention, and missing/invalid provider; real-provider failure returns unavailable and does not fall back to synthetic success. Exact blocker: no visible route or status indication, plus no packaged/provider installation UX. Smallest safe plan: expose one capability/status entry from existing agent-tools primitives, preserve the current command lifecycle, distinguish fixture from real capture in Portuguese, and add only a bounded provider prerequisite/status view.\n\nAndroid Companion — Backend/runtime: companion.rs is a SQLite metadata/fixture domain; companion_transport.rs supplies a bounded aip-companion-v1 authenticated TCP transport with HMAC, replay/counter checks, one-time pairing, private-bind validation, and explicit approval. Desktop Tauri commands start_companion_transport, stop_companion_transport, and get_companion_transport_status are registered in lib.rs, but the desktop UI never calls them. React entry: CompanionControls in App.tsx around lines 6310–6883. It calls only list/pair/session/queue/history/audit/key-rotation/revocation Tauri commands using hardcoded android-fixture-01 values. The panel is hidden under agent-tools. Installed discovery: none. Current desktop pairing is a local fixture database mutation, not network pairing; it does not show a listener endpoint or transport pairing code. Prerequisites/status: the Rust transport is bundled in the desktop binary, but no real Android release artifact is present. The Android project is a debug/source client with explicit-connect UX, Keystore storage, and private IPv4 validation. AndroidManifest.xml lacks INTERNET permission even though MainActivity uses java.net.Socket, blocking actual installed socket transport until fixed. No release signing/distribution configuration or APK/AAB was found. Real device, private-LAN, lifecycle, permission, overlay, notification, recovery, and release validation remain pending. Fail-closed behavior covers temporary chat, safe mode, suspension, Owner/agent ownership, exact fixture protocol identity, TTL, replay, approval, key rotation, and revocation. Smallest safe plan: first add INTERNET and produce a signed, bounded debug/release artifact only in an authorized phase; then connect the existing desktop transport status/start/stop primitives to a visible panel with endpoint, transient pairing, private-LAN confirmation, revocation, and explicit Owner confirmation. Do not enable LAN by default.\n\nGateway — Backend/runtime: gateway.rs is a fixture-only metadata domain. Accounts, transfers, recoveries, Cloudflare values, and credentials are synthetic/absent; externalEffectPerformed remains false. gateway_transport.rs provides bounded authenticated local TCP framing with HMAC, replay protection, one-time pairing, and loopback/private-bind policy. Tauri commands start_gateway_transport, stop_gateway_transport, and get_gateway_transport_status exist. React entry: GatewayControls in App.tsx around lines 6884–7536; it is the only transport UI consumer and is hidden under agent-tools. It starts with bindAddress 127.0.0.1, ephemeral port, and privateNetworkConfirmed false, then displays endpoint and transient pairing code. The private-LAN path exists in Rust but is not configurable from the desktop UI. Prerequisites/status: the listener is a real local runtime path when explicitly started; domain operations remain fixture/mock metadata and never reach BielOS, Cloudflare, external accounts, relay, or tunnel. Fail-closed behavior covers temporary chat, safe mode, suspension, fixture-agent identity, Owner ownership, approval/proof, replay, idempotency, pairing, and bind validation. Smallest safe plan: expose the existing listener/status controls visibly, label the current mode as this-PC loopback, and add a separate explicit private-LAN confirmation plus firewall/manual validation before exposing a private bind. Keep fixture domain operations clearly synthetic.\n\nPhase 7B–7F — Backend/runtime: Rust/SQLite commands, contracts, and migrations cover opinions, relationships, goals/fictional activities, public conversations, candidates, resource limits, approvals, persistence, and audit. CognitivePanelGate and CognitiveCorePanel in App.tsx provide controls for 7B–7E; 7F is primarily validation/documentation and has no independent user-facing control. React entry: mounted only under the hidden Valores cognitivos details item. Installed discovery: no primary route, settings section, or status link. The UI itself labels the feature Valores cognitivos simulados and states that opinions, relationships, goals, and activities are fictitious and do not imply diagnosis or external action. Durable operations pass temporaryChat false and Rust gates enforce temporary-chat, safe/silent/suspended, ownership, participant, approval, budget, and public-only constraints. Real versus fixture: these are local bounded product simulations, not autonomous private channels or external actions. Exact source/docs gap: visible activity lifecycle controls coexist with the closing copy Atividades fictícias ainda não estão implementadas neste checkpoint; phase docs claim controls are exposed, while CSS hides them. Smallest safe plan: make the existing panel reachable from a clearly labeled local/simulated capability entry, correct the contradictory copy, and add an App-level visibility test without expanding autonomy or private channels.\n\nNavigation/status-center and Portuguese gaps: the workspace union contains only chat, memories, state, appearance, and settings. Settings has no capability inventory; diagnostics show runtime/build/database metadata only. The footer reports runtime status but not feature readiness, provider prerequisites, transport state, pairing, or blocked reasons. Technical English terms such as fixture sintética, metadata-only, pairing, endpoint, private network, runtime, protocol, Owner, and provider path are surfaced inconsistently. Screen Vision should distinguish synthetic fixture from real display/provider availability. Companion says sem rede and somente comandos Tauri while a real transport module and Android client exist, which can confuse users. Gateway says local/privado although the current UI is loopback-only. All panels should state bundled, available, configuration required, unavailable, blocked, or pending in Portuguese.\n\nAcceptance criteria for the smallest follow-up: each capability is reachable from primary navigation or a visible capability/status center; hidden agent-tools is no longer the sole entry; status distinguishes bundled fixture, real runtime, configuration-required, unavailable, blocked, and human-validation-pending states; Screen Vision never presents fixture output as real capture; Companion transport commands are wired before claiming pairing/network support; Android has INTERNET permission and an authorized signed artifact before device testing; Gateway defaults to loopback and requires an explicit private-LAN confirmation; 7B–7F copy matches actual behavior; existing safe-mode, temporary-chat, Owner approval, bounded execution, no-upload, private-LAN, and Windows 10 x64 boundaries remain enforced.\n\nProvenance: inspected AGENTS.md, all five required skills, App.tsx, App.css, contracts, relevant Rust modules, migrations, Android Gradle/manifest/source, ROADMAP.md, KNOWN_LIMITATIONS.md, and Phase 7F/7E/11/12/13 documents. Historical FUNCTIONAL or test claims in documentation were not treated as current execution evidence.",
+  "files_changed": [],
+  "commands_run": [
+    "Get-Content E:\\AIP\\AGENTS.md and required SKILL.md files",
+    "git status --short; git branch --show-current; git rev-parse HEAD; git rev-parse origin/main; git log -1",
+    "rg -n for App.tsx, App.css, contracts, Rust commands/modules, migrations, phase docs, and Android sources",
+    "Get-Content bounded relevant sections of App.tsx, App.css, contracts, Rust, Android, ROADMAP.md, KNOWN_LIMITATIONS.md, and phase documents",
+    "git diff --check",
+    "pnpm secrets:scan",
+    "rg -n test inventories for Screen Vision, Companion, Gateway, transport, and Cognitive panels"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; repository remained unchanged."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "passed",
+      "details": "Completed with exit code 0; no repository secret or sensitive-value finding was reported."
+    },
+    {
+      "command": "Source test inventory via rg",
+      "status": "passed",
+      "details": "Relevant Rust and desktop test files were located, but this was inventory only; no tests were executed."
+    },
+    {
+      "command": "pnpm test, typecheck, cargo test, build, or packaged/installed validation",
+      "status": "not_run",
+      "details": "Explicitly prohibited by the read-only no-build/no-test task constraints."
+    }
+  ],
+  "remaining_issues": [
+    "All four audited areas, including 7B–7F, are hidden by .agent-tools { display: none } and have no primary navigation or capability status-center entry.",
+    "CompanionControls does not call the existing companion transport start/stop/status commands; its current pairing/session path is fixture-only local metadata.",
+    "AndroidManifest.xml lacks INTERNET permission although the Android client opens java.net.Socket; no signed distributable APK/AAB or release-signing path was found.",
+    "Gateway UI hardcodes loopback and privateNetworkConfirmed false; private-LAN support is not user-configurable and all gateway domain actions remain synthetic.",
+    "Screen Vision real execution depends on AIP_LOCAL_VISUAL_PROVIDER_PATH and a manually installed bounded .exe; no bundled visual provider/model or installed prerequisite flow exists.",
+    "Phase 7B–7F source/docs and UI copy are inconsistent, especially the claim that fictional activities are not implemented despite visible lifecycle controls.",
+    "No App-level test verifies that these capabilities are visible and reachable in the installed-facing navigation.",
+    "Before any private-LAN transport claim, add explicit Owner confirmation, endpoint/pairing/revocation UX, firewall/manual validation, and preserve loopback-by-default behavior."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T141249Z-aip-productization-audit-transport-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T141249Z-aip-productization-audit-transport-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T141249Z-aip-productization-audit-transport-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T141249Z-aip-productization-audit-transport-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a048af-d041-7831-9c43-9e801668041f",
+  "app_server_turn_id": "01a048b7-5617-7fb1-a134-5a9b36d837d1",
+  "app_server_process_id": "20612",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T141249Z-aip-productization-audit-transport-20260828.md",
+  "task_sha256": "a01fdd532b1cf38537ed07ad329ce797e0fd877932de73523d4a2cd18933ffb2",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

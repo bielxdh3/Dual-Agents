@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-ci-modefix-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Fix the Phase 12 CI-only failure without changing application behavior: make the tracked android/gradlew wrapper executable for Linux GitHub Actions (preserve contents exactly), run git diff --check and the repository-local Android validation if available, verify the resulting diff is mode-only, commit exactly as `fix: make android gradle wrapper executable`, and leave clean status. Do not modify source, docs, dependencies, remote branches, PRs, or use native subagents.",
+  "constraints": [
+    "Use only configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "The only allowed tracked change is the executable mode bit on android/gradlew; preserve bytes.",
+    "Do not claim Android validation if unavailable; report exact commands and results."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/android/gradlew"],
+  "max_correction_cycles": 0
+}

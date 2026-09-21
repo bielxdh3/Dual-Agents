@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-qa-phase1-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 1,
+  "started_at": "2026-08-29T16:54:09.455885+00:00",
+  "finished_at": "2026-08-29T17:04:11.664752+00:00",
+  "summary": "Codex executor failed; repository modifications, if any, were preserved.",
+  "files_changed": [
+    "src-tauri/src/commands.rs",
+    "src-tauri/src/main.rs",
+    "src/styles.css"
+  ],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "git_status": " M src-tauri/src/commands.rs\n M src-tauri/src/main.rs\n M src/styles.css\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T165409Z-prompt-arena-windows-qa-phase1-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T165409Z-prompt-arena-windows-qa-phase1-20260829",
+  "executor_report_file": "",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T165409Z-prompt-arena-windows-qa-phase1-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "",
+  "app_server_turn_id": "",
+  "app_server_process_id": "",
+  "executor_windows_sandbox": "",
+  "executor_windows_sandbox_readiness": "not_checked",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T165409Z-prompt-arena-windows-qa-phase1-20260829.md",
+  "task_sha256": "3e1c9384e5cdf0d3f359900c9e093e21ab66190521d4426b177a57f14ba1d909",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor exited with code 1."
+}

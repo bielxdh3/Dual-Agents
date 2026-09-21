@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-roadmap-update-20260827",
+  "parent_request_id": "prompt-arena-p2-ui-finalize-20260827",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Update only ROADMAP.md and docs/DELIVERY_MATRIX.md on completion/verification-packs to reflect the actual P2 implementation now present in commits 6c1eef9, b9ac2b4, and 952293a. Record objective verifiers, deterministic official-pack materialization and persistence, Docker-required no-host-fallback boundary, persisted Arena summaries/statistics, and usable UI paths as implementation/automated evidence. Keep P2 IN PROGRESS because native Tauri/WebView execution/reopen/export and Docker-boundary smoke are still pending; do not claim P2 or any other phase complete. Update stale statements that these features are not wired, without changing code. Run git diff --check and create one focused local docs commit. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "all edits and commit in BL4; preserve PR #17 and existing implementation commits",
+    "no product code changes in this turn; no motion; no P3-P7 scope",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/ROADMAP.md", "E:/Prompt Arena/docs/DELIVERY_MATRIX.md", "E:/Prompt Arena/docs/TESTING.md"],
+  "review_findings": [{"severity": "important", "title": "Roadmap/matrix stale after P2 implementation", "details": "Docs still say materialization, verifier persistence, uncertainty/tie margins, and Docker boundary are not wired, despite the committed implementation. Update truthfully while retaining native QA pending."}],
+  "max_correction_cycles": 0
+}

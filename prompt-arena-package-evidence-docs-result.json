@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-evidence-docs-20260829",
+  "parent_request_id": "prompt-arena-package-sidecar-proof-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:54:40.955886+00:00",
+  "finished_at": "2026-08-29T19:57:23.400956+00:00",
+  "summary": "Updated only the two requested documentation files. HEAD remains 57f02b35abacce6a0a1ed64a5f952d29a710614a. Staging and commit were blocked because Git could not create E:\\Prompt Arena\\.git\\worktrees\\Prompt-Arena-live-telemetry-i18n\\index.lock: Permission denied. BL4 provenance: biel4 Executor, App Server/headless, workspace-write, Windows elevated, readiness ready, approval never. No remote operation occurred.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "git status --short --untracked-files=all",
+    "git diff --check",
+    "git add -- docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md checksums-sha256.txt package-verification.txt",
+    "git diff --cached --name-only",
+    "git rev-parse HEAD"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff-check errors; only LF/CRLF normalization warnings."
+    },
+    {
+      "command": "git add -- docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md checksums-sha256.txt package-verification.txt",
+      "status": "failed",
+      "details": "Unable to create E:\\Prompt Arena\\.git\\worktrees\\Prompt-Arena-live-telemetry-i18n\\index.lock: Permission denied."
+    },
+    {
+      "command": "git commit -m \"docs: record Windows NSIS artifact evidence\"",
+      "status": "not_run",
+      "details": "Not attempted because staging was blocked."
+    }
+  ],
+  "remaining_issues": [
+    "The four requested files were not staged and no local commit was created. The linked worktree Git metadata is outside the writable sandbox path; the user must grant write access to its index/HEAD metadata or provide a writable non-protected worktree."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n?? checksums-sha256.txt\n?? package-verification.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T195441Z-prompt-arena-package-evidence-docs-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T195441Z-prompt-arena-package-evidence-docs-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T195441Z-prompt-arena-package-evidence-docs-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T195441Z-prompt-arena-package-evidence-docs-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ef8-9d5b-7451-8733-b9d0ad9288e4",
+  "app_server_turn_id": "01a04f16-af30-7b83-a78b-67bc386fced2",
+  "app_server_process_id": "9940",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T195441Z-prompt-arena-package-evidence-docs-20260829.md",
+  "task_sha256": "4b00286270348f5b75995211b2b9516d3182c812d8a85f04e219c576e46898e5",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

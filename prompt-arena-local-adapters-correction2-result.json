@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-local-adapters-correction2-20260830",
+  "parent_request_id": "prompt-arena-local-adapters-correction-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T06:30:48.930587+00:00",
+  "finished_at": "2026-08-30T06:37:54.597058+00:00",
+  "summary": "Completed and committed the minimal correction. Provenance: executor biel4, role executor, task transport app_server, wrapper-captured App Server IDs, workspace-write, Windows sandbox elevated, readiness ready, approval never; session 01a04e66-6ed5-7c33-987a-c2be8f1c8f79, thread 01a05159-fe11-78c0-a32b-84c9962414ec. Base SHA 1edcdc22da8550b041031f588f9ba8a4805d532e; new SHA 8588a2dd66e386082e153c933b1b55891ac42657. Commit: feat: wire local OpenAI-compatible adapters.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "src-tauri/src/lib.rs",
+    "src-tauri/src/model_library.rs",
+    "src-tauri/src/ollama.rs",
+    "src-tauri/src/openai_compatible.rs",
+    "src-tauri/src/orchestration.rs",
+    "src/run-plan.test.ts",
+    "src/run-plan.ts"
+  ],
+  "commands_run": [
+    "cargo fmt --manifest-path src-tauri/Cargo.toml --all",
+    "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+    "cargo test --manifest-path src-tauri/Cargo.toml openai_compatible -- --nocapture",
+    "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "npm run check:boundaries",
+    "git diff --check",
+    "git add -- docs/DELIVERY_MATRIX.md src-tauri/src/lib.rs src-tauri/src/model_library.rs src-tauri/src/ollama.rs src-tauri/src/openai_compatible.rs src-tauri/src/orchestration.rs src/run-plan.test.ts src/run-plan.ts",
+    "git diff --cached --check",
+    "git commit -m \"feat: wire local OpenAI-compatible adapters\"",
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git diff HEAD^ HEAD --check"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml --all",
+      "status": "passed",
+      "details": "Formatted successfully."
+    },
+    {
+      "command": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "Compiled successfully."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml openai_compatible -- --nocapture",
+      "status": "failed",
+      "details": "Initial cold-build attempt timed out after 120 seconds; rerun completed successfully."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml openai_compatible -- --nocapture",
+      "status": "passed",
+      "details": "4 focused tests passed."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "113 tests passed."
+    },
+    {
+      "command": "npm test",
+      "status": "failed",
+      "details": "Initial run exposed and was followed by a direct fix for the undefined validateLoopbackEndpoint reference."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "19 test files and 113 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript build checks passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed; existing large-chunk warning remains."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Repository boundary check passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only normal CRLF conversion notices."
+    }
+  ],
+  "remaining_issues": [
+    "Live LM Studio/llama.cpp service smoke, native Windows QA, and human QA remain pending; no native/human QA is claimed.",
+    "Remote CI is unconfirmed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T063049Z-prompt-arena-local-adapters-correction2-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T063049Z-prompt-arena-local-adapters-correction2-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T063049Z-prompt-arena-local-adapters-correction2-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T063049Z-prompt-arena-local-adapters-correction2-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05159-fe11-78c0-a32b-84c9962414ec",
+  "app_server_turn_id": "01a0515d-151e-7fd2-bb2e-85d81f7696af",
+  "app_server_process_id": "26508",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T063049Z-prompt-arena-local-adapters-correction2-20260830.md",
+  "task_sha256": "c7910cd3ea114d13c2871691eef240e0e099268a97f0fba7a6a18a984558879b",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'. Executor changed Git HEAD; no rollback was attempted."
+}

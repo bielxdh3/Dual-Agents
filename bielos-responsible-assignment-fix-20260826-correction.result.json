@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-fix-20260826-correction",
+  "parent_request_id": "bielos-responsible-assignment-fix-20260826",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T00:11:56.315467+00:00",
+  "finished_at": "2026-08-27T00:16:59.518080+00:00",
+  "summary": "Added the minimal explicit React import at line 1 of project-admin-controls.tsx. Provenance: account desktop-6nummdh\\bielx; label/role Biel4 App Server Executor / executor; backend/transport unconfirmed; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; repository=E:/BielOS; request=bielos-responsible-assignment-fix-20260826-correction; thread=01a0408f-2146-7e43-8e3b-32113ec1a527; turn/result IDs unavailable. No alternate backend or subagents used. Git status remains unstaged and pre-existing dirty paths were preserved; no diff or executor report file was created.",
+  "files_changed": [
+    "apps/hub/src/app/core/projects/project-admin-controls.tsx"
+  ],
+  "commands_run": [
+    "npm run test:core:unit",
+    "npx tsx --test --test-concurrency=1 apps/hub/src/app/core/projects/feedback.test.ts apps/hub/src/app/core/projects/project-admin-controls.test.tsx apps/hub/src/app/core/projects/access-policy.test.ts apps/hub/src/app/core/projects/detail-policy.test.ts apps/hub/src/app/core/projects/validation.test.ts",
+    "npm run test:core:db:integration",
+    "npm run typecheck --workspace @bielos/hub",
+    "npm run lint",
+    "npm run secrets:scan",
+    "git diff --check",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck --workspace @bielos/hub",
+      "status": "passed",
+      "details": "tsc --noEmit passed."
+    },
+    {
+      "command": "npm run lint",
+      "status": "passed",
+      "details": "ESLint passed with no warnings."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "npm run test:core:unit",
+      "status": "not_run",
+      "details": "Blocked before test execution: Node test workers failed with spawn EPERM."
+    },
+    {
+      "command": "Focused project unit suite",
+      "status": "not_run",
+      "details": "All five requested files were blocked by spawn EPERM before loading."
+    },
+    {
+      "command": "npm run test:core:db:integration",
+      "status": "not_run",
+      "details": "Docker test database startup failed with spawn EPERM; no database mutation occurred."
+    },
+    {
+      "command": "npm run secrets:scan",
+      "status": "not_run",
+      "details": "Scanner failed before scanning because its git subprocess returned spawnSync git EPERM."
+    }
+  ],
+  "remaining_issues": [
+    "Focused unit and database integration results remain unconfirmed; rerun in a normal executor with supported Node 22 because the repository excludes Node 24.",
+    "Backend/transport and turn/result provenance are not exposed by runtime metadata and are intentionally unasserted."
+  ],
+  "git_status": " M apps/hub/src/app/core/integration/project-access.db.test.ts\n M apps/hub/src/app/core/integration/trusted-browser.db.test.ts\n M apps/hub/src/app/core/projects/[projectId]/page.tsx\n M apps/hub/src/app/core/projects/actions.ts\n M apps/hub/src/app/core/projects/detail-policy.ts\n M apps/hub/src/app/core/projects/page.tsx\n M apps/hub/src/app/core/projects/project-admin-controls.tsx\n M apps/hub/src/app/globals.css\n M apps/hub/src/app/gymforge/page.tsx\n M docs/auth-hardening.md\n M docs/production.md\n M docs/security.md\n M package.json\n M packages/auth/src/cleanup-sessions.ts\n M packages/auth/src/index.ts\n M packages/auth/src/rate-limit-config.ts\n M packages/auth/src/security.ts\n?? apps/hub/src/app/core/projects/feedback.test.ts\n?? apps/hub/src/app/core/projects/feedback.ts\n?? apps/hub/src/app/core/projects/project-admin-controls.test.tsx\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T001156Z-bielos-responsible-assignment-fix-20260826-correction\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T001156Z-bielos-responsible-assignment-fix-20260826-correction",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T001156Z-bielos-responsible-assignment-fix-20260826-correction\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T001156Z-bielos-responsible-assignment-fix-20260826-correction\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0408f-2146-7e43-8e3b-32113ec1a527",
+  "app_server_turn_id": "01a0408f-21fd-7b72-aa33-7c920237d974",
+  "app_server_process_id": "9596",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T001156Z-bielos-responsible-assignment-fix-20260826-correction.md",
+  "task_sha256": "da87afa0d89fb65932e1ec79d8ddaf52d1bca08ed2883ac0e5e68e7664130ce9",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

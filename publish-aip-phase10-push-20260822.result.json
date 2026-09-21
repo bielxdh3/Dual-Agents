@@ -1,0 +1,7 @@
+{
+  "status": "blocked",
+  "operation": "unknown",
+  "mission_id": "",
+  "error_classification": "MALFORMED_PUBLICATION_REQUEST",
+  "detail": "Invalid commit SHA."
+}

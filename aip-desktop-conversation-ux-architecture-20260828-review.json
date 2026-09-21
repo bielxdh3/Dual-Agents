@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-review",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Act as the distinct Biel4 Reviewer through the configured App Server. Review exact clean branch fix/desktop-conversation-ux-architecture at commit 75fa3941d9262003bf4b6f94534cb886d28d50b0 against parent 7bbd5e7b92f580614fd99207640b3faf49d83066. Evidence only: do not edit files, create commits, push, open/update PRs, merge, tag, release, deploy, or build installers. Read the original /goal specification at C:/Users/bielx/.codex/attachments/c745ef0b-8fb9-46af-8219-9df4bb212ea3/pasted-text-1.txt and all required skills first. Independently inspect the complete net diff and relevant surrounding source/tests/docs. Answer every reviewer acceptance question: old horizontal tabs gone; sidebar agent-first grouping; multiple conversations/no privileged main UX; safe discoverable rename/pin/archive/unarchive/delete with archived chats absent from ordinary list; contextual temporary chat and advanced relocation; composer model selector immediate/default/override/unavailable behavior; aligned PT-BR-first profile; concise Local Resources/Voice with diagnostics hidden; actual overlay alpha/transparency/hitbox/click-through path and deterministic tests; legacy data migration/restart; security/privacy/Rust authority/temporary-chat/agent isolation/accessibility unchanged or stronger; truthful future bundled/managed offline STT+TTS roadmap. Check migration 0026 idempotence and active/deleted fallback, all overlay/Bubble callers/listeners, CSS/responsive behavior, and regressions in Phase 7-13 productization. Verify the reported validations from the executor where possible without modifying the tree. Return exactly one JSON object with summary, verdict (approved, approved_with_reservations, or changes_requested), findings [{severity,title,details}], files_reviewed, tests_reviewed, validations_reviewed, remaining_issues, and provenance. Use evidence only and call out any genuinely blocking no.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Reviewer identity; no native subagents, alternate backend, account, or fallback.",
+    "Keep the worktree clean and unchanged. Do not run commands that modify files, generated outputs, Git state, databases or user data.",
+    "Do not expose or print secrets, credentials, authentication files, local databases, histories, memories, private media or unnecessary private paths.",
+    "Do not infer installed-Windows overlay success from static code; label that manual human gate honestly. Do not infer CI or packaging without evidence."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/Overlay.tsx",
+    "E:/AIP/apps/desktop/src/Bubble.tsx",
+    "E:/AIP/apps/desktop/src/agent-navigation.ts",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-state.test.ts",
+    "E:/AIP/apps/desktop/src/overlay-input.ts",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0026_conversation_organization.sql",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/overlays.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/native_overlay_region.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/docs/ARCHITECTURE.md",
+    "E:/AIP/docs/DATA_MODEL.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md",
+    "E:/AIP/docs/UI_BEHAVIOR.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": []
+  }
+}

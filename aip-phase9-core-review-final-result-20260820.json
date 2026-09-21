@@ -1,0 +1,33 @@
+{
+  "verdict": "approved_with_reservations",
+  "blocking_findings": [],
+  "important_findings": [],
+  "evidence": [
+    "Diff is limited to migration 0023 and Rust database/tools/lib changes; no UI, contracts, shell, network, upload, telemetry, watcher, or public listener behavior entered.",
+    "Multi-move execution revalidates source/destination paths, rejects existing destinations, rolls back completed moves in reverse order, and reports workspace_move_failed versus workspace_move_partial with persisted failed status and audit.",
+    "Workspace roots reject drive/system/broad roots, symlinks, Windows reparse points, and symlinked intermediate components; canonical containment is checked for roots, sources, and destinations.",
+    "Owner/agent checks, safe-mode and temporary-chat rejection, approval and second confirmation, action-bound preview validation, idempotency uniqueness, bounded result/audit fields, and compensation paths are present.",
+    "Migration 0023 reconstructs constrained tables, preserves populated data, restores foreign keys/indexes, adds workspace_roots ownership/index constraints, and is registered as migration 23.",
+    "Fixture adapters remain metadata-only; local filesystem behavior is explicitly limited to configured roots and file metadata/moves without overwrite or delete."
+  ],
+  "validation_run": [
+    "Read AGENTS.md, phase-review, security-review, publication-check skills, Phase 9 specification, corrective gap matrix, complete changed-file scope, migration 0023, database.rs, tools.rs, and lib.rs.",
+    "git diff --check passed.",
+    "Repository secret/path searches found no obvious credentials or prohibited release artifacts in the reviewed scope.",
+    "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml was not completed because target-directory access was denied; escalation was requested and declined. Remote CI not confirmed."
+  ],
+  "remaining_human_checks": [
+    "Run the Rust test suite in an environment permitting target writes, including populated-v22 migration/reopen tests and Windows reparse-point behavior.",
+    "Perform packaged Windows/manual confirmation UX validation.",
+    "Intentional reservation: React/UI, contract integration, and broader documentation integration remain a later pass and are not defects in this Phase 9 core review."
+  ],
+  "provenance": {
+    "base": "06414e05765fe96f3e6fd736775c70e21187d5bb",
+    "head": "732480178086770fdbbfeef0d6a858c06c02c045",
+    "commits_reviewed": [
+      "f5ec675",
+      "7324801"
+    ],
+    "mode": "read-only"
+  }
+}

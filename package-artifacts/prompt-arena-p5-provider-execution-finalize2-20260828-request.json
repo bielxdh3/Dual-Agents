@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-provider-execution-finalize2-20260828",
+  "parent_request_id": "prompt-arena-p5-provider-execution-finalize-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize only the existing dirty P5 provider-execution diff (Cargo.toml, external_providers.rs, commands.rs, lib.rs, bridge.ts). Do not add UI or new features. Run cargo fmt --all -- --check, cargo check, cargo test, npm run typecheck, npm test, npm run build, and git diff --check from the correct directories. Fix only compile/test defects in this existing slice, then commit it with a descriptive message and leave the worktree clean. Preserve HEAD ff56656 and prior P1-P4 commits. No real provider calls, no secret output, no plaintext fallback, no reset/clean/discard, no merge/tag/release/deploy.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session with --allow-dirty; preserve current P5 diff",
+    "no direct Architect implementation, no TUI/native_tui/fallback/substitute",
+    "no secret values in tests, logs, errors, exports, snapshots, or reports",
+    "no external network calls during tests",
+    "no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/external_providers.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/Cargo.toml"],
+  "review_findings": [{"severity": "blocking", "title": "P5 provider execution diff is complete but uncommitted", "details": "Run the required validation and commit only this diff."}],
+  "max_correction_cycles": 0
+}

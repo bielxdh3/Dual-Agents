@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-transport-lifecycle-20260822",
+  "parent_request_id": "aip-phase12-transport-lifecycle-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Resolve the secure lifecycle blockers found before Phase 12 Tauri integration on branch feat/phase-12-android-companion at commit 4535b3d. Modify only companion_transport.rs and focused core tests, then commit exact message `fix: bound phase 12 transport lifecycle`.\n\nAdd an explicit ephemeral pairing-key lifecycle API: generate a cryptographically strong bounded random key/code only when an Owner-confirmed start manager requests it (use OS/Rust randomness or UUID plus secure hashing; never deterministic fixture data), return the raw pairing code only in the one-time start result to the Owner/UI caller, keep the key only in synchronized in-memory runtime state, and provide a redacted status type. Add consume/rotate/revoke semantics so a pairing code cannot be reused after explicit consumption/revocation; no SQLite/raw secret/log persistence. Keep the existing `start` callback API usable for tests, but make the intended manager handoff explicit and typed.\n\nExtend TransportHandle/transport runtime to track every accepted connection with synchronized cancellation flags/JoinHandles; stop must set all flags, wake the listener and active reads, join listener and connection threads within bounded time, and make repeated stop idempotent. Ensure a connection checks cancellation before/after read/write and never outlives the handle. Keep read/write timeouts and frame bounds. Add tests for ephemeral key one-time/rotation/revocation and deterministic active-connection shutdown, alongside existing auth/replay/bind/loopback tests. Do not add Tauri/SQLite/Android/UI in this correction; do not weaken local/private/auth/privacy constraints. Run fmt/check/clippy/focused/full Rust tests and diff check. No push/PR/merge/tag/release/deploy/BielOS/native subagents/direct edits outside Executor.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "No raw pairing key in SQLite, logs, docs, or durable audit; one-time Owner handoff only.",
+    "Transport stop must close listener and active connections deterministically and idempotently.",
+    "Preserve existing fixture behavior and public core tests; no remote mutation or external integration."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "review_findings": [
+    {
+      "title": "Secure pairing-key handoff and connection shutdown are missing",
+      "severity": "blocking",
+      "details": "The current core accepts a caller key but has no typed ephemeral one-time lifecycle or safe handoff, and TransportHandle cannot close detached connection threads. Add these primitives before integrating Tauri/SQLite/Android."
+    }
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/companion_transport.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/Cargo.toml",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "max_correction_cycles": 0
+}

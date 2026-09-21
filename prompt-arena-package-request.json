@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-20260829",
+  "parent_request_id": "prompt-arena-i18n-tests-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Package and verify the current exact reviewed commit be1007f in the isolated Prompt Arena product worktree. Do not change source files, docs, or repository history and do not use remote operations. Run the existing Windows package flow: npm ci only if needed, npm run tauri:build -- --bundles nsis, then npm run package:artifacts -- --platform windows and npm run verify:package -- --platform windows. Ensure the fixed worker sidecar is prepared/bundled, capture the exact NSIS path, size, SHA-256/checksum manifest, bundle/sidecar evidence, and clean-install/launch/restart/uninstall smoke result. If a Windows packaging permission/toolchain blocker occurs, report the exact command/error and preserve the source tree. The artifact must be associated with exact commit SHA be1007f. Use canonical biel4 App Server/headless, workspace-write, Windows elevated readiness ready, approval never; include authoritative provenance metadata.",
+  "constraints": [
+    "No commits, pushes, PRs, merges, tags, releases, deploys, or settings changes.",
+    "Do not alter source or docs; generated package-artifacts/target output may be created locally and remain ignored.",
+    "Do not claim human UI QA from automated smoke; separate installed-runtime human gates honestly."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

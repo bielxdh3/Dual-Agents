@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-native-label-20260830",
+  "parent_request_id": "prompt-arena-package-provenance-followup-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T07:34:03.493842+00:00",
+  "finished_at": "2026-08-30T07:36:36.311489+00:00",
+  "summary": "Implemented the minimal PT-BR correction. Added centralized \"Local models\": \"Modelos locais\" and a focused test. Started from clean 08a49eb; final clean HEAD is 4e471224d51bddef7f9d511f4dcce6df62f6a2ee. Production runtime implementation at 8588a2d remains preserved. Provenance: biel4, Executor, authenticated App Server/headless transport with wrapper-retained IDs, workspace-write, Windows elevated readiness ready, approval never.",
+  "files_changed": [
+    "src/i18n.ts",
+    "src/i18n.test.ts"
+  ],
+  "commands_run": [
+    "npm test -- --run src/i18n.test.ts",
+    "npm test -- --run",
+    "npm run typecheck",
+    "npm run build",
+    "npm run check:boundaries",
+    "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
+    "git diff --check",
+    "git commit -m \"fix: close native PT-BR label gap\""
+  ],
+  "tests": [
+    {
+      "command": "npm test -- --run src/i18n.test.ts",
+      "status": "passed",
+      "details": "7 tests passed, including the new Local models translation assertion."
+    },
+    {
+      "command": "npm test -- --run",
+      "status": "passed",
+      "details": "19 test files and 114 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript check passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed; existing large-chunk warning only."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Repository boundary check passed."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
+      "status": "passed",
+      "details": "Rust formatting check passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only CRLF conversion warnings."
+    }
+  ],
+  "remaining_issues": [
+    "PENDING_HUMAN_QA remains; the native accessibility finding is text evidence, not screenshot evidence. Screenshot capture remains blocked by SetIsBorderRequired 0x80004002.",
+    "BLOCKED_EXTERNAL_RUNTIME remains for Docker; BLOCKED LOCALLY/MSI remains; Linux and remote CI remain pending/unconfirmed.",
+    "Live LM Studio/llama.cpp service validation remains pending. No telemetry, adapter, Rust, package, or protected-worktree changes were made.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T073403Z-prompt-arena-i18n-native-label-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T073403Z-prompt-arena-i18n-native-label-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T073403Z-prompt-arena-i18n-native-label-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T073403Z-prompt-arena-i18n-native-label-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0517a-f89e-7ff1-be7e-d7314d0027bb",
+  "app_server_turn_id": "01a05197-0193-7840-a73c-41b3f5460479",
+  "app_server_process_id": "1012",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T073403Z-prompt-arena-i18n-native-label-20260830.md",
+  "task_sha256": "4e003fe5042f4ca12d00e2815f98ce685855b489ab240cd90225e63cf0b9a2c1",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

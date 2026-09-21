@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-localtarget-20260829",
+  "parent_request_id": "prompt-arena-package-targetdir-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Make one final packaging-only attempt for exact HEAD be1007f using a fresh target directory inside the isolated worktree: E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target-fresh. Create it if allowed, run npm run tauri:build -- --bundles nsis --target-dir E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target-fresh, then npm run package:artifacts -- --platform windows --bundle-root E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target-fresh\\release\\bundle and npm run verify:package -- --platform windows. Capture exact installer/hash/sidecar and clean install/launch/restart/uninstall smoke. If any permission/toolchain error occurs, report it verbatim and stop. Do not alter source/docs/history/remotes. Canonical biel4 App Server/headless, workspace-write, elevated readiness ready, approval never, complete provenance.",
+  "review_findings": [
+    {"title":"Environment-level packaging denial","details":"NSIS recreation failed twice with Acesso negado (os error 5), and a fresh target under C:\\Users\\bielx\\AppData\\Local\\DualCodex was also denied. Try only a fresh target inside the already writable isolated worktree."},
+    {"title":"Exact reviewed source unchanged","details":"Packaging-only retry; preserve HEAD be1007f and do not modify source/docs/history/remotes."}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-uninstall-smoke-fix-20260828",
+  "parent_request_id": "prompt-arena-p7-windows-smoke-20260828",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T19:58:46.982631+00:00",
+  "finished_at": "2026-08-28T20:01:58.719359+00:00",
+  "summary": "Fixed smoke termination waiting and committed as 8058d28 on completion/desktop-delivery. Native provenance: Windows PowerShell, start 05bd5bb0c6730e663da2d1a9f9bc49c304fb3e0b; final status clean.",
+  "files_changed": [
+    "scripts/verify-package.mjs"
+  ],
+  "commands_run": [
+    "npm run typecheck",
+    "npm test",
+    "npm run build",
+    "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+    "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+    "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+    "git diff --check",
+    "git add -- scripts/verify-package.mjs",
+    "git commit -m \"Wait for smoke process termination\"",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "78 tests passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "99 tests passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed; Git emitted an LF/CRLF warning."
+    }
+  ],
+  "remaining_issues": [
+    "Installer/package smoke was intentionally not run locally; clean-install, restart, and uninstall evidence remains CI-dependent.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T195847Z-prompt-arena-p7-uninstall-smoke-fix-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T195847Z-prompt-arena-p7-uninstall-smoke-fix-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T195847Z-prompt-arena-p7-uninstall-smoke-fix-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T195847Z-prompt-arena-p7-uninstall-smoke-fix-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a049d5-80b7-78a1-af9c-d95d81969102",
+  "app_server_turn_id": "01a049f4-1457-7ad3-ae67-cfef5e0d394e",
+  "app_server_process_id": "19876",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T195847Z-prompt-arena-p7-uninstall-smoke-fix-20260828.md",
+  "task_sha256": "9161d6807c0ad975b990566871d129e95d02993678f827f81f65dd2ee113ef31",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

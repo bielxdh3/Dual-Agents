@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-wire-contract-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Unify the Phase 12 Android wire contract before adding the Rust listener. Work on branch feat/phase-12-android-companion at current commit 3b7c00e. The existing Android client uses a custom five-field length codec, while the next desktop transport must use one shared newline-delimited JSON envelope. Make this scoped client/protocol correction and commit it; do not implement the desktop listener yet.\n\nDefine and document `aip-companion-v1` as one bounded JSON object per line with fixed fields: protocol (constant string), kind (bounded enum/string), clientId, sessionId (nullable), nonce (unique bounded base64/hex metadata), counter (non-negative integer), payload (bounded UTF-8 JSON string or bounded object with deterministic canonical form), and mac (lowercase HMAC-SHA-256 hex). The canonical MAC input must be deterministic and shared across Rust/Kotlin: concatenate the UTF-8 values in fixed field order with explicit separators and canonical payload bytes, excluding mac; reject missing/unknown/oversized fields, invalid UTF-8, bad hex/mac length, version mismatch, repeated nonce, non-monotonic counter, and frames over 16 KiB. Keep no raw secrets/logs.\n\nUpdate android Protocol.kt to encode/decode the JSON-line envelope with a JVM-safe deterministic codec (do not rely on an unmocked Android framework JSONObject in local JVM tests; use a small parser/encoder or a narrowly scoped test-only JSON implementation that does not change runtime behavior). Keep HMAC-SHA-256 constant-time verification, challenge/response helper, monotonic replay and nonce state, explicit key rotation and revocation, strict MAX_QUEUE=16/MAX_TEXT/MAX_PAYLOAD bounds, typed failures, and a SocketTransport interface/client skeleton that sends/receives one JSON line with timeout and offline fallback but does not claim a desktop connection until a real response is received. Add deterministic JVM tests for JSON round-trip/canonical MAC vector, HMAC auth failure, version/field/frame bounds, counter+nonce replay, challenge response, rotation/revocation, and offline timeout. Update docs/PHASE_12_ANDROID_IMPLEMENTATION.md and docs/PHASE_12_ANDROID_SPEC.md with the exact envelope/canonicalization and mark desktop transport as next. Do not weaken the Android Keystore path or UI.\n\nUse absolute checkout-local toolchain paths; run Android unit tests/lint/assembleDebug, APK SHA-256, `git diff --check`, and commit only this scope with exact message `feat: define phase 12 companion wire contract`. Leave .tooling and android/.gradle untracked/ignored as appropriate. No push, PR, merge, tag, release, deploy, BielOS change, native subagents, or direct edits outside the Executor.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Preserve the real APK project and existing Android Keystore/UI; do not replace with metadata or mocks.",
+    "Use one deterministic JSON-line contract suitable for serde_json Rust and Kotlin JVM tests; no Android-framework-only test dependency unless explicitly isolated.",
+    "No desktop listener/network claim in this commit; no remote mutation, relay, telemetry, raw secret/media, Python exposure, or BielOS import."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "review_findings": [
+    {
+      "title": "Android and planned desktop transports have incompatible wire formats",
+      "severity": "blocking",
+      "details": "The current Android client uses a custom length-delimited five-field codec; the authorized desktop transport requires bounded newline-delimited JSON. Define and test one deterministic shared envelope/canonical MAC contract first."
+    }
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/android/app/src/main/java/com/aip/companion/Protocol.kt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/android/app/src/test/java/com/aip/companion/ProtocolTest.kt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_12_ANDROID_SPEC.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "max_correction_cycles": 0
+}

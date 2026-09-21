@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-verification-packs-20260827-retry2",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement the complete P2 Verification, Packs, Docker, and Statistics slice on a new local branch completion/verification-packs from current completion/core-arena HEAD. Inspect and preserve P1 behavior. Deliver user-facing implementation, persistence, tests, and docs—not contracts/previews only. Requirements: expand objective verifiers to exact text, numeric tolerance, bounded JSON/schema, required fields, classification, and safe literal/regex patterns with explicit limits and persisted verifier policy/evidence; make all three official packs executable/evaluable with materialized procedural cases and deterministic seeds, pack/task/version metadata, and saved evidence in the Rust evidence store; wire programming/software-engineering tasks to Docker-required execution with clear unavailable/blocked state and absolutely no host fallback; support repetitions 1/3/5/10 with immutable per-sample evidence and mean/median/min/max/stddev/success rate plus uncertainty/tie margins; expose selection, execution, progress, failures, objective evidence, statistics, and reopen in the real React/Tauri UI; add focused TypeScript/Rust tests for verifiers, pack materialization/seeds, Docker no-fallback, persistence, statistics, and UI state; update ROADMAP.md and docs/DELIVERY_MATRIX.md honestly, leaving P2 IN PROGRESS until native Tauri acceptance. Do not implement page-transition motion or unrelated P3-P7 features. Create the local branch and commit the implementation with a focused message. No merge/tag/release/deploy/public release. Trusted control-plane attestation for this turn was emitted by the canonical wrapper before dispatch and must be treated as provenance, not inferred from shell: account=biel4; role=Executor/Reviewer; backend=app_server; task_transport=app_server; repository=E:/Prompt Arena; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; sandbox_mode=workspace-write; windows.sandbox=elevated; sandbox readiness=ready; approval_policy=never; danger-full-access prohibited; TUI/native_tui/fallback/substitute prohibited. Wrapper IDs: app_server thread_id=01a044e3-b948-7213-8581-6643bc5cc365, this turn_id will be recorded in the result metadata, process_id is emitted by wrapper. Do not attempt to replace or weaken this attestation with shell inference. If the wrapper metadata itself is absent or contradictory, fail closed; otherwise proceed with the implementation using the canonical app_server session.",
+  "constraints": [
+    "canonical BL4 only; use the trusted wrapper attestation above",
+    "all implementation and repository mutations must occur in this BL4 session",
+    "create completion/verification-packs from completion/core-arena at 8a7b6bd76f275e57a65f3541a46703868ea8cc77",
+    "no modification to PR #17 or completion/core-arena",
+    "sandbox_mode workspace-write; windows.sandbox elevated; readiness ready; approval_policy never",
+    "danger-full-access prohibited; no TUI/native_tui/fallback/substitute",
+    "Docker-required programming tasks must never execute on the host",
+    "no paid external API calls or secrets",
+    "no merge, tag, release, deploy, or public release",
+    "do not call P2 complete before native Tauri acceptance"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit", "create_branch"]},
+  "context_files": [
+    "E:/Prompt Arena/ROADMAP.md",
+    "E:/Prompt Arena/docs/DELIVERY_MATRIX.md",
+    "E:/Prompt Arena/docs/ARCHITECTURE.md",
+    "E:/Prompt Arena/docs/DATA_MODEL.md",
+    "E:/Prompt Arena/src/objective-verifiers.ts",
+    "E:/Prompt Arena/src/arena-runner.ts",
+    "E:/Prompt Arena/src/App.tsx",
+    "E:/Prompt Arena/src-tauri/src/official_packs.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/packs/official"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0
+}

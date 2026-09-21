@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-d1-correct-20260830",
+  "parent_request_id": "aip-systemic-phase-d1-profile-state-memory-20260830",
+  "action": "correct",
+  "repository": "E:/AIP",
+  "task": "Required skills at top: E:/AIP/.agents/skills/aip-implementation/SKILL.md; E:/AIP/.agents/skills/aip-phase-review/SKILL.md; E:/AIP/.agents/skills/aip-security-review/SKILL.md; E:/AIP/.agents/skills/aip-publication-check/SKILL.md; C:/CodexGlobal/skills/ponytail/SKILL.md (read each fully). Correct only the preserved uncommitted Phase D1 diff from the prior timeout on branch fix/systemic-desktop-ux-and-generation. Preserve commits through 3801c4e and do not reset/discard. Evidence: local `cargo test database::tests --lib` has 39 passed and the historical version_twenty_tool_capabilities_are_repaired_by_forward_migration fails with DatabaseError::Unavailable because the test deletes schema_migrations >=21 but keeps the new gender/sexuality columns, so migration 0028 is rerun and its raw ALTER TABLE duplicates columns. Make migration 0028 idempotent using the same checked-column pattern as migration 0026/0027 (and INSERT OR IGNORE), add/adjust a focused migration compatibility test if useful. Review the existing D1 profile patch for the invariant that human-specific gender/sexuality are optional and not forced on non-human identities; minimally normalize/clear those values when saving a non-human/custom identity if they would otherwise persist as irrelevant hidden fields, without weakening owner-only update_profile authority. Preserve custom pronouns, quick year/month navigation, State/Memories guidance. Do not change conversation lifecycle, model picker, modal, generation, overlay, or unrelated code. Run cargo fmt --check, cargo test database::tests --lib, pnpm --filter @aip/desktop typecheck, the focused D1 frontend tests, git diff --check, and pnpm secrets:scan. Commit all D1 changes locally with an explanatory message. Do not push, PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues. Browser/installed-Windows acceptance remains unclaimed.",
+  "constraints": [
+    "Use only configured Biel4 App Server/headless Executor with elevated/ready Windows sandbox. No native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "This is a correction of the existing Phase D1 diff only; preserve unrelated owner work and do not amend, rebase, squash, or force-push.",
+    "Keep optional identity values owner-controlled, bounded, never inferred, and cleared/ignored for non-human identities."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0028_optional_human_identity.sql",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/profile-form.test.tsx",
+    "E:/AIP/apps/desktop/src/state-memory-guidance.test.tsx",
+    "E:/AIP/packages/contracts/src/index.ts"
+  ],
+  "review_findings": [
+    {"title": "Migration replay failure", "details": "Version 20 forward-migration test reruns 0028 after deleting only migration markers; raw ALTER TABLE duplicates existing gender/sexuality columns and maps to DatabaseError::Unavailable."},
+    {"title": "Non-human optional identity", "details": "Review the existing D1 patch so hidden human-specific fields are not forced or retained as irrelevant values when identity is non-human/custom."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

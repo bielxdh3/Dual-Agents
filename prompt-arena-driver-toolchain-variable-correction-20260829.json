@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-driver-toolchain-variable-correction-20260829",
+  "parent_request_id": "prompt-arena-driver-toolchain-version-correction-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Read and apply C:\\CodexGlobal\\AGENTS.md and C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. Continue as BL4/biel4 Executor through the configured App Server/headless transport. Apply only this one-line correction to .github/workflows/native-driver-toolchain.yml in E:\\Prompt Arena-pr28-bl4 at HEAD 1e82e8f0ac15306f1ab653d580a3c87cb76ced8b: the binaries manifest entry still assigns `version = $tauriDriverVersion`, but that variable was removed when tauri-driver --version was made a non-fatal probe. Replace it with the verified `$tauriDriverPackageVersion` captured from cargo install output. Preserve all source-SHA, EdgeDriver compatibility, hash, artifact, and security behavior. Run focused YAML/PowerShell structure checks and git diff --check. Create one normal commit exactly `fix: use verified tauri driver package version`; do not amend, rebase, push, merge, tag, release, or deploy. Return the commit SHA and provenance; BL3 will inspect the control-plane envelope.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; no direct BL3 edits, native subagents, TUI/native_tui, fallback, TLS/policy weakening, or product changes.",
+    "Only .github/workflows/native-driver-toolchain.yml may change; preserve prior commits.",
+    "Authorize local_mutation and local_commit only."
+  ],
+  "review_findings": [
+    {
+      "title": "Fix stale strict-mode variable in manifest",
+      "details": "The workflow now defines tauriDriverPackageVersion but the first binaries entry still uses removed tauriDriverVersion. Set version to tauriDriverPackageVersion or Set-StrictMode will abort before artifact upload."
+    }
+  ],
+  "context_files": [
+    ".github/workflows/native-driver-toolchain.yml"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

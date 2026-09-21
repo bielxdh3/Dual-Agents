@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-companion-toolchain-20260822-v2",
+  "parent_request_id": "aip-phase12-android-companion-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Continue the Phase 12 implementation on the existing clean local branch feat/phase-12-android-companion at exact base SHA d0021802288136ffe4da1f3b91356722b015270f. The previous Executor turn made no file changes and was blocked only because Java, Gradle, and the Android SDK were absent. The roadmap explicitly authorizes normal user-space Android SDK/toolchain installation, so first install a reproducible toolchain under C:/Users/bielx/3D Objects/Dual-Codex-worktree/.tooling/android (do not use system directories or commit the toolchain): a supported JDK 17, Android command-line tools, platform-tools, Android platform 35, build-tools 35.0.0, and Gradle 8.9 if needed. Prefer pinned official Adoptium/Google/Gradle distributions with SHA/size checks where practical; set JAVA_HOME/ANDROID_SDK_ROOT only for this run. If network/download is blocked, report the exact URL/error and stop rather than fabricating APK evidence.\n\nAfter the toolchain is available, execute the full parent request exactly: implement the real native Kotlin Android project under android/ with pinned wrapper/AGP/Kotlin/SDK, debug APK/package ID, unit tests/lint, Portuguese chat/floating icon/guarded overlay/notifications, bounded offline history and outgoing text queue, reconnect/compatibility and explicit approval; use Android Keystore for credentials with no plaintext secret. Implement the real explicit Owner-enabled bounded local/private authenticated `aip-companion-v1` desktop transport with version negotiation, HMAC-SHA-256 challenge-response, nonce/replay/idempotency/ownership/safe-mode/temporary-chat gates, clean stop/revoke/rotation, and deterministic loopback/emulator integration for handshake/history/queue/reconnect/replay rejection/revocation/fallback. Preserve fixture paths and keep Phase 13 external/BielOS integration metadata-only. Add the minimum migration/contracts/Tauri/UI/docs/CI changes, focused Rust/TypeScript/Android tests, Android CI build/artifact job, APK hash, and all requested validation.\n\nAll mutations, including toolchain downloads and code edits, must be performed by this configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits. Do not push, publish, create PR, merge, tag, release, deploy, modify BielOS, or weaken existing safety/privacy/Owner controls. Commit only the scoped changes with exact message `feat: implement phase 12 android companion`.\n\nIf any requested behavior cannot be made secure or buildable, stop with a precise blocker and leave no partial claim.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Toolchain may be installed only under the explicit untracked user-space worktree path .tooling/android; never commit it or change system-wide state.",
+    "The result must contain a real buildable Android project and debug APK; metadata-only or mock-only output is not acceptable.",
+    "No remote GitHub mutation, push, PR, merge, tag, release, deployment, relay, public listener, telemetry, raw secret, raw media, or Python-runtime exposure.",
+    "Preserve existing fixture paths and all Rust/SQLite Owner/agent/safe-mode/temporary-chat/idempotency/audit gates.",
+    "Do not import BielOS code or implement Phase 13 external integration in this request."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase12-android-companion-20260822.json",
+    "C:/Users/bielx/Downloads/AIP_DUAL_CODEX_FULL_ROADMAP_AUTONOMOUS_COMPLETION.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/companion.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/gateway.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/.github/workflows/ci.yml"
+  ],
+  "review_findings": [
+    {
+      "title": "Previous Phase 12 attempt was blocked before implementation by missing Android toolchain",
+      "severity": "blocking",
+      "details": "The prior Executor turn created the requested local branch at d002180 but made no file changes because Java, Gradle, Android SDK, and Android environment variables were absent. Install the explicitly authorized user-space toolchain first, then complete the full real APK and authenticated transport scope; do not substitute metadata-only output."
+    }
+  ],
+  "max_correction_cycles": 0
+}

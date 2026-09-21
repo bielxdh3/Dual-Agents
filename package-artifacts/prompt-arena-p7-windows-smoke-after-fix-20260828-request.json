@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-windows-smoke-after-fix-20260828",
+  "parent_request_id": "prompt-arena-p7-uninstall-smoke-fix-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Read-only validation on clean completion/desktop-delivery at 8058d28f3ffa8cefef7d926d81755069d544a276. Do not edit tracked files, commit, push, merge, tag, release, deploy, or use TUI/native_tui/fallback/substitute. Do not rebuild the package. Confirm the existing ignored NSIS installer at src-tauri/target/release/bundle/nsis/Prompt Arena_0.1.0_x64-setup.exe, then create a unique temporary directory under the system temp directory. Run node scripts/package-artifacts.mjs --platform windows with --bundle-root pointing to the existing NSIS bundle and --output-directory and --manifest-path only in the temporary directory. Run node scripts/verify-package.mjs --platform windows --artifact-directory and --manifest-path from that temporary directory, with --evidence-file also in the temporary directory and --smoke enabled. Capture NSIS clean install/start/restart/uninstall results after the termination-wait fix. Remove only the unique temporary directory after the smoke, run git status --short --branch, and confirm no tracked files changed. Return the required JSON report and exact native provenance. Do not run paid providers or external network calls.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "read-only repository validation; temporary output only; no secrets, telemetry, cloud calls, or paid-provider calls"
+  ],
+  "authorization": {"allowed_actions": []},
+  "context_files": ["E:/Prompt Arena/src-tauri/target/release/bundle/nsis/Prompt Arena_0.1.0_x64-setup.exe", "E:/Prompt Arena/scripts/package-artifacts.mjs", "E:/Prompt Arena/scripts/verify-package.mjs", "E:/Prompt Arena/package.json"],
+  "max_correction_cycles": 0
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Build and validate a fresh Windows NSIS package from the exact current checkout HEAD 99485dec0f3f096b62fbe665c0085d8e7786579f (source remediation chain includes 75bf826, 1b7c7ce, bcf706e, 838d952, and docs commit 99485de). Use only canonical BL4/biel4 App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read C:\\CodexGlobal\\AGENTS.md and required skills before acting. Work only in E:\\Prompt Arena-live-telemetry-i18n; preserve the original E:\\Prompt Arena WIP and other worktrees. Use the established local-tools workaround (`npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'`) if needed. Run package:artifacts and verify:package for Windows, including smoke where supported. Record exact output path, file size, SHA-256, package checksum, clean install/launch/restart/uninstall evidence, worker sidecar presence/hash, and any native/runtime limitations. Do not build MSI if WiX remains blocked; do not push, tag, release, deploy, publish, or modify unrelated files. Do not claim visual or human QA. If the executor cannot commit because of linked-worktree Git permissions, leave artifacts and a precise result for host-side verification; do not weaken isolation or use native/TUI/danger-full-access fallback.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; Windows elevated sandbox; readiness ready; approval never.",
+    "Fresh NSIS must correspond to exact current HEAD 99485dec0f3f096b62fbe665c0085d8e7786579f.",
+    "Preserve E:\\Prompt Arena, E:\\Prompt Arena-pr28, and unrelated WIP.",
+    "No push/tag/release/deploy/public publication and no destructive cleanup.",
+    "Distinguish fresh package evidence from historical 57f02b3 NSIS evidence."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\package.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

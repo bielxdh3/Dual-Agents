@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-targetdir-20260829",
+  "parent_request_id": "prompt-arena-package-retry-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Retry exact-commit be1007f Windows NSIS packaging using a fresh isolated Cargo target directory to avoid the persistent Tauri NSIS directory recreation permission error. Use a target path under C:\\Users\\bielx\\AppData\\Local\\DualCodex\\prompt-arena-target-be1007f and invoke npm run tauri:build -- --bundles nsis --target-dir <that path> if supported. Then run npm run package:artifacts -- --platform windows --bundle-root <that path>\\release\\bundle and npm run verify:package -- --platform windows. Do not alter source/docs/history/remotes. Capture exact NSIS path/size/SHA-256, sidecar evidence, checksum manifest, and clean install/launch/restart/uninstall smoke; if CLI rejects --target-dir or still gets Acesso negado, report the exact failure and stop. Canonical biel4 App Server/headless, workspace-write, elevated readiness ready, approval never, complete provenance.",
+  "review_findings": [
+    {"title":"Persistent NSIS recreation permission failure","details":"Two canonical retries at exact HEAD be1007f built the app and sidecar but failed at Tauri NSIS directory recreation with Acesso negado (os error 5). No installer or checksum exists. Use a fresh target directory to isolate stale handles/ACLs."},
+    {"title":"Exact reviewed source unchanged","details":"This is packaging-only; do not modify source, docs, commit, or remote state. Keep exact HEAD be1007f and distinguish automated smoke from human visual QA."}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

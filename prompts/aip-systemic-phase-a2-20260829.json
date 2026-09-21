@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-a2-20260829",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Continue Phase A only from the preserved dirty checkout after timed-out request aip-systemic-phase-a-20260829. Required skills were already mandated; still read E:/AIP/AGENTS.md and the complete goal at C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md. Current branch is fix/systemic-desktop-ux-and-generation at c8dcbcd128e4f2babc2d4ebe27259f28529cef81 with an uncommitted four-line change in apps/desktop/src-tauri/src/chat.rs that caps context history at MAX_HISTORY_MESSAGES and asserts the bound. Inspect that change first and preserve it only if it is part of the evidence-backed fix. Narrow the investigation to the actual first stalled boundary in the generation path: Rust ChatCoordinator queue and request construction, Python managed-stdio protocol/parser/flush, Ollama adapter stream/terminal behavior, and frontend event finalization. Use targeted searches and existing tests rather than rereading the whole repository. If direct Ollama health/model checks are available, run short bounded checks without logging prompt/response content; otherwise record unavailable. Complete the smallest root-cause correction needed so a real AIP request reaches terminal success or a recoverable error, partial progress and cancellation are handled, stale/mismatched terminals are rejected, queue returns idle, provider health is not poisoned by cancellation, persistence and frontend finalization happen, and a following request succeeds. Add only focused deterministic regression tests for the proven boundary, reusing existing helpers/dependencies. Add bounded local request-ID tracing only if it materially proves the boundary; never telemetry or full content logging. Run focused checks and commit the complete Phase A change locally with an explanatory message. Do not push, PR, merge, tag, release, deploy, build installers, or implement Phases B-F. Preserve all unrelated work and do not reset, discard, amend, rebase, squash, force-push, or use native/direct fallback or another backend. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor. No native subagents, create_thread, alternate account, backend swap, or manual/direct implementation fallback.",
+    "Do not discard the existing dirty change or unrelated owner work; inspect and keep valid filesystem progress.",
+    "No arbitrary total timeout while measurable generation progress exists; no watchdog without evidence.",
+    "Preserve AIP local-first/security/privacy/temporary-chat/Rust authority/managed-stdio boundaries and never print secrets or private data.",
+    "Commit only focused Phase A files; leave publication and later phases to the orchestrator."
+  ],
+  "context_files": [
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/runtime.rs",
+    "E:/AIP/apps/runtime",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/apps/desktop/src-tauri/src/*test*"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

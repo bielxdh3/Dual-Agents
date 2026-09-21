@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase13-gateway-roundtrip-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Continue on the existing feat/phase-13-gateway branch and close the remaining implementation gap from the prior report. Do not switch branches, touch Android/Phase 12, or edit docs/React.\n\nFirst inspect the current three Phase 13 commits and preserve their scope. Add a real temporary-database localhost integration test in apps/desktop/src-tauri/src/lib.rs test module (or a focused gateway test module) that drives the actual `gateway_transport_handler` through `gateway_transport::start_secure` and signed TCP frames, not direct Database calls only. The test must cover a complete signed protocol/read plus transfer_prepare -> transfer_approve -> session_connect -> recovery_request -> recovery_approve -> session_revoke/transfer_revoke lifecycle with the fixture Owner and exact gateway constants; assert signed response payloads and IDs. Also assert wrong-MAC connection rejection, replay/old counter rejection across reconnect, strict unknown payload-field rejection, temporary-chat and safe-mode signed failures, post-revocation session failure, and listener connection closure after TransportHandle::stop. Keep all test data temporary and clean it up.\n\nAdd `#[serde(deny_unknown_fields)]` to GatewayTransportStartRequest if it is missing, and ensure all new gateway transport start/status result types remain bounded and secret-redacted. Fix any test-only import/compilation issue surfaced by the prior run, then run the full exact gates: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check, cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml, cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings, cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml, and git diff --check. Commit as `test: verify phase 13 gateway authority round trip` (plus a separate minimal fix commit only if needed) and leave clean status. Use only configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+  "constraints": [
+    "Use only configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "No BielOS imports, Cloudflare credentials, public listener, external network, raw secret logging/persistence, or Android/Phase 12 changes.",
+    "The integration test must exercise the real TCP/HMAC/replay/stop path and preserve Rust/SQLite Owner authority."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/gateway_transport.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/gateway.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs"
+  ],
+  "max_correction_cycles": 0
+}

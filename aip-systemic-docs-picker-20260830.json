@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-docs-picker-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Continue the clean AIP branch fix/systemic-desktop-ux-and-generation at current HEAD 4daad7eecca57be4a9fdaf62a3e9e2870f521882. Apply two bounded closure fixes only. First, reconcile authoritative documentation with shipped behavior: in docs/PRODUCT_SPEC.md add concise truthful paragraphs covering that custom pronouns are Owner-entered bounded text and persist, optional gender/sexuality are shown and saved only for human/human-compatible identity types, are never inferred or required for non-human identities, and Rust remains the authority; document the current State modes and values accurately (Normal/voice-muted/silent behavior, fictional energy/mood/sleep simulation, suspension and wake-now semantics, and explicitly that current state is not health telemetry and any mode effect that is not implemented must not be implied). Update docs/DATA_MODEL.md only if needed to mark legacy main-conversation fields as compatibility and mention the additive optional identity/empty-conversation expiry columns; do not rewrite migration history. Second, fix the shared ModelPicker so an unavailable selected-model placeholder is visibly disabled and cannot be selected by mouse or keyboard; preserve the ability to choose a valid model or the resolved agent-default option. Add or adjust focused tests for the unavailable option guard and documentation-independent component behavior. Run focused desktop tests, TypeScript typecheck, lint, secrets scan, and git diff --check. Commit one coherent change as `docs: close identity state and model availability`; do not push, PR, merge, tag, release, deploy, or build installers. Return a structured report with summary, files_changed, commands_run, tests, commit_sha, and remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor; no native subagents, alternate backend, account, or manual/direct implementation fallback.",
+    "Preserve existing commits and unrelated WIP. Do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Keep changes minimal and repository-native; no dependencies or secrets. Do not infer identity from conversation or weaken temporary/safe-mode boundaries.",
+    "Installed-Windows visual behavior remains a human gate and must not be claimed verified from static tests."
+  ],
+  "context_files": [
+    "E:/AIP/docs/PRODUCT_SPEC.md",
+    "E:/AIP/docs/DATA_MODEL.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/model-picker.test.tsx",
+    "E:/AIP/apps/desktop/src/profile-form.test.tsx",
+    "E:/AIP/apps/desktop/src/state-memory-guidance.test.tsx",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-driver-env-retry-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T12:09:04.225055+00:00",
+  "finished_at": "2026-08-29T12:11:42.207846+00:00",
+  "summary": "Environment-only retry stopped after both requested installations failed. Clone is exact and source semantics are unchanged. Executor: BL4/biel4, Executor, App Server/headless, readiness=ready, approval=never, effective sandbox=workspace-write; elevated Windows sandbox and thread/turn IDs were not exposed.",
+  "files_changed": [
+    ".native-driver-cargo-retry-20260829/ (workspace-local Cargo cache only)",
+    ".native-driver-target-retry-20260829/ (workspace-local Cargo target only)"
+  ],
+  "commands_run": [
+    "git branch --show-current; git rev-parse HEAD; git status --short; git diff --exit-code -- .",
+    "cargo install tauri-driver --locked with workspace-local CARGO_HOME/CARGO_TARGET_DIR and CARGO_NET_GIT_FETCH_WITH_CLI=true",
+    "cargo install --git https://github.com/chippers/msedgedriver-tool with workspace-local CARGO_HOME/CARGO_TARGET_DIR and CARGO_NET_GIT_FETCH_WITH_CLI=true",
+    "where.exe tauri-driver; tauri-driver --version; where.exe msedgedriver; msedgedriver --version; node --version; rustc --version",
+    "read-only Edge/WebView2 executable, registry, and RemoteDebuggingAllowed policy probes"
+  ],
+  "tests": [
+    {
+      "command": "Repository identity and artifacts",
+      "status": "passed",
+      "details": "Branch validation/native-tauri-acceptance; SHA f3048a61f45cdb6b29f362444f3d32646edf4943. App E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe SHA-256 BC632933E2B5DAD72EF907522B10D1E16D5869EEAFDAE714DCB133D74C4C361E. Worker E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena-worker.exe SHA-256 4E34773C5B30504292CF867D76D9734640C948798223C5EAE8132DA162D654F5."
+    },
+    {
+      "command": "Source integrity",
+      "status": "passed",
+      "details": "git diff --exit-code returned 0. Final git status showed only the authorized workspace-local Cargo cache directory; no source diff."
+    },
+    {
+      "command": "cargo install tauri-driver --locked",
+      "status": "failed",
+      "details": "Crates.io failed with Schannel SEC_E_NO_CREDENTIALS (0x8009030e), including the fresh workspace-local Cargo home."
+    },
+    {
+      "command": "cargo install --git https://github.com/chippers/msedgedriver-tool",
+      "status": "failed",
+      "details": "Git CLI fetch failed with Schannel SEC_E_NO_CREDENTIALS (0x8009030e); no tool was installed."
+    },
+    {
+      "command": "Native Tauri smoke",
+      "status": "not_run",
+      "details": "Per instruction, stopped after installation failure. No tauri-driver, msedgedriver, WebView session, invoke, sidecar, persistence, reopen, marker, or run_id was produced."
+    },
+    {
+      "command": "Runtime and policy provenance",
+      "status": "passed",
+      "details": "Node v24.14.1; rustc 1.97.1 (8bab26f4f 2026-07-14); WebView2 executable/ProductVersion 151.0.4129.107; registry version 151.0.4129.107. Edge msedge.exe was not found. RemoteDebuggingAllowed was absent at all checked Edge and EdgeWebView policy paths."
+    }
+  ],
+  "remaining_issues": [
+    "Install access remains blocked by Windows Schannel SEC_E_NO_CREDENTIALS; retry in an environment with working Cargo/Git TLS credentials.",
+    "tauri-driver, msedgedriver-tool, and msedgedriver paths/versions are unavailable.",
+    "NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED and persisted run_id are unavailable because smoke execution was correctly not attempted.",
+    "Temporary workspace-local Cargo directories remain because managed shell policy rejected recursive cleanup; no source files were changed.",
+    "Phase review verdict: Approved with reservations. Security controls and registry policy were unchanged. No publication or remote action occurred."
+  ],
+  "git_status": "?? .native-driver-cargo-retry-20260829/\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T120904Z-prompt-arena-native-local-driver-env-retry-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T120904Z-prompt-arena-native-local-driver-env-retry-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T120904Z-prompt-arena-native-local-driver-env-retry-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T120904Z-prompt-arena-native-local-driver-env-retry-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04d64-1a5e-7a22-8a03-7b99bf7069b5",
+  "app_server_turn_id": "01a04d6c-6671-72e0-b553-6d8041b9a17a",
+  "app_server_process_id": "4840",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T120904Z-prompt-arena-native-local-driver-env-retry-20260829.md",
+  "task_sha256": "35fb9a29f9f27eed1c47f699dd2ac09b8b82a835499155000d9e477282bbaea9",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

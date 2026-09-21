@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/advanced-arena",
+  "base_branch": "completion/model-library",
+  "title": "feat: add Advanced Arena rankings and tournament workflows",
+  "body": "## P4 — Advanced Arena\n\nStacked on PR #19 (`completion/model-library`); PRs #17 and #18 remain draft checkpoints.\n\n- adds bounded category rankings for quality, latency, throughput, and human scores with explicit direction, ties, uncertainty, and insufficient-data states\n- adds baseline/candidate regression comparisons with sample counts and improved/regressed/tie outcomes\n- adds a reachable Advanced Arena desktop surface for saved immutable summaries, transparent 1v1, blind ranking, round-robin, and single-elimination scheduling with byes\n- adds optional caller-supplied offline AI-judge scores, provenance/network-off labeling, calibration metrics, and disagreement handling\n- preserves Core Arena and keeps manual advanced inputs local to the view; no network calls or secrets\n- validates with 70 TypeScript tests, 90 Rust tests, typecheck, Vite build, cargo fmt/check, and diff checks via canonical BL4 app_server\n\nP4 remains IN PROGRESS pending native Tauri/WebView QA, local runtime interaction smoke, and remote CI.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

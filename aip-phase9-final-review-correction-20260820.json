@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-final-review-correction-20260820",
+  "parent_request_id": "aip-phase9-integration-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Apply the final read-only Reviewer corrections on the current clean Phase 9 branch feat/phase-9-supervised-tools at HEAD 23cbdeb77018ff1e8e5c28320992c7d2abe6c2ab. Read AGENTS.md and the required AIP implementation/phase/security/publication skills before editing. Keep the correction tightly limited to Phase 9 local-tool safety/contracts/docs; do not implement later phases or publish remotely.\n\nBlocking correction:\n1) Local compensation must verify file identity before reversing a move. The current compensate_tool_action path checks only bounded destination/source paths and then renames the current destination back to the original source. Extend the persisted local compensation record with bounded per-move identity tokens captured from the file after successful execution (use stable platform file identity metadata where available, with a conservative unavailable/error path rather than a weak guess). Before any reverse rename, preflight every move: canonical root/link/reparse checks, original source is still absent, destination exists, and destination identity exactly matches the recorded token. If any check fails, do not move anything and return/persist a truthful compensation-unavailable or failed code/audit; never overwrite or move an attacker-substituted destination. Preserve fixture compensation semantics. Add/adjust a deterministic test that replaces one destination before compensation and verifies the original source is not recreated from the substituted file and the action is not falsely marked compensated. Keep the persisted JSON bounded and relative-path-only. Update Rust and contracts types/parsers for optional bounded compensation move identities while remaining backward-compatible with fixture records.\n\nImportant correction:\n2) Strengthen the TypeScript tool boundary parsers with explicit bounded validators, not only Rust authority. Enforce non-empty maximum lengths and control-character rejection for tool/session/action IDs, agent IDs, tool IDs, names, scopes, relative input paths, move pairs (bounded count), summaries/effects/resources/output/code/audit fields, opaque root IDs, idempotency keys, and compensation identity fields. Keep known enum/status checks, untrusted=true, boolean changed, and fixture compatibility. Add focused contract tests for oversized/controlled action payloads and compensation identities. Do not broaden unrelated global parsers.\n\nDocumentation correction:\n3) Clarify docs/PHASE_9_TOOLS_SPEC.md that migration 0016 is the original fixture tool schema and migration 0023 rebuilds/preserves it while adding workspace_roots/local manifests; keep the functional local checkpoint and human/manual reservations truthful.\n\nValidation before commit: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm --filter @aip/contracts typecheck; pnpm --filter @aip/contracts build; pnpm --filter @aip/contracts test; pnpm --filter @aip/desktop typecheck; pnpm --filter @aip/desktop test; pnpm --filter @aip/desktop build; pnpm secrets:scan; git diff --check. The executor may report Node spawn EPERM, but the parent will rerun those gates. Create one corrective commit with exact message `fix: verify phase 9 compensation identity`. Do not push/create PR/merge/tag/release/deploy. Report all evidence and final SHA.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents or alternate backend.",
+    "Local mutation and one scoped commit only; no remote GitHub mutation or publication.",
+    "No arbitrary shell, network/upload, telemetry, watcher, public listener, raw-content persistence, broad filesystem access, or Phase 10+ behavior.",
+    "Preserve owner/agent, safe-mode, temporary-chat, approval/confirmation, replay/idempotency, Rust authority, and fixture-only mock boundaries."
+  ],
+  "review_findings": [
+    {
+      "title": "Compensation lacks file-identity verification",
+      "details": "compensate_tool_action can rename a substituted destination back to the original source because it checks only paths. Persist stable bounded identity metadata and preflight all moves before reverse rename; fail closed on mismatch.",
+      "severity": "blocking"
+    },
+    {
+      "title": "TypeScript tool parsers lack explicit bounded field validation",
+      "details": "Tool action/session/audit/manifest/input/compensation fields currently rely on unbounded cognitiveString. Add tool-specific length/control/count validators and regression tests.",
+      "severity": "important"
+    },
+    {
+      "title": "Clarify migration history in Phase 9 spec",
+      "details": "State that migration 0016 is the original fixture schema and 0023 rebuilds/preserves it while adding local roots/manifests.",
+      "severity": "optional"
+    }
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/tools.rs",
+    "apps/desktop/src-tauri/src/database.rs",
+    "packages/contracts/src/index.ts",
+    "packages/contracts/tests/contracts.test.ts",
+    "docs/PHASE_9_TOOLS_SPEC.md"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

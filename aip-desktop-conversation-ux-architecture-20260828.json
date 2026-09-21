@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Implement the complete /goal specification from C:/Users/bielx/.codex/attachments/c745ef0b-8fb9-46af-8219-9df4bb212ea3/pasted-text-1.txt on the clean branch fix/desktop-conversation-ux-architecture at starting SHA 7bbd5e7b92f580614fd99207640b3faf49d83066. Read that specification fully before editing. This is a corrective UX/product-architecture pass after PR #16, not a stable-release mission. Preserve all working productization/security/data behavior while replacing the developer-panel desktop experience with a conversation-first, agent-first UX. Required outcome: (1) remove the old horizontal top-tab navigation and make a left sidebar the primary organizational surface; each agent owns multiple conversations with create/open, rename, pin/unpin, archive/unarchive, and safe delete; remove privileged main-conversation UX while preserving legacy data with deterministic migration/restart coverage and agent isolation; archived chats are absent from the ordinary list and recoverable only from secondary management. (2) Put Temporary Chat in contextual conversation-header controls with clear active/persistence copy, keep its fail-closed non-persistence boundary, and move Advanced/developer controls off the ordinary surface. (3) Put a compact keyboard-accessible active conversation model selector by the composer with immediate apply/no Update button, visible resolved agent-default option and unavailable/degraded behavior; edit the agent default separately in Profile/Settings and never silently change it from a conversation override. (4) Redesign ProfileForm/Onboarding into aligned responsive identity/details, description, traits, and actions; preserve validation/save/cancel; use typed PT-BR-primary mappings for canonical values such as adult/agent/they-them with optional subordinate English and stable storage enums. (5) Simplify Local Resources to concise product language and clear actions, re-home Memories/State/Appearance/Profile/Settings by agent versus application versus advanced, and make Voice explicitly Status/Devices/Providers/Tests with diagnostics/provider IDs hidden under Advanced/Details; retain privacy/confirmation disclosures and never claim providers bundled. (6) Verify/fix actual Tauri/Windows overlay transparency and alpha end-to-end with no black rectangle; use robust alpha-aware/native region or click-through logic, scaling/bounds deterministic tests, and no brittle per-frame trap. (7) Add truthful roadmap/docs for future managed/bundled offline STT+TTS in Windows MSI and Android APK without claiming implementation, plus focused tests for all above including overlay logic. The acceptance bar is that ordinary use is conversational and agent-first, all actions are discoverable/accessible, security/privacy/Rust authority/runtime-degraded UI/temporary-chat boundaries are unchanged or stronger, and installed-Windows overlay validation remains explicitly human-only.",
+  "constraints": [
+    "Required skills: E:/AIP/.agents/skills/aip-implementation/SKILL.md, E:/AIP/.agents/skills/aip-phase-review/SKILL.md, E:/AIP/.agents/skills/aip-security-review/SKILL.md, E:/AIP/.agents/skills/aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md; read each fully before work.",
+    "Use only this configured Biel4 App Server/headless Executor. Do not use native subagents, create_thread, another backend, alternate account, or manual/direct implementation fallback.",
+    "Work only on E:/AIP branch fix/desktop-conversation-ux-architecture from the verified origin/main SHA above. Preserve unrelated user work; do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Use existing React/TypeScript, Rust/Tauri, SQLite migrations, contracts, CSS, and installed dependencies. No speculative abstractions or new dependencies. Keep the diff coherent and phase-scoped.",
+    "AIP remains local-first and standalone. Rust/SQLite remains authoritative; Python is replaceable inference only; temporary chat stays in memory and must not write content to disk/logs/telemetry; no remote access or weakened permissions.",
+    "Do not expose or commit secrets, credentials, databases, local histories/memories, model files, voice samples, exports, backups, private media, or authentication files. Avoid printing private paths in reports.",
+    "Do not create a stable tag, GitHub release, or prerelease. For this implementation turn, commit the coherent change locally with message fix: restructure desktop conversation UX; leave push/PR/merge and packaging to the orchestrator after distinct Reviewer acceptance.",
+    "If Windows spawn/permission prevents a validation, record the exact blocker and run safe deterministic alternatives; never weaken controls to make tests pass."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/use-phase-one.ts",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/overlays.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/native_overlay_region.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.tsx",
+    "E:/AIP/apps/desktop/src/overlay-input.ts",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/packages/contracts/tests/contracts.test.ts",
+    "E:/AIP/docs/ARCHITECTURE.md",
+    "E:/AIP/docs/PRODUCT_SPEC.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md",
+    "E:/AIP/docs/RELEASE_CHECKLIST.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

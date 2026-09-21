@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-implementation-correction-20260827",
+  "parent_request_id": "aip-big-smoke-implementation-20260827",
+  "action": "correct",
+  "repository": "E:/AIP",
+  "task": "Finish the existing AIP Big Smoke regression implementation already preserved on branch fix/big-smoke-ui-regressions. Do not redesign or broaden scope. Inspect the current diff and only make corrections needed for correctness, formatting, and commit readiness. Run the focused desktop tests for pixel-document, AgentSprite, pixel-editor, and conversation-list; run TypeScript typecheck and Prettier check for every touched file. Fix any failures, then create one focused local commit with message `fix: resolve Big Smoke UI regressions`. Do not push, open/update a PR, merge, tag, release, deploy, or build installers. Return a structured report with summary, files_changed, commands_run, tests, commit SHA, and remaining_issues.",
+  "constraints": [
+    "This is the same configured Biel4 App Server/headless Executor; do not use native subagents or a fallback backend.",
+    "Preserve the five root-cause fixes already present: alpha-aware SVG fill and PNG alpha, immutable Pencil updates, pointer-down Selection anchor, and scoped accessible ConversationList styling.",
+    "Do not discard valid existing changes or touch unrelated Phase 7-13 behavior.",
+    "No amend, rebase, squash, reset, force-push, remote publication, merge, or installer build.",
+    "Do not expose secrets, credentials, local databases, histories, memories, private media, or authentication files."
+  ],
+  "context_files": [
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.tsx",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.test.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.test.ts",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/pixel-editor.test.tsx"
+  ],
+  "review_findings": [
+    {
+      "title": "Implementation run timed out before report and commit",
+      "details": "The prior Biel4 implementation run exited after the 600-second limit with the requested files changed but no executor report, tests, or commit. The orchestrator independently confirmed the focused Vitest set (4 files, 12 tests) and TypeScript typecheck pass; Prettier currently reports all eight touched files as needing formatting. Complete formatting, rerun focused checks, inspect the final diff for scope, and commit the existing fixes.",
+      "severity": "blocking"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

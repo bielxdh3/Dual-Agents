@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-exact-head-2ddea5c1-20260830",
+  "action": "implement",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "Build and verify the Prompt Arena Windows package from the exact clean reviewed source HEAD 2ddea5c1b77d2132a091df43bf06bc2dd5947b5e on the isolated checkout. Work only as the canonical BL4 Executor through App Server/headless with account biel4. Verify the exact HEAD before build. Run cargo clean --manifest-path src-tauri/Cargo.toml, npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}', npm run package:artifacts -- --platform windows, and npm run verify:package -- --platform windows --smoke. Confirm the produced NSIS artifact and bundle size/SHA-256, confirm the fresh bundled src-tauri/target/release/prompt-arena-worker.exe size/SHA-256, and preserve the distinction from the tracked src-tauri/binaries source sidecar. Confirm checksum manifest, clean install, installed executable start, restart, and silent uninstall; record MSI unavailable precisely if unchanged. Do not modify source/tests/docs, do not commit, push, tag, release, deploy, merge, or create/update PRs. If package scripts update checksums-sha256.txt or package-verification.txt, preserve those evidence changes for BL3 review. Do not touch E:/Prompt Arena or E:/Prompt Arena-pr28. Report exact commands, hashes, sizes, provenance, and remaining native/Linux/CI gates.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; backend app_server; task transport app_server; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Build from exact clean HEAD 2ddea5c1 and keep product source changes untouched.",
+    "No public publication or remote operation; no workaround that hides MSI or human/native gaps.",
+    "No changes to E:/Prompt Arena or E:/Prompt Arena-pr28."
+  ],
+  "context_files": [
+    "E:/Prompt Arena-live-telemetry-i18n/package.json",
+    "E:/Prompt Arena-live-telemetry-i18n/src-tauri/tauri.conf.json",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/package-artifacts.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/verify-package.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/checksums-sha256.txt",
+    "E:/Prompt Arena-live-telemetry-i18n/package-verification.txt"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-persistence-20260830",
+  "action": "correct",
+  "parent_request_id": "ia-voz-delete-confirmation-20260830",
+  "repository": "C:/IA DE VOZ",
+  "task": "Diagnose and harden persistence of user profile changes across closing and relaunching the app. Trace ProfileStore rename/create/select and all UI callbacks that claim to save profile state. Keep the existing schema and paths. Make the shared JSON writer durable using a temp file flush+fsync before os.replace, fail closed on reparse paths, and verify read-back after profile rename/select writes so the callback reports an explicit saved-to-disk status or a clear failure. Ensure startup always reads persisted profile.json and voice_state.json from the application root, independent of cwd. Add concise Portuguese UI copy that profile changes are saved automatically and survive restart. Do not add a destructive save/reset behavior. Add focused tests that rename/select/create in a temporary store, instantiate a fresh ProfileStore, and prove names/active profile persist; test that invalid writes do not silently report success. Preserve current DELETE-only confirmation and all audio/profile isolation guards. Run py_compile, all tests, build_ui smoke, a real app restart/readback check without modifying user audio, and git diff --check. Do not run dataset preparation, training, generation or migration on real data. Do not change dependencies or .git metadata, and do not commit or push in the Executor task.",
+  "constraints": [
+    "Canonical biel4 App Server/headless Executor only; no native subagents, create_thread, alternate backend, TUI or direct fallback.",
+    "Edit only app.py and focused tests; preserve all real profiles/audio exactly.",
+    "No destructive action, dependency install, commit or push in the Executor task.",
+    "Do not treat browser/session state as persistence; disk-backed profile.json and voice_state.json are authoritative."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/tests/test_phase2_profiles.py",
+    "C:/IA DE VOZ/tests/test_phase4_audio_upload.py",
+    "C:/IA DE VOZ/config/voice_state.json",
+    "C:/IA DE VOZ/voices"
+  ],
+  "review_findings": [
+    {"title":"Persistence is implicit and unverified","details":"Rename/select call an atomic replace but do not fsync or read back the result, and the UI gives no durable-save confirmation. Strengthen the shared writer and callbacks while preserving the existing schema."},
+    {"title":"Restart must be an acceptance check","details":"A fresh ProfileStore/app process must rediscover the persisted display name and active voice from the application-root files, not from cwd or in-memory Gradio state."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

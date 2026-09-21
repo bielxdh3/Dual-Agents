@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-e-20260831",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Read the complete goal at C:/Users/bielx/.codex/attachments/bf0f727e-7197-435f-a1ee-ec7731fd15a9/goal-objective.md and E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md. Implement only Phase E — settings, administration, diagnostics, and local resources — on branch cdx/aip-ui-reset at current SHA b165c67d5c4637dddd10d2e2d823b134b92346ba. Build on the accepted visual foundation, sidebar, and core workspace surfaces. Restyle SettingsSurface and its settings cards/navigation for clear hierarchy, compact but readable forms, visible focus/hover/active states, 36px+ controls, semantic tokens, and responsive layouts. Restyle agent/model administration cards, badges, metadata definitions, toggles, model policy actions, security mode control, disabled backup state, and diagnostics/about metadata without changing invoke calls or security behavior. Restyle LocalCapabilitiesSurface, LocalCapabilityStatusCenter, status cards, details panels, VoiceControls, ToolControls, ExtensionControls, ScreenVisionControls, CompanionControls, and Gateway controls as a coherent local-capability dashboard. Preserve safe-mode and temporary-chat warnings, read-only wording, explicit approval semantics, all existing IDs/aria relationships, Rust/React contracts, and Portuguese UI copy. Use the semantic variables from the design spec; remove or override competing raw colors where these surfaces are touched. Keep the visual language editorial, quiet, content-first, and warm-paper rather than generic dashboard neon. Use no emoji as structural UI icons and do not add a dependency. Respect reduced motion and responsive breakpoints. Add focused tests only if needed to lock active settings, disabled/safe-mode states, local capability status labels, and accessible controls; do not rewrite product logic or backend contracts.",
+  "constraints": [
+    "Required skills: E:/AIP/.agents/skills/aip-implementation/SKILL.md, E:/AIP/.agents/skills/aip-phase-review/SKILL.md, E:/AIP/.agents/skills/aip-security-review/SKILL.md, E:/AIP/.agents/skills/aip-publication-check/SKILL.md, C:/CodexGlobal/skills/ponytail/SKILL.md, and C:/CodexGlobal/skills/ui-ux-pro-max/SKILL.md; read each fully before work.",
+    "Use only the configured Biel4 App Server/headless Executor and remain the same Executor identity for corrections. Do not use native subagents, create_thread, another backend, alternate account, or manual/direct implementation fallback.",
+    "Work only on E:/AIP branch cdx/aip-ui-reset. Preserve unrelated work; do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Use existing React/TypeScript, CSS, theme variables, contracts, installed dependencies, and portal logic. Do not add dependencies or copy Claude/React Bits branding/assets.",
+    "AIP remains standalone/local-first; Rust/SQLite authority, managed runtime degradation, temporary-chat memory-only behavior, model policy, accessibility semantics, and security boundaries must remain intact.",
+    "Do not expose or commit secrets, credentials, databases, local histories/memories, model files, voice samples, exports, backups, private media, or personal paths in product docs.",
+    "Do not push, create/update PR, merge, tag, release, deploy, or perform destructive remote actions. Commit the coherent phase locally with message style: refine AIP settings and local resources.",
+    "Run focused desktop tests, desktop typecheck, git diff --check, and formatting/lint checks proportional to changed files; report blockers precisely. Do not perform native/browser/computer-use visual QA; leave that for the human gate."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/theme.tsx",
+    "E:/AIP/apps/desktop/src/settings-models.test.tsx",
+    "E:/AIP/apps/desktop/src/local-capabilities.test.tsx",
+    "E:/AIP/apps/desktop/src/theme.test.tsx",
+    "E:/AIP/apps/desktop/src/shared-controls.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-byok-ui-finalize-20260828",
+  "parent_request_id": "prompt-arena-p5-byok-ui-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize only the preserved P5 BYOK UI diff in src/App.tsx, src/styles.css, src/byok-ui.ts, and src/byok-ui.test.ts. Inspect integration with existing bridge functions/types from commits 39de323/ff56656. Do not add new provider behavior or broaden into P6/P7. Run npm run typecheck, npm test, npm run build, cargo fmt --all -- --check, cargo check, cargo test, and git diff --check. Fix only compile/test defects in the preserved UI slice, ensure API keys are password-only and cleared/not persisted, metadata is redacted, explicit network consent is required, and browser preview remains honest. Commit only this UI slice with a descriptive message and leave the worktree clean. No direct Architect implementation, no real external network calls, no secrets in logs/errors/tests/exports, no reset/clean/discard, no merge/tag/release/deploy.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session with --allow-dirty; preserve HEAD 39de323 and prior P1-P5 commits",
+    "no TUI/native_tui/fallback/substitute, no external provider calls during tests",
+    "no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/styles.css", "E:/Prompt Arena/src/byok-ui.ts", "E:/Prompt Arena/src/byok-ui.test.ts", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/src/external_providers.rs"],
+  "review_findings": [{"severity": "blocking", "title": "P5 BYOK UI preserved after executor timeout", "details": "Run focused/full validation and commit only the preserved UI slice."}],
+  "max_correction_cycles": 0
+}

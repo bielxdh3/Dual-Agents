@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-correction-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Continue the existing dirty feat/phase-11-real-screen-vision work and finish the scoped Phase 11 implementation. Do not discard the useful real-display discovery changes. Implement actual explicit Owner-requested Windows screenshot capture into bounded in-memory bytes (with a safe provider abstraction and deterministic fake provider), real-provider gating, preview/confirmation integration, redaction/exclusion hooks, automatic cleanup on success/failure/cancellation, one-heavy-generation resource serialization, replaceable local visual adapter availability/missing-model degradation, bounded untrusted output and cancellation checkpoints. Wire truthful Tauri/TypeScript/Portuguese UI state for real display vs synthetic fixture. Add focused Rust/contracts/desktop tests for capture bounds/cleanup, provider unavailable, cancellation, adapter lifecycle/resource guard and fixture compatibility. Update Phase 11 docs/status and limitations. Run all relevant formatting/check/clippy/tests, desktop and contracts typecheck/build/tests, secrets scan and diff check; report sandbox-only not_run separately, but do not stop at a partial scaffold. Commit the complete coherent implementation with a descriptive message; do not push or publish.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits outside the Executor.",
+    "Actual capture must be Windows-only and safe: no continuous watcher, no network/upload, no default raw screenshot persistence, bounded dimensions/bytes, and deterministic cleanup.",
+    "A missing visual model or unsupported capture environment must return explicit unavailable/degraded status, never a fabricated successful real result.",
+    "Preserve safe-mode, temporary-chat, Owner confirmation, privacy, quotas, idempotency, audit, replay and bounded-error controls.",
+    "Do not modify Phase 12 Android or Phase 13 gateway behavior; do not push, merge, tag, release or deploy."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/runs/20260822T142757Z-aip-phase11-real-screen-vision-20260822/executor-report.json",
+    "C:/Users/bielx/.codex/attachments/6318d895-613a-41cb-8e95-cb0e08ad03dc/pasted-text-1.txt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/screen_vision.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/tests/contracts.test.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Phase 11 remains a metadata-only partial implementation",
+      "severity": "blocking",
+      "details": "The prior run only added primary-display metadata discovery and widened parsers. It did not implement screenshot bytes, cleanup lifecycle, visual adapter, cancellation/resource guards, focused tests, docs, or a commit. Objective exit requires an actual bounded capture path plus truthful unavailable/degraded behavior."
+    },
+    {
+      "title": "Do not stop after a scaffold",
+      "severity": "important",
+      "details": "The prior result stopped because the requested implementation was incomplete even though Rust checks passed. Continue from the dirty branch and deliver the minimum complete functional path with explicit remaining manual prerequisites."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

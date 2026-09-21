@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-implementation-20260827",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Implement the approved AIP Big Smoke UI regression correction on a new branch fix/big-smoke-ui-regressions, starting from the current clean branch feat/phase-9-supervised-tools at HEAD 9a7734460dded5469acd5e746f3118c9e3d28054. The user-authorized mission covers five confirmed regressions and must preserve all existing Phase 7-13/runtime behavior. Do not push, open/update a PR, merge, tag, release, deploy, or build installers yet; stop after focused implementation validation and a focused commit so the Biel3 orchestrator can run the distinct Reviewer gate. Approved root-cause evidence: (1) apps/desktop/src/components/AgentSprite.tsx:79-82 spreads a PixelOverlay object onto SVG rect, passing color as an invalid presentation prop instead of fill, so custom pixels become default opaque black and lose intended alpha; App.tsx PNG import at 3754-3762 also drops alpha by filtering alpha<128 and serializing only RGB. (2) The same compositor can render dense/transparent document pixels as an unintended black 64x64 square; overlay/Tauri transparency rules are already correct, while editor-only canvas background/box-shadow must remain scoped to the editor and not leak into sprite overlays. (3) App.tsx:3651-3673 mutates activeLayer.pixels in place before updatePixelLayer, risking source/preview/composite aliasing; use immutable layer/document updates and preserve undo/redo. (4) App.tsx:3609-3620 derives the Selection anchor from the existing selection rectangle; pointer-down at 4072-4076 only clears strokeRef, so arbitrary, reverse, repeated, and clamped drags lose the true pointer-down anchor. (5) ConversationList at App.tsx:1139-1191 has no matching global conversation-list styling; CSS import and Vite/Tauri packaging paths are present, so restore scoped styling hooks and accessible labeling rather than redesigning the app. Implement the smallest root-cause fixes: explicit alpha-aware SVG attributes and alpha-preserving PNG serialization, immutable active-layer updates, a stable pointer-down selection anchor with correct reverse/clamp/reset/end/cancel behavior, and scoped conversation-list CSS/semantic hooks with coherent focus/hover/disabled states. Add deterministic regression tests for alpha/pixel overlay rendering and PNG alpha where practical, Pencil isolation/unchanged unrelated layers plus undo/redo, selection top-left->bottom-right, reverse, arbitrary center, repeated, edge clamp, and pointer cancel/end, and conversation semantic classes/accessibility. Reuse existing helpers/dependencies; do not add dependencies or brittle screenshot-golden tests. Preserve eraser, fill, eyedropper, mirror, layers, palette, zoom, import, agent switching, overlay positioning, conversation create/archive/switch, safe mode, temporary chat, and Phase 7-13 wiring. Return a structured report with summary, files_changed, commands_run, tests, remaining_issues, and commit SHA.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md plus .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "Ponytail full: understand callers and shared state before editing; choose the smallest safe repo-native fix.",
+    "Create the branch fix/big-smoke-ui-regressions from the current HEAD; do not alter or discard unrelated user work.",
+    "Commit only focused files for these five regressions with an explanatory commit message; no amend, rebase, squash, reset, force-push, or history rewrite.",
+    "Do not push, create/update PR, merge, tag, release, deploy, or build installers in this phase.",
+    "Do not touch BielOS or later-scope voice, tools, screen vision, Android, gateway, or unrelated CSS/runtime behavior.",
+    "Do not expose or commit secrets, credentials, local databases, histories, memories, private media, or authentication files.",
+    "If a focused test is blocked by Windows spawn EPERM, record the exact blocker and continue with deterministic checks that can run; do not weaken tests or bypass required security controls."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.tsx",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.test.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.test.ts",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "C:/Users/bielx/.codex/attachments/6cd6b1a1-7f60-490d-8246-36367010c788/pasted-text-1.txt"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "create_branch", "local_commit"]
+  }
+}

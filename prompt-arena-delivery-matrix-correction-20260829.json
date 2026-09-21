@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-delivery-matrix-correction-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are the same BL4/biel4 App Server/headless Executor. Work on E:\\Prompt Arena-pr28-bl4 branch validation/native-tauri-acceptance at current HEAD d1a4d2165471b1b473e8f7b91ad7b02d97afff9c. Review your immediately previous docs/DELIVERY_MATRIX.md audit commit. Apply only these documentation corrections: (1) make the table explicitly seven columns in the requested order requirement -> implementation -> user-facing surface -> automated evidence -> native QA evidence -> artifact evidence -> status, with concise truthful artifact evidence for each row (use `none yet`, source-only, or named CI/package artifacts where appropriate); (2) update current native evidence to the latest PR #28 run 33233256324, stating Linux passed the full chain and Windows failed at real tauri-driver session creation with `DevToolsActivePort file doesn't exist` after UDF/capability fixes; you may mention prior run 33232495346 only as historical context. Keep CI 33233256205 and packaging 33213307890 details truthful. Preserve all IN PROGRESS/BLOCKED statuses, do not mark any phase COMPLETE, do not alter ROADMAP.md or product code. Create one normal follow-up documentation commit. Validate with git diff --check and a bounded check that all table rows have seven cells and required run ids are present. Do not push, merge, release, tag, or deploy. Return exact report and machine-readable metadata proving biel4 App Server/headless, elevated ready sandbox, executor role, and commit SHA.",
+  "constraints": [
+    "BL4/biel4 App Server/headless is the only allowed implementation Executor; fail closed if provenance is not proven.",
+    "Only docs/DELIVERY_MATRIX.md may change; no product source, tests, workflow, ROADMAP, or package artifacts.",
+    "No COMPLETE status may be introduced; native QA, security, publication, and MSI gaps must remain explicit.",
+    "No merge, tag, release, deploy, force-push, or public release. Keep PR #28 draft."
+  ],
+  "context_files": [
+    "docs/DELIVERY_MATRIX.md",
+    "ROADMAP.md"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

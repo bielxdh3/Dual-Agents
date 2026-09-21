@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-product-docs-20260829",
+  "parent_request_id": "prompt-arena-p2-ui-overhaul-correction-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Update only the evidence documentation for the reviewed Prompt Arena product batch in the exact current checkout. Use canonical BL4/biel4 Executor via App Server/headless, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Read C:\\CodexGlobal\\AGENTS.md and required ponytail, project-phase-review, project-security-review, project-publication-check, product-design/index, and product-design/audit SKILL.md files first. Do not modify source, tests, generated artifacts, remotes, tags, releases, deploys, or other worktrees. Re-read docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md. Update both to exact current reviewed HEAD after the committed P0/P1/P2 changes (75bf8266a7af257a028724365f627a31aa28af37, 1b7c7ce2898881375bfdd61af3c782ed2d7359d2, bcf706e5c32568ba43ac24f7673074c6d230098; verify actual HEAD before writing). Add evidence-backed entries for: P0 async execute_run_once/spawn_blocking and bounded blind response panes/local score state; P1 typed model availability/actions and honest local-only discovery boundary; P2 contrast/interaction/motion/reduced-motion, active sidebar, bounded shell overflow with comparison-only horizontal scroll, Models progressive disclosure/hardware advanced diagnostics, Settings advanced grouping, Arena horizontal comparison, telemetry layout, and i18n. Record tests already passed: full npm test 17 files/99 tests, npm run typecheck, npm run build, focused Rust commands/model-library tests where applicable, git diff --check; label human/native runtime evidence PENDING_HUMAN_QA because no Ollama endpoint/browser harness/installed visual session was available. Add explicit markers from the supplied QA brief and concise PASS/FAIL/PENDING rows for core stability, score continuity, model actions, primary UI, accessibility, i18n, and packaging. Keep prior 57f02b3 NSIS artifact evidence clearly historical/not an artifact for the new reviewed HEAD; set fresh exact-HEAD NSIS to PENDING_AUTOMATED_NATIVE_QA until a new package is built. Preserve MSI BLOCKED LOCALLY, Linux CI PENDING, and remote CI unconfirmed. Do not claim visual audit or human QA from code/tests. Use precise statuses COMPLETE only for implementation/automated subitems, PENDING_HUMAN_QA for visual/native gates, BLOCKED_EXTERNAL_RUNTIME for unavailable Ollama/Docker where applicable, and MISSING_IMPLEMENTATION only when still true. Create one normal local documentation commit with message `docs: record P0-P2 product remediation evidence` if possible; otherwise leave exact docs changes for host-side commit. Do not push, merge, tag, release, deploy, or publish.",
+  "constraints": [
+    "Only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md may change.",
+    "Evidence-backed statuses only; do not imply code tests prove installed Windows visual/human acceptance.",
+    "Preserve old artifact hashes as historical evidence and do not relabel them as current HEAD output.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No source/config/test/generated/remote/tag/release/deploy changes and no other worktree changes."
+  ],
+  "review_findings": [
+    {
+      "title": "Current matrix/checklist target stale pre-remediation commit",
+      "details": "Both docs still target 57f02b3 and omit the new P0/P1/P2 remediation commits and test evidence."
+    },
+    {
+      "title": "Human QA must remain explicit",
+      "details": "No local Ollama listener, browser/component harness, or installed Windows visual session is available. Core stability, score continuity, layout, native controls, accessibility, i18n restart, and fresh packaging remain human/native gates."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

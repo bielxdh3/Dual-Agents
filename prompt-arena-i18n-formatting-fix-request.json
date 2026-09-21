@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-formatting-fix-20260829",
+  "parent_request_id": "prompt-arena-i18n-formatting-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Fix the formatting-only regression in the isolated worktree, preserving the intended locale display changes and all product/security behavior. Do not modify original worktrees or use commits/remote operations. At src/App.tsx line 556, formatLocaleNumber(summary.evidence.length) fails TypeScript because the value is typed `{}` | null. Use the correct numeric evidence count already available in the summary model, or a safe finite-number guard/fallback, without changing canonical stored values. Then run npm run typecheck and npm test and report exact outcomes plus BL4 provenance. Do not refactor unrelated files.",
+  "review_findings": [
+    {"title":"Typecheck regression","details":"npm run typecheck fails at src/App.tsx(556,126): Argument of type '{} | null' is not assignable to parameter of type 'number' for formatLocaleNumber(summary.evidence.length). Fix with a type-safe numeric presentation path."},
+    {"title":"Formatting scope","details":"Keep locale formatting presentation-only and preserve the existing i18n/telemetry/security behavior; no schema or evidence mutation."}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\byok-ui.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

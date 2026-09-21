@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-final-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-correction-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Finish the current clean branch feat/phase-11-real-screen-vision at 9827ee4 as the minimum complete Phase 11 checkpoint. Preserve the bounded Windows GDI capture/provider and truthful display UI already committed. Add the missing replaceable visual-model adapter abstraction: deterministic fake adapter for fixture tests, real local adapter availability/degradation result when no model is configured, bounded input/output and one-heavy-generation resource guard, explicit cleanup/cancellation checkpoints, and ensure the actual captured byte buffer is transient and never persisted. Integrate adapter invocation/result/lifecycle into confirm_screen_vision_job so a real display is not reported as synthetic success; unsupported or missing model must yield a typed bounded unavailable/degraded result/error while fixture path remains deterministic. Ensure the existing Owner confirmation, safe-mode, quotas, idempotency, audit, cancellation and cleanup commands remain truthful for real jobs. Add focused tests for adapter unavailable/degraded behavior, resource busy/serialization, cancellation/cleanup, and real-vs-fixture result status. Update docs/PHASE_11_SCREEN_VISION_SPEC.md (create if needed), docs/ROADMAP.md, docs/KNOWN_LIMITATIONS.md, docs/CORRECTIVE_GAP_MATRIX.md and README.md with honest status: functional automated capture/provider checkpoint; local model installation, packaged Windows/manual UX, and visual quality remain human prerequisites. Run cargo fmt/check/clippy/full and focused tests, contracts typecheck/build/tests, desktop typecheck/tests/build and secrets scan; if App Server spawn policy blocks any command, report it and do host reruns where possible. Commit all changes with a descriptive message. Do not push, publish, merge, tag, release or deploy.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits outside the Executor.",
+    "Do not claim a model is installed or a real analysis succeeded when it is unavailable; expose explicit degraded/unavailable semantics.",
+    "No continuous capture, public listener, network/upload, raw screenshot persistence, Python runtime exposure, or weakened Owner/privacy/safe-mode controls.",
+    "Do not modify Phase 12 Android or Phase 13 gateway behavior."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/runs/20260822T143154Z-aip-phase11-real-screen-vision-correction-20260822/executor-report.json",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/screen_vision.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/.codex/attachments/6318d895-613a-41cb-8e95-cb0e08ad03dc/pasted-text-1.txt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Provider commit is still an incomplete Phase 11 product surface",
+      "severity": "blocking",
+      "details": "9827ee4 adds real display discovery and bounded GDI bytes, but confirm_screen_vision_job discards bytes and always returns model_unavailable for real displays. There is no replaceable adapter/lifecycle contract, focused adapter/resource tests, or Phase 11 docs. Complete those pieces without fabricating model success."
+    },
+    {
+      "title": "Validation and status must be truthful",
+      "severity": "important",
+      "details": "The previous run had desktop/contracts tests and secrets scan not_run due spawn policy. Run them when possible and report any remaining not_run separately; commit only after the implementation is complete."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-final-human-gate-final-smoke-correction-20260827",
+  "action": "correct",
+  "parent_request_id": "aip-final-human-gate-review-final-20260827",
+  "repository": "E:/AIP",
+  "task": "On the clean branch docs/final-human-gate-preparation at HEAD 06d0f9338cb774a29a0b1bf59b9d23c43555df4d, add one genuinely pending human scenario to docs/V0_1_MANUAL_VALIDATION.md: test the exact release-candidate Windows artifact named in the record through install or upgrade, basic launch and main navigation, clean exit and reopen, crash/data-loss/recovery behavior, and version/about display if present. Give it number 8 with exact Portuguese action, expected result, and PASS/FAIL criterion. Keep the five resolved Big Smoke checks omitted, preserve all seven existing scenarios, historical record, hashes, canonical matrix, exclusions, and terminal waiting gate. Do not change product code or other docs. Run git diff --check and focused static structure checks. Commit only this documentation addition with exact message docs: add final release-candidate smoke gate. Do not push, merge, tag, or release. Return concise structured report and leave branch clean.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor through the Dual Codex launcher; no native subagents, alternate backend, or fallback.",
+    "Read E:/AIP/AGENTS.md and the required AIP implementation, phase-review, security-review, publication-check, and C:/CodexGlobal/skills/ponytail/SKILL.md instructions.",
+    "Reviewer follow-up: the consolidated checklist must explicitly cover final release-candidate install/upgrade, launch, exit/reopen, recovery, and version smoke where still pending.",
+    "No force-push, reset, rebase, amend, squash, history rewrite, unrelated cleanup, or product-code changes.",
+    "Do not expose or commit secrets, credentials, databases, histories, memories, backups, models, media, private paths, or generated artifacts."
+  ],
+  "context_files": [
+    "E:/AIP/docs/V0_1_MANUAL_VALIDATION.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [
+    {"severity":"important","title":"Final release-candidate smoke not explicit","details":"The pending checklist covers installed feature flows but lacks a distinct exact-artifact install/upgrade, launch, clean exit/reopen, crash/data-loss/recovery, and version/about scenario required by Stage D category I."}
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

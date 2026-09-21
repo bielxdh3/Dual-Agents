@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-localtarget-20260829",
+  "parent_request_id": "prompt-arena-package-targetdir-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:04:41.128037+00:00",
+  "finished_at": "2026-08-29T19:05:11.665087+00:00",
+  "summary": "Exact HEAD confirmed as be1007f99814f004e384abae6acd986e5bcaa521. Fresh worktree target directory was created, but Tauri rejected the requested option before building: `error: unexpected argument '--target-dir' found`. Per instruction, stopped immediately. BL4 provenance: canonical biel4 App Server/headless, workspace-write, Windows elevated readiness ready, approval never; no source, docs, history, or remote operations changed.",
+  "files_changed": [
+    "src-tauri/target-fresh/"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "New-Item -ItemType Directory -Path E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target-fresh -Force",
+    "npm run tauri:build -- --bundles nsis --target-dir E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target-fresh"
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis --target-dir E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target-fresh",
+      "status": "failed",
+      "details": "CLI rejected the option verbatim: `error: unexpected argument '--target-dir' found`; tip: similar argument `--target`; usage reported `tauri build build <--runner ...|--target <TARGET>|...`."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows --bundle-root E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target-fresh\\release\\bundle",
+      "status": "not_run",
+      "details": "Stopped after CLI rejection."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows",
+      "status": "not_run",
+      "details": "Stopped after CLI rejection."
+    },
+    {
+      "command": "Windows NSIS clean-install/launch/restart/uninstall smoke",
+      "status": "not_run",
+      "details": "No installer was produced."
+    }
+  ],
+  "remaining_issues": [
+    "The installed Tauri CLI does not support `--target-dir`; it rejects the exact requested command before compilation or bundling.",
+    "No installer, checksum manifest, sidecar from this attempt, or automated smoke result was produced."
+  ],
+  "git_status": " M src-tauri/Cargo.toml\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190441Z-prompt-arena-package-localtarget-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190441Z-prompt-arena-package-localtarget-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190441Z-prompt-arena-package-localtarget-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190441Z-prompt-arena-package-localtarget-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ed8-00cd-7cf3-911d-b4bbaf1e09d0",
+  "app_server_turn_id": "01a04ee8-e984-7fc2-ba7e-09d181c83a18",
+  "app_server_process_id": "10380",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T190441Z-prompt-arena-package-localtarget-20260829.md",
+  "task_sha256": "9230ae4fad120afadcedb118efc3a91c9783a7e3188670b10059551c214c45ea",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

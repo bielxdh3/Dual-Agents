@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-final-human-gate-docs-correction-20260827",
+  "action": "correct",
+  "parent_request_id": "aip-final-human-gate-docs-20260827",
+  "repository": "E:/AIP",
+  "task": "Finish the existing documentation-only final-human-gate preparation on the dirty branch docs/final-human-gate-preparation at HEAD cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4. Do not inspect or change product code. In docs/V0_1_MANUAL_VALIDATION.md, add the exact per-file SHA-256 values for A.I.P._0.1.0_x64_en-US.msi = 47DB703F45F91BACD9928A863ADCCD44C68C2DA3FCD3259FFA8F8D522C2EE512 and A.I.P._0.1.0_x64-setup.exe = C7748D42361F3C97E2A3190172B7EC3DF1BB177B8F5E7B84A1E20B896987F085, while retaining the CI bundle digest and truthful wording. In docs/ROADMAP.md make the Phase 0-13 Truthful status column use exactly one allowed classification per phase: APPROVED for 0-6 and 7A, FUNCTIONAL — HUMAN VALIDATION PENDING for 7B-7F, 8, 9, 11, 12, 13, and FUNCTIONAL — AUTOMATED VALIDATION COMPLETE for 10; keep details that human package review remains pending. Review the focused diff for truthful scope, then commit only these documentation files with exact message test: record approved Big Smoke validation. Do not push, merge, tag, release, or run broad tests in this correction. Return concise structured report and leave the branch clean.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor through the Dual Codex launcher; no native subagents, alternate backend, or fallback.",
+    "Read E:/AIP/AGENTS.md and the required AIP implementation, phase-review, security-review, publication-check, and C:/CodexGlobal/skills/ponytail/SKILL.md instructions.",
+    "Review finding is blocking: exact per-installer hashes are missing and the matrix uses combined non-canonical classifications.",
+    "No force-push, reset, rebase, amend, squash, history rewrite, unrelated cleanup, or product-code changes.",
+    "Do not expose or commit secrets, credentials, databases, histories, memories, backups, models, media, private paths, or generated artifacts."
+  ],
+  "context_files": [
+    "E:/AIP/docs/V0_1_MANUAL_VALIDATION.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md",
+    "E:/AIP/docs/CORRECTIVE_GAP_MATRIX.md"
+  ],
+  "review_findings": [
+    {"severity":"blocking","title":"Per-installer hashes missing","details":"The focused record currently records only the CI bundle digest, but the approved evidence includes exact MSI and NSIS hashes that must be recorded."},
+    {"severity":"blocking","title":"Phase matrix classification not canonical","details":"Phase 10 uses a combined status and several rows include suffixes; use exactly one allowed classification in the Truthful status column while retaining explanatory detail."}
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

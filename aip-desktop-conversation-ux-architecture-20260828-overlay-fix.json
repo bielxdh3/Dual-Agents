@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-overlay-fix",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Apply one minimal follow-up fix to the clean AIP branch fix/desktop-conversation-ux-architecture at HEAD 75fa3941d9262003bf4b6f94534cb886d28d50b0. The distinct Biel4 Reviewer approved_with_reservations and identified this concrete medium risk: Overlay reads the native alpha mask from the base HTML image only, while AgentSprite renders custom/imported pixel-document RGBA pixels in a separate SVG; visible custom pixels outside the base mask may therefore lack matching interactive regions and violate the imported PNG/RGBA hitbox requirement. Inspect the existing AgentSprite, Overlay and overlay-input primitives. Extend them minimally so custom visible pixel overlays are included in the deterministic interactive-region calculation (or prove an equally safe existing path), preserving alpha threshold, scaling, label/thought regions, native SetWindowRgn/click-through safeguards and no giant rectangle. Add/adjust focused deterministic tests for the custom-pixel mask/region case and rerun the focused overlay/desktop tests, TypeScript typecheck, cargo fmt/check and the relevant Rust tests. Do not redesign unrelated UX or docs. Create one new local commit with message `fix: include custom overlay hit regions`; do not push, PR, merge, tag, release, deploy or build installers. Return a structured report with summary, files_changed, commands_run, tests, commit_sha and remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor; no native subagents, alternate backend, account or manual/direct implementation fallback.",
+    "Current worktree is clean and contains the accepted parent commit. Preserve it; no reset, discard, amend, rebase, squash, force-push or history rewrite.",
+    "Use existing React/TypeScript and installed dependencies only. Keep the patch minimal and security/accessibility/data-integrity safeguards intact.",
+    "Do not expose or commit secrets, credentials, databases, histories, memories, model files, voice samples, exports, backups, private media or authentication files.",
+    "Installed-Windows transparency/hitbox behavior remains a human gate; do not claim it verified from static tests. No stable release/tag."
+  ],
+  "context_files": [
+    "E:/AIP/apps/desktop/src/components/AgentSprite.tsx",
+    "E:/AIP/apps/desktop/src/Overlay.tsx",
+    "E:/AIP/apps/desktop/src/overlay-input.ts",
+    "E:/AIP/apps/desktop/src/overlay-input.test.ts",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.test.ts",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src-tauri/src/overlays.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/native_overlay_region.rs"
+  ],
+  "review_findings": [
+    {
+      "title": "Custom/imported pixel overlays are absent from native hit regions",
+      "details": "Reviewer evidence: readSpriteMask is derived from the base HTMLImageElement; AgentSprite renders custom pixel-document pixels as separate SVG rects, but Overlay passes only spriteMask plus label/thought bounds to buildInteractiveRegions. A custom visible pixel outside the base mask can be rendered yet click-through. Include custom visible pixels in the same deterministic region calculation and test it.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

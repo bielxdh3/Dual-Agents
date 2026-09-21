@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-client-correction-20260822",
+  "parent_request_id": "aip-phase12-android-client-v5-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Finish and commit the existing untracked Phase 12 Android client slice on branch feat/phase-12-android-companion at base d002180. The project under android/ and docs/PHASE_12_ANDROID_IMPLEMENTATION.md already exist, and host validation proved absolute-toolchain `lintDebug` and `assembleDebug` pass with APK at android/app/build/outputs/apk/debug/app-debug.apk. Do not delete the valid project. Use absolute checkout-local toolchain paths: JAVA_HOME=C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/.tooling/android/jdk/jdk-17.0.12+7, ANDROID_SDK_ROOT/ANDROID_HOME=C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/.tooling/android/sdk, GRADLE_USER_HOME=C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/.tooling/gradle-home, Gradle distribution at .tooling/android/gradle/gradle-8.9/bin/gradle.bat. Leave .tooling untracked and never commit it.\n\nActionable review findings to fix before commit:\n1. `android/app/src/test/.../ProtocolTest.kt` fails: `org.json.JSONObject.put` is not mocked in local JVM tests. Remove Android framework JSON from the pure protocol test path by adding a small deterministic bounded frame codec/parser (or a narrowly scoped test JSON dependency) so all protocol tests run and pass without Android instrumentation.\n2. Strengthen the protocol client slice: strict max frame/text and payload bounds, canonical authenticated bytes, version negotiation, challenge-response HMAC-SHA-256, monotonic replay counter/nonce rejection, typed auth/version/replay/revocation failures, and explicit key rotation/revocation state. Keep no fake desktop-delivery claim.\n3. Keep the offline queue bounded at 16 items, expose deterministic preview/approval/cancel/retry semantics, and make the UI visibly show bounded local read-only history and privacy-safe status/notification behavior. Overlay remains explicitly permission/policy-gated; never auto-start/request. SecureStore must have a safe decrypt/load path and never persist plaintext.\n4. Add/finish deterministic Android unit tests for codec/HMAC/handshake/replay/bounds/revocation, queue/history limits, notification redaction, and overlay gating.\n5. Add the Android build/test/lint/assembleDebug artifact job to .github/workflows/ci.yml without weakening desktop gates; update docs/ROADMAP.md, docs/KNOWN_LIMITATIONS.md, docs/CORRECTIVE_GAP_MATRIX.md, and README.md truthfully: real Android client/protocol/APK functional; desktop authenticated transport integration is next; Phase 13 remains metadata-only.\n\nRun with the existing toolchain: `gradle.bat --no-daemon testDebugUnitTest lintDebug assembleDebug`; compute `Get-FileHash android/app/build/outputs/apk/debug/app-debug.apk -Algorithm SHA256`; run `pnpm secrets:scan` and `git diff --check`. Inspect all files for placeholders/unsafe claims. Commit only this slice with exact message `feat: add phase 12 android companion client`. Do not push, publish, PR, merge, tag, release, deploy, modify BielOS, or use native subagents/direct edits.\n\nDo not start desktop transport implementation in this correction; it is the next scoped commit.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Use absolute checkout-local toolchain paths; leave .tooling untracked and never commit it.",
+    "Preserve the real APK project; fix tests and safety rather than replacing it with metadata or mocks.",
+    "No remote mutation, relay/public listener, telemetry, raw credential/media persistence, Python exposure, BielOS import, or safety weakening.",
+    "Do not implement desktop transport in this correction."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "review_findings": [
+    {
+      "title": "JVM protocol test fails on Android framework JSONObject",
+      "severity": "blocking",
+      "details": "Host Gradle testDebugUnitTest reports RuntimeException: Method put in org.json.JSONObject not mocked at ProtocolTest.frameAndReplay. Replace the framework JSON dependency in the pure protocol path or add a tested JVM-safe codec so the test suite passes."
+    },
+    {
+      "title": "Client slice needs bounded UX/protocol/docs/CI completion",
+      "severity": "important",
+      "details": "The APK builds and lint passes, but queue bound, challenge/replay/key-rotation semantics, visible history/privacy behavior, Android CI, roadmap/gap docs, and commit are still incomplete or unverified."
+    }
+  ],
+  "max_correction_cycles": 0
+}

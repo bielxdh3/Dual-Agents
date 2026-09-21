@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-docs-test-count-103-fresh-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "As the same canonical BL4 Executor, make a documentation-only evidence correction in the intentionally dirty Prompt Arena worktree. Update docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md so the recorded current npm test result says 17 files and 103 tests, matching the independently rerun current checkout after the immutable blind-lock retry test was added. Preserve all other gate/live/package wording. Do not change source/test code, do not commit, and do not touch protected worktrees. Run git diff --check and report exact files and provenance.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Preserve all current uncommitted source/test changes; no reset, stash, or commit.",
+    "No remote actions or UI automation."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Current test count evidence",
+      "details": "Independent current-checkout npm test output is 17 files and 103 tests; both evidence documents still record 102.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "parent_request_id": "prompt-arena-blind-lock-retry-correction-20260830",
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

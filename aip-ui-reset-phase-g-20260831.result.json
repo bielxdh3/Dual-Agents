@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-g-20260831",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-31T21:33:57.836326+00:00",
+  "finished_at": "2026-08-31T21:43:24.450664+00:00",
+  "summary": "Consolidated the responsive, semantic, accessibility, and reduced-motion CSS foundation in commit e13c192. Only App.css changed.",
+  "files_changed": [
+    "apps/desktop/src/App.css"
+  ],
+  "commands_run": [
+    "pnpm exec prettier --write apps/desktop/src/App.css",
+    "pnpm --filter @aip/desktop exec vitest run --passWithNoTests",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm exec eslint apps/desktop/src --max-warnings=0",
+    "pnpm exec prettier --check apps/desktop/src/App.css apps/desktop/src/App.tsx",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git add -- apps/desktop/src/App.css",
+    "git commit -m \"consolidate AIP responsive accessibility foundation\""
+  ],
+  "tests": [
+    {
+      "command": "Focused desktop Vitest suite",
+      "status": "passed",
+      "details": "11 files, 44 tests passed."
+    },
+    {
+      "command": "Full desktop Vitest suite",
+      "status": "passed",
+      "details": "30 files, 118 tests passed."
+    },
+    {
+      "command": "Desktop TypeScript typecheck",
+      "status": "passed",
+      "details": "tsc --noEmit completed successfully."
+    },
+    {
+      "command": "ESLint",
+      "status": "passed",
+      "details": "No warnings or errors."
+    },
+    {
+      "command": "Prettier check",
+      "status": "passed",
+      "details": "All checked files formatted."
+    },
+    {
+      "command": "Secrets scan",
+      "status": "passed",
+      "details": "200 repository files checked."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "CSS token audit",
+      "status": "passed",
+      "details": "Hex colors remain limited to token definitions; reduced-motion handling is centralized."
+    }
+  ],
+  "remaining_issues": [
+    "Native/browser visual QA was not run; human visual validation remains required.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T213358Z-aip-ui-reset-phase-g-20260831\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T213358Z-aip-ui-reset-phase-g-20260831",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T213358Z-aip-ui-reset-phase-g-20260831\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T213358Z-aip-ui-reset-phase-g-20260831\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05910-09d5-7723-9116-e11fbee1ea5e",
+  "app_server_turn_id": "01a059be-4bdc-7d20-ae51-4a656bb408c9",
+  "app_server_process_id": "18548",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260831T213358Z-aip-ui-reset-phase-g-20260831.md",
+  "task_sha256": "366aabf28825bd2ca4621e65225d1525885495aa7b3430c530ad1c09ebe85117",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

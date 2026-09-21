@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase8-voice-integration-commit-20260820",
+  "parent_request_id": "aip-phase8-voice-integration-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "The Phase 8 command/contracts/UI/docs integration is already applied on top of commit 6893d72. The Executor environment could not run pnpm secrets:scan because Node spawnSync git returned EPERM, but the orchestrator has independently run `pnpm secrets:scan` successfully (147 repository files checked), and the remaining required checks are green. Do not change source behavior or broaden scope. Inspect the current diff, confirm it is limited to lib.rs, App.tsx, contracts, and the two Phase 8 docs, then create the required local commit with exactly `feat: wire phase 8 local voice commands and controls`. Do not push or perform GitHub operations. Return the wrapper-required JSON report fields only.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents.",
+    "Preserve commit 6893d72 and the current integration diff; no reset, discard, rebase, or force operation.",
+    "No raw audio persistence, upload, telemetry, public listener, cloud provider, arbitrary shell, or safety weakening.",
+    "Do not modify Phase 9 or later behavior and do not perform remote operations.",
+    "Do not rerun broad exploratory work; this is a commit-only correction after independent validation."
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/App.tsx",
+    "packages/contracts/src/index.ts",
+    "docs/PHASE_8_VOICE_SPEC.md",
+    "docs/CORRECTIVE_GAP_MATRIX.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Commit the independently validated Phase 8 integration",
+      "severity": "blocking",
+      "details": "The integration source changes are present and local validation passed: cargo fmt/check/clippy/test (115 passed, 1 ignored), contracts typecheck, desktop typecheck, secrets scan (147 files), and git diff --check. The only executor failure was its environment-level spawnSync git EPERM during secrets scan; no source correction is requested. Create only the exact integration commit."
+    }
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

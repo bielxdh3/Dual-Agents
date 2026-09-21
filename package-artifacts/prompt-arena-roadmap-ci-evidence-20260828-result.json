@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-roadmap-ci-evidence-20260828",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T22:03:27.588593+00:00",
+  "finished_at": "2026-08-28T22:04:26.886293+00:00",
+  "summary": "Updated ROADMAP.md only with the supplied workflow 33213307890 P7 CI evidence, MSI limitation, and explicit BL4 native-diagnostic gaps. Committed as d77c520; working tree is clean.",
+  "files_changed": [
+    "ROADMAP.md"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "git branch --show-current",
+    "git status --short",
+    "git diff --check -- ROADMAP.md",
+    "git diff -- ROADMAP.md",
+    "git add -- ROADMAP.md",
+    "git diff --cached --check",
+    "git commit -m \"Record P7 CI packaging evidence\"",
+    "git log -1 --oneline --decorate"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check -- ROADMAP.md",
+      "status": "passed",
+      "details": "Focused documentation diff check passed."
+    }
+  ],
+  "remaining_issues": [
+    "P7 remains IN PROGRESS because MSI was unavailable with zero artifacts and final native/manual desktop acceptance is separate.",
+    "P1-P6 remain IN PROGRESS; the BL4 diagnostic only proved Vite/Tauri startup and did not exercise native UI, bridge, sidecar, restart, or reopen flows.",
+    "No product tests were run because this was a documentation-only correction.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T220327Z-prompt-arena-roadmap-ci-evidence-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T220327Z-prompt-arena-roadmap-ci-evidence-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T220327Z-prompt-arena-roadmap-ci-evidence-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T220327Z-prompt-arena-roadmap-ci-evidence-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04a43-d35d-72d2-b67b-c13dab282a0d",
+  "app_server_turn_id": "01a04a66-3961-75e1-9f95-70cac44ecceb",
+  "app_server_process_id": "22812",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T220327Z-prompt-arena-roadmap-ci-evidence-20260828.md",
+  "task_sha256": "09a7a8c32749915301b1124e1b657317a4744a57bcaebeb6692dc3876184d496",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

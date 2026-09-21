@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-history-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Continue Prompt Arena P5 from clean completion/byok-followup at 8ba4065eb37a8c96ec79cfaf5f17881e5eb1f766. Audit existing secure BYOK implementation against the mission requirement for immutable historical price snapshot, provider identity, actual usage/cost, and budget decisions without secrets in logs/exports. Add the smallest coherent app-owned persistence slice: an immutable sanitized external-generation evidence record (migration, typed storage methods, Tauri commands/bridge) that stores provider ID, requested/provider model identity and confidence, network-used flag, sanitized token usage, estimated/actual cost, preflight/final budget decisions, dated price snapshot, and creation time, but never prompt text, response text, API keys, credential blobs, or arbitrary headers. Persist the record only after a successful provider response; fail closed if required price/usage evidence is invalid. Add a reloadable history section in Settings/BYOK UI with redacted provider/model/usage/cost/price evidence and explicit network disclosure; ensure exports/logs remain secret-free. Preserve OS secure credential storage, explicit HTTPS network consent, budget ceilings, no silent provider substitution, and no paid CI calls. Add focused TypeScript/Rust tests for immutable save/reopen, idempotence, tamper/source validation, and secret non-disclosure using existing mock transport. Update ROADMAP P5 honestly. Run npm typecheck/test/build, cargo fmt/check/test, and git diff --check. Commit focused implementation. No push, merge, tag, release, deploy, or page-transition motion.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "start clean on completion/byok-followup at 8ba4065eb37a8c96ec79cfaf5f17881e5eb1f766",
+    "preserve unrelated work; no generated evidence files committed; do not call real external providers"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "C:/Users/bielx/Downloads/PROMPT_ARENA_PRODUCT_COMPLETION_AND_REAL_DESKTOP_DELIVERY.md",
+    "E:/Prompt Arena/ROADMAP.md",
+    "E:/Prompt Arena/src-tauri/src/external_providers.rs",
+    "E:/Prompt Arena/src-tauri/src/commands.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/src-tauri/src/lib.rs",
+    "E:/Prompt Arena/src/bridge.ts",
+    "E:/Prompt Arena/src/App.tsx",
+    "E:/Prompt Arena/src/byok-ui.ts",
+    "E:/Prompt Arena/src-tauri/src/storage/migrations/0006_model_library.sql"
+  ],
+  "max_correction_cycles": 0
+}

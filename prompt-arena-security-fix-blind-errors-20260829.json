@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-security-fix-blind-errors-20260829",
+  "parent_request_id": "prompt-arena-final-reviews-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Fix the confirmed security finding from the final review in the exact current checkout at edb7b2d1ca1b24c000d101f3b74e7e42a5a4f14d. Use only canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Read C:\\CodexGlobal\\AGENTS.md and C:\\CodexGlobal\\skills\\ponytail\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md, C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\index\\SKILL.md, and C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\audit\\SKILL.md before acting. Preserve all existing P0/P1/P2 changes; no reset, push, merge, tag, release, deploy, or other worktree changes. Confirmed issue: in blind Arena execution, App.tsx ArenaExecutionMonitor renders latest.error and telemetry.lastError directly (review evidence around current lines 3050 and 3054); arena-runner sanitized errors can still carry model/runtime identity, and Ollama/runtime errors may include model names. In blind mode, error/status surfaces must never expose model/provider/profile/runtime identity or identity-bearing raw error text. Add a small pure helper (prefer in arena-runner.ts or results-ui.ts) that returns a generic localized-safe blind error/status while preserving the full sanitized error for non-blind/revealed diagnostics. Apply it to every blind live-telemetry error path (per-competitor latest.error and Arena-level lastError), keep cancellation/failure semantics and no prompt/secret leakage, and add focused tests proving blind output is generic even for identity-bearing messages while non-blind retains bounded sanitized detail. Also inspect the quick Arena lock path text matching noted as a hypothesis; if a stable attempt key can be corrected safely within this focused scope, do so with tests, otherwise document why it remains non-confirmed rather than altering unrelated logic. Run npm test, npm run typecheck, npm run build, focused Rust tests only if touched, git diff --check, and a targeted security review. Create one normal local commit with message `fix: protect blind telemetry errors` if possible; if linked-worktree Git permissions block it, leave the reviewed diff for host-side commit. Return exact files/lines, tests, confirmed vs residual findings, and full provenance. Do not claim native/runtime/human QA.",
+  "constraints": [
+    "Only source/tests required for this confirmed blind-error leak may change; no broad redesign or docs in this request.",
+    "Blind mode must stay generic for identity-bearing errors; non-blind/revealed diagnostics may retain bounded sanitized detail.",
+    "Preserve blind identity hiding, immutable evaluation/storage, cancellation, process isolation, i18n, and P0/P1/P2 behavior.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No raw secret/prompt/response logging, forced reloads, arbitrary delays, unsafe HTML, native TUI, cloud calls, push, merge, tag, release, or deploy."
+  ],
+  "review_findings": [
+    {
+      "title": "Confirmed blind telemetry identity leak",
+      "details": "Final security review found App.tsx ArenaExecutionMonitor displaying latest.error and telemetry.lastError during blind execution. Sanitized runtime errors can still contain model names, so blind mode can reveal identity."
+    },
+    {
+      "title": "Residual quick Arena text matching is only a hypothesis",
+      "details": "ArenaResultsSurface lockEvaluation matches prepared response by text; no exploit was proven. Change only if a stable key mapping is unambiguously available without broad evaluation rewrite."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\ollama.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\runtime.rs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

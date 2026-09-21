@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-exact-head-37dbafc-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Build and verify a fresh Windows NSIS package from the exact current reviewed checkout HEAD 37dbafcabb03079927e6d2f1ee499269c1a6722f (branch completion/windows-qa-live-telemetry-i18n). Work only as canonical BL4/biel4 through App Server/headless. Confirm clean HEAD before build. Because prior package attempts hit Windows STATUS_IN_PAGE_ERROR, if needed run cargo clean for this repository's src-tauri manifest only, then run npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}', npm run package:artifacts -- --platform windows, and npm run verify:package -- --platform windows --smoke. Verify the bundled worker, artifact size/hash, checksum manifest, clean install, executable start, restart, and silent uninstall. Preserve source behavior, do not alter protected worktrees, do not commit/push/tag/release/deploy/merge/PR, and return exact commands/results plus canonical provenance and any remaining MSI/CI/human gates. If packaging updates tracked checksum/evidence files, leave those changes uncommitted for BL3 review.",
+  "constraints": [
+    "Exact reviewed HEAD must remain the build input; no source edits or version changes.",
+    "Canonical BL4/biel4 App Server/headless; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Repository-bounded cleanup only; do not delete broad directories or alter E:\\Prompt Arena or E:\\Prompt Arena-pr28.",
+    "No remote/publication actions and no commit."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\package.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

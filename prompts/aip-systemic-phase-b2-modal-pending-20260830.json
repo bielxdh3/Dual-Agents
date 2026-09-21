@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-b2-modal-pending-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Required skills at top: E:/AIP/.agents/skills/aip-implementation/SKILL.md; E:/AIP/.agents/skills/aip-phase-review/SKILL.md; E:/AIP/.agents/skills/aip-security-review/SKILL.md; E:/AIP/.agents/skills/aip-publication-check/SKILL.md; C:/CodexGlobal/skills/ponytail/SKILL.md (read each fully). Execute only bounded Phase B2 UI corrections from C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md. Start from current branch fix/systemic-desktop-ux-and-generation at HEAD 5c602255d39f91214f9d9c2d81bd8002db9ceab5, which contains the accepted B1 commit; do not reset/discard. Inspect only apps/desktop/src/App.tsx and its existing CSS/tests plus relevant conversation-state contracts. Replace every browser-native window.confirm in App.tsx with an AIP-styled accessible modal/dialog that is localized PT-BR, keyboard-dismissable, has explicit Cancel/Confirm actions, and does not execute destructive action until confirmed. Cover conversation deletion and pixel-layer deletion while preserving existing authorization/ownership and state refresh. Hide all assistant message actions that are not meaningful while the assistant message is pending or streaming (including copy/model/details/retry controls); do not hide the live queue cancellation control in the composer. Preserve user-message editing, completed/failed retry, temporary chat, and existing behavior. Add narrow deterministic frontend tests only if the existing setup supports them without broad dependency work; otherwise document unavailable. Do not change database schema, generation transport, model picker, profile, state, memories, calendar, overlay, or unrelated components. Run git diff --check, cargo fmt --check only if Rust touched (it should not), and the narrowest available frontend type/test check. Commit locally with an explanatory message. Do not push, PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues; do not claim browser acceptance.",
+  "constraints": [
+    "Use only configured Biel4 App Server/headless Executor with elevated/ready Windows sandbox. No native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Keep the diff strictly Phase B2 and preserve unrelated owner work; no amend, rebase, squash, force-push, or remote publication.",
+    "Use apply_patch or equivalent tracked edits in the target repository and keep modal behavior local-first with no data leakage."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/apps/desktop/src/use-phase-one.ts",
+    "E:/AIP/packages/contracts/src/index.ts"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

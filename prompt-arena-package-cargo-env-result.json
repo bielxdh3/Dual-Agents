@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-cargo-env-20260829",
+  "parent_request_id": "prompt-arena-package-localtarget-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:33:29.700334+00:00",
+  "finished_at": "2026-08-29T19:39:47.918790+00:00",
+  "summary": "Packaging attempt stopped at NSIS with the verbatim error: failed to bundle project: `Acesso negado. (os error 5)`. HEAD remained exactly 57f02b35abacce6a0a1ed64a5f952d29a710614a before and after. No tracked files changed. BL4 provenance: biel4 Executor, App Server/headless, workspace-write, Windows elevated, readiness ready, approval never.",
+  "files_changed": [
+    "src-tauri/target-cargo-env/"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "npm run tauri:build -- --bundles nsis",
+    "git status --short",
+    "git diff --check"
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis",
+      "status": "failed",
+      "details": "Exit code 1 after frontend/Rust release compilation. Exact error: failed to bundle project: `Acesso negado. (os error 5)`. No NSIS installer was produced."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "not_run",
+      "details": "Stopped after the NSIS permission error."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows",
+      "status": "not_run",
+      "details": "Stopped after the NSIS permission error."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff-check errors."
+    }
+  ],
+  "remaining_issues": [
+    "No NSIS installer path, size, SHA-256, checksum manifest, bundled-installer sidecar evidence, or install/launch/restart/uninstall smoke exists. Package and verification commands were not run. Generated target output remains at src-tauri/target-cargo-env/; compiled worker evidence was produced at release/prompt-arena-worker.exe (2570752 bytes, SHA-256 D07270DBE2ED0216B87BB14B41F421B264C8E077672FE935F6D53266E2933135) and x86_64-pc-windows-msvc/release/prompt-arena-worker.exe (2547712 bytes, SHA-256 593552C60654CC0D8B48C0908C558F4ADA7DEC4F316E3D82BD2D821781FACBD8), but neither was bundled into an installer."
+  ],
+  "git_status": "?? src-tauri/target-cargo-env/\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T193329Z-prompt-arena-package-cargo-env-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T193329Z-prompt-arena-package-cargo-env-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T193329Z-prompt-arena-package-cargo-env-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T193329Z-prompt-arena-package-cargo-env-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ef8-9d5b-7451-8733-b9d0ad9288e4",
+  "app_server_turn_id": "01a04f03-4b58-7453-b601-1e2a6e51ed69",
+  "app_server_process_id": "2688",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T193329Z-prompt-arena-package-cargo-env-20260829.md",
+  "task_sha256": "97f69277b9dafa6d9629fe7985f17176fbe7fa9f76b642aaf0d0607c0f992a9e",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-smoke-20260829",
+  "parent_request_id": "prompt-arena-package-local-tools-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Run the existing Windows package verification smoke for the already-produced exact-HEAD artifact in E:\\Prompt Arena-live-telemetry-i18n. Do not modify source files, docs, repository history, remotes, settings, or package contents. Confirm HEAD remains 57f02b35abacce6a0a1ed64a5f952d29a710614a. Run exactly `npm run verify:package -- --platform windows --smoke` against package-artifacts/prompt-arena-0.1.0-windows-nsis.exe. Capture the generated package-verification.txt and the exact clean install, installed executable launch, restart, and silent uninstall outcomes. If WebView2 or another runtime prevents launch, report the verbatim failure and preserve the installer/checksum evidence; do not claim human UI QA. Use canonical biel4 Executor through App Server/headless with workspace-write, Windows elevated readiness ready, approval never, and complete provenance metadata.",
+  "constraints": [
+    "No source, docs, history, remote, tag, release, deploy, or settings changes.",
+    "Generated package-verification.txt may be updated by the verification command.",
+    "Preserve exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a."
+  ],
+  "review_findings": [
+    {
+      "title": "Installer exists and checksum verification passed",
+      "details": "The prior canonical local-tools packaging run produced package-artifacts/prompt-arena-0.1.0-windows-nsis.exe and checksums-sha256.txt at exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a. The previous verification intentionally omitted --smoke."
+    },
+    {
+      "title": "Complete the required package lifecycle gate",
+      "details": "Run only the repository-native --smoke path so it installs to a temporary directory, launches, restarts, and silently uninstalls. Separate automated runtime failure from native human UI QA."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\package-artifacts\\prompt-arena-0.1.0-windows-nsis.exe",
+    "E:\\Prompt Arena-live-telemetry-i18n\\checksums-sha256.txt"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

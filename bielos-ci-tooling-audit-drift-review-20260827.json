@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-ci-tooling-audit-drift-review-20260827",
+  "action": "implement",
+  "repository": "E:\\BielOS",
+  "task": "Review the exact-SHA GitHub Actions failure for pushed commit 367ff05e1d696f1c48081a444a9666a92c949b14. Run scripts/tooling-audit-policy.mjs and inspect only the existing tooling-audit policy and relevant lockfile/workflow inputs. CI run 33082119121 failed only in Audit Prisma tooling policy with: Advisory metadata, path, severity, or fix data drifted. The current npm audit output shows the accepted Prisma advisory set but the prisma vulnerability range is >=6.13.0-dev.1 instead of the policy's expected 6.13.0-dev.1 - 7.10.0-integration-fix-prisma-publish-token.1. Determine whether this is upstream advisory metadata drift, an environment/version issue, or a repository defect, and whether any correction is required before the responsible-assignment publication can satisfy its exact-CI gate.",
+  "constraints": [
+    "Use only the configured biel4 App Server Executor; no native subagents or alternate backend.",
+    "Read-only review only: do not edit any file, stage, commit, push, create a PR, rebuild, restart, or mutate production/runtime state.",
+    "Preserve unrelated WIP paths exactly as currently restored in E:\\BielOS.",
+    "Do not propose waiving the failed CI job; report the concrete cause and the narrowest authorized next step.",
+    "Return structured findings and full trustworthy App Server provenance."
+  ],
+  "context_files": [
+    "scripts/tooling-audit-policy.mjs",
+    "scripts/tooling-audit-policy.test.mjs",
+    ".github/workflows/ci.yml",
+    "package-lock.json"
+  ],
+  "review_findings": [
+    {
+      "title": "Exact-SHA CI tooling audit policy drift",
+      "details": "CI run 33082119121 for 367ff05e1d696f1c48081a444a9666a92c949b14 failed only in Audit Prisma tooling policy with 'Advisory metadata, path, severity, or fix data drifted'. Current npm audit output matches the accepted three-advisory set except prisma.range is >=6.13.0-dev.1 rather than the policy's older bounded range. Determine whether this is upstream metadata drift, an environment/version issue, or a repository defect, and whether the responsible-assignment publication can proceed without changing unrelated policy files.",
+      "severity": "blocking"
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": []
+  }
+}

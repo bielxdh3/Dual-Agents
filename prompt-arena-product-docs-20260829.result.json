@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-product-docs-20260829",
+  "parent_request_id": "prompt-arena-p2-ui-overhaul-correction-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T01:27:35.938466+00:00",
+  "finished_at": "2026-08-30T01:32:29.214714+00:00",
+  "summary": "Updated both evidence documents for exact HEAD bcf706e5c32568ba43ac24f7673074c6d230098. Commit was blocked by linked worktree permissions; no SHA.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "git status --short",
+    "git diff --check",
+    "git add docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only line-ending warnings."
+    },
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Docs-only change; prior 17-file/99-test pass is recorded in the documents."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "not_run",
+      "details": "Docs-only change; prior pass is recorded in the documents."
+    },
+    {
+      "command": "npm run build",
+      "status": "not_run",
+      "details": "Docs-only change; prior pass is recorded in the documents."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "not_run",
+      "details": "Docs-only change; prior focused Rust command/model-library pass is recorded in the documents."
+    }
+  ],
+  "remaining_issues": [
+    "Staging and commit were blocked because Git could not create E:/Prompt Arena/.git/worktrees/Prompt-Arena-live-telemetry-i18n/index.lock. No commit SHA.",
+    "Native/human QA remains pending; Ollama and Docker remain unavailable, MSI remains blocked locally, Linux CI remains pending, and remote CI is unconfirmed.",
+    "Requested product-design skill files were unavailable locally."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T012736Z-prompt-arena-product-docs-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T012736Z-prompt-arena-product-docs-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T012736Z-prompt-arena-product-docs-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T012736Z-prompt-arena-product-docs-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a05047-7abb-7e41-ac48-7d67dde3dcd9",
+  "app_server_process_id": "5152",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T012736Z-prompt-arena-product-docs-20260829.md",
+  "task_sha256": "db221a0fbf818e65597829e4925f5d574d4567b9bae8387455cbe062acf9cc41",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

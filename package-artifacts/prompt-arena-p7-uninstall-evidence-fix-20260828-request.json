@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-uninstall-evidence-fix-20260828",
+  "parent_request_id": "prompt-arena-p7-windows-smoke-after-fix-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "On clean completion/desktop-delivery, fix only scripts/verify-package.mjs for two verified issues from the read-only Windows smoke. First, after the NSIS uninstaller exits, wait for the installed executable path to disappear for a bounded interval before declaring failure, so asynchronous filesystem deletion is handled without weakening the final absence check; if it remains, still fail with a clear uninstall error. Second, preserve the parsed --evidence-file path in the error path so failures write evidence only to the requested path (not repository-root package-verification.txt), while keeping symlink/real-directory protections. Do not change packaging metadata, workflow, sandbox, or unrelated files. Add focused tests only if feasible within this narrow scope. Run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Commit only the focused fix if tracked code changes are required. No package build, no push, no merge, no tag, no release, no deploy, and no paid-provider or external network calls.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "completion/desktop-delivery must start clean at 8058d28f3ffa8cefef7d926d81755069d544a276",
+    "focused correction only; preserve unrelated user work; no generated evidence files committed"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/scripts/verify-package.mjs", "E:/Prompt Arena/scripts/package-artifacts.test.mjs", "E:/Prompt Arena/package.json"],
+  "review_findings": [
+    {
+      "severity": "important",
+      "file": "scripts/verify-package.mjs",
+      "title": "Wait for NSIS file removal before final failure",
+      "details": "The uninstaller exits while the installed executable can still be removed asynchronously. Poll for bounded disappearance after uninstaller exit, then retain a hard failure if the path remains. Do not weaken the absence assertion."
+    },
+    {
+      "severity": "important",
+      "file": "scripts/verify-package.mjs",
+      "title": "Honor evidence path on verification errors",
+      "details": "The catch block currently writes the failure report to repository-root package-verification.txt even when --evidence-file points into a temporary directory. Preserve the parsed evidence path and write only there, retaining symlink and parent-directory checks."
+    }
+  ],
+  "max_correction_cycles": 0
+}

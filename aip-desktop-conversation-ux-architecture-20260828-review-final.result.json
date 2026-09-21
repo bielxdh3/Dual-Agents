@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-review-final",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T21:47:04.480863+00:00",
+  "finished_at": "2026-08-28T21:52:51.793626+00:00",
+  "summary": "Review do commit 78d38a19d1357a068b00b1d98995fb6448de1eaa contra 75fa3941d9262003bf4b6f94534cb886d28d50b0; worktree limpo. Veredicto: changes_requested. Q1-Q8: sim — tabs horizontais ativos removidos; sidebar agent-first; múltiplas conversas; sem UX permanente privilegiada de main; ações contextuais seguras; arquivadas ocultas; Temporary Chat contextual; Advanced secundário. Q9-Q12: sim — seletor junto ao composer, aplicação imediata, default separado por agente, retorno explícito ao default e estado indisponível preservado. Q13-Q15: sim — perfil em grid responsivo, mapeamentos PT-BR-first para adult/agent/they/them e inglês secundário. Q16-Q18: sim — Recursos locais/Voice recolhidos e concisos, diagnósticos em Avançado e ações principais identificáveis. Q19-Q20: caminho estático correto — transparência Tauri/CSS, máscara alfa 128, pixels customizados RGBA unidos e projetados, regiões nativas SetWindowRgn e click-through preservados; validação Windows instalado continua manual. Q21-Q23: dados legados, histórico, ownership, isolamento, temporary-chat, autoridade Rust e guards de segurança preservados estaticamente. Migração 0026 usa verificação de coluna e índice IF NOT EXISTS; roadmap bundled/offline STT+TTS permanece explicitamente futuro. O bloqueio encontrado é o fallback ativo: main_conversation ordena apenas updated_at/id, embora a documentação e o fallback de arquivamento prometam pinned-first; após excluir a conversa ativa, uma conversa fixada mais antiga pode não ser escolhida.",
+  "files_changed": [],
+  "commands_run": [
+    "Get-Content AGENTS.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md e /goal original",
+    "git status --short --branch; git rev-parse HEAD; git rev-parse HEAD^; git show -s --format=... HEAD",
+    "git diff --check 7bbd5e7b92f580614fd99207640b3faf49d83066..HEAD",
+    "git diff --stat e --name-status 7bbd5e7b92f580614fd99207640b3faf49d83066..HEAD",
+    "rg/Get-Content nos fontes, testes, migrações, contratos e documentação relevantes",
+    "git diff --unified=0 e git diff --unified=25 do diff líquido e do follow-up",
+    "git status --porcelain=v1"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check baseline..HEAD",
+      "status": "passed",
+      "details": "Diff sem erros de whitespace."
+    },
+    {
+      "command": "git status --porcelain=v1",
+      "status": "passed",
+      "details": "Worktree limpo e HEAD/parent correspondem ao pedido."
+    },
+    {
+      "command": "Testes Vitest, TypeScript e Rust reportados pelo Executor",
+      "status": "not_run",
+      "details": "Não foram rerunados para manter o worktree imutável; o relatório anterior informa Vitest desktop 25/25, typecheck, cargo fmt/check e Rust 154 passados, 1 ignorado por Ollama local."
+    }
+  ],
+  "remaining_issues": [
+    "Medium/blocking: corrigir e testar o fallback de conversa ativa para ordenar is_pinned DESC, updated_at DESC, id ASC também no caminho main_conversation usado após exclusão.",
+    "Low: regras CSS antigas .nav-item/.main-panel permanecem sem callers JSX; não reconstituem a navegação antiga, mas são resíduos.",
+    "A transparência, click-through e hitbox no Windows instalado ainda exigem smoke humano; não há evidência independente de packaging ou CI remoto."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T214704Z-aip-desktop-conversation-ux-architecture-20260828-review-final\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T214704Z-aip-desktop-conversation-ux-architecture-20260828-review-final",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T214704Z-aip-desktop-conversation-ux-architecture-20260828-review-final\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T214704Z-aip-desktop-conversation-ux-architecture-20260828-review-final\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04a44-41dc-7291-b61f-65b62802dc47",
+  "app_server_turn_id": "01a04a57-38c4-75b2-91c5-2cb0d1308f88",
+  "app_server_process_id": "21416",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T214704Z-aip-desktop-conversation-ux-architecture-20260828-review-final.md",
+  "task_sha256": "a15ecc0897ca1f8415469c8e1dc88963bc4a970437282d27a5b00c5ac8142f82",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

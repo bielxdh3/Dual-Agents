@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-preflight-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Read-only canonical BL4 operational preflight. Do not alter any repository file, do not commit, push, merge, tag, release, deploy, or implement P4; do not use TUI/native_tui/fallback/substitute. In the same BL4 biel4 Executor/Reviewer app_server session, first capture native wrapper provenance including account, role, CODEX_HOME, backend, task_transport, sandbox_mode, windows.sandbox, readiness, approval_policy, thread_id, turn_id, and process_id. From E:/Prompt Arena run exactly: (1) node -e \"const {spawnSync}=require('child_process');const r=spawnSync('cmd.exe',['/c','echo BL4_CHILD_OK'],{encoding:'utf8'});console.log(JSON.stringify({status:r.status,error:r.error?.message||null,stdout:r.stdout?.trim()||''}));process.exit(r.status??1)\"; (2) node -e \"const {spawnSync}=require('child_process');const r=spawnSync(process.execPath,['-e','console.log(\\\"BL4_NODE_CHILD_OK\\\")'],{encoding:'utf8'});console.log(JSON.stringify({status:r.status,error:r.error?.message||null,stdout:r.stdout?.trim()||''}));process.exit(r.status??1)\"; (3) npm test; (4) npm run build; (5) git status --short --branch. Report exact exit code, sanitized error, and structured stdout for each. Confirm no files changed. Expected repository root E:/Prompt Arena, branch completion/advanced-arena, HEAD 1e2e40ac560973e102f44a6b7cb9ed70d5a68800. Do not infer native provenance from shell output; wrapper metadata is authoritative. Return a compact JSON report even if the wrapper marks the read-only run as failed due no diff.",
+  "constraints": [
+    "account must be biel4",
+    "role must be Executor/Reviewer",
+    "CODEX_HOME must be C:/Users/bielx/3D Objects/CodexProfiles/executor",
+    "backend must be app_server",
+    "task_transport must be app_server",
+    "sandbox_mode must be workspace-write",
+    "windows.sandbox must be elevated",
+    "readiness must be ready",
+    "approval_policy must be never",
+    "danger-full-access prohibited",
+    "no file changes, no commit, no push, no implementation",
+    "no TUI/native_tui/fallback/substitute",
+    "fail closed if native provenance is absent or mismatched"
+  ],
+  "authorization": {"allowed_actions": []},
+  "context_files": [],
+  "review_findings": [],
+  "max_correction_cycles": 0
+}

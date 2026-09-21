@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-final-package-docs-update-37dbafc-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "As the canonical BL4 Executor through a fresh App Server/headless session, update only the two evidence documents in the intentionally dirty Prompt Arena checkout to reconcile the reviewed source and fresh package evidence. The reviewed source commit is 37dbafcabb03079927e6d2f1ee499269c1a6722f (commit fix: harden blind evaluation continuity and model actions); later package checksum changes are evidence only. Replace stale source/package references that still name 838d952/f393e9023b2f1d28de27ce34b73eff83f9a2af45 and the prior 3,756,114-byte/085C1BF1... installer with the current package evidence: checkout/source HEAD 37dbafcabb03079927e6d2f1ee499269c1a6722f; NSIS artifact and bundle 3,757,226 bytes, SHA-256 68C4CCF7E7AB0B1D14501DCE1CF401A2DEECC0A8DB52228557B28E447F34AE6C; the fresh bundled worker from src-tauri/target/release/prompt-arena-worker.exe is 2,567,680 bytes, SHA-256 80AB45BCEBE7009CD174B9C1E1B1D360D3D9BD029002EE15A6A0D279035BE078; tracked source sidecar remains separately identified if mentioned; checksums-sha256.txt current SHA-256 D361EE0B0C0984A202BB392B6FC6732CBBEDCFF299385CF4955CB2889B9E5B52. State that checksum verification, clean install, executable start, restart, and silent uninstall passed; MSI remains unavailable, Linux/remote CI and visual/native/full Tauri Arena human QA remain pending. Preserve historical 57f02b3 evidence separately and all live Ollama worker evidence at its actual checkout. Do not alter source/test code, do not commit, and do not touch E:\\Prompt Arena or E:\\Prompt Arena-pr28. Run git diff --check and report exact files plus provenance.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Documentation-only mutation; preserve all current source/test/checksum changes and existing gate wording unless required for exact-head reconciliation.",
+    "No reset, stash, commit, push, tag, release, deploy, merge, PR, or UI automation."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\checksums-sha256.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n\\package-verification.txt"
+  ],
+  "review_findings": [
+    {
+      "title": "Stale exact-head package evidence",
+      "details": "Both evidence documents still cite source 838d952/f393e902 and the prior 3,756,114-byte installer; fresh package smoke passed at source HEAD 37dbafc with the new artifact and worker hashes supplied in this request.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "parent_request_id": "prompt-arena-package-exact-head-37dbafc-20260830",
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

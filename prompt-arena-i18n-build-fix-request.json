@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-build-fix-20260829",
+  "parent_request_id": "prompt-arena-i18n-app-settings-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Correct only the i18n build/test regressions in the isolated product worktree. Preserve all existing behavior and boundaries; local mutation only, no commits or remote operations, and do not modify the original worktrees. Use canonical biel4 App Server/headless workspace-write elevated/ready approval-never transport.",
+  "review_findings": [
+    {"title":"Duplicate translation keys break typecheck","details":"npm run typecheck fails with TS1117 in src/i18n.ts at lines 659, 672-674, 707, 709-710, 730, 736, 789, 792, 815, and 821. Remove duplicate object properties while preserving one correct PT-BR value for each key. The test runner also emits the same duplicate-key warnings."},
+    {"title":"Advanced Arena direct render regression","details":"npm test has 1 failure in src/advanced-arena-view.test.tsx because AdvancedArenaView now calls useI18n outside I18nProvider. Remove the unnecessary hook dependency there and rely on the existing translate helper/parent rerender, or otherwise provide a safe provider-independent path without changing tests or behavior."},
+    {"title":"Validation","details":"After the minimal fix run npm run typecheck and npm test; report exact results. Do not refactor unrelated UI or telemetry."}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.test.tsx"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

@@ -1,0 +1,12 @@
+{
+  "operation": "create_branch",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/advanced-arena-followup",
+  "expected_remote_state": "absent",
+  "new_sha": "455df511996259213ce917f1138dfcd091f7003e",
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-exact-head-20260830",
+  "parent_request_id": "prompt-arena-status-vocabulary-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated Dual Codex App Server/headless path. Continue the single Prompt Arena completion task in E:\\Prompt Arena-live-telemetry-i18n-commit2 on branch completion/windows-qa-live-telemetry-i18n. The source implementation is already reviewed and tested; exact current checkout HEAD is da36292cb8e19336d401f9a05f18c788985d647f, whose source code is unchanged from reviewed implementation HEAD 8588a2dd66e386082e153c933b1b55891ac42657. Do not modify source code, tests, or protected E:\\Prompt Arena, E:\\Prompt Arena-live-telemetry-i18n, or E:\\Prompt Arena-pr28 worktrees. Perform the required fresh Windows NSIS packaging at this exact reviewed source tree: first verify clean tracked status and exact HEAD, run cargo clean --manifest-path src-tauri/Cargo.toml (target directory only), then npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}', npm run package:artifacts -- --platform windows, and npm run verify:package -- --platform windows --smoke. Capture exact artifact/bundle/bundled-worker/sidecar sizes and SHA-256 values, checksum manifest and package-verification hashes, and the lifecycle smoke results. Update only evidence files justified by the fresh measurements: checksums-sha256.txt, package-verification.txt, docs/DELIVERY_MATRIX.md, and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md. In both docs, keep the reviewed source implementation HEAD 8588a2d explicit, state that the fresh package was built from this exact source tree, change only the NSIS exact-head row/status from PARTIAL_IMPLEMENTATION to COMPLETE if and only if the build/checksum/clean-install/start/restart/silent-uninstall checks pass, and retain PENDING_HUMAN_QA for visual/native/full Tauri Arena and human review. Preserve MISSING/blocked/reserved statuses for Docker, MSI, Linux/remote CI and honest live LM Studio/llama.cpp service smoke status (the adapters are implemented, but no live service smoke is claimed). Do not claim human QA from package smoke. Run git diff --check, verify source files are unchanged, verify protected-worktree status without attempting unsafe ownership workarounds, stage only the four evidence files, and create exactly one normal local commit with message docs: refresh exact-head Windows package evidence. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use an alternate execution path. Provenance handling: the authenticated wrapper records executor account biel4, executor role, App Server transport and IDs, workspace-write, Windows sandbox elevated/readiness ready, and approval never in its result metadata; treat wrapper metadata as authoritative and do not self-block on unsupported PowerShell snapshots or protected-worktree dubious-ownership warnings. Report complete provenance, commands, exact hashes/sizes, source/head relation, changed files, and remaining gates. Only if the wrapper itself genuinely lacks a required field should you stop without committing and report PROMPT_ARENA_BLOCKED_BY_PROVENANCE.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI/native_tui, fallback backend, alternate account, or danger-full-access.",
+    "No source implementation/test changes and no modifications to the original, linked-source, or PR#28 protected worktrees.",
+    "cargo clean may affect only src-tauri/target; package artifacts may be regenerated, but stage only checksums, verifier, and the two evidence docs.",
+    "Fresh package evidence must be tied to reviewed source implementation HEAD 8588a2d (current checkout docs-only descendant da36292) and must not claim visual/native/human acceptance.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, or reset."
+  ],
+  "review_findings": [
+    {"title":"Current package evidence is stale","details":"The existing NSIS/package hashes were built at source HEAD 5c5de64, while the reviewed adapter implementation is at 8588a2d. A fresh exact-head NSIS build and lifecycle smoke are required before the package row can return to COMPLETE.","severity":"blocking"},
+    {"title":"Preserve honest QA boundaries","details":"Package checksum/install/start/restart/uninstall smoke is automated packaging evidence only; retain PENDING_HUMAN_QA for visual/native/full Tauri Arena and human review, and retain Docker/MSI/Linux/remote/live-service reservations.","severity":"important"}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package.json",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\scripts\\verify-package.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\checksums-sha256.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package-verification.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

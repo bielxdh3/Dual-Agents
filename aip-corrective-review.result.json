@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "request_id": "6318d895-613a-41cb-8e95-cb0e08ad03dc",
+  "verdict": "changes_requested",
+  "summary": "The corrective implementation substantially adds real bounded runtime paths for Phases 8–11 and preserves the existing Android/gateway boundaries. However, documentation still uses non-approved status vocabulary, and the full test suite could not be executed in this environment.",
+  "findings": [
+    {
+      "severity": "medium",
+      "path": "docs/PHASE_8_VOICE_SPEC.md:1; docs/PHASE_9_TOOLS_SPEC.md:3; docs/PHASE_10_EXTENSIONS_SPEC.md:3; docs/PHASE_11_SCREEN_VISION_SPEC.md:3; docs/PHASE_12_ANDROID_SPEC.md:3",
+      "evidence": "These documents use statuses such as \"functional local runtime\", \"functional local checkpoint\", \"functional automated capture/provider checkpoint\", and \"real Android APK\", which are outside the required vocabulary.",
+      "recommendation": "Replace status declarations with only FOUNDATION ONLY, FUNCTIONAL — AUTOMATED VALIDATION COMPLETE, FUNCTIONAL — HUMAN VALIDATION PENDING, APPROVED, RELEASED, or BLOCKED."
+    },
+    {
+      "severity": "medium",
+      "path": "repository validation",
+      "evidence": "`pnpm test` could not complete: Node failed with `spawn EPERM` before the workspace test suites executed. No successful full Rust/TypeScript test evidence was available in this review.",
+      "recommendation": "Run the complete workspace and Rust/Tauri validation in an environment where child-process spawning is permitted, and record the actual results."
+    },
+    {
+      "severity": "low",
+      "path": "apps/desktop/src-tauri/src/voice.rs; apps/desktop/src-tauri/src/screen_vision.rs",
+      "evidence": "Real device/provider behavior depends on Windows hardware and externally installed local executables configured through environment variables.",
+      "recommendation": "Retain as explicit human/external validation reservations; do not mark release-ready until supported Windows runtime checks complete."
+    }
+  ],
+  "phase_status": {
+    "phase_8": "FUNCTIONAL — HUMAN VALIDATION PENDING",
+    "phase_9": "FUNCTIONAL — HUMAN VALIDATION PENDING",
+    "phase_10": "FUNCTIONAL — AUTOMATED VALIDATION COMPLETE",
+    "phase_11": "FUNCTIONAL — HUMAN VALIDATION PENDING",
+    "phase_12": "FUNCTIONAL — HUMAN VALIDATION PENDING",
+    "phase_13": "FUNCTIONAL — HUMAN VALIDATION PENDING"
+  },
+  "validation_evidence": [
+    "Reviewed all corrective commits in origin/main..HEAD.",
+    "Confirmed bounded Windows waveIn/waveOut enumeration, capture, playback, cancellation, provider degradation, and custom-reference validation.",
+    "Confirmed bounded workspace containment, link/reparse rejection, preview, approval, second confirmation, dry-run, audit, cancellation, and compensation paths.",
+    "Confirmed closed declarative Rust extension VM with integrity validation, capabilities, bounded host context, cancellation, lifecycle controls, rollback, and disable behavior.",
+    "Confirmed Windows GDI capture and bounded executable visual-provider protocol with timeout, cancellation, cleanup, and strict uncertain output.",
+    "Confirmed no corrective changes to the existing Android/gateway transport implementation and no BielOS coupling.",
+    "Publication searches found no obvious credential or private-data match.",
+    "Remote CI not confirmed.",
+    "Full local test suite not completed because of spawn EPERM."
+  ],
+  "human_validation": [
+    "Windows microphone/speaker and provider installation.",
+    "Wake-word behavior and voice quality.",
+    "Filesystem confirmation UX and real Windows path behavior.",
+    "Extension usability and packaged desktop behavior.",
+    "Screen privacy, display behavior, and visual quality.",
+    "Physical Android/private-LAN behavior.",
+    "Optional BielOS or Cloudflare integration."
+  ],
+  "publication_readiness": "Release artifact review required. No obvious secret was found in the inspected tree, but full history and generated artifacts were not independently scanned.",
+  "provenance": {
+    "reviewer_role": "Biel4 Reviewer",
+    "repository": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\aip-phase10-checkout",
+    "branch": "cdx/corrective-runtime-completion",
+    "base": "origin/main",
+    "head": "edb7a9a",
+    "control_plane_provenance": "Not independently verifiable from repository-only inspection"
+  },
+  "reviewer_report_file": null,
+  "git_status": {
+    "clean": true,
+    "branch": "cdx/corrective-runtime-completion",
+    "head": "edb7a9a",
+    "review_range": "origin/main..HEAD"
+  }
+}

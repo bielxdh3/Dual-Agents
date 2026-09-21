@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-formatting-fix-20260829",
+  "parent_request_id": "prompt-arena-i18n-formatting-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:21:50.445264+00:00",
+  "finished_at": "2026-08-29T19:23:52.686504+00:00",
+  "summary": "Fixed the TypeScript regression with a finite-number guard for summary.summary.completed. Locale presentation changes and canonical data behavior were preserved. BL4 provenance: biel4 Executor, canonical executor profile, app_server, isolated workspace-write Windows worktree, approval never. Phase-review verdict: Approved.",
+  "files_changed": [
+    "src/App.tsx",
+    "src/advanced-arena-ui.ts",
+    "src/advanced-arena-view.tsx",
+    "src/byok-ui.ts",
+    "src/i18n.ts",
+    "src/results-ui.ts"
+  ],
+  "commands_run": [
+    "npm run typecheck",
+    "npm test",
+    "git diff --check",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "tsc completed with no errors."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "17 test files passed; 92 tests passed."
+    }
+  ],
+  "remaining_issues": [
+    "Remote CI and manual UI validation were not run; requested local checks pass."
+  ],
+  "git_status": " M src/App.tsx\n M src/advanced-arena-ui.ts\n M src/advanced-arena-view.tsx\n M src/byok-ui.ts\n M src/i18n.ts\n M src/results-ui.ts\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T192150Z-prompt-arena-i18n-formatting-fix-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T192150Z-prompt-arena-i18n-formatting-fix-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T192150Z-prompt-arena-i18n-formatting-fix-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T192150Z-prompt-arena-i18n-formatting-fix-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ef8-9d5b-7451-8733-b9d0ad9288e4",
+  "app_server_turn_id": "01a04ef8-9df6-75b2-b607-3b5ad3beb538",
+  "app_server_process_id": "8816",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T192150Z-prompt-arena-i18n-formatting-fix-20260829.md",
+  "task_sha256": "0ed7aaecccf153678d17f08ace1999dcb1486c22d4f6caa4ab7e5404bbf943e4",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "App Server returned a failed custom-tool output; the report cannot be accepted as a successful execution."
+}

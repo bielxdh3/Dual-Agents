@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-product-polish-after-reset-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement P6 product polish end-to-end in the existing Prompt Arena Tauri app on completion/product-polish from the current HEAD. Do not implement page-transition motion. Add a useful Dashboard/Overview reading local app-owned data (runs, Arena summaries, profiles/models, diagnostics) with navigation to Arena, Advanced Arena, Runs, Models, and Settings. Preserve honest loading, empty, error, and browser-preview states; never invent sample data. Improve Runs/history/results so persisted evidence is discoverable, readable, and keyboard accessible. Provide sanitized deterministic bounded local-first JSON, Markdown, and CSV exports from persisted Arena evidence where applicable; never include API keys or credential material. Add an accessible local diagnostics surface explaining desktop bridge status, storage/runtime boundaries, and local capabilities with semantic labels and live regions. Polish responsive layout and product copy; remove user-facing foundation/scaffold/Phase F wording for shipped capabilities while retaining truthful preview disclaimers. Keep appearance controls and reduced-motion preference; do not add page-transition animation, telemetry, cloud service, or hidden network calls. Update ROADMAP.md honestly for P6 and keep P1-P6 IN PROGRESS while native acceptance, security review, publication checks, or other declared gates remain pending. Add focused tests. Run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, and cargo test --manifest-path src-tauri/Cargo.toml --all-targets. Commit on completion/product-polish and report exact provenance metadata and SHA.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/product-polish; preserve all P1-P5 commits; no reset/clean/discard",
+    "no secrets, telemetry, cloud calls, paid-provider calls, merge/tag/release/deploy/public release",
+    "do not implement page-transition motion"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/results-ui.ts", "E:/Prompt Arena/ROADMAP.md"],
+  "max_correction_cycles": 1
+}

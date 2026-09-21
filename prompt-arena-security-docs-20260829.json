@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-security-docs-20260829",
+  "parent_request_id": "prompt-arena-security-fix-blind-errors",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Update only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md for the exact current Prompt Arena HEAD after the confirmed blind-telemetry security fix. Use canonical BL4/biel4 App Server/headless, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read C:\\CodexGlobal\\AGENTS.md and required ponytail, project-security-review, project-phase-review, project-publication-check, product-design/index, and product-design/audit SKILL.md files first. Verify actual HEAD before writing; current expected source chain ends at 838d952b2c352404eabdf082ce37847f5f3a1cb4 after docs commit edb7b2d and security fix. Do not modify source/tests/generated artifacts/remotes/tags/releases/deploys or other worktrees. Correct prior docs target mismatch so both docs target the exact final HEAD (or clearly state source HEAD vs docs commit without claiming a predecessor). Add P0 blind telemetry error genericization evidence (`visibleArenaTelemetryError` in src/arena-runner.ts/App.tsx and focused test), updated full-suite result 17 files/100 tests, typecheck/build/diff-check, and keep all native/runtime/package gates PENDING_HUMAN_QA/BLOCKED_EXTERNAL_RUNTIME/PENDING_AUTOMATED_NATIVE_QA as appropriate. Update security section: confirmed blind error leak is fixed; blind identity/score/reveal, local model path safety, sanitized errors, async worker isolation, and no-secrets checks remain covered by source/tests; no new confirmed source leak. Record publication review as `Create a sanitized public copy` because reachable history/docs include local usernames/absolute paths and operational provenance; do not sanitize internal evidence in this commit unless required, but state no publication/push/tag/release/deploy occurred and a public copy must redact those details. Keep historical 57f02b3 NSIS evidence separate from current HEAD; fresh current-HEAD NSIS remains PENDING_AUTOMATED_NATIVE_QA. Add explicit remaining QA markers for P0 freeze, score continuity, model actions, contrast/overflow/scroll/native controls/motion/i18n. Create one normal local docs commit with message `docs: record blind telemetry security remediation` if possible; otherwise leave exact two-file diff for host-side commit. Do not claim visual/human/native QA.",
+  "constraints": [
+    "Only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md may change.",
+    "Do not claim the old NSIS artifact is current-head output; retain its hashes as historical evidence.",
+    "Use exact current HEAD and distinguish internal evidence from sanitized public publication.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No source/generated/remote/tag/release/deploy/other-worktree changes."
+  ],
+  "review_findings": [
+    {
+      "title": "Docs target became stale after security hotfix",
+      "details": "Both evidence docs currently target predecessor bcf706e while current source now includes 838d952 blind telemetry genericization."
+    },
+    {
+      "title": "Publication requires sanitized copy",
+      "details": "Final publication review found local usernames/absolute paths in reachable docs/history and incomplete unreachable-object verification; no public publication is authorized."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

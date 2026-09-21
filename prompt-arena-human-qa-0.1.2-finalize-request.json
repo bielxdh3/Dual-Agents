@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-human-qa-0.1.2-finalize",
+  "action": "implement",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "Finalize the existing BL4-generated Prompt Arena human-QA correction diff in the current dirty worktree. Do not reset or redesign. Read the objective at C:\\Users\\bielx\\.codex\\attachments\\472d0c0f-7aee-4933-935c-26b69ea8f998\\goal-objective.md and inspect the current diff. Make only the minimal fixes needed for the known validation failures: remove the unused ReactKeyboardEvent import in src/App.tsx; add/update focused tests for contrastId normalization/serialization and any new listbox behavior; restore all PT-BR resource entries expected by existing i18n tests while keeping the new terminology and adding translations for every new user-facing literal; update the static UI contract expectations for valid new translated props rather than weakening the audit. Confirm every remaining JSX <select> is gone or accessible by the shared listbox and that the required Settings cleanup/status block, default/high contrast tokens, motion/reduced-motion rules, and structural settings styles remain intact. Do not use Computer Use/browser automation or claim visual/human acceptance. Do not push, tag, release, deploy, merge, rebase, force-push, or change repository settings. Run npm test, npm run typecheck, npm run check:boundaries, git diff --check; if they pass, commit all intended code/test changes locally with a clear message. Do not change application version or build artifacts in this short finalization request; leave that for the architect after review.",
+  "constraints": [
+    "BL4 / biel4 executor only; current files are partial output from the same executor and must be preserved.",
+    "This is a bounded finalization pass, not a broad redesign or a new visual audit.",
+    "Preserve stored data-model IDs and immutable/versioned semantics; no weakening of security or accessibility contracts.",
+    "Human Windows/native visual QA remains pending and must be reported as such."
+  ],
+  "context_files": [
+    "C:/Users/bielx/.codex/attachments/472d0c0f-7aee-4933-935c-26b69ea8f998/goal-objective.md",
+    "E:/Prompt Arena-live-telemetry-i18n/src/App.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/advanced-arena-view.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/accessible-listbox.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/appearance.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/appearance.test.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/i18n.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/i18n.test.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/ui-contracts.test.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/src/styles.css"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T01:54:15.784938+00:00",
+  "finished_at": "2026-08-30T01:59:12.709227+00:00",
+  "summary": "Fresh NSIS packaging was attempted twice at exact HEAD 99485dec0f3f096b62fbe665c0085d8e7786579f using the requested local-tools override, but Rust compilation failed with Windows STATUS_IN_PAGE_ERROR. No fresh installer was produced. Frontend validation passed; tracked worktree remains clean. No MSI, push, tag, release, deploy, or visual/human QA occurred.",
+  "files_changed": [],
+  "commands_run": [
+    "git status --short; git branch --show-current; git rev-parse HEAD; git log -5 --oneline --decorate",
+    "Read required AGENTS.md and skill files",
+    "Read package.json, src-tauri/tauri.conf.json, packaging scripts, and existing artifact metadata",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+    "$env:CARGO_BUILD_JOBS='1'; cargo build --release --locked --manifest-path src-tauri/Cargo.toml --bin prompt-arena-worker --target x86_64-pc-windows-msvc",
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "git status --short; git rev-parse HEAD; git diff --check; git diff --name-only",
+    "Get-FileHash and metadata inspection for installer, bundle, and worker sidecar",
+    "Read checksums-sha256.txt and package-verification.txt"
+  ],
+  "tests": [
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "17 test files and 100 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript checks passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Frontend production build passed; existing large-chunk warning emitted."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+      "status": "failed",
+      "details": "Rust compilation failed before bundling with Windows STATUS_IN_PAGE_ERROR; repeated retry produced the same failure."
+    },
+    {
+      "command": "cargo build --release --locked --manifest-path src-tauri/Cargo.toml --bin prompt-arena-worker --target x86_64-pc-windows-msvc",
+      "status": "failed",
+      "details": "Single-job isolation reproduced STATUS_IN_PAGE_ERROR while compiling the prompt-arena library."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "not_run",
+      "details": "Skipped to avoid copying the unchanged historical installer and mislabeling it as current-HEAD output."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "not_run",
+      "details": "Skipped because no fresh exact-HEAD package exists; historical verification is not current-HEAD evidence."
+    }
+  ],
+  "remaining_issues": [
+    "No fresh exact-HEAD NSIS artifact, checksum, sidecar hash, or install/launch/restart/uninstall smoke evidence can be recorded until the Rust STATUS_IN_PAGE_ERROR environment/toolchain failure is resolved.",
+    "Existing files are historical 57f02b3 evidence, not fresh output: package-artifacts/prompt-arena-0.1.0-windows-nsis.exe and src-tauri/target/release/bundle/nsis/Prompt Arena_0.1.0_x64-setup.exe are 3,744,774 bytes with SHA-256 755BC8C48FD8912A4C8E07BB4C8ED11938D5022F63DBE800800BE69CCD05991C; the worker sidecar is 2,547,712 bytes with SHA-256 89B82DCDB78B0B99FF0B0DCD29C42C9836901B66CDD86CC1CEA3077B77744F76.",
+    "package-verification.txt records historical successful smoke only and must not be treated as validation for HEAD 99485de.",
+    "Remote CI, live runtime, installed native behavior, and human visual/accessibility QA remain unconfirmed."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T015416Z-prompt-arena-package-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T015416Z-prompt-arena-package-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T015416Z-prompt-arena-package-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T015416Z-prompt-arena-package-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0505f-e34d-7411-ac49-6da0255deaa2",
+  "app_server_process_id": "23648",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T015416Z-prompt-arena-package-20260829.md",
+  "task_sha256": "bb9efd313cca521b75754e6529ca5efe07c64acfe757b71b5b6e0897b728aac5",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase8-voice-integration-commit-20260820",
+  "parent_request_id": "aip-phase8-voice-integration-20260820",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-20T17:26:02.763482+00:00",
+  "finished_at": "2026-08-20T17:26:18.453812+00:00",
+  "summary": "Confirmed the integration diff was limited to the five requested files and committed it with the exact required message.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src/App.tsx",
+    "packages/contracts/src/index.ts",
+    "docs/PHASE_8_VOICE_SPEC.md",
+    "docs/CORRECTIVE_GAP_MATRIX.md"
+  ],
+  "commands_run": [
+    "git diff --name-only",
+    "git status --short",
+    "git commit -m \"feat: wire phase 8 local voice commands and controls\""
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Previously validated."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Previously validated."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Previously validated."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "115 passed, 0 failed, 1 ignored."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "passed",
+      "details": "Previously validated."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "Previously validated."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "passed",
+      "details": "Independently validated by orchestrator; 147 repository files checked."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Previously validated."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T172603Z-aip-phase8-voice-integration-commit-20260820\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T172603Z-aip-phase8-voice-integration-commit-20260820",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T172603Z-aip-phase8-voice-integration-commit-20260820\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T172603Z-aip-phase8-voice-integration-commit-20260820\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02026-9d28-7423-b67e-3e1548ed7ff4",
+  "app_server_turn_id": "01a02035-5fcd-7aa2-9fa5-7afce81bc1c6",
+  "app_server_process_id": "25028",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260820T172603Z-aip-phase8-voice-integration-commit-20260820.md",
+  "task_sha256": "fe4f846ebc27a526c665ca7a5fdb0174a9e2afc71ff5864529fe17416b9ef4ee",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

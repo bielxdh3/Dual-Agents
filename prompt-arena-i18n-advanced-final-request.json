@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-advanced-final-20260829",
+  "parent_request_id": "prompt-arena-i18n-finalize-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Make one narrow i18n-only edit pass in the current isolated worktree. Preserve existing telemetry, Windows/UI fixes, security and evidence boundaries. Do not modify E:\\Prompt Arena or E:\\Prompt Arena-pr28 and do not commit or use remote operations. In src/advanced-arena-view.tsx, wrap every remaining user-facing English literal visible in JSX (headings, help, labels, buttons, options, captions, table headers, status text, aria text) with the existing translate(...) helper and add only missing PT_BR_MESSAGES entries in src/i18n.ts. Keep W-L-T, IDs, code syntax, user-entered content, and technical identifiers unchanged. Do not redesign i18n or run broad tests; only run npm run typecheck if quick. Include exact changed files and provenance metadata.",
+  "constraints": [
+    "Use canonical biel4 App Server/headless executor with workspace-write, Windows elevated readiness ready, approval never.",
+    "No untrusted HTML interpolation and no translation of IDs, paths, protocol names, code, or user content.",
+    "Do not change behavior outside translation wiring."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

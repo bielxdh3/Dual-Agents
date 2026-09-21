@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-fix-20260826",
+  "action": "implement",
+  "repository": "E:\\BielOS",
+  "task": "You are Biel4, the Executor implementing a blocking BielOS Core responsible/owner assignment correction. Read C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, E:\\BielOS\\.agents\\skills\\bielos-security-review\\SKILL.md, E:\\BielOS\\AGENTS.md, and the attached operational mission context before editing. Work on the already checked out branch main at starting SHA 4eb59583cb7dc77c416437053b8d2b21abd8021a. The worktree is intentionally dirty with unrelated pre-existing changes; preserve them and do not modify or stage unrelated paths.\n\nArchitect Phase-1 trace already established this flow: CoreProjectAdminControls UI access form (userId/accessLevel) -> setCoreProjectAccess server action -> Cloudflare Access + CSRF + authenticated global OWNER/ADMIN check -> PROJECT_OWNER_ACCESS_CHANGE elevation -> setCoreProjectAccessRecord -> serializable ProjectAccess create/update transaction -> sanitized audit -> revalidatePath and redirect -> project read-back. Existing database integration coverage currently passes OWNER grant/change/repeat, authorization, invalid target, and last-owner cases, so reproduce the reported human-smoke failure at the UI/server-action/read-back boundary instead of assuming the persistence service is correct. Inspect current source and tests deeply enough to identify the concrete root cause. Likely fault classes to verify include the responsible/OWNER control not being submitted as intended, missing/incorrect UI read-back or stale state, swallowed mutation/elevation errors with false-looking success, or an owner/responsible semantic mismatch. Do not stop at a hypothesis.\n\nImplement the smallest coherent repo-native correction. Preserve the ProjectAccess canonical ownership model, Cloudflare-before-BielOS auth, CSRF, server-side validation, session/elevation checks, global OWNER/ADMIN boundaries, serializable transaction and audit behavior, and last-active-owner protection. Do not weaken or bypass any gate. Make rejected assignment visible as a meaningful failure (never false success), ensure successful assignment is read back from persisted data after redirect/refresh, and ensure the supported OWNER flow makes the intended responsible/OWNER relationship unambiguous. Add focused automated coverage at the correct layer(s), including valid OWNER assignment and persisted/read-back state, unauthorized rejection, invalid/nonexistent target rejection, last-owner protection, no false-success failure handling, and reload/refetch preservation where applicable. Keep tests deterministic and use disposable fixtures.\n\nDo not change the database schema unless the evidence proves it is necessary. Do not add dependencies. Do not touch GymForge or unrelated auth/rate-limit/docs changes. Do not perform production mutations, Docker destructive actions, Cloudflare/DNS changes, push, PR, merge, tag, release, deploy, rebuild, or restart. Do not commit unless explicitly necessary for the local correction; prefer leaving the existing worktree changes and the new scoped correction uncommitted for Architect review.\n\nRun focused validation for changed paths (targeted project access/UI tests and relevant database tests); run lint/typecheck/build only if materially required. Report a structured result with summary, files_changed, commands_run, tests, remaining_issues, git_status, diff_file, and executor_report_file. Include trustworthy Dual Codex App Server provenance in the result: executor account/label, backend/transport, CODEX_HOME/profile, repository, thread/turn/result correlation, and no secrets. Stop with a precise blocker if App Server provenance or a required environment gate cannot be established.",
+  "constraints": [
+    "Use only the configured biel4 App Server Executor; no native subagents, TUI substitute, alternate backend, or visible orchestrator codex exec.",
+    "Local source/test mutation only; preserve all unrelated pre-existing dirty paths; no commit, push, PR, merge, tag, release, deploy, production rebuild/restart, or production DB mutation.",
+    "Preserve Cloudflare Access, BielOS auth, CSRF, elevation, authorization, canonical ProjectAccess ownership semantics, sanitized audit, serializable transaction, and last-owner protections.",
+    "No schema/dependency change without evidence; no GymForge or unrelated auth/rate-limit/docs changes.",
+    "Return structured evidence and trustworthy App Server provenance; fail closed if provenance is unavailable."
+  ],
+  "context_files": [
+    "apps/hub/src/app/core/projects/project-admin-controls.tsx",
+    "apps/hub/src/app/core/projects/actions.ts",
+    "apps/hub/src/app/core/projects/access-service.ts",
+    "apps/hub/src/app/core/projects/read-service.ts",
+    "apps/hub/src/app/core/projects/access-policy.ts",
+    "apps/hub/src/app/core/projects/[projectId]/page.tsx",
+    "apps/hub/src/app/core/integration/project-access.db.test.ts",
+    "apps/hub/src/app/core/integration/project-authorization.db.test.ts",
+    "docs/deployment-verification.md",
+    "docs/administrative-elevation.md"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation"]
+  },
+  "max_correction_cycles": 1
+}

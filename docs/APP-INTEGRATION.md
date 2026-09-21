@@ -19,6 +19,15 @@ compatibilidade do Architect e de comandos legados.
    `correct` ligado por `parent_request_id`. Nao ha correcao automatica sem
    essa evidencia.
 
+Quando o fluxo completo `dual-codex run` e usado, cada fase resolve o ator
+novamente a partir de `[roles]` no momento da chamada. Architect e Reviewer
+seguem o perfil Codex configurado (inclusive quando compartilham o mesmo
+perfil); Executor segue exclusivamente o perfil Antigravity/Gemini
+configurado. A execucao grava `provenance.json` e a secao `Configured actor
+routing` do relatorio com `actor_id`, provider, backend, transporte e
+`configured_actor=true`. Nenhuma fase configurada e satisfeita por um worker
+generico ou por uma API de subagente nativo.
+
 O App deve consultar `status --json` antes de delegar quando precisar confirmar
 role, label, repositorio, Git, a versao do Codex e a versao/status do `agy`.
 Delegacao e recusada se o executor nao estiver configurado como `antigravity`,

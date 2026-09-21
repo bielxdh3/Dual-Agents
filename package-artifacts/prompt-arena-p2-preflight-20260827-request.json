@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-preflight-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Read-only control-plane and repository preflight only. Do not modify any file, do not commit, do not push, do not run implementation, do not use TUI/native_tui/fallback/substitute. From the canonical BL4 Executor/Reviewer app_server session, capture native provenance and effective execution metadata, then run only read-only checks: Get-Location, git rev-parse --show-toplevel, git branch --show-current, git rev-parse HEAD, git status --short --branch, and report the requested native session fields. If permitted without altering state, report process identity and executor launch arguments relevant to sandbox. Do not run tests or builds in this preflight.",
+  "constraints": [
+    "account must be biel4",
+    "role must be Executor/Reviewer",
+    "backend must be app_server",
+    "task_transport must be app_server",
+    "repository must be E:/Prompt Arena",
+    "sandbox_mode must remain workspace-write",
+    "windows.sandbox must remain elevated",
+    "approval_policy must remain never",
+    "danger-full-access is prohibited",
+    "no file changes of any kind",
+    "no commit",
+    "no push",
+    "no TUI, native_tui, fallback, or substitute executor",
+    "fail closed if native provenance is not available"
+  ],
+  "authorization": {"allowed_actions": []},
+  "context_files": [],
+  "review_findings": [],
+  "max_correction_cycles": 0
+}

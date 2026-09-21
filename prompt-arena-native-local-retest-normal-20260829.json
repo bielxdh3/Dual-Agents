@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-retest-normal-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-native-local-20260829-pr",
+  "task": "Read C:\\CodexGlobal\\AGENTS.md and the required skills C:\\CodexGlobal\\skills\\ponytail\\SKILL.md, C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md before acting. This is a fresh normal Windows native acceptance retest after successful Codex Windows elevated sandbox reprovisioning. Use only canonical BL4/biel4 Executor through the configured App Server/headless transport. The old App Server process was explicitly terminated by BL3; do not reuse old sessions or state. Work only in E:\\Prompt Arena-native-local-20260829-pr; never touch E:\\Prompt Arena original WIP. Product under test is exact SHA f3048a61f45cdb6b29f362444f3d32646edf4943, release app src-tauri\\target\\release\\prompt-arena.exe and worker src-tauri\\target\\release\\prompt-arena-worker.exe. Toolchain is already present in .native-tools: tauri-driver 2.0.6 and msedgedriver 151.0.4129.101; host Edge/WebView2 is 151.0.4129.107. Re-verify manifest and binary SHA-256 and product app/worker SHA-256. For this FIRST test, prepend only .native-tools to PATH and run exactly `node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe` with normal GPU/security settings. Do NOT use --disable-gpu, --no-sandbox, --disable-gpu-sandbox, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, or any workaround, policy change, registry change, fallback driver, browser-only test, TUI/native_tui, or cargo install. The acceptance must exercise the real chain: Tauri app, WebView2 WebDriver session, bridge/Tauri internals, Rust commands, app-owned worker sidecar, persistence, close, reopen, and persisted-run assertions. On success emit `WINDOWS_NATIVE_TAURI_ACCEPTANCE_LOCAL_PASS` and include `NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED run_id=...` plus exact BL4 thread/turn IDs, app/worker/tool paths and hashes, driver versions, and evidence for every chain stage. On failure capture exact first failing stage/error and read-only WebView2/DevToolsActivePort/GPU/process/port diagnostics; do not run the A/B --disable-gpu test in this task even if STATUS_ACCESS_DENIED recurs. No source, script, workflow, docs, policy, manifest, commit, push, merge, release, tag, deploy, or original-WIP changes; only authorized transient smoke logs may be produced. Return a structured report and full control-plane provenance; do not claim acceptance without the marker.",
+  "constraints": [
+    "BL4/biel4 only; App Server/headless; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never. These must be visible in result metadata with real app_server thread and turn IDs.",
+    "Fresh normal-GPU retest only. No security workaround or A/B flag in this task.",
+    "Validation-only; no source or remote changes; no original-WIP access; preserve existing untracked temporary files."
+  ],
+  "context_files": [
+    "scripts/native-ui-smoke.mjs",
+    ".native-tools/manifest.json",
+    "src-tauri/target/release/prompt-arena.exe",
+    "src-tauri/target/release/prompt-arena-worker.exe"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

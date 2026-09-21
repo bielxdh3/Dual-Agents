@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-c3-scroll-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Continue the clean AIP branch fix/systemic-desktop-ux-and-generation at its current HEAD. Apply one bounded follow-up for the attached systemic desktop UX goal: (1) reconcile authoritative documentation with the already-shipped conversation lifecycle by removing the stale claim in docs/PRODUCT_SPEC.md that one conversation is marked as the main conversation; describe ordinary per-agent conversations, explicit active selection, temporary chat, and the persisted/unnamed draft/empty-chat TTL behavior truthfully, without rewriting historical migration records or claiming future work; also update the closest authoritative UI behavior/known-limitations text only where it repeats that stale semantic. (2) inspect the current desktop CSS/layout and establish or minimally tighten a shared scroll ownership policy so the app shell owns page overflow, workspace panels/list/detail surfaces own internal overflow, and modal/popover/bubble content has bounded internal scrolling without clipped controls; preserve the existing conversation follow-bottom behavior and overlay transparency. Add focused deterministic tests or assertions for any changed UX helper/layout contract where practical. Do not redesign unrelated surfaces or touch generation/database/security behavior. Run focused desktop tests, TypeScript typecheck, cargo fmt/check for any Rust touched, secrets scan, and git diff --check. Create one local commit with message `docs: reconcile conversation semantics and scroll policy`; do not push, PR, merge, tag, release, deploy, or build installers. Return a structured report with summary, files_changed, commands_run, tests, commit_sha, and remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor; no native subagents, alternate backend, account, or manual/direct implementation fallback.",
+    "Preserve all existing commits and unrelated WIP. Do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Keep the patch minimal and repository-native. Do not add dependencies or commit secrets, databases, memories, model files, exports, backups, or auth material.",
+    "The attached goal document is the acceptance specification, but it is not itself a repository artifact to copy into the product.",
+    "Installed-Windows visual scroll/overlay behavior remains a human gate; do not claim it verified from static tests."
+  ],
+  "context_files": [
+    "E:/AIP/docs/PRODUCT_SPEC.md",
+    "E:/AIP/docs/UI_BEHAVIOR.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/conversation-scroll.ts",
+    "E:/AIP/apps/desktop/src/conversation-scroll.test.ts"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

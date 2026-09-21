@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-ui-surface-20260828",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Finish the visible UI/integration portion of the AIP Productization Closure core lot on branch fix/productize-local-capabilities. The worktree is intentionally dirty from a timed-out Biel4 run: preserve and review the existing Rust/contract additions for get_voice_provider_status, get_ollama_status, get_screen_vision_provider_status and import_extension_manifest, plus local ToolControls inputs and the safe extension example. Do not reset or discard them blindly. Implement only the missing installed-facing surface: add a clear keyboard-accessible Portuguese Recursos locais route in primary desktop navigation; make Voice, Ferramentas supervisionadas, Extensões, Visão de tela, Companion Android, Gateway and Valores cognitivos individually discoverable without relying on .agent-tools display:none; reuse existing stateful components without unsafe duplication and keep raw diagnostics behind Avançado. Add a compact truthful capability status center that consumes existing Tauri getters/contracts and represents runtime/Ollama, STT, TTS, microphone, output device, visual provider, screen capture, workspace root, extensions, Android companion and Gateway as Pronto, Não configurado, Indisponível, Bloqueado pelo modo or Erro, with Portuguese prerequisite and fixture/mock versus real-local explanations. Wire the existing VoiceProviderStatus/ProviderSnapshot/ScreenVisionProviderStatus parsers into the UI; do not expose executable paths or claim providers are bundled. Ensure ToolControls local workspace.inspect_local and workspace.organize_local preview/approval paths are reachable and have clear root-required copy. Surface the existing declarative extension example/import lifecycle and distinguish pending review, active, disabled, rejected and fixture-only behavior. Preserve safe mode, temporary chat, suspended/quiet modes, Owner approval/second confirmation, bounded local paths, no-upload/no-background-capture/no-raw-audio guarantees and Rust authority. Add focused React/contract tests for route visibility, status labels, provider parsing/gating, local tool input reachability and extension fixture labeling; no screenshot goldens or new dependencies. Update only directly affected roadmap/limitations copy to hard status vocabulary. Run focused formatter, TypeScript/UI/contract tests, Rust fmt/check for touched command wiring and git diff --check. Commit all coherent current-lot changes in one local commit with an explanatory message; do not push, create/update PR, merge, tag, release, deploy or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, remaining_issues and commit_sha.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md, .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "Ponytail full: reuse existing components/contracts/commands; no speculative abstractions or dependencies.",
+    "Work only on fix/productize-local-capabilities from cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4; preserve unrelated user work and the existing partial diff.",
+    "Commit only this current lot; no amend, rebase, squash, reset, force-push, history rewrite, push, PR, merge, tag, release, deploy or installer build.",
+    "Do not expose or commit secrets, credentials, local databases, histories, memories, private media, model files, voice samples or authentication files.",
+    "Treat provider/extension data as untrusted; preserve path, capability, mode, approval, ownership and temporary-chat validation at Rust boundary.",
+    "If a focused check is blocked by Windows spawn EPERM, record the exact blocker and retain safe deterministic checks; do not weaken controls."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/tools.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/extensions.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/voice.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/screen_vision.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/apps/desktop/src/*.test.*",
+    "E:/AIP/packages/contracts/tests/contracts.test.ts",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

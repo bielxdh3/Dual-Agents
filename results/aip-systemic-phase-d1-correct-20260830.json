@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-d1-correct-20260830",
+  "parent_request_id": "aip-systemic-phase-d1-profile-state-memory-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T05:30:04.346139+00:00",
+  "finished_at": "2026-08-30T05:36:25.055244+00:00",
+  "summary": "Corrigida a migração 0028 para replay seguro e normalização de gênero/sexualidade em identidades não humanas. Commit local c631462, preservando 3801c4e.",
+  "files_changed": [
+    "apps/desktop/src-tauri/migrations/0028_optional_human_identity.sql",
+    "apps/desktop/src-tauri/src/chat.rs",
+    "apps/desktop/src-tauri/src/database.rs",
+    "apps/desktop/src-tauri/src/domain.rs",
+    "apps/desktop/src/App.css",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/profile-form.test.tsx",
+    "apps/desktop/src/profile-localization.ts",
+    "apps/desktop/src/state-memory-guidance.test.tsx",
+    "packages/contracts/src/index.ts"
+  ],
+  "commands_run": [
+    "cargo fmt --check",
+    "cargo test database::tests --lib",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop test -- src/profile-form.test.tsx src/state-memory-guidance.test.tsx",
+    "git diff --check",
+    "pnpm secrets:scan",
+    "git commit -m \"fix: make phase D1 identity migration replay-safe\""
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Formatação Rust validada."
+    },
+    {
+      "command": "cargo test database::tests --lib",
+      "status": "passed",
+      "details": "40 testes passaram, incluindo a regressão de migração."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "TypeScript validado."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop test -- src/profile-form.test.tsx src/state-memory-guidance.test.tsx",
+      "status": "passed",
+      "details": "2 arquivos e 8 testes passaram."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Nenhum erro de whitespace."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "passed",
+      "details": "183 arquivos verificados; nenhum segredo detectado."
+    }
+  ],
+  "remaining_issues": [
+    "Aceitação em navegador/Windows instalado permanece não reivindicada.",
+    "Remote CI not confirmed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T053004Z-aip-systemic-phase-d1-correct-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T053004Z-aip-systemic-phase-d1-correct-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T053004Z-aip-systemic-phase-d1-correct-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T053004Z-aip-systemic-phase-d1-correct-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05125-780c-7ea1-a51a-7cea6f813658",
+  "app_server_turn_id": "01a05125-78ad-70d3-bb2a-0f7f6a974d07",
+  "app_server_process_id": "24792",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T053004Z-aip-systemic-phase-d1-correct-20260830.md",
+  "task_sha256": "2769cff65d442a54d5f9aa079716503f9a257db4fda63fdfe30405ad1d61ba18",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

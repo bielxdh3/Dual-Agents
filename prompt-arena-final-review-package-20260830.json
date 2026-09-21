@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-final-review-package-20260830",
+  "parent_request_id": "prompt-arena-final-recheck-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Perform a read-only final project security review, phase review, and publication check at exact current checkout HEAD 73991b03282e3ec766ab824f6bdfb9ff8e4c616a on completion/windows-qa-live-telemetry-i18n. The reviewed source implementation target is 838d952; later commits are documentation/checksum/package evidence only. Use canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Read C:\\CodexGlobal\\AGENTS.md and required ponytail, project-security-review, project-phase-review, project-publication-check, product-design/index, and product-design/audit SKILL.md files before inspection. Do not edit, commit, push, merge, release, tag, deploy, or touch other worktrees. Verify source security controls including visibleArenaTelemetryError on both blind live error surfaces, blind identity/score/reveal, model path safety, async worker isolation, i18n and untrusted text rendering. Verify docs and fresh package evidence: NSIS at checkout f393e9023b2f1d28de27ce34b73eff83f9a2af45 is 3,756,114 bytes SHA-256 085C1BF1EC49D6B8C5701AC4412DBA5FCE53989C2A075C2BB7E1768FF5FFCF62, worker sidecar 2,544,640 bytes SHA-256 C42F5C56C18DAF36455D2062498FA7DE66CB5BB730AE58DFE4A1DB45F549BAB0, package verification passed checksum/install/start/restart/uninstall; historical 57f02b3 remains separate. Run safe read-only checks only, including git diff-check/status and reachable-history credential scan; do not print secrets. Return compact structured findings with exactly one phase verdict (Approved, Approved with reservations, Hotfix required, or Rejected), exactly one publication verdict, remaining human/runtime/CI/MSI gates, and full provenance. Do not infer visual/human QA from package smoke.",
+  "constraints": [
+    "Read-only only; no file, repository, remote, package, or worktree mutation.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; Windows elevated; readiness ready; approval never.",
+    "Do not claim fresh package smoke as visual or human QA.",
+    "Do not claim public-history safety beyond the performed reachable scan."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\checksums-sha256.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n\\package-verification.txt"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": { "allowed_actions": [] }
+}

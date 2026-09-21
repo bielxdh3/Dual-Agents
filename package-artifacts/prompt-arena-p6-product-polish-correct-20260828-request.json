@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-product-polish-correct-20260828",
+  "parent_request_id": "prompt-arena-p6-product-polish-after-reset-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Continue and finish the partial P6 implementation already present in the working tree on completion/product-polish. The previous canonical BL4 turn timed out after editing src/App.tsx, src/arena-runner.ts, src/run-plan.ts, and src/styles.css; preserve the existing diff and do not reset, clean, discard, or rewrite it wholesale. Inspect the diff, complete any missing compile/UI details, ensure Dashboard, diagnostics, persisted evidence history, sanitized JSON/Markdown/CSV exports, accessible states/navigation, responsive polish, and removal of user-facing foundation/scaffold/Phase F wording are coherent. Do not implement page-transition motion, telemetry, cloud calls, paid-provider calls, or unrelated P7 work. Run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Fix only defects in the current P6 slice, then create one focused commit on completion/product-polish. Update ROADMAP.md honestly for P6 if not already done, keeping P1-P6 IN PROGRESS while native acceptance/security/publication gates remain pending. Return the required JSON report and exact native provenance.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "preserve current dirty P6 diff; no reset/clean/discard; no merge/tag/release/deploy/public release",
+    "do not implement page-transition motion or P7",
+    "no secrets, telemetry, cloud calls, or paid-provider calls"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/run-plan.ts", "E:/Prompt Arena/src/styles.css", "E:/Prompt Arena/ROADMAP.md"],
+  "review_findings": [{"severity": "blocking", "title": "P6 Executor turn timed out with uncommitted partial diff", "details": "Preserve and complete the current four-file diff, validate it, and commit the focused P6 slice."}],
+  "max_correction_cycles": 0
+}

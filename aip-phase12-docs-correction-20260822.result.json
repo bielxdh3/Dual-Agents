@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-docs-correction-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T17:02:55.585720+00:00",
+  "finished_at": "2026-08-22T17:03:43.072224+00:00",
+  "summary": "Aligned Phase 12 documentation with the functional debug APK and authenticated local/private socket client. Committed as 067f527.",
+  "files_changed": [
+    "docs/PHASE_12_ANDROID_SPEC.md",
+    "docs/KNOWN_LIMITATIONS.md"
+  ],
+  "commands_run": [
+    "git diff --check",
+    "consistency scan across Phase 12 docs, roadmap, gap matrix, and README",
+    "git commit -m \"docs: align phase 12 status\"",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff errors."
+    },
+    {
+      "command": "Documentation consistency scan",
+      "status": "passed",
+      "details": "No stale claims found for unimplemented transport cryptography, unopened socket, or missing APK build."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T170255Z-aip-phase12-docs-correction-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T170255Z-aip-phase12-docs-correction-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T170255Z-aip-phase12-docs-correction-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T170255Z-aip-phase12-docs-correction-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a63-9209-7be2-8af4-08b9c61c3fa5",
+  "app_server_turn_id": "01a02a6c-eb89-7c03-8c4e-a578436f0ab7",
+  "app_server_process_id": "18068",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T170255Z-aip-phase12-docs-correction-20260822.md",
+  "task_sha256": "ea788b624b253c742e6a7aad4a5af68f9d150656166ffbaa2e4c8671d8a44d9e",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

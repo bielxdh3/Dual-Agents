@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-coverage-followup-20260830",
+  "parent_request_id": "prompt-arena-i18n-coverage-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated App Server/headless path. The previous canonical attempt preserved an unfinished six-file diff in E:\\Prompt Arena-live-telemetry-i18n; do not redo, revert, or broaden it. Review the existing dirty changes in scripts/ui-contracts.test.mjs, src/App.tsx, src/advanced-arena-view.tsx, src/arena-runner.test.ts, src/arena-runner.ts, and src/i18n.ts. Preserve E:\\Prompt Arena and E:\\Prompt Arena-pr28 untouched. Validate and, only if needed, minimally correct compile/test/static-coverage issues in this existing patch. The intended patch closes missing centralized PT-BR resources for literal shipped UI translation calls and adds a focused coverage test; it makes the live Arena monitor show sample X/Y, repetition X/Y where distinct, and competitor accumulated time versus Arena wall time with honest blind visibility. Preserve sequential execution, blind hiding of identity-sensitive model/timing/speed/token/cost/runtime data, exact-key English fallback, and no invented TTFT/resource/cost values. Do not change backend architecture, packaging configuration, unrelated UI, generated artifacts, or protected worktrees. Run npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check serially. Verify the six-file scope and clean protected worktrees. If validation passes, stage only those six files and create one normal local commit with a concise message such as fix: complete localized Arena monitor coverage. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use any alternate execution path. Report structured provenance including executor account, role, App Server transport, workspace-write sandbox, Windows sandbox mode/readiness, approval policy, branch, commit, tests, and protected-worktree status. The installed/native/human QA boundary remains pending and must not be claimed as passed.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI, fallback backend, or danger-full-access.",
+    "The dirty six-file patch is prior executor work and must be preserved/reviewed, not duplicated or discarded.",
+    "Original E:\\Prompt Arena and PR #28 worktree must remain unchanged.",
+    "Keep the patch minimal and repository-native; no new dependencies and no translation-platform rewrite.",
+    "Do not leak or persist secrets, prompts, responses, credentials, or untrusted HTML.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, or reset."
+  ],
+  "review_findings": [
+    {
+      "title": "Finish and validate existing localization/monitor patch",
+      "details": "The previous BL4 attempt left only six intended files modified but exited before tests and commit. Review the current diff in place; do not start a second implementation. Confirm all literal translation calls in the shipped App and advanced Arena surfaces have centralized PT-BR resources, and confirm monitor denominator/time semantics and blind visibility with behavior tests."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\ui-contracts.test.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

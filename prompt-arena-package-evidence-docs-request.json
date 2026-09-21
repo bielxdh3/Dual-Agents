@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-evidence-docs-20260829",
+  "parent_request_id": "prompt-arena-package-sidecar-proof-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Update only the delivery evidence documentation for the now-successful exact-HEAD Windows NSIS package in E:\\Prompt Arena-live-telemetry-i18n, then create one normal local commit. Do not change application source, tauri config, tests, generated package contents, remotes, tags, releases, deploys, or protected worktrees. Re-read the current docs first. Update docs/DELIVERY_MATRIX.md target to exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a and replace the stale Windows NSIS BLOCKED_ENVIRONMENT/no-artifact claim with evidence-backed status: NSIS build succeeded using the supported CLI config override bundle.useLocalToolsDir=true; package:artifacts and verify:package passed; verify:package --smoke passed clean install, launch, restart, and silent uninstall; temporary installed-tree proof found prompt-arena.exe and prompt-arena-worker.exe and confirmed both disappeared after uninstall. Record installer path, size 3744774 bytes, SHA-256 755BC8C48FD8912A4C8E07BB4C8ED11938D5022F63DBE800800BE69CCD05991C, checksum-sha256.txt and package-verification.txt, sidecar prepared hash 89B82DCDB78B0B99FF0B0DCD29C42C9836901B66CDD86CC1CEA3077B77744F76, and installed worker hash 31FDC12F505EF00A15D56AF2C9CF3DFB5C3BA33428C8B3D4D29B784454A7D437. Keep native human UI rows PENDING_HUMAN_QA, optional MSI BLOCKED LOCALLY, Linux CI PENDING, and remote CI unconfirmed. Update docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md to the exact current HEAD and state automated package lifecycle/sidecar proof passed while keeping visual/native-human checkboxes pending; do not imply automation proves visual UI acceptance. Stage only docs/DELIVERY_MATRIX.md, docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md, checksums-sha256.txt, and package-verification.txt. Verify staged names and diff, run git diff --check, and create one normal commit with message `docs: record Windows NSIS artifact evidence`. Do not push.",
+  "constraints": [
+    "Only the four explicitly allowed files may be staged or committed.",
+    "No source/config/test/history/remote/tag/release/deploy changes.",
+    "Do not claim native human UI QA from automated smoke."
+  ],
+  "review_findings": [
+    {
+      "title": "Documentation is stale after successful package production",
+      "details": "The current matrix and checklist still say Windows NSIS is BLOCKED_ENVIRONMENT with no installer, but the canonical local-tools build produced and checksum-verified an installer at exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a."
+    },
+    {
+      "title": "Automated lifecycle and sidecar evidence is available",
+      "details": "Canonical --smoke passed checksum, clean install, launch, restart, and silent uninstall. A separate temporary proof found and hashed prompt-arena.exe and prompt-arena-worker.exe in the installed tree and confirmed both disappeared after uninstall. Keep human visual QA pending."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\checksums-sha256.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n\\package-verification.txt"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/desktop-delivery",
+  "base_branch": "completion/product-polish",
+  "title": "feat: harden desktop packaging and clean-install verification",
+  "body": "## P7 — Desktop delivery\n\nStacked after PR #21 (`completion/product-polish`); PRs #17–#21 remain draft.\n\n- retains Tauri NSIS, MSI, deb, and AppImage targets with stable metadata, current-user Start Menu/uninstall, upgrade code, and app-owned data persistence\n- adds deterministic target-specific package normalization and SHA256 manifest generation\n- adds package verification plus Windows NSIS install/start/restart/uninstall and Linux deb/AppImage smoke paths when runner tooling permits\n- records MSI outcome honestly while keeping NSIS mandatory\n- wires exact-ref workflow packaging and unsigned artifact upload without GitHub Release\n- validates with 78 TypeScript tests, 99 Rust tests, typecheck, Vite build, cargo fmt/check, and diff checks via canonical BL4 app_server\n\nP7 remains IN PROGRESS pending real clean-install/start/restart/uninstall and Linux launch evidence from CI/native runners.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

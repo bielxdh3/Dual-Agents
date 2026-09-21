@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-security-docs-audit-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are the same BL4/biel4 App Server/headless Executor. Work on E:\\Prompt Arena-pr28-bl4 branch validation/native-tauri-acceptance at current HEAD 2c5a006f925efffc333f1dad2700d0c870ac7096. Perform a read-only security-documentation consistency audit against current code/tests and ROADMAP. Update ONLY docs/SECURITY.md to remove stale statements that P3 model-library operations, P4 advanced artifacts/calibration/tournament, or P5 external BYOK/secure storage/generation/history are architecture-only or not wired when bounded implementations and tests now exist. Describe their actual typed boundaries, fail-closed gates, sanitized evidence, and explicitly retain native QA/security/publication gates as pending. Preserve all valid residual local filesystem TOCTOU races, Docker-required/no-host-fallback boundary, unsupported official judge integration, unsupported long-lived runtime process lifecycle or destructive cleanup where applicable, no-secrets rule, and no claim of native acceptance. Do not weaken or remove security controls and do not alter product code, tests, ROADMAP, workflows, or matrix. Create one normal documentation commit. Validate with git diff --check and a bounded check that no obsolete architecture-only wording remains for implemented P3-P5 paths and residual race/future-control wording remains. Do not push, merge, release, tag, or deploy. Return exact report and machine-readable metadata proving biel4 App Server/headless, elevated ready sandbox, executor role, and commit SHA.",
+  "constraints": [
+    "BL4/biel4 App Server/headless is the only allowed implementation Executor; fail closed if provenance is not proven.",
+    "Only docs/SECURITY.md may change; no product source, tests, workflow, ROADMAP, or delivery matrix.",
+    "Do not claim security closure or native acceptance; preserve all residual race and future-control caveats.",
+    "No merge, tag, release, deploy, force-push, or public release. Keep PR #28 draft."
+  ],
+  "context_files": [
+    "docs/SECURITY.md",
+    "ROADMAP.md",
+    "src-tauri/src/model_library.rs",
+    "src-tauri/src/external_providers.rs",
+    "src-tauri/src/storage.rs",
+    "src/advanced-arena.ts",
+    "src/advanced-arena-view.tsx"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

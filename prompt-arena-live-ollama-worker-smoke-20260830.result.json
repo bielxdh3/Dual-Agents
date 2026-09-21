@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-ollama-worker-smoke-20260830",
+  "parent_request_id": "prompt-arena-rust-runtime-tests-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:42:39.205117+00:00",
+  "finished_at": "2026-08-30T02:44:21.457190+00:00",
+  "summary": "Read-only Rust validation passed at HEAD 73991b03282e3ec766ab824f6bdfb9ff8e4c616a on completion/windows-qa-live-telemetry-i18n. Definitive all-target Cargo validation passed 109 tests plus two zero-test targets. The available Ollama endpoint exercised the healthy branch of the live health test. Working tree remained clean.",
+  "files_changed": [],
+  "commands_run": [
+    "Read AGENTS.md and required skill files",
+    "Verified HEAD, branch, and clean status",
+    "cargo test --manifest-path src-tauri/Cargo.toml --all-targets (initial bounded run)",
+    "cargo test --manifest-path src-tauri/Cargo.toml --all-targets (definitive run)",
+    "Inspected src-tauri/src/ollama.rs live health test",
+    "git diff --check",
+    "Final HEAD and status verification"
+  ],
+  "tests": [
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets (initial run)",
+      "status": "failed",
+      "details": "120-second command bound expired with exit code 124; no assertion failure was reported."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "109 passed, 0 failed, 0 ignored; two additional targets ran 0 tests. The Ollama health test passed through the available endpoint branch. Only a non-failing linker warning was emitted."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "Final HEAD/status verification",
+      "status": "passed",
+      "details": "HEAD and branch matched exactly; status count was 0."
+    }
+  ],
+  "remaining_issues": [
+    "No full Arena run, model mutation, persistence, UI, blind-evaluation, visual, or human QA was performed.",
+    "Remote CI and other runtime/package validation remain unconfirmed.",
+    "Thread and turn identifiers were not exposed."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T024239Z-prompt-arena-live-ollama-worker-smoke-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T024239Z-prompt-arena-live-ollama-worker-smoke-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T024239Z-prompt-arena-live-ollama-worker-smoke-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T024239Z-prompt-arena-live-ollama-worker-smoke-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0508c-30e6-7860-9534-dce8794696ea",
+  "app_server_process_id": "6740",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T024239Z-prompt-arena-live-ollama-worker-smoke-20260830.md",
+  "task_sha256": "fc9577d0249f63b86a869e4deeda1155dbc02c73c458911b2644f89b1c8b0be8",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

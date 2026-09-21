@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-f-20260831",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-31T21:28:58.921102+00:00",
+  "finished_at": "2026-08-31T21:32:08.165278+00:00",
+  "summary": "Implementada e commitada a Phase F no commit a76f678, com editor de pixel art focal e estilos para overlays/bubbles, preservando lógica, hit-testing e contratos.",
+  "files_changed": [
+    "apps/desktop/src/App.css",
+    "apps/desktop/src/App.tsx"
+  ],
+  "commands_run": [
+    "pnpm exec prettier --write apps/desktop/src/App.tsx apps/desktop/src/App.css",
+    "pnpm --filter @aip/desktop exec vitest run src/pixel-editor.test.tsx src/bubble.test.tsx src/overlay-input.test.ts src/overlay-gesture.test.ts",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm exec eslint apps/desktop/src/App.tsx apps/desktop/src/Overlay.tsx apps/desktop/src/Bubble.tsx",
+    "pnpm exec prettier --check apps/desktop/src/App.tsx apps/desktop/src/App.css",
+    "pnpm --filter @aip/desktop exec vitest run --passWithNoTests",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"refine AIP appearance and overlays\""
+  ],
+  "tests": [
+    {
+      "command": "focused pixel/bubble/overlay Vitest",
+      "status": "passed",
+      "details": "4 arquivos, 19 testes aprovados."
+    },
+    {
+      "command": "desktop Vitest completo",
+      "status": "passed",
+      "details": "30 arquivos, 118 testes aprovados."
+    },
+    {
+      "command": "desktop typecheck",
+      "status": "passed",
+      "details": "tsc --noEmit concluído sem erros."
+    },
+    {
+      "command": "ESLint",
+      "status": "passed",
+      "details": "Arquivos TS relevantes sem avisos ou erros."
+    },
+    {
+      "command": "Prettier check",
+      "status": "passed",
+      "details": "Arquivos alterados formatados."
+    },
+    {
+      "command": "secrets scan",
+      "status": "passed",
+      "details": "200 arquivos verificados."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Nenhum erro de whitespace."
+    }
+  ],
+  "remaining_issues": [
+    "Native/browser visual QA não foi executada; permanece para o gate humano conforme solicitado.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T212859Z-aip-ui-reset-phase-f-20260831\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T212859Z-aip-ui-reset-phase-f-20260831",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T212859Z-aip-ui-reset-phase-f-20260831\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T212859Z-aip-ui-reset-phase-f-20260831\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05910-09d5-7723-9116-e11fbee1ea5e",
+  "app_server_turn_id": "01a059b9-bcc6-7ab2-ba74-dd68297afe60",
+  "app_server_process_id": "19552",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260831T212859Z-aip-ui-reset-phase-f-20260831.md",
+  "task_sha256": "74d2a2907d849bcfbc53cebef46edf80a5d2fd204abc6ec3496c99d6d91feff8",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

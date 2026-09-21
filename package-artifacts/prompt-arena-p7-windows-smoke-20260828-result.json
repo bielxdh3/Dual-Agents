@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-windows-smoke-20260828",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T19:48:28.802764+00:00",
+  "finished_at": "2026-08-28T19:56:07.050858+00:00",
+  "summary": "Read-only Windows provenance on completion/desktop-delivery: NSIS build reached release compilation but Tauri bundling failed with Access denied (os error 5). Temporary artifact verification found one NSIS artifact; install/start/restart passed, uninstall failed. No tracked files changed.",
+  "files_changed": [
+    "package-verification.txt"
+  ],
+  "commands_run": [
+    "npm run tauri:build -- --bundles nsis",
+    "node scripts/package-artifacts.mjs --platform windows --output-directory \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-mtdddu1h-30yybnp4e6\\artifacts\" --manifest-path \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-mtdddu1h-30yybnp4e6\\checksums-sha256.txt\"",
+    "node scripts/verify-package.mjs --platform windows --artifact-directory \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-mtdddu1h-30yybnp4e6\\artifacts\" --manifest-path \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-mtdddu1h-30yybnp4e6\\checksums-sha256.txt\" --evidence-file \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-mtdddu1h-30yybnp4e6\\package-verification.txt\" --smoke",
+    "PowerShell: remove only C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-mtdddu1h-30yybnp4e6",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis",
+      "status": "failed",
+      "details": "Worker/frontend/release compilation completed, then Tauri NSIS bundling failed with Access denied (os error 5)."
+    },
+    {
+      "command": "node scripts/package-artifacts.mjs --platform windows ...",
+      "status": "passed",
+      "details": "Normalized one NSIS artifact; MSI was unavailable."
+    },
+    {
+      "command": "node scripts/verify-package.mjs --platform windows ... --smoke",
+      "status": "failed",
+      "details": "NSIS clean install passed; installed executable start passed; restart passed; silent uninstall failed because the installed executable remained."
+    },
+    {
+      "command": "Temporary directory cleanup",
+      "status": "passed",
+      "details": "Removed only the unique temporary smoke directory."
+    },
+    {
+      "command": "git status --short --branch",
+      "status": "passed",
+      "details": "Branch is completion/desktop-delivery with no tracked changes; untracked package-verification.txt remains from verifier failure fallback."
+    }
+  ],
+  "remaining_issues": [
+    "NSIS bundling is blocked by Windows Access denied (os error 5).",
+    "Silent NSIS uninstall smoke failed because the installed executable remained.",
+    "MSI was unavailable and no MSI smoke was performed.",
+    "The verifier wrote untracked package-verification.txt at the repository root on failure; it was not removed because cleanup was restricted to the unique temporary directory."
+  ],
+  "git_status": "?? package-verification.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T194829Z-prompt-arena-p7-windows-smoke-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T194829Z-prompt-arena-p7-windows-smoke-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T194829Z-prompt-arena-p7-windows-smoke-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T194829Z-prompt-arena-p7-windows-smoke-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a049d5-80b7-78a1-af9c-d95d81969102",
+  "app_server_turn_id": "01a049ea-a4bd-7a72-a8f4-b01a01b237ce",
+  "app_server_process_id": "8704",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T194829Z-prompt-arena-p7-windows-smoke-20260828.md",
+  "task_sha256": "a761b0426e02c3bb72d9294e0aec707e3bb6d460ab006806976f66fe4a8ce5be",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

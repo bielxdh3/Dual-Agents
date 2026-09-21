@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
-from .config import AgentConfig
+from .bootstrap import configured_actor_prompt
+from .config import AgentConfig, SUPPORTED_ROLES
+from .paths import path_identity_key, same_path
 from .process import CommandError, CommandResult, codex_environment, run_command
 
 
@@ -80,18 +83,193 @@ def run_codex_exec(
     )
 
 
-def _annotate_provider_result(result: CommandResult, agent: AgentConfig, role: str) -> CommandResult:
-    result.metadata.setdefault("profile_id", agent.account_name)
-    result.metadata.setdefault("provider", agent.provider_type)
-    result.metadata.setdefault("adapter", agent.adapter_type)
-    result.metadata.setdefault("role", role)
+def _identity_digest(value: Path | None) -> str:
+    if value is None:
+        return ""
+    return hashlib.sha256(path_identity_key(value).encode("utf-8")).hexdigest()[:16]
+
+
+def _same_configured_actor(left: AgentConfig, right: AgentConfig) -> bool:
+    """Compare trusted actor identity without relying on display labels."""
+
+    if (
+        left.account_name != right.account_name
+        or left.backend != right.backend
+        or left.provider_type != right.provider_type
+        or left.adapter_type != right.adapter_type
+    ):
+        return False
+    if not same_path(left.codex_home, right.codex_home):
+        return False
+    if left.state_root is not None or right.state_root is not None:
+        if left.state_root is None or right.state_root is None or not same_path(left.state_root, right.state_root):
+            return False
+    return (
+        left.model == right.model
+        and left.runtime_model == right.runtime_model
+        and left.reasoning_effort == right.reasoning_effort
+        and left.fixed_mode == right.fixed_mode
+    )
+
+
+def configured_actor_provenance(
+    *,
+    agent: AgentConfig,
+    role: str,
+    repository: Path,
+    canonical_root: Path | None = None,
+    configured_actor: bool = True,
+) -> dict[str, Any]:
+    """Build non-secret, control-plane-owned actor provenance."""
+
+    transport = {
+        "antigravity": "antigravity",
+        "app_server": "app_server",
+        "windows": "codex_terminal",
+        "api": "api",
+    }.get(agent.backend, agent.backend or "unknown")
+    metadata: dict[str, Any] = {
+        "phase": role,
+        "role": role,
+        "actor_id": agent.account_name,
+        "profile_id": agent.account_name,
+        "configured_actor": bool(configured_actor),
+        "provider": agent.provider_type,
+        "adapter": agent.adapter_type,
+        "backend": agent.backend,
+        "model": agent.model,
+        "runtime_model": agent.runtime_model or agent.model,
+        "reasoning_effort": agent.reasoning_effort or "provider-default",
+        "delegation_transport": transport,
+        "repository": str(repository.expanduser().resolve()),
+        "codex_home_identity": _identity_digest(agent.codex_home),
+        "state_root_identity": _identity_digest(agent.state_root),
+        "fallback_used": False,
+    }
+    if canonical_root is not None:
+        metadata.update(
+            {
+                "canonical_instructions_root": str(canonical_root),
+                "canonical_bootstrap_required": True,
+                "canonical_bootstrap_source": "machine-wide",
+            }
+        )
+    return metadata
+
+
+def _annotate_provider_result(
+    result: CommandResult,
+    agent: AgentConfig,
+    role: str,
+    *,
+    repository: Path | None = None,
+    canonical_root: Path | None = None,
+    configured_actor: bool = True,
+) -> CommandResult:
+    result.metadata.update(
+        configured_actor_provenance(
+            agent=agent,
+            role=role,
+            repository=repository or Path("."),
+            canonical_root=canonical_root,
+            configured_actor=configured_actor,
+        )
+    )
     return result
+
+
+def _delegate_to_configured_actor(
+    *,
+    config,
+    role: str,
+    task: str,
+    repository: Path,
+    output_path: Path | None = None,
+    schema_path: Path | None = None,
+    request_id: str = "",
+    run_id: str = "",
+    progress: Callable[[str], None] | None = None,
+    runner: Callable[..., CommandResult],
+) -> CommandResult:
+    """Resolve a role from the registry and dispatch only to that actor.
+
+    ``runner`` is an internal seam used only by the orchestrator's deterministic
+    provider boundary. It cannot change the resolved actor; the trusted
+    ``AgentConfig`` and provenance are bound before the call.
+    """
+
+    if role not in SUPPORTED_ROLES:
+        raise ValueError(f"Unsupported configured role '{role}'.")
+    agent = config.agent_for_role(role)
+    if output_path is None:
+        output_path = config.runs_dir / f".configured-{role}.json"
+    if schema_path is None:
+        schema_name = {
+            "architect": "plan.schema.json",
+            "executor": "delegation-report.schema.json",
+            "reviewer": "review.schema.json",
+            "orchestrator": "plan.schema.json",
+        }[role]
+        schema_path = config.project_root / "schemas" / schema_name
+    prepared_prompt, canonical_root = configured_actor_prompt(task, role=role)
+    dispatch = runner
+    result = dispatch(
+        config=config,
+        agent=agent,
+        role=role,
+        repository=repository,
+        prompt=prepared_prompt,
+        output_path=output_path,
+        schema_path=schema_path,
+        request_id=request_id,
+        run_id=run_id,
+        progress=progress,
+    )
+    if not isinstance(result, CommandResult):
+        raise TypeError("Configured actor dispatch must return CommandResult.")
+    result.metadata.update(
+        configured_actor_provenance(
+            agent=agent,
+            role=role,
+            repository=repository,
+            canonical_root=canonical_root,
+        )
+    )
+    return result
+
+
+def delegate_to_configured_actor(
+    *,
+    config,
+    role: str,
+    task: str,
+    repository: Path,
+    output_path: Path | None = None,
+    schema_path: Path | None = None,
+    request_id: str = "",
+    run_id: str = "",
+    progress: Callable[[str], None] | None = None,
+) -> CommandResult:
+    """Resolve and dispatch a phase through its configured actor only."""
+
+    return _delegate_to_configured_actor(
+        config=config,
+        role=role,
+        task=task,
+        repository=repository,
+        output_path=output_path,
+        schema_path=schema_path,
+        request_id=request_id,
+        run_id=run_id,
+        progress=progress,
+        runner=run_codex_for_role,
+    )
 
 
 def run_codex_for_role(
     *,
     config,
-    agent: AgentConfig,
+    agent: AgentConfig | None = None,
     role: str,
     repository: Path,
     prompt: str,
@@ -102,6 +280,24 @@ def run_codex_for_role(
     progress: Callable[[str], None] | None = None,
 ) -> CommandResult:
     """Dispatch orchestration through the configured account backend."""
+    if role not in SUPPORTED_ROLES:
+        raise ValueError(f"Unsupported configured role '{role}'.")
+    configured = False
+    canonical_root = None
+    configured_resolver = getattr(config, "agent_for_role", None)
+    if callable(configured_resolver):
+        configured_agent = configured_resolver(role)
+        if agent is None:
+            agent = configured_agent
+        elif not _same_configured_actor(agent, configured_agent):
+            raise ValueError(
+                f"Role '{role}' must use its configured actor '{configured_agent.account_name}'; "
+                "caller-supplied actor identity is not authoritative."
+            )
+        configured = True
+        prompt, canonical_root = configured_actor_prompt(prompt, role=role)
+    if agent is None:
+        raise ValueError(f"Required role '{role}' is unassigned.")
     if role == "executor" and agent.backend != "antigravity":
         raise ValueError(
             "Dual Agents requires Antigravity/Gemini as the Executor backend; no fallback is permitted."
@@ -119,7 +315,7 @@ def run_codex_for_role(
             prompt=prompt,
             output_path=output_path,
             config=config,
-        ), agent, role)
+        ), agent, role, repository=repository, canonical_root=canonical_root, configured_actor=configured)
     if agent.backend == "antigravity":
         if role != "executor":
             raise ValueError("Antigravity backend is reserved for the Executor role.")
@@ -137,7 +333,7 @@ def run_codex_for_role(
             schema_path=schema_path,
             config=config,
             progress=progress,
-        ), agent, role)
+        ), agent, role, repository=repository, canonical_root=canonical_root, configured_actor=configured)
     if agent.backend == "app_server":
         from .terminal import session_id_for
 
@@ -151,13 +347,21 @@ def run_codex_for_role(
             request_id=request_id,
             run_id=run_id,
             role=role,
+            configured_actor=configured,
             progress=progress,
         )
         if result.returncode != 0:
             raise CommandError(
                 f"Codex {role} failed through the configured App Server backend: {result.stderr}"
             )
-        return _annotate_provider_result(result, agent, role)
+        return _annotate_provider_result(
+            result,
+            agent,
+            role,
+            repository=repository,
+            canonical_root=canonical_root,
+            configured_actor=configured,
+        )
     if agent.backend != "windows":
         raise ValueError(f"Unsupported Codex backend '{agent.backend}'.")
     from .terminal import session_id_for
@@ -169,13 +373,21 @@ def run_codex_for_role(
         prompt=prompt,
         output_path=output_path,
         session_id=session_id_for(agent.account_name, repository),
+        role=role,
         progress=progress,
     )
     if result.returncode != 0:
         raise CommandError(
             f"Codex {role} failed through the configured Windows terminal backend: {result.stderr}"
         )
-    return _annotate_provider_result(result, agent, role)
+    return _annotate_provider_result(
+        result,
+        agent,
+        role,
+        repository=repository,
+        canonical_root=canonical_root,
+        configured_actor=configured,
+    )
 
 
 def run_codex_terminal(
@@ -186,6 +398,7 @@ def run_codex_terminal(
     prompt: str,
     output_path: Path,
     session_id: str,
+    role: str = "",
     task_artifact_path: Path | None = None,
     task_sha256: str = "",
     reuse_existing: bool = False,
@@ -242,7 +455,7 @@ def run_codex_terminal(
         ensure_kwargs = {
             "session_id": session_id,
             "agent": agent,
-            "role": "executor" if agent.sandbox == "workspace-write" else "architect",
+            "role": role or ("executor" if agent.sandbox == "workspace-write" else "architect"),
             "repository": repository,
             "approval_policy": "never" if agent.sandbox == "workspace-write" else "on-request",
             "add_dirs": add_dirs,

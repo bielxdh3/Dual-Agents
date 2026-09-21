@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-c1-model-picker-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Required skills at top: E:/AIP/.agents/skills/aip-implementation/SKILL.md; E:/AIP/.agents/skills/aip-phase-review/SKILL.md; E:/AIP/.agents/skills/aip-security-review/SKILL.md; E:/AIP/.agents/skills/aip-publication-check/SKILL.md; C:/CodexGlobal/skills/ponytail/SKILL.md (read each fully). Execute only Phase C1 shared model-picker work from C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md. Start from branch fix/systemic-desktop-ux-and-generation at HEAD 7200000aa8860ec014208f44cc91d8ff05eeea72, clean; preserve all commits and do not reset/discard. Inspect apps/desktop/src/App.tsx, App.css, existing desktop tests, and @aip/contracts OllamaModel/ProviderSnapshot types. Replace raw HTML model <select> controls (the conversation override picker and the profile default-model picker) with one shared accessible custom ModelPicker component. Acceptance: trigger is a button with PT-BR label and aria-haspopup/listbox semantics; selected/current unavailable model remains visible; opening supports search/filter over display name/ref/metadata, keyboard Escape/Arrow/Enter, outside close, and scrollable options; visual states cover checking/loading, empty, unavailable/malformed/timeout error, and normal options with concise localized copy; transitions/focus-visible styling fit existing desktop CSS; disabled state is explicit. Selecting an option invokes the same existing Tauri command and closes only after selection; no raw model select remains. Do not change keep-alive select, branch select, other profile fields, database, generation transport, lifecycle/modal, state, memories, calendar, overlay, or unrelated UI. Add narrow deterministic frontend tests for open/filter/select, empty/error, and keyboard behavior using existing Vitest setup. Run pnpm --filter @aip/desktop typecheck, the focused model/ConversationSurface/profile tests, git diff --check, and pnpm secrets:scan. Commit locally with an explanatory message. Do not push, PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues; browser acceptance remains unclaimed.",
+  "constraints": [
+    "Use only configured Biel4 App Server/headless Executor with elevated/ready Windows sandbox. No native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Keep diff strictly Phase C1 and preserve local-first security, provider metadata validation, and current command arguments.",
+    "No amend, rebase, squash, force-push, or remote publication; preserve unrelated owner work."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/profile-form.test.tsx",
+    "E:/AIP/packages/contracts/src/index.ts"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

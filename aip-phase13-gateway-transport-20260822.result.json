@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase13-gateway-transport-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T17:41:42.761512+00:00",
+  "finished_at": "2026-08-22T17:48:20.770867+00:00",
+  "summary": "Started `feat/phase-13-gateway` from exact origin/main cbbe814283cfe91034ba8315e0d6f32955d3f8bc. Added a bounded aip-gateway-v1 transport core, Tauri start/stop/status lifecycle commands, private bind policy, in-memory pairing, signed responses, replay protection, shutdown cleanup, gateway operation routing, and strict gateway payload schemas. Commits: 8e7a6ce, 2392741, 34de2e2.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/gateway_transport.rs",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src-tauri/src/gateway.rs"
+  ],
+  "commands_run": [
+    "git switch -c feat/phase-13-gateway origin/main",
+    "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check",
+    "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked",
+    "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings",
+    "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked",
+    "git diff --check",
+    "git commit -m \"feat: add phase 13 gateway transport core\"",
+    "git commit -m \"feat: integrate phase 13 gateway transport\"",
+    "git commit -m \"feat: enforce strict gateway payloads\"",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check",
+      "status": "passed",
+      "details": "Formatting check passed."
+    },
+    {
+      "command": "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked",
+      "status": "passed",
+      "details": "Compilation passed."
+    },
+    {
+      "command": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Clippy passed with warnings denied."
+    },
+    {
+      "command": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked",
+      "status": "passed",
+      "details": "144 passed, 1 ignored, 0 failed. Gateway transport loopback, replay, concurrency, bounds, rotation, stop, and signed error tests passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff errors."
+    }
+  ],
+  "remaining_issues": [
+    "The requested temporary-database integration test covering the complete transfer/session/recovery gateway round trip was not added; only the transport-core deterministic tests and existing gateway SQLite authority tests ran.",
+    "No physical-device, private-LAN, public-listener, BielOS, Cloudflare, or external-network validation was performed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T174143Z-aip-phase13-gateway-transport-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T174143Z-aip-phase13-gateway-transport-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T174143Z-aip-phase13-gateway-transport-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T174143Z-aip-phase13-gateway-transport-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a63-9209-7be2-8af4-08b9c61c3fa5",
+  "app_server_turn_id": "01a02a90-7068-7c12-8a1f-c47b2dc43145",
+  "app_server_process_id": "2520",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T174143Z-aip-phase13-gateway-transport-20260822.md",
+  "task_sha256": "6fa95bce662b99e6e36ff43770eac572d65d54502e0cf6b485576ad288fd5464",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

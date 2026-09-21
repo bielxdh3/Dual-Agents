@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-driver-toolchain-workflow-correction-20260829",
+  "parent_request_id": "prompt-arena-driver-toolchain-workflow-retry-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Read and apply C:\\CodexGlobal\\AGENTS.md and the required skills C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. Continue as BL4/biel4 Executor through the current configured App Server/headless transport. Apply only the review correction to the existing commit 90b65d3ffa33b8a4cc4184957e5de1d26b52ae2f in E:\\Prompt Arena-pr28-bl4; do not touch product code or the original WIP. The workflow currently checks out the default pull_request merge ref and derives sourceCommit from git rev-parse HEAD, which can record a synthetic merge SHA rather than the PR head. Pin actions/checkout to github.event.pull_request.head.sha when present, falling back to github.sha for workflow_dispatch, and use the same source SHA for the artifact name and manifest so the artifact unambiguously corresponds to the PR source commit. Keep the exact tool install commands, 151.0.4129 compatibility gate, binary resolution, SHA-256 manifest, x64 check, short retention, read-only permissions, and no-release boundary. Amend/rewrite is not allowed: make one new normal correction commit with message `fix: pin native driver artifact to source SHA`. Run focused YAML/PowerShell structure checks and git diff --check. Do not push. Return the new commit SHA and complete provenance; the control-plane result envelope will be independently reviewed for biel4/App Server/elevated/ready/never.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; no native subagents, TUI/native_tui, direct BL3 edits, or fallback.",
+    "Only .github/workflows/native-driver-toolchain.yml may change. No registry policy, TLS, product/harness, release, tag, deploy, merge, or force-push.",
+    "Preserve the parent commit; create one additive correction commit only."
+  ],
+  "review_findings": [
+    {
+      "title": "Pin checkout and artifact identity to PR source SHA",
+      "details": "On pull_request events actions/checkout defaults to a synthetic merge ref, so git rev-parse HEAD and github.sha may not identify the PR head requested for local acceptance. Use github.event.pull_request.head.sha when available for checkout, manifest sourceCommit, and artifact naming; retain github.sha fallback for workflow_dispatch."
+    }
+  ],
+  "context_files": [
+    ".github/workflows/native-driver-toolchain.yml"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

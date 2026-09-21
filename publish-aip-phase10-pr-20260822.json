@@ -1,0 +1,13 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "aip-phase10-pr-create-20260822",
+  "authorization_reference": "aip-phase10-pr-create-20260822",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "repository_full_name": "bielxdh3/AIP",
+  "branch": "feat/phase-10-extension-runtime",
+  "base_branch": "main",
+  "title": "feat: functional phase 10 extension runtime",
+  "body": "## Summary\n\nPhase 10 replaces the metadata-only extension checkpoint with a local, closed declarative package runtime. Packages are Owner-reviewed and untrusted; Rust/SQLite remains authoritative. No native code, shell, filesystem, network, subprocess, credential, upload, telemetry, watcher, or public listener capability exists.\n\n## Implementation\n\n- `da62a12` adds the bounded package/instruction model, SHA-256 integrity, SQLite execution records, idempotency, cancellation checkpoints, budgets, and closed interpreter.\n- `e6b3e16` adds bounded real agent/tool host context and deterministic Rust execution/gate tests.\n- `f7224b1` exposes typed Tauri execute/cancel commands and strict TypeScript contracts/parsers.\n- `85413fc` adds the Rust-authoritative package builder, Portuguese executable/metadata UI, execution/cancellation controls, and truthful Phase 10 docs.\n- `f297503` enforces lowercase integrity hashes after independent review.\n\n## Evidence\n\n- Final HEAD: `f2975033ae602c7ef14e1dbcc7d68694f8093ac0`; remote branch was created from main `35ea9a0f630112be20727a54b0b197a2cd710c40` and exact SHA reverified.\n- Rust gates: fmt/check/clippy passed; `cargo test --locked --lib` passed `123`, failed `0`, with `1` optional test ignored; focused extension tests passed (`6`).\n- Contracts: typecheck/build/tests passed (`19`). Desktop: typecheck/tests/build passed (`49` tests; Vite production build passed). `pnpm secrets:scan` passed (`149` files). `git diff --check` passed.\n- Distinct Biel4 read-only final review: `approved_with_reservations`, zero blocking/important findings after lowercase-hash correction.\n- Codex Security diff scan `ca0f1535-b0a8-4767-83e2-553b619936f6` for `35ea9a0..f297503`: complete coverage, zero findings. TAC advisory connector was unavailable (`USER_NOT_LOGGED_IN`); delegated security workers were unavailable, so parent coverage was used.\n\n## Boundaries and status\n\nThis is `FUNCTIONAL — AUTOMATED VALIDATION COMPLETE`; human extension usability/package review, packaged Windows/manual validation, protected remote CI, and release approval remain pending. Phase 11–13 remain unchanged and are not implemented here. Do not treat this PR as a stable-release claim.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["draft_pr_create"]}
+}

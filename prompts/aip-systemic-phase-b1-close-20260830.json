@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-b1-close-20260830",
+  "parent_request_id": "aip-systemic-phase-b1-lifecycle-20260830",
+  "action": "correct",
+  "repository": "E:/AIP",
+  "task": "Required skills at top: E:/AIP/.agents/skills/aip-implementation/SKILL.md; E:/AIP/.agents/skills/aip-phase-review/SKILL.md; E:/AIP/.agents/skills/aip-security-review/SKILL.md; E:/AIP/.agents/skills/aip-publication-check/SKILL.md; C:/CodexGlobal/skills/ponytail/SKILL.md (read each fully). A prior Biel4 App Server turn timed out after preserving an uncommitted Phase B1 patch in the current checkout. Review and close only that existing diff on branch fix/systemic-desktop-ux-and-generation, preserving HEAD f0db5428b163c3cef7095a737404c38334c9d7c8 and unrelated work. Inspect git diff and the focused conversation files. Validate and minimally repair only the Phase B1 lifecycle contract: additive empty_expires_at migration, seven-day named-empty expiry cleanup, first persisted message clears expiry, active conversation fallback after delete/archive, and ConversationList refresh after create/rename/pin/archive/restore. Ensure migration registration compiles, SQL remains compatible with legacy data, ownership/temporary-chat boundaries remain intact, and avoid model picker, modal, profile, state, memories, calendar, overlay, or generation changes. Add or retain focused deterministic Rust tests. Run cargo fmt --check and cargo test database::tests (or the narrowest equivalent), plus git diff --check. If tests reveal a defect, fix it minimally. Commit the final Phase B1 diff locally with an explanatory message. Do not push, create PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues. Do not claim browser/UI or full end-to-end validation.",
+  "constraints": [
+    "Use only configured Biel4 App Server/headless Executor with elevated/ready Windows sandbox. No native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "The existing uncommitted diff is authorized work; preserve it and do not reset, discard, amend, rebase, squash, or force-push.",
+    "Keep this correction strictly Phase B1 and local-commit only."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0027_conversation_empty_expiry.sql",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/use-phase-one.ts"
+  ],
+  "review_findings": [
+    {"title": "Transport timeout", "details": "Prior turn ended at transport timeout before tests/report/commit; current checkout contains the preserved diff."},
+    {"title": "B1 invariants", "details": "Review specifically for migration registration/test compilation and active fallback invariants."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

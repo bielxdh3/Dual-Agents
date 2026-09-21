@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-final-reviews-20260829",
+  "parent_request_id": "prompt-arena-product-docs-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T01:33:28.593452+00:00",
+  "finished_at": "2026-08-30T01:42:15.270773+00:00",
+  "summary": "Read-only final review completed at HEAD edb7b2d1ca1b24c000d101f3b74e7e42a5a4f14d on completion/windows-qa-live-telemetry-i18n. No files changed. Phase verdict: Hotfix required. Confirmed blind telemetry can expose model/runtime identity through error text. Publication verdict: Create a sanitized public copy. Other reviewed trust boundaries and documented P0/P1/P2 implementation are broadly supported, but native, runtime, visual, and fresh-package gates remain unconfirmed. No thread_id or turn_id was exposed.",
+  "files_changed": [],
+  "commands_run": [
+    "git status --short; git branch --show-current; git rev-parse HEAD",
+    "git log and git diff inspection from 57f02b3 through HEAD",
+    "git diff --check 57f02b3..HEAD",
+    "git ls-files and sensitive filename/ignored-file scans",
+    "git grep high-confidence credential patterns across 80 reachable commits",
+    "git fsck --full --unreachable --no-reflogs (timed out after 20 seconds)",
+    "read-only inspection of source, tests, manifests, CSP, capabilities, and evidence documentation"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors in the reviewed history/diff."
+    },
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Not rerun during this read-only review; documentation records 17 files and 99 tests previously passing."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "not_run",
+      "details": "Not rerun during this read-only review; prior pass is documented only."
+    },
+    {
+      "command": "npm run build",
+      "status": "not_run",
+      "details": "Not rerun during this read-only review; no fresh exact-HEAD package was built."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "not_run",
+      "details": "Not rerun because this review is read-only and Rust build/test output would mutate build artifacts."
+    },
+    {
+      "command": "Browser/native visual audit and human QA",
+      "status": "not_run",
+      "details": "No browser harness, installed Windows visual session, or native capture tool was available."
+    }
+  ],
+  "remaining_issues": [
+    "Confirmed security finding: blind telemetry renders unsanitized latest.error and telemetry.lastError at src/App.tsx:3050 and 3054; arena error handling is insufficiently identity-safe at src/arena-runner.ts:170, 209, 368-373, while Ollama/runtime errors can carry model names at src-tauri/src/ollama.rs:960-978 and src-tauri/src/runtime.rs:464. Suppress or generically localize these fields in blind mode and add coverage.",
+    "Confirmed documentation provenance mismatch: both docs target predecessor source HEAD bcf706e5c32568ba43ac24f7673074c6d230098 at docs/DELIVERY_MATRIX.md:3-4 and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md:3-7, while repository HEAD is the docs-only commit edb7b2d1ca1b24c000d101f3b74e7e42a5a4f14d.",
+    "Hypothesis requiring targeted verification: quick Arena score locking matches response text rather than a stable attempt key at src/App.tsx:2909; this is not proven exploitable under the normal one-attempt invariant.",
+    "Reachable-history scan covered 80 commits with zero high-confidence raw credential matches, but a historical private local-user path remains at 57f02b3:docs/DELIVERY_MATRIX.md:63. Current docs/source also disclose the biel4 account identifier. The timed-out fsck means unreachable-object history was not fully verified.",
+    "Product-design visual audit, installed Windows behavior, resize/overflow, native control behavior, accessibility, i18n restart, live Ollama/Docker behavior, remote CI, and fresh exact-HEAD NSIS packaging remain pending. MSI remains blocked locally and Linux CI remains pending.",
+    "checksums-sha256.txt and package-verification.txt contain historical package evidence and must not be treated as artifacts for the current HEAD."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T013328Z-prompt-arena-final-reviews-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T013328Z-prompt-arena-final-reviews-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T013328Z-prompt-arena-final-reviews-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T013328Z-prompt-arena-final-reviews-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0504c-db78-7211-8af3-4aecff310cb1",
+  "app_server_process_id": "22744",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T013328Z-prompt-arena-final-reviews-20260829.md",
+  "task_sha256": "aff36c4cf51fca6243a2ea67961c3675665dddaf28d6659fccbccfa06b70e60b",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

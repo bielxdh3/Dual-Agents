@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/model-library",
+  "base_branch": "completion/verification-packs",
+  "title": "feat: complete local model library",
+  "body": "## P3 — Full local Model Library\n\nStacked on PR #18 (`completion/verification-packs`), with PR #17 remaining the draft P1 checkpoint.\n\n- adds unified Ollama, LM Studio, and llama.cpp/GGUF discovery with bounded metadata and loopback-only endpoints\n- adds managed GGUF import, persisted download/import/removal operations, progress/cancellation, and SHA-256 removal evidence\n- adds duplicate grouping with quantization-distinct competitors and explicit source availability\n- adds usable desktop catalog/search/source configuration, operation progress/cancel, managed import/removal, hardware recommendation display, and browser-preview honesty\n- validates with 90 Rust tests, 63 TypeScript tests, typecheck, Vite build, boundary fixtures, fmt/check, and diff checks\n\nP3 remains IN PROGRESS pending native Tauri/WebView QA, local runtime interaction smoke, and remote CI.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

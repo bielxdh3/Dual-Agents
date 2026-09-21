@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-delivery-matrix-linux-status-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are the same BL4/biel4 App Server/headless Executor. Work on E:\\Prompt Arena-pr28-bl4 branch validation/native-tauri-acceptance at current HEAD 5cf7aca0d71ddc280ec0b1dc181659a76c9a0e7e. Inspect only docs/DELIVERY_MATRIX.md and reconcile its Linux deb/AppImage row with the already recorded packaging evidence: run 33213307890 passed Linux DEB/AppImage builds, checksum normalization, and package/app smoke. Change only that row's stale `CI PENDING` status to a truthful artifact/QA-pending status consistent with the Windows NSIS row, without marking the phase complete. Do not alter any other file or status. Create one normal documentation commit, validate git diff --check and a focused row/evidence consistency check, do not push/merge/release/tag/deploy, and return exact report plus biel4 App Server/headless/elevated-ready provenance metadata and commit SHA.",
+  "constraints": [
+    "BL4/biel4 App Server/headless is the only allowed implementation Executor; fail closed if provenance is not proven.",
+    "Only docs/DELIVERY_MATRIX.md may change; no product source, tests, workflow, ROADMAP, or SECURITY docs.",
+    "Do not mark Linux or any phase COMPLETE; retain native/manual QA and publication/security gates.",
+    "No merge, tag, release, deploy, force-push, or public release. Keep PR #28 draft."
+  ],
+  "context_files": [
+    "docs/DELIVERY_MATRIX.md",
+    "ROADMAP.md"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

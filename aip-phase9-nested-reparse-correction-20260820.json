@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-nested-reparse-correction-20260820",
+  "parent_request_id": "aip-phase9-final-review-source-identity-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Apply the remaining independent Reviewer correction on the current clean Phase 9 branch at HEAD 5864d526eb07aa2c8b15973dfd5c44c2275bb799. Read AGENTS.md and required AIP implementation, phase, security, and publication skills before editing. Keep the change limited to Phase 9 Rust workspace path validation and focused tests; do not publish remotely or implement later phases.\n\nBlocking correction: safe_child currently checks only the final entry or immediate parent before canonicalization. Add a repository-native helper that walks every existing component from the configured root through the requested relative path (or through its parent when the destination leaf is absent), using symlink_metadata and Windows FILE_ATTRIBUTE_REPARSE_POINT checks, and rejects any intermediate symlink, junction, mount/reparse point, or other reparse component before canonicalization/containment. Preserve traversal/absolute rejection, root validation, missing-final-destination semantics, no-overwrite behavior, and existing error codes. Ensure both existing sources and destination parents are covered on every execution/compensation preflight. Add a deterministic focused test for an intermediate symlink component where the platform permits creating one; on Windows, use the available junction/reparse mechanism or skip only when the OS refuses test-link creation, while keeping the production validator unconditional. The test must prove the nested link path is rejected and no move occurs. Do not weaken other Phase 9 boundaries.\n\nValidation before commit: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm --filter @aip/contracts typecheck; pnpm --filter @aip/contracts build; pnpm --filter @aip/contracts test; pnpm --filter @aip/desktop typecheck; pnpm --filter @aip/desktop test; pnpm --filter @aip/desktop build; pnpm secrets:scan; git diff --check. The executor may report Node spawn EPERM, but the parent will rerun those gates. Create one corrective commit with exact message `fix: reject nested reparse paths`. Do not push, create PR, merge, tag, release, or deploy. Report all evidence and final SHA.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents or alternate backend.",
+    "Local mutation and one scoped commit only; no remote GitHub mutation or publication.",
+    "Preserve all source-identity, compensation, collection, audit, root, owner, safe-mode, temporary-chat, approval, and fixture boundaries."
+  ],
+  "review_findings": [
+    {
+      "title": "Reject nested symlink/junction/reparse components",
+      "details": "safe_child checks only the final entry or immediate parent. Walk and reject every existing component from the configured root to the source or destination parent before canonicalization; add a nested-link regression test.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/tools.rs",
+    "apps/desktop/src-tauri/src/database.rs"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

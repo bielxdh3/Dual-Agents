@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-audit-ui-20260828",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Read-only Phase A audit of the installed-facing AIP UI and runtime for navigation/discoverability, Voice, Supervised Tools, and Extensions. Baseline is origin/main cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4. Do not edit files, create branches, commit, push, open PRs, merge, tag, release, deploy, or build. Inspect only the relevant App.tsx sections/components, App.css, contracts, and Rust commands/modules. For each area report concise evidence: backend/runtime, Tauri commands, React entry point, how an installed user finds it, prerequisites and whether bundled/discoverable/configurable/hidden, real versus fixture/mock execution, fail-closed behavior, exact blockers, and the smallest safe implementation plan. Include navigation/status-center and Portuguese copy gaps. Return JSON or concise markdown with summary, files_changed (empty), commands_run, tests (read-only), capability_audit, acceptance_criteria, provenance, and remaining_issues; keep the report under 4000 words.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md, .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "Ponytail full: trace existing callers and reuse primitives; propose the smallest coherent fix.",
+    "No file edits or generated artifacts in E:/AIP; files_changed must be empty.",
+    "Use only the configured Biel4 App Server/headless executor; no native subagents or fallback backend.",
+    "Do not expose secrets, credentials, private databases, histories, memories, media, or authentication files.",
+    "Preserve local-first/no-upload, safe mode, temporary chat, explicit approval, bounded execution, and Windows 10 64-bit boundaries.",
+    "Do not infer product completion from backend existence or FUNCTIONAL docs."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src-tauri/src/voice.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/tools.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/extensions.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

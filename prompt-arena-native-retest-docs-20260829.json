@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-retest-docs-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Update only docs/DELIVERY_MATRIX.md in E:\\Prompt Arena-pr28-bl4 with the post-reprovisioning native retest evidence. Preserve all existing P1-P7 IN PROGRESS statuses and all security controls. Add concise factual entries: (1) fresh normal-GPU retest on product SHA f3048a61f45cdb6b29f362444f3d32646edf4943 in isolated clone, using verified toolchain tauri-driver 2.0.6 and EdgeDriver 151.0.4129.101, failed at WebDriver POST /session with `session not created from chrome not reachable`; DevToolsActivePort existed, but WebView2 GPU exited repeatedly with STATUS_ACCESS_DENIED (0xC0000022); no acceptance marker or bridge/Rust/sidecar/persistence/reopen assertions. (2) authorized B-only A/B retest with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu only in the child test process also failed with the same session error and GPU access-denied diagnostic; flag was cleared and not persisted. (3) Record current environment drift observed during B: Edge ProductVersion 152.0.4191.53 while WebView2 and supplied EdgeDriver remain 151.0.4129.x; this is an unproven environmental hypothesis, not a product finding. Keep the existing hosted classification CI_HOSTED_WINDOWS_WEBDRIVER_POLICY_LIMITATION and add/retain LOCAL_WINDOWS_WEBVIEW2_GPU_HOST_LIMITATION. State that native Windows acceptance remains unproven and no merge/release/tag/deploy occurred. Do not edit source, scripts, workflows, docs other than DELIVERY_MATRIX.md, policies, tests, package files, or original WIP. Commit locally as `docs: record post-reprovisioning native retest` so BL3 can review and broker a normal push; do not push or merge in the Executor.",
+  "constraints": [
+    "BL4/biel4 via App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never; real thread/turn metadata required.",
+    "Documentation-only change; no security workaround, no product changes, no remote action, preserve P1-P7 truth."
+  ],
+  "context_files": ["docs/DELIVERY_MATRIX.md"],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_commit"]}
+}

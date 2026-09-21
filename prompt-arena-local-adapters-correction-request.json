@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-local-adapters-correction-20260830",
+  "parent_request_id": "prompt-arena-local-adapters-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated Dual Codex App Server/headless path. Continue the same Prompt Arena local-adapter task in E:\\Prompt Arena-live-telemetry-i18n-commit2 on branch completion/windows-qa-live-telemetry-i18n. Preserve the existing adapter patch; do not start a duplicate implementation and do not touch the protected E:\\Prompt Arena, E:\\Prompt Arena-live-telemetry-i18n, or E:\\Prompt Arena-pr28 worktrees. Fix only the concrete review findings below, then complete the requested validation so this patch can be independently assessed. The current source base before the adapter patch is 1edcdc22da8550b041031f588f9ba8a4805d532e; keep all telemetry/i18n behavior unchanged. Required fix: make the shared response-size constant available through a narrow repo-native interface (or avoid importing it) without weakening bounds; remove unused imports; run cargo fmt. Then run cargo check/test focused on the new OpenAI-compatible provider, full cargo test --manifest-path src-tauri/Cargo.toml --all-targets, npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check serially. If further compile/test failures are caused by this patch, fix only those directly and report them; do not broaden scope. Review that LM Studio and llama.cpp use explicit runtime selection, loopback-only endpoints, bounded HTTP/SSE parsing, typed errors/cancellation, no fabricated timing, and no silent Ollama fallback. Do not update artifacts or claim native/human QA. Stage implementation/tests and any justified docs/DELIVERY_MATRIX.md change only after all checks pass, and create at most one normal local commit with message feat: wire local OpenAI-compatible adapters. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use an alternate execution path. Return exactly the required structured report plus complete provenance: executor account biel4, role executor, task transport app_server, App Server thread/turn/process IDs, workspace-write sandbox, Windows sandbox elevated and readiness ready, approval never, exact base/new SHA, files, commands/results, and remaining gates. If any provenance field cannot be proven, stop without committing and report PROMPT_ARENA_BLOCKED_BY_PROVENANCE.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI/native_tui, fallback backend, alternate account, or danger-full-access.",
+    "Preserve the existing adapter patch and all protected worktrees; no duplicate implementation or unrelated telemetry/i18n changes.",
+    "Fix only the compile/test findings caused by the existing patch; retain loopback, bounded transport, explicit runtime, typed error, cancellation, and no-fabricated-metrics controls.",
+    "Run all requested checks serially and never weaken existing assertions.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, or reset; create at most one normal local commit."
+  ],
+  "review_findings": [
+    {"title":"Private response-size constant blocks compilation","details":"Independent cargo check --manifest-path src-tauri/Cargo.toml --all-targets fails with E0603: openai_compatible.rs imports MAX_STREAMED_RESPONSE_BYTES, but the constant remains private in ollama.rs. Expose it through a narrow pub(crate) interface or avoid the import while preserving the existing response-size bound.","severity":"blocking"},
+    {"title":"Unused imports in adapter patch","details":"The compiler reports unused imports parse_openai_model_info in model_library.rs and MAX_LOCAL_MODEL_METADATA_BYTES/ResponseFormat in openai_compatible.rs. Remove them and ensure cargo fmt/check are clean.","severity":"important"}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\openai_compatible.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\ollama.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\model_library.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\orchestration.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\run-plan.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\run-plan.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

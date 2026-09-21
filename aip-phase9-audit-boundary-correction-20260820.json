@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-audit-boundary-correction-20260820",
+  "parent_request_id": "aip-phase9-final-review-corrected-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Apply the one remaining independent Reviewer correction on the current clean Phase 9 branch at HEAD a66585092e63745aaf6c66ef6bceeb5813cb9e1e. Read AGENTS.md and required AIP implementation, phase, security, and publication skills before editing. Keep the change limited to packages/contracts/src/index.ts and its focused contract test. Do not publish remotely or implement later phases.\n\nBlocking correction: parseToolAuditRecord still validates nullable candidate.actionId and candidate.sessionId with unbounded cognitiveString(). Replace both checks with the existing tool-specific bounded identifier validator used by ToolAction and ToolSession, preserving nullability, non-empty limits, and control-character rejection. Add a focused contract test proving oversized or control-character actionId/sessionId is rejected while a valid bounded audit record remains accepted. Do not weaken other validation or broaden unrelated global parsers.\n\nValidation before commit: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm --filter @aip/contracts typecheck; pnpm --filter @aip/contracts build; pnpm --filter @aip/contracts test; pnpm --filter @aip/desktop typecheck; pnpm --filter @aip/desktop test; pnpm --filter @aip/desktop build; pnpm secrets:scan; git diff --check. The executor may report Node spawn EPERM, but the parent will rerun those gates. Create one corrective commit with exact message `fix: bound tool audit identifiers`. Do not push, create PR, merge, tag, release, or deploy. Report all evidence and final SHA.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents or alternate backend.",
+    "Local mutation and one scoped commit only; no remote GitHub mutation or publication.",
+    "Preserve the existing Phase 9 compensation identity and all prior safety, owner, agent, safe-mode, temporary-chat, and fixture boundaries."
+  ],
+  "review_findings": [
+    {
+      "title": "Bound audit action and session identifiers",
+      "details": "parseToolAuditRecord still uses unbounded cognitiveString for nullable actionId and sessionId. Use the existing bounded tool ID validator and add a regression test.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "packages/contracts/src/index.ts",
+    "packages/contracts/tests/contracts.test.ts"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-core-review-correction-20260820",
+  "parent_request_id": "aip-phase9-core-20260820-correction",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Apply the independent Biel4 Reviewer corrections to the existing Phase 9 core commit on feat/phase-9-supervised-tools. Work only in E:\\AIP, read AGENTS.md and the required AIP phase/security/publication skills, and preserve the existing fixture/runtime boundaries. Do not implement contracts/UI or Phase 10+.\n\nBlocking findings to fix before integration:\n1) Partial filesystem execution is not safely compensated. In tools.rs execute_adapter currently performs sequential fs::rename calls and returns on a later failure, leaving earlier moves applied while the database action is not recorded as failed. Implement a transactional-equivalent bounded move helper: immediately before each rename revalidate source/destination/root/link/reparse conditions; track completed moves; on any later failure, reverse completed moves only when the current destination still matches the approved bounded destination and the original source is absent/unchanged, with no overwrite/delete/unexpected-path behavior. If rollback is not fully possible, persist an explicit failed/partial result and audit code rather than falsely returning success or silently losing the state. Keep owner/agent/action binding and compensation safe. Add a deterministic test that forces a multi-move failure after one move and verifies no unexpected file is overwritten and the action/result/audit is truthful.\n2) Root restrictions are incomplete. Harden validate_workspace_root and its tests to reject filesystem/drive roots and broad/system roots on Windows and portable builds (including Windows\\, Windows\\System32, Program Files/ProgramData, the drive root, and portable equivalents such as /, /home, /tmp, /var, /etc, /usr, /opt, /Users where applicable). Permit a normal user-selected workspace beneath those broad parents when it is a real directory. Walk/check every existing component for symlink/junction/reparse-point escapes, reject root and child reparse points, and keep canonical containment. Add deterministic platform-aware tests without hardcoded private user paths.\n3) Add focused migration compatibility coverage for a populated v22 database: preserve at least one existing fixture catalog/session/action/audit row and capabilities during migration 0023, verify the new local manifests/workspace_roots are present, foreign keys/indexes remain valid, and reopen/idempotent initialization succeeds. Keep the existing legacy capability repair test green.\n\nAlso reconcile any remaining temporary diagnostics and keep persisted audit/result payloads bounded and relative-path-only. Required validation: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm secrets:scan (if executor gets EPERM, report it for independent rerun); git diff --check. Create one corrective local commit with exact message `fix: harden phase 9 workspace safety`. Do not push/create PR/merge/tag/release/deploy. Return full evidence and final SHA. Stop if safety cannot be preserved rather than weakening gates.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents or alternate backend.",
+    "Local mutation and one scoped local commit only; no remote GitHub or publication mutation.",
+    "No arbitrary shell, network/upload, telemetry, watchers, public listeners, raw-content persistence, broad filesystem scans, or Phase 10+ behavior.",
+    "Preserve existing fixture-only mocks and owner/agent/safe-mode/temporary-chat/approval/replay/audit controls."
+  ],
+  "review_findings": [
+    {
+      "title": "Partial filesystem execution is not safely compensated",
+      "details": "execute_adapter sequentially renames multiple files and leaves earlier moves applied when a later rename fails. Add bounded reverse rollback and explicit failed/partial recording; never overwrite an unexpected destination.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Workspace root policy permits broad/system directories",
+      "details": "validate_workspace_root only rejects a few Windows suffixes and does not reject drive roots, Windows\\System32, or portable broad/system roots. Add platform-aware policy plus component-level link/reparse checks and tests.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Missing populated-v22 migration compatibility test",
+      "details": "Add a deterministic fixture that migrates an existing populated v22 database through 0023, preserving catalog/session/action/audit data and validating local manifests, roots, FKs, indexes, and reopen idempotency.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/tools.rs",
+    "apps/desktop/src-tauri/src/database.rs",
+    "apps/desktop/src-tauri/migrations/0023_phase9_workspace_roots.sql",
+    "docs/PHASE_9_TOOLS_SPEC.md",
+    "docs/CORRECTIVE_GAP_MATRIX.md"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

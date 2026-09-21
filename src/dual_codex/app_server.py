@@ -12,6 +12,7 @@ import threading
 import time
 from typing import Any, Callable, Mapping
 
+from .bootstrap import BOOTSTRAP_MARKER, CANONICAL_INSTRUCTIONS_ROOT
 from .config import AgentConfig, OrchestratorConfig
 from .live_events import LiveEventJournal
 from .process import CommandResult, _prepare_command, codex_environment, executor_npm_cache
@@ -985,10 +986,27 @@ def run_codex_app_server(
     request_id: str = "",
     run_id: str = "",
     role: str = "executor",
+    configured_actor: bool = False,
     progress: Callable[[str], None] | None = None,
 ) -> CommandResult:
     command = _app_server_command(config)
     metadata: dict[str, Any] = {
+        "phase": role,
+        "role": role,
+        "actor_id": agent.account_name,
+        "profile_id": agent.account_name,
+        "configured_actor": bool(configured_actor),
+        "provider": agent.provider_type,
+        "adapter": agent.adapter_type,
+        "backend": agent.backend,
+        "model": agent.model,
+        "runtime_model": agent.runtime_model or agent.model,
+        "reasoning_effort": agent.reasoning_effort or "provider-default",
+        "delegation_transport": "app_server",
+        "fallback_used": False,
+        "canonical_bootstrap_required": BOOTSTRAP_MARKER in prompt,
+        "canonical_instructions_root": str(CANONICAL_INSTRUCTIONS_ROOT) if BOOTSTRAP_MARKER in prompt else "",
+        "canonical_bootstrap_source": "machine-wide" if BOOTSTRAP_MARKER in prompt else "",
         "app_server_session_id": session_id,
         "task_transport": "app_server",
         "task_artifact": str(task_artifact_path.resolve()) if task_artifact_path else "",

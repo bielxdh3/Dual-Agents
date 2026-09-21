@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-review",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T21:34:24.912653+00:00",
+  "finished_at": "2026-08-28T21:39:56.511648+00:00",
+  "summary": "verdict=approved_with_reservations. Commit 75fa3941d9262003bf4b6f94534cb886d28d50b0 matches parent 7bbd5e7b92f580614fd99207640b3faf49d83066 and the worktree is clean. Acceptance answers: 1-18 yes; 19-20 static implementation present but Windows runtime unverified; 21-23 yes. Migration 0026 is rerunnable and legacy history/fallback behavior is covered by reported passing tests.",
+  "files_changed": [],
+  "commands_run": [
+    "git status --short --branch",
+    "git show --stat 75fa3941d9262003bf4b6f94534cb886d28d50b0",
+    "git diff 7bbd5e7b92f580614fd99207640b3faf49d83066 75fa3941d9262003bf4b6f94534cb886d28d50b0",
+    "git diff --check 7bbd5e7b92f580614fd99207640b3faf49d83066 75fa3941d9262003bf4b6f94534cb886d28d50b0",
+    "rg searches for stale navigation, overlay callers, accessibility, isolation, temporary chat and safe mode",
+    "read-only inspection of relevant React, Rust, migration, contract, test and documentation files"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Executor reported pass; not rerun to preserve the clean-tree constraint."
+    },
+    {
+      "command": "cargo check",
+      "status": "passed",
+      "details": "Executor reported pass; not rerun."
+    },
+    {
+      "command": "cargo test database::tests::",
+      "status": "passed",
+      "details": "Executor reported 35 passed, including legacy migration, active deletion fallback and agent isolation."
+    },
+    {
+      "command": "cargo test",
+      "status": "passed",
+      "details": "Executor reported 154 passed and 1 ignored because it requires a local Ollama model."
+    },
+    {
+      "command": "focused desktop Vitest set",
+      "status": "passed",
+      "details": "Executor reported 4 files and 17 tests passed."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "Executor reported TypeScript pass."
+    },
+    {
+      "command": "Windows installed overlay smoke, production build, Clippy, lint, secrets scan, Python checks, packaging and remote CI",
+      "status": "not_run",
+      "details": "Not evidenced in the reviewed commit/report, and runtime/build commands were not rerun because review was read-only."
+    }
+  ],
+  "remaining_issues": [
+    "Installed-Windows manual gate remains open for actual transparency, alpha compositing, click-through, hitbox behavior, display scaling and restart behavior. Static code must not substitute for this evidence.",
+    "Medium: the overlay alpha mask is read from the base image only; custom/imported pixel overlays rendered by AgentSprite are separate SVG content and may be visible without being included in native interactive regions when outside the base mask.",
+    "Low: unknown profile canonical values fall back to rendering their raw value; known adult/agent/they-them defaults are localized.",
+    "Focused automated coverage does not directly exercise profile localization, all conversation CRUD actions, model-selector UI behavior or contextual temporary-chat rendering.",
+    "Remote CI not confirmed. No production installer or fresh MSI/NSIS artifact was evidenced."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T213425Z-aip-desktop-conversation-ux-architecture-20260828-review\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T213425Z-aip-desktop-conversation-ux-architecture-20260828-review",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T213425Z-aip-desktop-conversation-ux-architecture-20260828-review\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T213425Z-aip-desktop-conversation-ux-architecture-20260828-review\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04a44-41dc-7291-b61f-65b62802dc47",
+  "app_server_turn_id": "01a04a4b-a173-7fb0-969d-7a613dd42803",
+  "app_server_process_id": "22788",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T213425Z-aip-desktop-conversation-ux-architecture-20260828-review.md",
+  "task_sha256": "303487d244615ebffc0c4141408aca0805557f2122e5703b9af38a05c9866e7c",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

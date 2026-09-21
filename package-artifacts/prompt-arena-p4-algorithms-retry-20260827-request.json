@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-algorithms-retry-20260827",
+  "parent_request_id": "prompt-arena-p4-algorithms-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "On completion/advanced-arena, implement only the bounded deterministic P4 algorithm slice in a new focused TypeScript module plus tests. Preserve HEAD 1e2e40ac560973e102f44a6b7cb9ed70d5a68800. Add rankings by category and metric (objective pass rate, duration, tokens/s, human score) with sample size, uncertainty and explicit tie handling; baseline/candidate regression comparisons with deltas and insufficient-data status; deterministic Tournament Mode scheduling for 1v1, bounded round-robin, and single-elimination; blind ranking aggregation; optional judge score input boundary; calibration agreement/disagreement metrics. Validate max 8 competitors, max 64 matches, score ranges, deterministic ordering, and no fabricated significance. No persistence, commands, UI, external network, or AI calls in this turn. Run npm typecheck/test/build and git diff --check, then create one focused local commit. No P5/P6/P7 and no merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/advanced-arena; preserve P1/P2/P3 commits and PRs",
+    "local deterministic evidence only; no secrets/cloud calls/AI fabrication",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/arena-runner.test.ts", "E:/Prompt Arena/src/bridge.ts"],
+  "review_findings": [{"severity": "blocking", "title": "P4 algorithm executor launch produced no turn", "details": "Retry the same bounded algorithm slice after immediate executor failure."}],
+  "max_correction_cycles": 0
+}

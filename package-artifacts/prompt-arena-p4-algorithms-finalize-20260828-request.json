@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-algorithms-finalize-20260828",
+  "parent_request_id": "prompt-arena-p4-algorithms-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize the preserved P4 algorithm diff on completion/advanced-arena. Inspect src/advanced-arena.ts, src/arena-runner.ts, src/bridge.ts, and storage.rs changes from the timed-out turn. Run npm typecheck, npm test, npm run build, cargo fmt/check/test, and git diff --check. Fix only compile/type/test/format issues or clear boundary defects needed for the deterministic ranking/regression/tournament/blind-ranking/AI-score-input/calibration slice; keep limits and no-fabrication boundaries. Then create one focused local commit. Do not add P5/P6/P7 or external network calls. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/advanced-arena; preserve HEAD 1e2e40ac560973e102f44a6b7cb9ed70d5a68800 and all P1/P2/P3 commits",
+    "preserve current intentional dirty P4 diff; no reset/clean/discard",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/advanced-arena.ts", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/src/storage.rs"],
+  "review_findings": [{"severity": "blocking", "title": "P4 algorithm turn timed out with preserved diff", "details": "Validate, correct minimally, and commit the existing algorithm slice."}],
+  "max_correction_cycles": 0
+}

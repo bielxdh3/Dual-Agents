@@ -31,16 +31,25 @@ service_tier = ""
 backend = "windows"
 network_access = false
 
-[accounts.secondary]
+[accounts.executor]
 label = "Antigravity / Gemini Executor"
 codex_home = "C:/Users/USER/CodexProfiles/executor"
-model = ""
-reasoning_effort = "high"
+model = "gemini-3.8-flash"
+reasoning_effort = "medium"
 service_tier = ""
 backend = "antigravity"
 network_access = false
 # The dashboard normalizes agy slugs such as -low/-medium/-high into one model.
 # Fixed runtime modes (for example Thinking) remain read-only in the UI.
+
+[accounts.codex-secondary]
+label = "Codex Secondary Architect / Reviewer"
+codex_home = "C:/Users/USER/CodexProfiles/secondary"
+model = "gpt-5.6-luna"
+reasoning_effort = "max"
+service_tier = ""
+backend = "app_server"
+network_access = false
 
 # API profiles use an environment-variable reference; never put the key here.
 # [accounts.api]
@@ -58,6 +67,6 @@ network_access = false
 
 [roles]
 orchestrator = "primary"
-architect = "primary"
-reviewer = "primary"
-executor = "secondary"
+architect = "codex-secondary"
+reviewer = "codex-secondary"
+executor = "executor"

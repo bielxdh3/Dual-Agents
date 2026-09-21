@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-c1-model-picker-20260830",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T05:06:57.193362+00:00",
+  "finished_at": "2026-08-30T05:15:34.050284+00:00",
+  "summary": "Phase C1 implementada e commitada localmente em 3801c4e.",
+  "files_changed": [
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/App.css",
+    "apps/desktop/src/model-picker.test.tsx",
+    "apps/desktop/src/conversation-surface.test.tsx",
+    "apps/desktop/src/profile-form.test.tsx"
+  ],
+  "commands_run": [
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop test -- src/model-picker.test.tsx src/conversation-surface.test.tsx src/profile-form.test.tsx",
+    "git diff --check",
+    "pnpm secrets:scan",
+    "git commit -m \"feat: add accessible shared model picker\""
+  ],
+  "tests": [
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "TypeScript passou."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop test -- src/model-picker.test.tsx src/conversation-surface.test.tsx src/profile-form.test.tsx",
+      "status": "passed",
+      "details": "9 testes passaram."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passou."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "passed",
+      "details": "181 arquivos verificados."
+    },
+    {
+      "command": "Validação browser/UI",
+      "status": "not_run",
+      "details": "Não executada por escopo."
+    }
+  ],
+  "remaining_issues": [
+    "Browser acceptance, instaladores, E2E completo e Remote CI não confirmados.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T050657Z-aip-systemic-phase-c1-model-picker-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T050657Z-aip-systemic-phase-c1-model-picker-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T050657Z-aip-systemic-phase-c1-model-picker-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T050657Z-aip-systemic-phase-c1-model-picker-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a050ff-5995-7ff1-8aa5-d10b4d5a730a",
+  "app_server_turn_id": "01a05110-4f0c-7270-8f0a-c211bfc59034",
+  "app_server_process_id": "8240",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T050657Z-aip-systemic-phase-c1-model-picker-20260830.md",
+  "task_sha256": "6b9d11e6bc0a0eb99f97c890bb15d5d20459128c3a4340514032ad4e88e94762",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

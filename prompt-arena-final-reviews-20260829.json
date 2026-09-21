@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-final-reviews-20260829",
+  "parent_request_id": "prompt-arena-product-docs-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Perform read-only final project security review, phase review, and publication check for Prompt Arena exact HEAD edb7b2d1ca1b24c000d101f3b74e7e42a5a4f14d on branch completion/windows-qa-live-telemetry-i18n. Use canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Before inspection read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md, C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\index\\SKILL.md, and C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\audit\\SKILL.md. Do not edit any file, commit, push, merge, release, tag, deploy, or touch other worktrees. Inspect exact diff/history from the prior reviewed source base through edb7b2d, changed files, docs claims, ignored files, .env/log/database/backup patterns, and relevant trust boundaries. Security: trace blind identity/score/reveal/storage, model download/import/remove path validation and sanitized errors, custom/native controls/i18n text rendering, live telemetry/prompt/credential exposure, async worker/process isolation/cancellation, and dependency/packaging disclosure; never print secrets. Phase review: compare P0/P1/P2 claims to source/tests/docs, detect unrelated refactors or stale claims, verify validation proportionality, and state exactly one verdict among Approved, Approved with reservations, Hotfix required, Rejected. Publication check: inspect history/files for credentials, private paths/usernames, generated artifacts, copyrighted assets, operational disclosure, and public/private leakage; do not claim safe history without the necessary scan and use exactly one publication verdict. Run only safe read-only commands and bounded existing tests if useful; remote CI, live Ollama, Docker, browser/native human QA, and fresh exact-HEAD package are unconfirmed/pending. Return compact structured findings, confirmed vs hypothesis, required fixes, validations run/not run, manual gates, exact file/line evidence, and full provenance including real thread_id/turn_id if exposed. Do not modify repository.",
+  "constraints": [
+    "Read-only only; no file, repository, remote, package, or worktree mutation.",
+    "Never print or commit secrets, credentials, private logs, databases, dumps, or backups.",
+    "Use exact skill verdict vocabulary for phase and publication review.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "Do not infer human/native/runtime/package success from source or unit tests."
+  ],
+  "review_findings": [
+    {
+      "title": "Final reviewed source chain is P0/P1/P2 plus evidence docs",
+      "details": "P0 async execution/blind score fix, P1 availability actions, P2 desktop UI overhaul, and docs were committed as 75bf826, 1b7c7ce, bcf706e, and edb7b2d."
+    },
+    {
+      "title": "Human and external gates remain open",
+      "details": "No local Ollama endpoint, browser/component harness, installed Windows visual session, Docker runtime, Linux runner, or fresh exact-HEAD NSIS artifact was available in this review."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\model_library.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\storage.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\evaluation.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": { "allowed_actions": [] }
+}

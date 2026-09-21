@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-docs-final-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-display-bound-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Correct the stale Phase 11 statements in docs/KNOWN_LIMITATIONS.md identified by the final Biel4 read-only review. Replace wording that calls Phase 11 synthetic metadata-only or says no Windows screenshot API/desktop capture exists. State precisely that bounded on-demand Windows display enumeration and confirmed GDI capture are implemented with transient non-persistent pixels, while local visual-model installation/availability, packaged Windows behavior, Owner privacy/UX validation, cancellation under load and visual quality remain pending. Keep the release/manual reservations and no-upload/no-continuous/no-durable boundaries. Do not change production code or later phases. Run git diff --check plus the full focused Rust/contracts/desktop/secrets gates on host if practical, then commit the documentation-only correction. Do not push or publish.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits outside the Executor.",
+    "Do not weaken any security/privacy boundary or claim a local model is installed; only reconcile documentation with the shipped capture/provider implementation.",
+    "Do not modify Phase 12 Android or Phase 13 gateway behavior; do not push, merge, tag, release or deploy."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase11-review-20260822.result.json",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/KNOWN_LIMITATIONS.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_11_SCREEN_VISION_SPEC.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/screen_vision.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Known limitations contradict the real capture provider",
+      "severity": "blocking",
+      "details": "docs/KNOWN_LIMITATIONS.md:13 and :77-78 still describe Phase 11 as synthetic metadata-only and say it does not call a Windows screenshot API or capture a desktop/window. HEAD 6cb6a2e ships bounded confirmed Windows GDI capture and multi-display enumeration; reconcile the text while retaining pending model/manual/release reservations."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

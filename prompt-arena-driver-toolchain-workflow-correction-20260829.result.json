@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-driver-toolchain-workflow-correction-20260829",
+  "parent_request_id": "prompt-arena-driver-toolchain-workflow-retry-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T13:12:08.762188+00:00",
+  "finished_at": "2026-08-29T13:14:02.652646+00:00",
+  "summary": "Applied the additive source-SHA correction to the existing workflow and committed it as c010f439e47bb3014ec8ad18ec9e2614301384ad. Pull requests now use github.event.pull_request.head.sha, workflow_dispatch falls back to github.sha, checkout is verified against SOURCE_SHA, and the same source SHA identifies both manifest.sourceCommit and the artifact name. Provenance: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4/biel4 Executor\",\"task_transport\":\"App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"turn_id\":\"not exposed in Executor transport\",\"workspace\":\"E:\\\\Prompt Arena-pr28-bl4\",\"workspace_write\":\"verified\",\"windows_sandbox\":\"elevated (control-plane asserted)\",\"readiness\":\"ready (control-plane asserted)\",\"approval\":\"never\",\"commit\":\"c010f439e47bb3014ec8ad18ec9e2614301384ad\"}. Parent commit 90b65d3 was preserved. No push attempted.",
+  "files_changed": [
+    ".github/workflows/native-driver-toolchain.yml"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "Get-Content .github/workflows/native-driver-toolchain.yml",
+    "python source-SHA YAML/PowerShell structure check",
+    "git diff --check",
+    "embedded PowerShell syntax check",
+    "git diff inspection",
+    "git add -- .github/workflows/native-driver-toolchain.yml",
+    "git commit -m \"fix: pin native driver artifact to source SHA\"",
+    "git diff HEAD^ HEAD --check",
+    "git show --stat --oneline --decorate HEAD"
+  ],
+  "tests": [
+    {
+      "command": "source-SHA YAML/PowerShell structure check",
+      "status": "passed",
+      "details": "Checkout ref, SOURCE_SHA fallback expression, manifest source identity, artifact naming, install commands, and compatibility guard validated."
+    },
+    {
+      "command": "embedded PowerShell syntax check",
+      "status": "passed",
+      "details": "Workflow PowerShell block parsed successfully."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "git diff HEAD^ HEAD --check",
+      "status": "passed",
+      "details": "Committed correction diff is clean."
+    },
+    {
+      "command": "Remote GitHub Actions execution",
+      "status": "not_run",
+      "details": "Requires a remote runner; no push was authorized."
+    }
+  ],
+  "remaining_issues": [
+    "The workflow has not been executed remotely, so no artifact or manifest instance is available yet.",
+    "No push, merge, release, tag, or deploy was performed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T131209Z-prompt-arena-driver-toolchain-workflow-correction-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T131209Z-prompt-arena-driver-toolchain-workflow-correction-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T131209Z-prompt-arena-driver-toolchain-workflow-correction-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T131209Z-prompt-arena-driver-toolchain-workflow-correction-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04da6-273a-70c1-99d4-c452885c5861",
+  "app_server_process_id": "15672",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T131209Z-prompt-arena-driver-toolchain-workflow-correction-20260829.md",
+  "task_sha256": "15bce709148a9fbdb4dec3371eee4f2f6e7b0407db78274e97379f6c5febbd5d",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

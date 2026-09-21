@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-audit-20260827",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Perform Phase A of the AIP Productization Closure mission as a read-only installed-facing capability audit. Inspect the verified origin/main baseline at cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4 and the current branch fix/productize-local-capabilities. Do not modify files, create branches, commit, push, open PRs, merge, tag, release, deploy, or build installers. For Voice, Supervised Tools, Extensions, Screen Vision, Android Companion desktop UX, Gateway, the prerequisite status center, provider configuration boundary, and Phase 7B-7F navigation, trace actual Rust/Tauri commands, React entry points, installed discoverability, prerequisites, configuration paths, real versus fixture/mock execution, fail-closed behavior, and security/privacy boundaries. Produce an evidence-backed table with current backend/runtime, commands, UI entry point, discovery path, prerequisite and whether bundled/discoverable/configurable/hidden, real execution status, fixture/mock-only status, exact blockers, and the smallest coherent implementation plan. Identify reusable existing primitives and deterministic tests. Return a structured executor report with summary, files_changed (must be empty), commands_run, tests, capability_audit, acceptance_criteria, provenance, and remaining_issues. This report is the approval input for Biel3 before implementation.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md, .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "Ponytail full: understand the end-to-end flow, reuse existing primitives, and propose the smallest safe repo-native change.",
+    "No file edits or generated artifacts in E:/AIP during this phase; files_changed must be empty.",
+    "Use only the configured Biel4 App Server/headless executor; do not use native subagents or a fallback backend.",
+    "Do not expose secrets, credentials, local databases, histories, memories, private media, or authentication files.",
+    "Preserve AIP standalone boundaries, Portuguese UI, local-first/no-upload guarantees, safe mode, temporary chat, explicit approval, bounded capture, and Windows 10 64-bit scope.",
+    "Do not infer product completion from backend existence or documentation claims; inspect actual code paths."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src-tauri/src/voice.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/screen_vision.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/tools.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/extensions.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/android.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/gateway.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

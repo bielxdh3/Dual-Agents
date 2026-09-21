@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-local-adapters-correction-20260830",
+  "parent_request_id": "prompt-arena-local-adapters-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T06:27:26.175642+00:00",
+  "finished_at": "2026-08-30T06:29:17.864487+00:00",
+  "summary": "PROMPT_ARENA_BLOCKED_BY_PROVENANCE: executor biel4, role executor, task transport app_server, workspace-write, approval never, CODEX_HOME verified, session/thread IDs available; authoritative App Server turn/process IDs, Windows sandbox elevated, and readiness ready could not be proven. Base SHA 1edcdc22da8550b041031f588f9ba8a4805d532e; new SHA unchanged. No edits or commit made.",
+  "files_changed": [
+    "src-tauri/src/lib.rs",
+    "src-tauri/src/model_library.rs",
+    "src-tauri/src/ollama.rs",
+    "src-tauri/src/orchestration.rs",
+    "src/run-plan.test.ts",
+    "src/run-plan.ts",
+    "src-tauri/src/openai_compatible.rs"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git rev-parse --verify completion/windows-qa-live-telemetry-i18n",
+    "git worktree list --porcelain",
+    "Get-ChildItem Env:CODEX*",
+    "Get-Process -Id $PID"
+  ],
+  "tests": [
+    {
+      "command": "cargo check/test focused on the OpenAI-compatible provider",
+      "status": "not_run",
+      "details": "Blocked by missing authoritative provenance."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "not_run",
+      "details": "Blocked by missing authoritative provenance."
+    },
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Blocked by missing authoritative provenance."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "not_run",
+      "details": "Blocked by missing authoritative provenance."
+    },
+    {
+      "command": "npm run build",
+      "status": "not_run",
+      "details": "Blocked by missing authoritative provenance."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "not_run",
+      "details": "Blocked by missing authoritative provenance."
+    },
+    {
+      "command": "git diff --check",
+      "status": "not_run",
+      "details": "Blocked by missing authoritative provenance."
+    }
+  ],
+  "remaining_issues": [
+    "Required correction, validation, staging, and local commit remain pending provenance verification.",
+    "Protected worktrees were not modified."
+  ],
+  "git_status": " M src-tauri/src/lib.rs\n M src-tauri/src/model_library.rs\n M src-tauri/src/ollama.rs\n M src-tauri/src/orchestration.rs\n M src/run-plan.test.ts\n M src/run-plan.ts\n?? src-tauri/src/openai_compatible.rs\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062726Z-prompt-arena-local-adapters-correction-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062726Z-prompt-arena-local-adapters-correction-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062726Z-prompt-arena-local-adapters-correction-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062726Z-prompt-arena-local-adapters-correction-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05159-fe11-78c0-a32b-84c9962414ec",
+  "app_server_turn_id": "01a05159-fef4-7223-9553-e77b129cdb02",
+  "app_server_process_id": "23816",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T062726Z-prompt-arena-local-adapters-correction-20260830.md",
+  "task_sha256": "e322c1f8f3b9a6eeae6b3bd43c87856b3c7ffcf076cdc7e2a9aa2b1d44d6effc",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

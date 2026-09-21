@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-ollama-worker-smoke-20260830",
+  "parent_request_id": "prompt-arena-rust-runtime-tests-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Run a bounded live local Ollama worker-protocol smoke at exact current checkout HEAD 73991b03282e3ec766ab824f6bdfb9ff8e4c616a. Use canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read required AGENTS.md and skills first. Do not edit source, docs, history, package outputs, remotes, tags, releases, deploys, or Ollama model state. Verify http://127.0.0.1:11434 health and use the existing packaged worker binary `src-tauri/binaries/prompt-arena-worker-x86_64-pc-windows-msvc.exe` with six GenerateOnce JSON requests: two competitors (`qwen3.5:0.8b` and `llama3.2:1b`), three unique repetitions each, unique bounded run/job IDs, generic prompt `Reply with exactly OK.`, runtime config endpoint 127.0.0.1:11434, read deadline 120000ms, max_tokens 32, text_generation/available boundary, no objective verifier. Feed requests through the worker protocol sequentially, capture only per-attempt status, elapsed milliseconds, response byte count, usage/timing presence, and sanitized error code/message; do not print response text, prompts beyond the generic test string, credentials, or model metadata beyond the two requested model names. Report counts for 6/6 completion, failure isolation, and whether any process/listener leaked. This is worker/runtime evidence only; do not claim Arena UI responsiveness, persistence, blind evaluation continuity, or human QA. Run git diff --check and final status/HEAD verification.",
+  "constraints": [
+    "Read-only with respect to repository and Ollama state; only transient worker processes are allowed.",
+    "No model pull/delete/update, no source/docs/generated/package changes, no remote operations.",
+    "Do not emit response text or sensitive runtime diagnostics.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; elevated ready; approval never."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\binaries\\prompt-arena-worker-x86_64-pc-windows-msvc.exe",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\bin\\prompt-arena-worker.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\protocol.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\orchestration.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": { "allowed_actions": [] }
+}

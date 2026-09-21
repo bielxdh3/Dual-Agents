@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-tests-20260829",
+  "parent_request_id": "prompt-arena-i18n-build-fix-20260829",
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T18:48:49.868396+00:00",
+  "finished_at": "2026-08-29T18:50:18.237542+00:00",
+  "summary": "Added focused repo-native i18n coverage only. BL4 provenance: canonical biel4 App Server/headless executor, workspace-write, elevated readiness ready, approval never; local mutation only, no commits or remote operations.",
+  "files_changed": [
+    "src/i18n.test.ts"
+  ],
+  "commands_run": [
+    "npx vitest run src/i18n.test.ts",
+    "npm run typecheck"
+  ],
+  "tests": [
+    {
+      "command": "npx vitest run src/i18n.test.ts",
+      "status": "passed",
+      "details": "1 test file passed; 5 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript build completed successfully."
+    }
+  ],
+  "remaining_issues": [],
+  "git_status": " M src-tauri/src/commands.rs\n M src-tauri/src/main.rs\n M src-tauri/src/storage.rs\n M src/App.tsx\n M src/advanced-arena-view.tsx\n M src/arena-runner.test.ts\n M src/arena-runner.ts\n M src/bridge.ts\n M src/styles.css\n?? src/i18n.test.ts\n?? src/i18n.ts\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T184850Z-prompt-arena-i18n-tests-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T184850Z-prompt-arena-i18n-tests-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T184850Z-prompt-arena-i18n-tests-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T184850Z-prompt-arena-i18n-tests-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ed8-00cd-7cf3-911d-b4bbaf1e09d0",
+  "app_server_turn_id": "01a04eda-64fd-7f13-aaca-48c55a38c43c",
+  "app_server_process_id": "9744",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T184850Z-prompt-arena-i18n-tests-20260829.md",
+  "task_sha256": "8a84c12277fbcac94c61ca9af02fd1b201f6dc14d4237ce8505d04b87dbc7d3c",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

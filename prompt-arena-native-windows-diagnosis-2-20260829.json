@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-windows-diagnosis-2-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are the same BL4/biel4 implementation Executor through the configured App Server/headless transport. Work directly in E:\\Prompt Arena-pr28-bl4 on branch validation/native-tauri-acceptance at HEAD 5aa76dd6e62a760c8481340dd5014cbfe7c6a23f. Reassess the latest native acceptance evidence: Linux job passed fully on run 33233256324, but Windows still fails at real tauri-driver/EdgeDriver session creation with `session not created: DevToolsActivePort file doesn't exist` after the current harness already atomically creates a writable tauri:options.webviewOptions.userDataFolder. Diagnose the remaining Windows failure using the exact workflow/harness and authoritative Tauri/Microsoft WebView2/EdgeDriver behavior, then apply the smallest justified harness/workflow-only fix that makes the real Tauri WebView session start. Consider whether supported WebView2 automation environment/EdgeDriver capability needs explicit propagation, executable/driver compatibility, process cleanup, or a workflow prerequisite; do not guess or weaken assertions. Preserve the full acceptance chain (real Tauri WebView -> bridge -> Rust command -> app-owned sidecar -> persisted evidence -> close/reopen). Do not replace native Tauri with browser-only tests, mocks, fallback drivers, or a different executor. Keep product behavior and roadmap untouched. Create one normal commit with the fix, run only validations actually available (`node --check scripts/native-ui-smoke.mjs`, `git diff --check`, plus any focused harness check), and report exact evidence; do not attempt network push because App Server credentials are unavailable. If authoritative evidence shows the failure is an external runner/runtime limitation rather than a harness defect, leave the code unchanged and report the reproducible blocker and the smallest evidence-backed workflow prerequisite instead of forcing a green check.",
+  "constraints": [
+    "BL4/biel4 App Server/headless is the only allowed implementation Executor; fail closed if provenance is not proven.",
+    "Scope is .github/workflows/native-ui.yml and scripts/native-ui-smoke.mjs only unless a directly necessary native harness file is proven.",
+    "Never weaken asserts, skip sidecar/persistence/reopen checks, add paid APIs, or use TUI/native_tui/fallback/native subagents.",
+    "No merge, tag, release, deploy, force-push, or public release. Keep PR #28 draft."
+  ],
+  "context_files": [
+    ".github/workflows/native-ui.yml",
+    "scripts/native-ui-smoke.mjs",
+    "src-tauri/tauri.conf.json",
+    "src-tauri/src/lib.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

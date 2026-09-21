@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-harness-fix-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are BL4/biel4, the only implementation Executor, through the configured App Server/headless transport. Work directly in E:\\Prompt Arena-pr28 on branch validation/native-tauri-acceptance at starting HEAD 687db83dcdad050c914ca6ea8dcfd555e44cb28f. Fix only the native Tauri acceptance harness using the smallest repo-native diff. Evidence from latest PR #28 run 33221866743: Linux reaches the real Tauri UI/bridge but execute_run_once rejects the smoke plan with run_plan_invalid because benchmarkVersionId native-ui-smoke-v1 is not a deterministic benchmark-id@version identity; Windows reaches tauri-driver/EdgeDriver but session creation fails with DevToolsActivePort file doesn't exist. Correct the Linux plan identity without weakening any assertion. For Windows, diagnose and apply the smallest correct native WebView2/EdgeDriver harness fix (use the supported tauri:options/ms:edgeOptions contract and a unique writable test profile or equivalent only if required); do not replace Tauri with browser-only tests, mocks, fallback drivers, or weaker assertions. Preserve the required acceptance chain: real Tauri WebView -> bridge -> Rust command -> app-owned worker sidecar -> persisted evidence -> close/reopen evidence. Keep the PR draft. Run focused validation appropriate to the changed files and report exact commands and outcomes. Commit the implementation and push the exact branch normally so PR #28 reruns; do not merge, tag, release, deploy, force-push, or alter product features.",
+  "constraints": [
+    "BL4/biel4 App Server/headless is the only allowed implementation Executor; do not use TUI, native_tui, fallback, another Executor, Codex native subagents, or BL3 implementation.",
+    "Fail closed if executor/backend/provenance cannot be proven by control-plane/result metadata.",
+    "Do not modify product behavior, roadmap claims, or unrelated WIP; scope is .github/workflows/native-ui.yml and scripts/native-ui-smoke.mjs unless a directly necessary harness-only file is proven.",
+    "Do not weaken asserts, skip the worker/persistence/reopen path, add paid APIs, or add a new dependency unless strictly required and justified.",
+    "No merge, release, tag, deploy, force-push, or public release; preserve draft PR state."
+  ],
+  "context_files": [
+    ".github/workflows/native-ui.yml",
+    "scripts/native-ui-smoke.mjs",
+    "scripts/prepare-worker-sidecar.mjs",
+    "src-tauri/src/commands.rs",
+    "src-tauri/src/orchestration.rs",
+    "src-tauri/src/domain.rs",
+    "src-tauri/src/runtime.rs",
+    "ROADMAP.md"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit",
+      "normal_push",
+      "branch_publication",
+      "draft_pr_update"
+    ]
+  }
+}

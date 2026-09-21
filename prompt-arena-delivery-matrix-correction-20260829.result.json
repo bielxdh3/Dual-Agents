@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-delivery-matrix-correction-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T04:37:51.917761+00:00",
+  "finished_at": "2026-08-29T04:40:05.083677+00:00",
+  "summary": "Corrected the matrix to seven columns with artifact evidence for every row, updated native evidence to run 33233256324, and committed as 2c5a006f925efffc333f1dad2700d0c870ac7096. Metadata: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4 implementation Executor\",\"task_transport\":\"App Server/headless\",\"sandbox\":\"managed workspace-write; local mutation verified\",\"repository\":\"E:\\\\Prompt Arena-pr28-bl4\",\"branch\":\"validation/native-tauri-acceptance\",\"commit\":\"2c5a006f925efffc333f1dad2700d0c870ac7096\"}. No push attempted.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git diff --check",
+    "bounded PowerShell seven-column matrix check",
+    "git add -- docs/DELIVERY_MATRIX.md",
+    "git commit -m \"docs: correct delivery evidence columns\"",
+    "git diff HEAD^ HEAD --check"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "bounded PowerShell seven-column matrix check",
+      "status": "passed",
+      "details": "26 table lines have seven columns in the requested order; required run IDs are present; no COMPLETE status introduced."
+    },
+    {
+      "command": "git diff HEAD^ HEAD --check",
+      "status": "passed",
+      "details": "Committed documentation diff is clean."
+    }
+  ],
+  "remaining_issues": [
+    "Windows native acceptance remains unproven because run 33233256324 failed at real tauri-driver session creation with DevToolsActivePort file doesn't exist.",
+    "MSI remains unavailable with zero artifacts; native QA, security, and publication gates remain incomplete.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T043752Z-prompt-arena-delivery-matrix-correction-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T043752Z-prompt-arena-delivery-matrix-correction-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T043752Z-prompt-arena-delivery-matrix-correction-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T043752Z-prompt-arena-delivery-matrix-correction-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04bcf-4f2e-7c83-ace3-b9e48aa40092",
+  "app_server_process_id": "4496",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T043752Z-prompt-arena-delivery-matrix-correction-20260829.md",
+  "task_sha256": "68b617d6ee2f029e910aa491b9f3686201406bf8e2531988b6821e584f6f266e",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-source-identity-correction-20260820",
+  "parent_request_id": "aip-phase9-final-review-collections-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Apply the two remaining independent Reviewer corrections on the current clean Phase 9 branch at HEAD 3ae7a9eda4843093b77b7fb2533e740e809450b4. Read AGENTS.md and required AIP implementation, phase, security, and publication skills before editing. Keep the change limited to Phase 9 Rust tools/database authority, contracts, focused tests, and the matching UI error label. Do not publish remotely or implement later phases.\n\nBlocking correction 1 — approved source identity: local workspace organize execution currently re-resolves bounded paths but does not compare the source file with the identity captured at preview. Persist a stable bounded source identity with each normalized local move during validate_local_action_input/preview (use the existing stable Windows file-index or Unix device/inode capture; never accept a caller-supplied identity). Extend the internal serialized ToolFileMove with an optional bounded sourceIdentity that is absent for fixture moves and backward-compatible for old records. In execute_adapter for workspace.organize_local, require the preview identity, preflight all moves for safe root/link/reparse/containment, source existence and destination absence, then immediately revalidate each source identity immediately before its rename; on mismatch fail closed with a truthful bounded workspace error, never move the substituted source, and preserve rollback/partial-failure recording. Add a deterministic Rust test that previews a local move, substitutes the source path before execution, then verifies the substitute is not moved and the action is not falsely executed. Keep compensation identity and all existing fixture semantics intact. Update the TypeScript ToolFileMove/parser only enough to allow an optional bounded sourceIdentity emitted by Rust while rejecting oversized/control values from untrusted input.\n\nBlocking correction 2 — Rust collection authority: align SQLite/Rust with the contract maxima. Add explicit constants and enforcement for maximum workspace roots (64 total owner rows, including disabled rows, before a new insert), list_workspace_roots LIMIT 64, and list_tool_catalog LIMIT 16. Return a bounded cognitive error for root-limit rejection and add its contract/UI label. Keep existing Rust limits for moves 32, permissions 12, sessions 32, and audit 100 unchanged. Add focused tests for root-list/insert limit behavior where practical.\n\nValidation before commit: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm --filter @aip/contracts typecheck; pnpm --filter @aip/contracts build; pnpm --filter @aip/contracts test; pnpm --filter @aip/desktop typecheck; pnpm --filter @aip/desktop test; pnpm --filter @aip/desktop build; pnpm secrets:scan; git diff --check. The executor may report Node spawn EPERM, but the parent will rerun those gates. Create one corrective commit with exact message `fix: revalidate phase 9 source identity`. Do not push, create PR, merge, tag, release, or deploy. Report all evidence and final SHA.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents or alternate backend.",
+    "Local mutation and one scoped commit only; no remote GitHub mutation or publication.",
+    "Preserve the existing Phase 9 compensation identity, collection bounds, audit identifier bounds, and all safety, owner, agent, safe-mode, temporary-chat, and fixture boundaries."
+  ],
+  "review_findings": [
+    {
+      "title": "Revalidate approved local source identity before rename",
+      "details": "execute_adapter does not compare the current source identity with an identity captured during preview, so a substitute at the approved source path could be moved. Persist preview identity, reject caller-supplied identity, and revalidate immediately before each rename with a regression test.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Enforce Rust catalog and workspace-root collection maxima",
+      "details": "Rust list_tool_catalog/list_workspace_roots are unbounded and add_workspace_root has no maximum-count enforcement, while contracts cap catalog at 16 and roots at 64.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/tools.rs",
+    "packages/contracts/src/index.ts",
+    "packages/contracts/tests/contracts.test.ts",
+    "apps/desktop/src/App.tsx"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

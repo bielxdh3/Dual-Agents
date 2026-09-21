@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-review-correction-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-contract-count-test-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T14:48:55.973518+00:00",
+  "finished_at": "2026-08-22T14:52:50.675702+00:00",
+  "summary": "Implemented bounded multi-monitor Windows enumeration with stable bounds-based identities and selected-origin capture, plus shared per-job cancellation signaling threaded through real capture and local adapter paths. Added registry cleanup coverage and updated Phase 11 documentation. Commit: 4eed9f5e1570ef855de4b0e64392e42974f728ad.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/screen_vision.rs",
+    "docs/PHASE_11_SCREEN_VISION_SPEC.md"
+  ],
+  "commands_run": [
+    "cargo fmt",
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "cargo test --locked --lib screen_vision::tests",
+    "git diff --check",
+    "git commit -m \"fix: enumerate displays and wire screen cancellation\""
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Passed on Windows host, including the Windows display enumeration/capture code."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "125 passed, 1 ignored."
+    },
+    {
+      "command": "cargo test --locked --lib screen_vision::tests",
+      "status": "passed",
+      "details": "6 focused tests passed, including cancellation registry signaling and cleanup."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    }
+  ],
+  "remaining_issues": [
+    "Contracts/desktop Node validation and secrets scan were not rerun in this correction because the host's process-spawn EPERM restriction remains active; prior host attempts showed the same Vitest/Vite/secrets-scan limitation.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T144856Z-aip-phase11-real-screen-vision-review-correction-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T144856Z-aip-phase11-real-screen-vision-review-correction-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T144856Z-aip-phase11-real-screen-vision-review-correction-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T144856Z-aip-phase11-real-screen-vision-review-correction-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029f2-3f20-7032-a429-36b2ad6beab1",
+  "app_server_process_id": "1516",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T144856Z-aip-phase11-real-screen-vision-review-correction-20260822.md",
+  "task_sha256": "5d16dc8f826468f08523f6bdfe74d135a777abfb0044ebadb3fe4d8ce4a2384a",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

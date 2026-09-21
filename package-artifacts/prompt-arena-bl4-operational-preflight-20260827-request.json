@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-bl4-operational-preflight-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Read-only BL4 operational preflight. Do not edit files, commit, push, or implement anything; do not use TUI/native_tui/fallback/substitute. Run exactly these checks from E:/Prompt Arena and report their raw structured results: Get-Location; git rev-parse --show-toplevel; git branch --show-current; git rev-parse HEAD; git status --short --branch; the cmd.exe child_process.spawnSync gate with echo BL4_CHILD_PROCESS_OK; and the node child_process.spawnSync gate with BL4_NODE_CHILD_OK. Return one JSON object with summary, files_changed, commands_run, tests, remaining_issues. Do not infer sandbox provenance from shell output; the canonical app_server wrapper supplies native provenance.",
+  "constraints": [
+    "account biel4",
+    "role Executor/Reviewer",
+    "backend app_server",
+    "task_transport app_server",
+    "repository E:/Prompt Arena",
+    "no file changes",
+    "no commit",
+    "no push",
+    "no implementation",
+    "no TUI/native_tui/fallback/substitute"
+  ],
+  "authorization": {"allowed_actions": []},
+  "context_files": [],
+  "review_findings": [],
+  "max_correction_cycles": 0
+}

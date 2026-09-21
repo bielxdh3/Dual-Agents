@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-exact-head-37dbafc-20260830",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T03:21:18.490704+00:00",
+  "finished_at": "2026-08-30T03:31:06.050091+00:00",
+  "summary": "Built and verified a fresh NSIS package from clean HEAD 37dbafcabb03079927e6d2f1ee499269c1a6722f on completion/windows-qa-live-telemetry-i18n. Canonical provenance: BL4/biel4 Executor, App Server/headless, Windows elevated, readiness ready, approval never. No source edits or commit.",
+  "files_changed": [
+    "checksums-sha256.txt"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD; git branch --show-current; git status --short",
+    "cargo clean --manifest-path src-tauri/Cargo.toml",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows --smoke",
+    "Installer worker presence/hash check with silent install and uninstall",
+    "git diff --check"
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+      "status": "passed",
+      "details": "NSIS bundle produced successfully."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "passed",
+      "details": "Prepared 1 Windows artifact; MSI optional and unavailable."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum manifest, clean install, executable start, restart, and silent uninstall passed."
+    },
+    {
+      "command": "Bundled worker inspection",
+      "status": "passed",
+      "details": "Installed prompt-arena-worker.exe was present, 2,567,680 bytes, SHA-256 80ab45bcebe7009cd174b9c1e1b1d360d3d9bd029002ee15a6a0d279035be078; uninstall passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only LF-to-CRLF warnings."
+    }
+  ],
+  "remaining_issues": [
+    "NSIS artifact: package-artifacts/prompt-arena-0.1.0-windows-nsis.exe, 3,757,226 bytes, SHA-256 68c4ccf7e7ab0b1d14501dce1cf401a2deecc0a8db52228557b28e447f34ae6c; checksum manifest updated and left uncommitted.",
+    "MSI remains unavailable/blocked locally; Linux packages require CI/Linux validation.",
+    "Native visual/accessibility/full Tauri Arena human QA and remote CI remain pending."
+  ],
+  "git_status": " M checksums-sha256.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T032118Z-prompt-arena-package-exact-head-37dbafc-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T032118Z-prompt-arena-package-exact-head-37dbafc-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T032118Z-prompt-arena-package-exact-head-37dbafc-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T032118Z-prompt-arena-package-exact-head-37dbafc-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a050ad-9550-7ce0-acde-0e3b5c34f567",
+  "app_server_turn_id": "01a050af-94d4-7fe1-9768-9324d74b9360",
+  "app_server_process_id": "20604",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T032118Z-prompt-arena-package-exact-head-37dbafc-20260830.md",
+  "task_sha256": "bad916397c873371d81a66b6aaddb06d7699655c4b904b25a8c56484929fc4f6",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

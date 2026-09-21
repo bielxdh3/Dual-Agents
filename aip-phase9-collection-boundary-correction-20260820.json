@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-collection-boundary-correction-20260820",
+  "parent_request_id": "aip-phase9-final-review-final-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Apply the one remaining independent Reviewer correction on the current clean Phase 9 branch at HEAD dfeee2fa6d9ce264938d369f7a2e3e029ddb52b0. Read AGENTS.md and required AIP implementation, phase, security, and publication skills before editing. Keep the change limited to packages/contracts/src/index.ts and packages/contracts/tests/contracts.test.ts. Do not publish remotely or implement later phases.\n\nBlocking correction: align the TypeScript supervised-tool collection parsers with the existing Rust/database bounds. parseToolActionInput workspaceOrganize.moves must be non-empty and <=32, matching validate_local_action_input. parseToolSession.permissions must be non-empty and <=12, matching MAX_SESSION_PERMISSIONS. parseToolSessions must reject more than 32 records, matching list_tool_sessions LIMIT 32. parseToolAudit must reject more than 100 records, matching MAX_AUDIT_ROWS. Add explicit bounded maxima for parseWorkspaceRoots and parseToolCatalog (use conservative Phase 9 boundary maxima of 64 roots and 16 manifests) so they cannot accept arbitrary arrays. Keep item validators and all prior control-character, length, status, owner, compensation, and fixture checks unchanged. Add focused tests rejecting oversized move, permission, root, catalog, session, and audit arrays while valid arrays remain accepted. Do not broaden unrelated global parsers.\n\nValidation before commit: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm --filter @aip/contracts typecheck; pnpm --filter @aip/contracts build; pnpm --filter @aip/contracts test; pnpm --filter @aip/desktop typecheck; pnpm --filter @aip/desktop test; pnpm --filter @aip/desktop build; pnpm secrets:scan; git diff --check. The executor may report Node spawn EPERM, but the parent will rerun those gates. Create one corrective commit with exact message `fix: bound phase 9 tool collections`. Do not push, create PR, merge, tag, release, or deploy. Report all evidence and final SHA.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents or alternate backend.",
+    "Local mutation and one scoped commit only; no remote GitHub mutation or publication.",
+    "Preserve the existing Phase 9 compensation identity, audit identifier bounds, and all safety, owner, agent, safe-mode, temporary-chat, and fixture boundaries."
+  ],
+  "review_findings": [
+    {
+      "title": "Bound supervised-tool collection payloads",
+      "details": "TypeScript parsers accepted arbitrary move, permission, root, catalog, session, and audit array lengths despite Rust/database bounds. Add explicit maxima and regression tests.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "packages/contracts/src/index.ts",
+    "packages/contracts/tests/contracts.test.ts",
+    "apps/desktop/src-tauri/src/tools.rs"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

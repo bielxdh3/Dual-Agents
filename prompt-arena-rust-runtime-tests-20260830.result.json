@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-rust-runtime-tests-20260830",
+  "parent_request_id": "prompt-arena-final-review-package-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:37:31.040602+00:00",
+  "finished_at": "2026-08-30T02:41:24.090269+00:00",
+  "summary": "Read-only Rust validation completed at HEAD 73991b03282e3ec766ab824f6bdfb9ff8e4c616a on completion/windows-qa-live-telemetry-i18n. Final all-target Cargo tests passed. Provenance: canonical BL4/biel4 App Server/headless, workspace-write, Windows elevated, readiness ready, approval never.",
+  "files_changed": [],
+  "commands_run": [
+    "Read AGENTS.md and required skill files",
+    "git rev-parse HEAD and git status --short",
+    "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+    "Inspected live_ollama_health_self_skips_when_unavailable test",
+    "git diff --check",
+    "Final git rev-parse HEAD and git status --short"
+  ],
+  "tests": [
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "failed",
+      "details": "Initial 120-second bound expired while Cargo was compiling/running remaining targets; no test failure was reported."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "109 passed, 0 failed, 0 ignored, 0 measured, plus two zero-test targets. live_ollama_health_self_skips_when_unavailable passed; with the available loopback endpoint it observed healthy Ollama rather than taking the unavailable self-skip branch."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "HEAD and working-tree verification",
+      "status": "passed",
+      "details": "HEAD remained 73991b03282e3ec766ab824f6bdfb9ff8e4c616a and status remained clean."
+    }
+  ],
+  "remaining_issues": [
+    "No full model Arena, model download, deletion, or Ollama state mutation was performed.",
+    "Visual, human, native UI, and remote CI validation were not performed or claimed.",
+    "Thread and turn identifiers were not exposed by the execution environment."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T023731Z-prompt-arena-rust-runtime-tests-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T023731Z-prompt-arena-rust-runtime-tests-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T023731Z-prompt-arena-rust-runtime-tests-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T023731Z-prompt-arena-rust-runtime-tests-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a05087-8048-79b3-acb4-d75f9f646b3a",
+  "app_server_process_id": "8920",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T023731Z-prompt-arena-rust-runtime-tests-20260830.md",
+  "task_sha256": "a35f54a762bedc60b64c8acdd99689e19094501f34afe2fe43294fc05fad9c5a",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

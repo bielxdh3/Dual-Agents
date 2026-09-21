@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-a-20260829",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Required skills (read fully before work): E:/AIP/.agents/skills/aip-implementation/SKILL.md, E:/AIP/.agents/skills/aip-phase-review/SKILL.md, E:/AIP/.agents/skills/aip-security-review/SKILL.md, E:/AIP/.agents/skills/aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md (full). Execute only Phase A (P0 text-generation pipeline) of C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md, after reading the complete goal. Work on E:/AIP branch fix/systemic-desktop-ux-and-generation at starting SHA c8dcbcd128e4f2babc2d4ebe27259f28529cef81. Trace one real request end to end across React composer/state, Tauri invoke, Rust ChatCoordinator/queue, Python sidecar framing, Ollama request/stream, Rust event parsing/request-sequence acceptance, SQLite persistence, frontend finalization/render. Reproduce the stall where possible; independently check Ollama health and installed models and run bounded direct Ollama generation outside AIP when available, without exposing prompt/response content. Find and fix the first progressing boundary/root cause, not just the pending label. Add bounded local-only request-ID tracing without full prompt/response content only where needed; preserve privacy and no telemetry. Ensure recoverable provider/request errors, retry, cancellation, no eternal pending assistant card, accurate provider health, queue idle recovery, stale/mismatched terminal rejection, and a subsequent request after completion and cancel. Add focused behavioral regression tests for queue start/progress/terminal, cancellation, provider health, next request, stale terminal, persistence/frontend final state. Reuse existing code/dependencies and keep the smallest coherent diff; do not implement later UX phases. Run focused tests and the smallest relevant formatting/type/lint checks, plus a real local AIP/Ollama smoke when available; record exact blockers instead of weakening controls. Commit the focused Phase A change locally with an explanatory message. Do not push, create/update PR, merge, tag, release, deploy, or build installers in this phase. Preserve unrelated work and do not reset, discard, amend, rebase, squash, force-push, or use a native/direct fallback or another backend. Return a structured report with root cause, evidence, files_changed, commands_run, tests, direct_provider_comparison, remaining_issues, and commit SHA.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor for this task. No native subagents, create_thread, alternate account, backend swap, or manual/direct implementation fallback.",
+    "Read E:/AIP/AGENTS.md and all required skills named in the task before inspecting or editing implementation files.",
+    "AIP stays local-first: Rust/SQLite authoritative, Python replaceable inference only, managed stdio, Ollama loopback, no telemetry, no secrets/private data, temporary-chat boundaries unchanged, runtime failure must not block UI.",
+    "Diagnostics must be local, bounded, request-ID based, and must not log full prompt/response content or credentials.",
+    "No arbitrary total timeout while measurable generation progress exists; any no-progress watchdog requires runtime evidence and must distinguish progress from stall.",
+    "Commit only focused Phase A files; leave publication, PR, merge, packaging, and human installed-Windows validation to the orchestrator."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/apps/desktop/src/use-phase-one.ts",
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations",
+    "E:/AIP/apps/desktop/src-tauri",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/apps/desktop/src/*test*",
+    "E:/AIP/apps/runtime",
+    "E:/AIP/packages"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

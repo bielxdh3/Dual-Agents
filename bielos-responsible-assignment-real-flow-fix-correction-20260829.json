@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-real-flow-fix-correction-20260829",
+  "parent_request_id": "bielos-responsible-assignment-real-flow-fix-20260829",
+  "action": "correct",
+  "repository": "E:/BielOS",
+  "task": "Correct the preserved BielOS Core responsible-assignment patch after Biel 3 review. Keep the intended WIP untouched. The production evidence still shows the real browser failures reached core-project-access-set with valid Cloudflare Access but no access mutation audit because no PROJECT_OWNER_ACCESS_CHANGE elevation was active; this is the exact boundary prior DB-only tests skipped. The current patch only extracts a parser/orchestrator and adds dependency-injected tests; it does not materially repair the supported human flow or prove the actual Server Action wrapper. Re-inspect the real form and administrative elevation UX and implement the smallest repo-native behavior correction that makes the supported OWNER flow reliable when a valid PROJECT_OWNER_ACCESS_CHANGE elevation exists, without bypassing or weakening elevation. The project access UI must make the required scope and next step unambiguous and route through the existing admin elevation surface safely (fixed internal path only; no arbitrary return URL or open redirect). If the action-contract helper is retained, it must be the single parser/orchestration path used by setCoreProjectAccess and its tests must cover canonical projectId/userId/accessLevel values, valid elevation, missing/expired elevation, and mutation rejection; do not claim this alone is browser integration. Add focused coverage for the UI-to-action contract and the resulting persisted/read-back behavior using existing DB helpers. Preserve Cloudflare Access -> CSRF -> session -> authorization -> scoped elevation -> serializable mutation ordering, persisted actor and target checks, audit redaction, isolation, and last-owner protection. Do not add dependencies, broad infrastructure, success-only messaging, false-success states, or unrelated refactors. Do not commit, push, publish, deploy, restart production, or mutate real production data. Run focused unit/DB tests and git diff --check, and return the exact structured executor JSON report.",
+  "constraints": [
+    "Biel 4 remains Executor only; do not issue an Architect review or acceptance verdict.",
+    "Use only the same configured Biel4 App Server/headless executor with task_transport=app_server. No native subagents, create_thread, TUI fallback, codex exec, or alternate backend.",
+    "Preserve the nine pre-existing unrelated WIP paths exactly; do not reset, clean, stash-drop, amend, rebase, or rewrite them.",
+    "Do not expose .env, credentials, cookies, session tokens, JWTs, passwords, recovery codes, raw identifiers, private logs, or database dumps.",
+    "No commit, push, PR, merge, tag, release, deploy, production rebuild/restart, Cloudflare/DNS mutation, or destructive database action."
+  ],
+  "context_files": [
+    "E:/BielOS/AGENTS.md",
+    "C:/CodexGlobal/AGENTS.md",
+    "E:/BielOS/.agents/skills/bielos-core-identity-implementation/SKILL.md",
+    "E:/BielOS/.agents/skills/bielos-security-review/SKILL.md",
+    "C:/CodexGlobal/skills/ponytail/SKILL.md",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-admin-controls.tsx",
+    "E:/BielOS/apps/hub/src/app/core/projects/actions.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-access-action.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/access-service.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/read-service.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/[projectId]/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/projects/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-panel.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-actions.ts",
+    "E:/BielOS/apps/hub/src/app/core/security/admin/page.tsx",
+    "E:/BielOS/packages/auth/src/administration.ts",
+    "E:/BielOS/packages/auth/src/elevation-scopes.ts",
+    "E:/BielOS/apps/hub/src/app/core/integration/project-access.db.test.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-admin-controls.test.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-panel.test.tsx"
+  ],
+  "review_findings": [
+    {
+      "title": "Blocking: no material runtime correction",
+      "details": "The new helper centralizes code but leaves the browser flow behaviorally unchanged: setCoreProjectAccess still requires an elevation that the project UI neither initiates nor safely guides to, and the production attempts had zero active PROJECT_OWNER_ACCESS_CHANGE elevation. Make the supported path reliable with a valid scoped elevation while retaining the guard; do not bypass elevation.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Blocking: wrapper boundary remains untested",
+      "details": "The added tests call executeCoreProjectAccessAction with injected dependencies, not the actual Next Server Action setCoreProjectAccess with its Cloudflare, CSRF, session, elevation, redirect, and revalidation wrapper. Add the narrowest coverage that proves the browser form contract is the contract consumed by the action; do not represent the helper-only test as full browser integration.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Important: preserve minimality and WIP separation",
+      "details": "Keep the action helper only if it is necessary to share one parser/orchestration path. Do not modify any of the nine pre-existing unrelated dirty paths. The current intended diff is limited to project-access action/UI/tests.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

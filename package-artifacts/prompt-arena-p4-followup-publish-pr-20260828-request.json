@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/advanced-arena-followup",
+  "base_branch": "completion/desktop-delivery",
+  "title": "feat: persist advanced arena artifacts and tournament outcomes",
+  "body": "## P4 follow-up — Advanced Arena persistence\n\nStacked after PR #22 (`completion/desktop-delivery`); PRs #17–#22 remain draft.\n\n- adds immutable app-owned calibration benchmark/result and tournament-result storage with migration, typed commands, provenance hashes, and fail-closed source validation\n- freezes AI-judge identity/version/rubric/prompt metadata and validates official 3- or 5-judge panels without network calls or silent substitution\n- resolves tournament outcomes/standings from immutable Arena evidence and exposes persisted save/reopen/disagreement UI\n- keeps objective verifier authority, blind evidence boundaries, and deterministic insufficient-data/tie handling\n- validated by canonical BL4 app_server: 79 TypeScript tests, 100 Rust tests, typecheck, Vite build, cargo fmt/check, and diff checks\n\nP4 remains IN PROGRESS pending real native Tauri acceptance, official benchmark-version judge integration, and remaining publication/security gates.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-retest-docs-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T14:41:05.448199+00:00",
+  "finished_at": "2026-08-29T14:44:09.517846+00:00",
+  "summary": "Updated only docs/DELIVERY_MATRIX.md with the requested native retest evidence. Commit 3233896eaaf1cd734d728704a42c1ef2d0b7f3c5 created locally. Provenance: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4 App Server/headless Executor\",\"task_transport\":\"App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"turn_id\":\"not exposed by Executor transport\",\"workspace\":\"E:\\\\Prompt Arena-pr28-bl4\",\"workspace_write\":\"verified\",\"windows_sandbox\":\"elevated (control-plane asserted)\",\"readiness\":\"ready (control-plane asserted)\",\"approval\":\"never\"}.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md"
+  ],
+  "commands_run": [
+    "git diff --check",
+    "PowerShell bounded delivery-matrix evidence, seven-cell, status-preservation, and scope check",
+    "git diff --unified=1 -- docs/DELIVERY_MATRIX.md",
+    "git add -- docs/DELIVERY_MATRIX.md",
+    "git diff --cached --check",
+    "git commit -m \"docs: record post-reprovisioning native retest\"",
+    "git diff HEAD^ HEAD --check",
+    "PowerShell bounded committed documentation consistency check",
+    "git rev-parse HEAD",
+    "git status --short --branch",
+    "git show --stat --oneline --decorate HEAD"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "Bounded delivery-matrix consistency check",
+      "status": "passed",
+      "details": "Only the requested file changed; all 24 data rows have seven cells, all 25 statuses are unchanged, no COMPLETE status was introduced, and required evidence/classifications are present."
+    },
+    {
+      "command": "git diff HEAD^ HEAD --check",
+      "status": "passed",
+      "details": "Committed documentation diff has no whitespace errors."
+    },
+    {
+      "command": "Bounded committed documentation consistency check",
+      "status": "passed",
+      "details": "Committed scope and required retest evidence are present; table structure remains valid and statuses remain incomplete."
+    }
+  ],
+  "remaining_issues": [
+    "Windows native acceptance remains unproven due to the recorded hosted WebDriver policy limitation and local WebView2 GPU host limitation.",
+    "No push, merge, release, tag, or deploy was performed; the local branch is one commit ahead of origin.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T144105Z-prompt-arena-native-retest-docs-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T144105Z-prompt-arena-native-retest-docs-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T144105Z-prompt-arena-native-retest-docs-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T144105Z-prompt-arena-native-retest-docs-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04df7-9571-7f90-9a5d-4658281da521",
+  "app_server_process_id": "18780",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T144105Z-prompt-arena-native-retest-docs-20260829.md",
+  "task_sha256": "eebf2ee792bb12118e1296604cfcecf77de10daad801ab63b31927aa7aa0cc12",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-testfix-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-final-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Fix the current Phase 11 branch after host validation. The implementation commit 2beca1f is otherwise complete, but cargo test fails on Windows because capture_providers_are_bounded_and_fail_closed asserts that WindowsScreenVisionCaptureProvider must error even when the host successfully captures the primary display. Make the focused test truthful and portable: accept a successful capture only when bytes are non-empty and <= the declared bound, still accept the bounded unavailable/oversized/failed outcomes, and separately assert cancellation is fail-closed. Add/adjust focused assertions for Deterministic and Local visual adapters (fixture success, real-model unavailable, cancellation) without weakening production behavior. Correct docs/PHASE_11_SCREEN_VISION_SPEC.md and any related roadmap/README language that still says Phase 11 has no Windows screenshot API or no real pixels; state that capture is now real Windows-only and on-demand, while the local model is intentionally unavailable/degraded unless installed and raw bytes are transient. Run cargo fmt/check/clippy/full and focused tests, contracts typecheck/build/tests, desktop typecheck/tests/build, secrets scan and diff check. Commit the correction with a descriptive message; do not push or publish.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits outside the Executor.",
+    "Do not turn a host-dependent successful capture into a fabricated failure; preserve the actual real-provider path and bounded cleanup.",
+    "Keep no continuous capture, no network/upload, no raw screenshot persistence, and preserve Owner/privacy/safe-mode/idempotency controls.",
+    "Do not modify Phase 12 Android or Phase 13 gateway behavior; do not push, merge, tag, release or deploy."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/runs/20260822T143549Z-aip-phase11-real-screen-vision-final-20260822/executor-report.json",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/screen_vision.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_11_SCREEN_VISION_SPEC.md",
+    "C:/Users/bielx/.codex/attachments/6318d895-613a-41cb-8e95-cb0e08ad03dc/pasted-text-1.txt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Focused Rust test fails on Windows host",
+      "severity": "blocking",
+      "details": "cargo test --locked --lib and screen_vision::tests fail at capture_providers_are_bounded_and_fail_closed because the real GDI provider successfully returns bounded pixels on this Windows host, contrary to the test's hard-coded error assertion. The test must cover both valid bounded success and fail-closed outcomes."
+    },
+    {
+      "title": "Phase 11 spec contradicts shipped capture provider",
+      "severity": "important",
+      "details": "docs/PHASE_11_SCREEN_VISION_SPEC.md still lists a Windows screenshot API and real pixels as explicit non-goals and describes only synthetic fixtures. Update the truth boundary to distinguish real on-demand capture from intentionally unavailable local-model analysis."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Implement the PT-BR + English interface-language phase from section 12 of C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md in the current isolated product worktree, preserving the already implemented Windows/UI remediation and Live Arena telemetry. Add a maintainable centralized translation resource with typed/safe lookup and deliberate English fallback; support exactly pt-BR (default or existing default language) and en. Add an appropriate Settings language selector, persist the choice in the local desktop webview across restart without touching immutable evidence or credentials, and apply changes cleanly. Translate the complete user-facing application surfaces already present in App.tsx: sidebar/navigation, Overview, Arena, Advanced Arena, Benchmarks, Models, Runs, Settings, dialogs/actions/empty states/statuses/validation/errors/tooltips, live execution monitor/telemetry, Results/blind reveal, Model Library, BYOK consent/settings, packaging/diagnostics copy. Never translate model/provider/runtime/benchmark/profile IDs, file paths, protocol names, code, or user-provided content. Localize display formatting (numbers, percentages, dates/durations/currency where appropriate) while retaining canonical stored values. Do not interpolate untrusted HTML; keep React text escaped. Add tests for language persistence/normalization, switching/fallback, important surfaces not rendering raw translation keys, locale formatting, and telemetry labels in both languages. Keep the implementation repo-native and minimal; do not add a translation framework dependency. Do not modify E:\\Prompt Arena or E:\\Prompt Arena-pr28. Do not commit, push, create/update PRs, merge, tag, release, deploy, or alter repository settings. Run focused TypeScript tests/typecheck/build and report exact commands, files, failures, remaining gaps, plus complete authoritative provenance metadata (biel4 Executor, App Server/headless, workspace-write, elevated/ready, approval never, thread/turn/process IDs).",
+  "constraints": [
+    "Preserve all existing security/no-secret/BYOK, blind-evaluation, process-isolation, cancellation, and immutable-evidence boundaries.",
+    "No raw translation keys in shipped user-facing UI when a string is missing; fallback to English deliberately.",
+    "No giant locale ternary chains and no untrusted HTML interpolation.",
+    "Do not translate technical identifiers or user-provided benchmark/model content.",
+    "Local mutation only; no commits or remote operations."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\bridge.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\appearance.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

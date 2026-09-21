@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/byok",
+  "base_branch": "completion/advanced-arena",
+  "title": "feat: add secure BYOK provider execution and controls",
+  "body": "## P5 — BYOK provider execution\n\nStacked after PR #20 (`completion/advanced-arena`); PRs #17, #18, #19, and #20 remain draft.\n\n- stores provider credentials through Windows Credential Manager/DPAPI and fails closed when OS secure storage is unavailable\n- supports OpenAI-compatible, OpenAI, Anthropic, and Gemini HTTPS request/response formats with bounded WinHTTP transport\n- requires explicit external-network consent, redacts secrets, and returns only sanitized identity/usage/cost evidence\n- enforces dated price snapshots, estimated/actual usage cost, confirmation thresholds, and hard budget ceilings\n- adds reachable Settings BYOK configuration, removal, cost-policy, and one-shot generation controls; browser preview stays read-only\n- validates with 99 Rust tests, 74 TypeScript tests, typecheck, Vite build, cargo fmt/check, and diff checks via canonical BL4 app_server\n\nP5 remains IN PROGRESS pending native Tauri/WebView QA, real provider opt-in smoke, and remote CI.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

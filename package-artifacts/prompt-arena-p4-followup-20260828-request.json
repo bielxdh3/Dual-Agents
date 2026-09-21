@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-followup-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Continue the Prompt Arena product-completion mission from clean completion/advanced-arena-followup at 081db3ec4a1ca29972a0ec84f298076411b98014. Complete the genuine remaining P4 user-facing gaps required by the mission document and current ROADMAP, without redoing existing P1-P3 work and without implementing page-transition motion. Audit the current Advanced Arena implementation first. Implement the smallest coherent product slice that makes the advanced workflows real rather than preview-only: immutable app-owned persistence for calibration benchmark/result evidence (with a migration, typed Tauri commands/bridge, reloadable history, and bounded sanitized records); frozen AI-judge identity/version/rubric/prompt and optional official 3-or-5 judge panel metadata with no silent substitution or network call; tournament match outcomes/standings and regression/ranking outputs must operate on the selected immutable Arena evidence rather than only displaying a schedule; and wire the Advanced Arena UI so users can save/reopen these artifacts, see human-vs-AI disagreement, insufficient-data states, ties, and provenance. Preserve objective-verifier authority and blind/anonymized evidence boundaries. Add focused TypeScript/Rust tests for persistence, validation, determinism, limits, and tamper-safe behavior. Keep all network calls disabled for the local AI-judge path. Update ROADMAP only to describe the exact remaining native/security/publication gates honestly. Do not alter packaging/P7 files except if a compile fix is unavoidable. Run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Commit the implementation in focused commit(s). No push, merge, tag, release, deploy, or paid-provider calls.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "start clean on completion/advanced-arena-followup at 081db3ec4a1ca29972a0ec84f298076411b98014",
+    "preserve unrelated work; no generated evidence files committed; no page-transition motion"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "C:/Users/bielx/Downloads/PROMPT_ARENA_PRODUCT_COMPLETION_AND_REAL_DESKTOP_DELIVERY.md",
+    "E:/Prompt Arena/ROADMAP.md",
+    "E:/Prompt Arena/src/advanced-arena.ts",
+    "E:/Prompt Arena/src/advanced-arena-view.tsx",
+    "E:/Prompt Arena/src/bridge.ts",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/src-tauri/src/commands.rs",
+    "E:/Prompt Arena/src-tauri/src/lib.rs"
+  ],
+  "max_correction_cycles": 0
+}

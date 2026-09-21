@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/product-polish-followup",
+  "base_branch": "completion/byok-followup",
+  "title": "feat: add bounded retention and appearance transfer",
+  "body": "## P6 follow-up — product polish completion slice\n\nStacked after PR #26 (`completion/byok-followup`); PRs #17–#26 remain draft.\n\n- adds preview-first local retention controls for derived history with age bounds, a 256-record deletion ceiling, exact confirmation, stale-preview checks, and a transaction that protects immutable sources, audit rows, managed-model records, external-generation evidence, and response artifacts\n- adds versioned, normalized, 8 KiB-bounded appearance JSON import/export with unknown-field filtering and browser-preview/local-only boundaries\n- exposes typed Tauri commands and accessible Settings controls with honest loading, empty, error, and unsupported states\n- validates with 84 TypeScript tests, 106 Rust tests, typecheck, Vite build, cargo fmt/check/test, and diff checks via canonical BL4 app_server\n\nP6 remains IN PROGRESS pending native Tauri/WebView accessibility/smoke acceptance, security/publication gates, and final desktop evidence.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

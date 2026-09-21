@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-multi-voice-phase2-migration-hotfix-20260830",
+  "action": "correct",
+  "parent_request_id": "ia-voz-multi-voice-phase2-20260830",
+  "repository": "C:/IA DE VOZ",
+  "task": "Required skills at top: C:/CodexGlobal/skills/ponytail/SKILL.md; C:/CodexGlobal/skills/project-phase-review/SKILL.md; C:/CodexGlobal/skills/project-security-review/SKILL.md. Re-read each fully and report resolved paths. Apply one final bounded migration hotfix to the current Phase 2 code in C:/IA DE VOZ through the same canonical biel4 App Server/headless Executor. Evidence: app.py now compiles and focused profile tests pass, but real copy-only migration aborts on dataset/test_fixtures/smoke_24k_train_raw.jsonl because that fixture references a deliberately absent legacy dataset/raw WAV. Fix the root cause without touching legacy files: preserve test fixtures and rewrite known path fields to profile-relative paths when they are safely inside the legacy root even if the referenced fixture artifact is absent; continue to hard-fail unknown, traversal, outside-root, absolute escape, or non-fixture required speaker artifacts. Ensure migration idempotency and source-manifest checks remain strict, and do not let ordinary transcript text be interpreted as a path. Re-run py_compile, the focused temporary-root tests, and a bounded real migration smoke that copies C:/IA DE VOZ legacy input_audio/dataset/training/generated only (no PREPARE DATASET, training, generation, or dependency changes), then verify the four input_audio hashes and legacy manifest are unchanged. Return exactly one JSON object with summary, files_changed, commands_run, tests, remaining_issues and full provenance/phase/security fields. No commit, push, PR, merge, release, tag, deployment, publication, or deletion.",
+  "constraints": [
+    "Use only the same biel4 App Server/headless Executor and isolated CODEX_HOME; no native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Migration is copy-only. Never move, rename, rewrite, delete, or overwrite C:/IA DE VOZ/input_audio or any legacy source artifact. Remove only failed temporary staging created by the migration itself.",
+    "Keep profile containment, reparse rejection, traversal rejection, cross-profile rejection, callback ownership, and stale-job guards fail-closed for real speaker artifacts.",
+    "Do not install dependencies, change .git metadata, commit, push, or broaden beyond the migration hotfix."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/scripts/train_runner.py",
+    "C:/IA DE VOZ/tests/test_phase2_profiles.py",
+    "C:/IA DE VOZ/README_PTBR.md",
+    "C:/IA DE VOZ/input_audio",
+    "C:/IA DE VOZ/dataset",
+    "C:/IA DE VOZ/training",
+    "C:/IA DE VOZ/generated"
+  ],
+  "review_findings": [
+    {"title":"Real migration aborts on missing fixture reference","details":"migrate_legacy() currently fails at dataset/test_fixtures/smoke_24k_train_raw.jsonl because its historical audio path points to a missing dataset/raw WAV. Preserve and rewrite this fixture metadata safely without weakening hard-fail behavior for real required speaker artifacts or outside paths."},
+    {"title":"Do not classify ordinary text as paths","details":"_rewrite_metadata_value must rewrite only known path-bearing fields or explicit absolute paths; a slash in a transcript/reason string must not trigger a legacy-path lookup."},
+    {"title":"Prove real copy-only migration and preservation","details":"After the hotfix, run a bounded real migration smoke with no dataset preparation/training/generation, verify idempotency and unchanged legacy manifest plus four input_audio hashes, and report all evidence."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

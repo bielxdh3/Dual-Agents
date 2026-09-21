@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-operations-finalize-20260827",
+  "parent_request_id": "prompt-arena-p3-operations-20260827",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T23:02:48.126827+00:00",
+  "finished_at": "2026-08-27T23:11:31.413957+00:00",
+  "summary": "Finalized bounded model operations and secure GGUF removal; added focused tests and committed as 81df991, preserving a5e0cd2.",
+  "files_changed": [
+    "src-tauri/src/model_library.rs",
+    "src-tauri/src/storage.rs"
+  ],
+  "commands_run": [
+    "cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+    "cargo check --manifest-path src-tauri/Cargo.toml",
+    "cargo test --manifest-path src-tauri/Cargo.toml",
+    "git diff --check",
+    "git commit -m \"feat(models): finalize local model operations\""
+  ],
+  "tests": [
+    {
+      "command": "cargo check --manifest-path src-tauri/Cargo.toml",
+      "status": "passed",
+      "details": "Compiled successfully."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml",
+      "status": "passed",
+      "details": "90 passed; 0 failed."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+      "status": "passed",
+      "details": "Formatting clean."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T230248Z-prompt-arena-p3-operations-finalize-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T230248Z-prompt-arena-p3-operations-finalize-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T230248Z-prompt-arena-p3-operations-finalize-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T230248Z-prompt-arena-p3-operations-finalize-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04576-31b6-7711-b626-8d2d84c6ec53",
+  "app_server_turn_id": "01a04576-326d-7461-ab30-668e5d816708",
+  "app_server_process_id": "18684",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T230248Z-prompt-arena-p3-operations-finalize-20260827.md",
+  "task_sha256": "d3d0cc31185cee2734c143c636064fab9b5f0628e89306edc576b96fbe75ce5c",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-core-continuity-model-state-retry-20260830",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T03:02:02.550083+00:00",
+  "finished_at": "2026-08-30T03:08:48.606055+00:00",
+  "summary": "Implemented minimal blind-evaluation continuity and model-action precedence fixes. Active installs now show DOWNLOADING/CANCEL; legacy scoring uses stable execution identity, bounded memoized cards, and safe lock validation. Changes are uncommitted. Provenance: canonical BL4/biel4 Executor, app_server/headless, workspace-write, approval never; observed CODEX_HOME is executor profile.",
+  "files_changed": [
+    "src/App.tsx",
+    "src/results-ui.ts",
+    "src/results-ui.test.ts",
+    "src/model-library.ts",
+    "src/model-library.test.ts",
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "npm test -- --run src/results-ui.test.ts src/model-library.test.ts",
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "npm run check:boundaries",
+    "git diff --check"
+  ],
+  "tests": [
+    {
+      "command": "Focused Vitest tests",
+      "status": "passed",
+      "details": "25/25 tests passed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "17 files, 101 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "Passed after correcting score-state typing."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Vite production build passed; existing large-chunk warning remains."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Repository boundary check passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff errors."
+    }
+  ],
+  "remaining_issues": [
+    "Native Tauri visual validation was not run: black-screen continuity, lock/reveal, reopen, Windows responsiveness, and model-operation smoke remain human gates.",
+    "Rust/Cargo validation was not rerun because changes were limited to the frontend state and model-action paths."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n M src/App.tsx\n M src/model-library.test.ts\n M src/model-library.ts\n M src/results-ui.test.ts\n M src/results-ui.ts\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T030202Z-prompt-arena-core-continuity-model-state-retry-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T030202Z-prompt-arena-core-continuity-model-state-retry-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T030202Z-prompt-arena-core-continuity-model-state-retry-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T030202Z-prompt-arena-core-continuity-model-state-retry-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0509d-f0a3-7e82-8264-6cdcf7ec4446",
+  "app_server_turn_id": "01a0509d-f14b-7991-9c27-5d5bfc9165ae",
+  "app_server_process_id": "22716",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T030202Z-prompt-arena-core-continuity-model-state-retry-20260830.md",
+  "task_sha256": "04666b7d1b46e75b72beebedae45cd6c036fb62f45fe290c2f265054f2f1468f",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "App Server returned a failed custom-tool output; the report cannot be accepted as a successful execution."
+}

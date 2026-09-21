@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p0-fixes-20260829",
+  "parent_request_id": "prompt-arena-p0-score-diagnosis-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Implement and verify the two critical P0 fixes in the exact current Prompt Arena checkout, using only canonical BL4/biel4 Executor through App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Before inspection/editing read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md, C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md, C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\index\\SKILL.md, and C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\audit\\SKILL.md. Work only in E:\\Prompt Arena-live-telemetry-i18n at HEAD 474f4ee05a3ddab51913adccdfcfd47bd10a0d16; preserve E:\\Prompt Arena original WIP and all other worktrees. Correct the findings WINDOWS_QA_FINDING_ARENA_UI_FREEZES_DURING_BENCHMARK and WINDOWS_QA_FINDING_EVALUATION_SCORE_CAUSES_BLACK_SCREEN. Freeze: use the evidence-backed boundary from the diagnosis (App.tsx:2668 -> arena-runner.ts:270-357 -> bridge.ts execute_run_once -> commands.rs:967-1076 synchronous worker wait plus synchronous persistence; cancellation currently only between samples). Move the long-running worker/persistence path off the UI-sensitive command execution path with the repo-native Tauri async/spawn-blocking mechanism, preserving bounded request/response limits, process isolation, no cloud calls, no prompt/response leakage, immutable persistence, and fair sequential Arena semantics. Keep progress/state updates bounded and asynchronous; do not add arbitrary sleeps/timeouts, suppress not-responding symptoms, or blindly throttle events. Preserve cancellation semantics and, if the native command boundary allows it safely, connect active worker cancellation; otherwise document the exact remaining gate rather than inventing a false pass. Add focused tests proving the execution command is non-blocking/asynchronous and cancellation/failure does not deadlock, using existing mocks only. Score black-screen: preserve blind identity and immutable storage, but make score edits local/functional without unnecessary parent status reconciliation, memoize or otherwise isolate unchanged response panes, and impose a bounded scrollable response presentation (or an equally safe bounded rendering strategy) for up to the existing response-size limits; never truncate evidence silently and keep full text accessible for evaluation. Add focused tests for score edits, state transitions prepared -> prepared, lock/reveal sequencing, invoke/persistence failure recovery, and at least a bounded rendering invariant. Add or retain a minimal renderer error/recovery boundary only if justified by the traced code; never use forced reload/F5. Review changed code for security, failure paths, and React key/state correctness. Run focused frontend tests, Rust tests for touched modules, typecheck/build where practical, git diff --check, and inspect exact diff. Create one normal local commit only after tests pass, with a clear message. Do not push, merge, tag, release, deploy, or modify unrelated docs/generated artifacts.",
+  "constraints": [
+    "Only source and focused test files needed for these two P0 fixes may change; no broad UI redesign in this request.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No arbitrary sleeps/timeouts, forced reloads, global overflow masking, event suppression, unsafe HTML, weakened isolation, or cloud/provider calls.",
+    "Preserve blind evaluation integrity, immutable persistence, bounded payloads, cancellation/failure handling, and original WIP worktree.",
+    "No push, merge, tag, release, deploy, or public publication."
+  ],
+  "review_findings": [
+    {
+      "title": "P0 freeze: synchronous command waits for one-shot worker and persistence",
+      "details": "Diagnosis found the likely freeze boundary at App.tsx:2668 -> arena-runner.ts:270-357 -> commands.rs:967-1076. The command waits on child completion and synchronous persistence; cancellation is checked only between samples. Ollama stream reads are blocking and can amplify the apparent freeze."
+    },
+    {
+      "title": "P0 score black screen: unbounded blind response presentation and whole-tree rerender",
+      "details": "Diagnosis found BlindEvaluationPanel App.tsx:3761-3771 and styles.css:1164-1215 render up to 32 responses/4 MiB without a height/overflow bound. setScore App.tsx:3678-3685 calls updateState and parent onStatusChange for every score, rerendering the full response tree. No direct invalid-index or invoke exception was found."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\bridge.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\lib.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\orchestration.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\runtime.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\ollama.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\evaluation.rs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

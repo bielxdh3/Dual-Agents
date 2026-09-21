@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-driver-toolchain-version-correction-20260829",
+  "parent_request_id": "prompt-arena-driver-toolchain-workflow-correction-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Read and apply C:\\CodexGlobal\\AGENTS.md and the required skills C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. Continue as BL4/biel4 Executor via the configured App Server/headless transport. Apply only this correction to the existing native-driver-toolchain workflow in E:\\Prompt Arena-pr28-bl4 at HEAD c010f439e47bb3014ec8ad18ec9e2614301384ad. Remote run 33254571307 proved that `cargo install tauri-driver --locked` succeeds but the installed tauri-driver binary exits nonzero for `--version`; the upstream tauri-driver CLI has no version flag. Do not invent a version or fail artifact acquisition for an unsupported probe. Keep the exact install command, but capture and retain its stdout/stderr, parse the verified `Installing tauri-driver vX.Y.Z` package version from that output, and include it in manifest.json as `tauriDriverPackageVersion`. Also run `tauri-driver --version` as a non-fatal probe and record its exit/output (for example `tauriDriverVersionProbe`) so the requested command is auditable. Continue to require a successful `msedgedriver.exe --version`, parse and enforce prefix 151.0.4129, hash both staged binaries, bind source SHA/artifact name to the PR head, and upload only binaries plus manifest. Preserve read-only permissions, x64/short-retention/no-release boundaries. Make one new normal commit exactly `fix: record tauri driver package version`; no amend/rebase/push/merge/tag/release/deploy. Run focused YAML/PowerShell structure checks and git diff --check. Return the commit SHA and complete provenance; BL3 will review the control-plane result envelope.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; no direct BL3 edits, native subagents, TUI/native_tui, browser-only fallback, TLS/policy weakening, or product changes.",
+    "Only .github/workflows/native-driver-toolchain.yml may change; preserve the two prior commits.",
+    "Authorize local_mutation and local_commit only; no remote publication."
+  ],
+  "review_findings": [
+    {
+      "title": "Do not require unsupported tauri-driver --version",
+      "details": "Run 33254571307 failed at Read-Version for tauri-driver although cargo install succeeded. The tauri-driver CLI uses pico_args and exposes port/native-port options, not --version. Record package version from the cargo install output and retain a non-fatal --version probe instead of rejecting a valid toolchain."
+    }
+  ],
+  "context_files": [
+    ".github/workflows/native-driver-toolchain.yml"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

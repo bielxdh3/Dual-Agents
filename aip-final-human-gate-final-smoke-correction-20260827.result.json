@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-final-human-gate-final-smoke-correction-20260827",
+  "parent_request_id": "aip-final-human-gate-review-final-20260827",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T23:00:16.079664+00:00",
+  "finished_at": "2026-08-27T23:02:15.866002+00:00",
+  "summary": "Cenário 8 adicionado e commit local criado: bcc07aebb8d879225489dfa88e286c5607cef4f7. Worktree limpo.",
+  "files_changed": [
+    "docs/V0_1_MANUAL_VALIDATION.md"
+  ],
+  "commands_run": [
+    "Git state and focused structure inspection",
+    "Focused static checks",
+    "git diff --check",
+    "git commit -m \"docs: add final release-candidate smoke gate\"",
+    "Final clean-worktree verification"
+  ],
+  "tests": [
+    {
+      "command": "Focused documentation structure checks",
+      "status": "passed",
+      "details": "Scenario 8 covers exact artifact, install/upgrade, launch, navigation, exit/reopen, recovery, data loss, and version/about; scenarios 1-7 and existing records remain preserved."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "Broad product tests",
+      "status": "not_run",
+      "details": "Not run per instruction."
+    }
+  ],
+  "remaining_issues": [
+    "Broad product tests were intentionally not run; no product validation is claimed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T230016Z-aip-final-human-gate-final-smoke-correction-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T230016Z-aip-final-human-gate-final-smoke-correction-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T230016Z-aip-final-human-gate-final-smoke-correction-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T230016Z-aip-final-human-gate-final-smoke-correction-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04556-d4b2-71e0-a749-a53c8b3f1d84",
+  "app_server_turn_id": "01a04573-e077-7db3-a29c-e17d2b350fc0",
+  "app_server_process_id": "10740",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T230016Z-aip-final-human-gate-final-smoke-correction-20260827.md",
+  "task_sha256": "0343dbdeeecf0052914f3faa5d1f8a75892613b7dac7f1f2d6844cf99bc3c939",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

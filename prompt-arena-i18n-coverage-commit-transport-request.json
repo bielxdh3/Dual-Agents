@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-coverage-commit-transport-20260830",
+  "parent_request_id": "prompt-arena-i18n-coverage-followup-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated App Server/headless path. This is a commit-transport correction, not a new implementation. The prior canonical executor authored and validated a six-file patch in E:\\Prompt Arena-live-telemetry-i18n at branch completion/windows-qa-live-telemetry-i18n, base commit 6d38f018b51fa58400d22e73e4af0747b9e124ab, but could not write the linked-worktree index outside its workspace-write sandbox. A standalone local clone is available at E:\\Prompt Arena-live-telemetry-i18n-commit2 on the same branch and base commit. Import mechanically, without redesigning or reimplementing, only the exact current diff for these six files from the preserved source worktree E:\\Prompt Arena-live-telemetry-i18n: scripts/ui-contracts.test.mjs, src/App.tsx, src/advanced-arena-view.tsx, src/arena-runner.test.ts, src/arena-runner.ts, and src/i18n.ts. Before applying, verify the source worktree is still on the stated branch/base and has no other modified tracked files; if not, stop and report. After importing, inspect the diff and run npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check serially. Verify no files outside the six-file scope changed and verify protected E:\\Prompt Arena, E:\\Prompt Arena-live-telemetry-i18n, and E:\\Prompt Arena-pr28 remain untouched by this run. If all checks pass, stage only the six imported files and create exactly one normal local commit with message fix: complete localized Arena monitor coverage. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use any alternate execution path. Report structured provenance including executor account, role, App Server transport, workspace-write sandbox, Windows sandbox mode/readiness, approval policy, branch, exact new commit, imported diff identity, tests, and protected-worktree status. The installed/native/human QA boundary remains pending and must not be claimed as passed.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI, fallback backend, or danger-full-access.",
+    "Import the existing executor-authored six-file diff mechanically; do not duplicate, broaden, redesign, or discard it.",
+    "Original E:\\Prompt Arena, source E:\\Prompt Arena-live-telemetry-i18n, and PR #28 worktree must remain unchanged.",
+    "Keep the patch minimal and repository-native; no new dependencies and no translation-platform rewrite.",
+    "Do not leak or persist secrets, prompts, responses, credentials, or untrusted HTML.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, or reset."
+  ],
+  "review_findings": [
+    {
+      "title": "Linked-worktree commit transport",
+      "details": "The exact six-file patch passed 111 tests, typecheck, build, boundary checks, and diff-check in the canonical source worktree, but commit staging was blocked because its linked-worktree index/object database is outside the executor sandbox. This standalone clone exists solely to preserve that patch and make the required normal local commit."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\ui-contracts.test.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-display-bound-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-review-correction-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Fix the single blocking finding from the final Biel4 review. Rust screen_vision_fixtures currently returns two synthetic fixtures plus every EnumDisplayMonitors result, while packages/contracts parseScreenVisionFixtures rejects arrays longer than three. Define one explicit bounded maximum for real monitors (use 16 displays plus the two synthetic fixtures, total 18 records unless a safer documented bound is justified), enforce it in Rust enumeration and TS parser, and document the bound in the Phase 11 spec/limitations. Add/update Rust and contract tests proving a multi-display array (at least four records) is accepted up to the bound and the next record is rejected; preserve real display metadata acceptance and forbidden pixel/durable-field rejection. Do not weaken capture/cancellation/privacy/Owner gates or change Phase 12/13. Run cargo fmt/check/clippy/full/focused, contracts typecheck/build/tests, desktop typecheck/tests/build, secrets scan and diff check. Commit the correction; do not push or publish.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits outside the Executor.",
+    "The bound must be explicit and shared/documented so Rust and TypeScript cannot diverge; no unbounded monitor metadata.",
+    "Keep no continuous capture, network/upload, raw screenshot persistence, or weakened privacy/safe-mode/Owner/idempotency controls.",
+    "Do not modify Phase 12 Android or Phase 13 gateway behavior; do not push, merge, tag, release or deploy."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase11-review-20260822.result.json",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/screen_vision.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/tests/contracts.test.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_11_SCREEN_VISION_SPEC.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Rust and TypeScript fixture bounds diverge",
+      "severity": "blocking",
+      "details": "The Rust provider enumerates all monitors and returns two synthetic fixtures plus each real display, but parseScreenVisionFixtures in packages/contracts/src/index.ts rejects arrays longer than three. A multi-monitor response therefore fails at the UI boundary. Define and enforce a shared explicit maximum (recommended 18 total: 2 synthetic + 16 displays) and add compatibility tests."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

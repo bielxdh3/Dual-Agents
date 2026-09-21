@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-final-review-package-20260830",
+  "parent_request_id": "prompt-arena-final-recheck-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:28:06.419716+00:00",
+  "finished_at": "2026-08-30T02:33:14.689805+00:00",
+  "summary": "Read-only review completed at HEAD 73991b03282e3ec766ab824f6bdfb9ff8e4c616a. Source target 838d952 is unchanged; later commits contain only documentation/checksum/package evidence. Security controls and fresh NSIS evidence are consistent. Phase verdict: Approved with reservations. Publication verdict: Create a sanitized public copy. Provenance: canonical BL4/biel4 App Server/headless, workspace-write, Windows elevated, readiness ready, approval never.",
+  "files_changed": [],
+  "commands_run": [
+    "Read AGENTS.md and required skill files",
+    "git rev-parse HEAD and git status --short",
+    "git log and commit-scope inspection from 838d952 through HEAD",
+    "Source trust-boundary rg/Get-Content inspection",
+    "Package/hash/checksum/verification evidence inspection",
+    "git diff --check",
+    "npm test",
+    "npm run typecheck",
+    "Non-printing reachable-history credential and sensitive-filename scan across 85 commits",
+    "Final immutable HEAD/status verification"
+  ],
+  "tests": [
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "17 test files and 100 tests passed, including blind telemetry genericization."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript compilation passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "Reachable-history credential scan",
+      "status": "passed",
+      "details": "Across 85 reachable commits: no private-key, cloud-key, GitHub-token, Slack-token, credential-assignment, or sensitive-filename matches. Private path/username disclosure matches were found and remain a publication concern."
+    },
+    {
+      "command": "Fresh package evidence hash cross-check",
+      "status": "passed",
+      "details": "NSIS artifact and bundle are 3,756,114 bytes with SHA-256 085C1BF1EC49D6B8C5701AC4412DBA5FCE53989C2A075C2BB7E1768FF5FFCF62. Worker sidecar is 2,544,640 bytes with SHA-256 C42F5C56C18DAF36455D2062498FA7DE66CB5BB730AE58DFE4A1DB45F549BAB0. Manifest SHA-256 is f052e25cdda301c094a54053119c7492550f4bc5d38e1a91e3b3d92b2b1de72c; verification records checksum, install, start, restart, and uninstall passes."
+    },
+    {
+      "command": "npm run build / cargo tests / package smoke",
+      "status": "not_run",
+      "details": "Not rerun during this read-only review; existing exact-HEAD package and automated evidence was inspected. Package smoke is not visual or human QA."
+    }
+  ],
+  "remaining_issues": [
+    "Confirmed controls: visibleArenaTelemetryError genericizes both blind live error surfaces at src/arena-runner.ts:209-212 and src/App.tsx:3020, 3047, 3057; non-blind errors remain bounded by sanitizeArenaError at src/arena-runner.ts:373-376. Worker isolation is at src-tauri/src/commands.rs:966-985; model path validation is at src-tauri/src/model_library.rs:1389-1405; blind score/token validation is in src-tauri/src/evaluation.rs:265-344; no unsafe HTML/eval matches were found.",
+    "Residual hypothesis only: quick blind lock still matches prepared responses by text at src/App.tsx:2910; no exploit or stable-key defect was confirmed.",
+    "PENDING_HUMAN_QA remains for visual layout, accessibility, native controls, reduced motion, i18n restart, and live Arena behavior.",
+    "BLOCKED_EXTERNAL_RUNTIME remains for unavailable Ollama/Docker; MSI remains blocked, Linux CI remains pending, and remote CI is unconfirmed.",
+    "Reachable history contains local path/username and operational provenance disclosure, including evidence documentation; sanitize a public copy before publication. Unreachable-object history was not verified."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T022806Z-prompt-arena-final-review-package-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T022806Z-prompt-arena-final-review-package-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T022806Z-prompt-arena-final-review-package-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T022806Z-prompt-arena-final-review-package-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0507e-e17f-70a1-95e9-b26abe33b02b",
+  "app_server_process_id": "10532",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T022806Z-prompt-arena-final-review-package-20260830.md",
+  "task_sha256": "b62553a325f4671cd99107d2898c75dfca6cffc6ebd79b2bced89244ac430db7",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

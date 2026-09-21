@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-evidence-docs-20260830",
+  "parent_request_id": "prompt-arena-package-clean-retry-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Update only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md with the successful fresh exact-head Windows package evidence. Use canonical BL4/biel4 App Server/headless, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read required AGENTS.md and skills first. Verify the reviewed source HEAD remains 838d952 and the package was built at checkout HEAD f393e9023b2f1d28de27ce34b73eff83f9a2af45 (docs-only commits may subsequently advance the checkout and do not change the source target). Record fresh NSIS path E:\\Prompt Arena-live-telemetry-i18n\\package-artifacts\\prompt-arena-0.1.0-windows-nsis.exe, installer size 3,756,114 bytes, SHA-256 085C1BF1EC49D6B8C5701AC4412DBA5FCE53989C2A075C2BB7E1768FF5FFCF62, bundle path, worker sidecar E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\binaries\\prompt-arena-worker-x86_64-pc-windows-msvc.exe size 2,544,640 bytes SHA-256 C42F5C56C18DAF36455D2062498FA7DE66CB5BB730AE58DFE4A1DB45F549BAB0, checksum manifest SHA-256 f052e25cdda301c094a54053119c7492550f4bc5d38e1a91e3b3d92b2b1de72c, and package verification results: checksum pass, clean install pass, executable start pass, restart pass, silent uninstall pass. State that the earlier STATUS_IN_PAGE_ERROR was resolved by generated Cargo cleanup for this attempt; MSI remains unavailable and no visual/human QA is claimed. Update PENDING_AUTOMATED_NATIVE_QA to show the fresh package gate complete, while keeping PENDING_HUMAN_QA for visual/accessibility/live Arena review, BLOCKED_EXTERNAL_RUNTIME for Ollama/Docker, MSI blocked, Linux CI pending, and remote CI unconfirmed. Preserve historical 57f02b3 evidence separately, phase verdict Approved with reservations, publication verdict Create a sanitized public copy. Do not modify source/tests/generated artifacts/history/remotes/tags/releases/deploys or other worktrees; leave exact two-file diff unstaged and do not commit.",
+  "constraints": [
+    "Only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md may change.",
+    "Do not claim package smoke as visual or human QA.",
+    "Keep historical 57f02b3 hashes separate from fresh f393e package evidence.",
+    "No source/generated/remote/tag/release/deploy/other-worktree changes."
+  ],
+  "review_findings": [
+    {
+      "title": "Fresh package gate succeeded after generated-target cleanup",
+      "details": "Canonical BL4 result reports exact checkout HEAD f393e, NSIS 3,756,114 bytes with SHA-256 085c1bf1..., worker sidecar 2,544,640 bytes with SHA-256 c42f5c56..., checksum, clean install, launch, restart, and silent uninstall all passed."
+    },
+    {
+      "title": "Evidence docs still describe packaging as blocked",
+      "details": "Both docs need to replace the resolved STATUS_IN_PAGE_ERROR pending-package wording with the fresh package evidence while retaining human/native and MSI/runtime gates."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\package-artifacts\\prompt-arena-0.1.0-windows-nsis.exe",
+    "E:\\Prompt Arena-live-telemetry-i18n\\checksums-sha256.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n\\package-verification.txt",
+    "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\prompt-arena-package-clean-retry-20260830.result.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase8-functional-voice-20260820",
+  "action": "implement",
+  "repository": "E:\\AIP",
+  "task": "# Phase 8 functional voice implementation\n\nYou are the Biel4 Executor. Implement the real local Windows voice capability on branch feat/phase-8-functional-voice at starting SHA 42c52e26ac3ffb01adeb06db7fa0e0f00798abe1. Read AGENTS.md and the AIP implementation/phase/security/publication skills before editing. Read docs/PHASE_8_VOICE_SPEC.md and the existing voice.rs, lib.rs, contracts and VoiceControls first.\n\nThe current Phase 8 code is metadata-only fixtures. Replace the runtime path with an actual, on-demand local Windows audio adapter while preserving the fixture paths only as explicit test fixtures. Provide: (1) real Windows microphone/input capture with bounded duration/PCM memory, explicit device selection, cancellation and cleanup; (2) a provider-neutral local STT adapter that invokes only an explicitly configured local/offline provider or bundled local engine, with strict argv/path validation, bounded input/output, timeout/cancellation, and truthful voice_model_unavailable/device errors; (3) a provider-neutral local TTS adapter with the same local-only/no-shell-injection/no-upload/cancellation guarantees and explicit output-device handling; (4) on-demand wake-word detection over the bounded local capture path, never a hidden/background listener; (5) a consented custom voice adapter that uses a local provider reference only, never uploads or persists raw voice samples, and keeps the immutable base voice protected; (6) Tauri commands, contracts, UI controls, and audit/status records for start/cancel/completion/degraded states. Preserve Rust/SQLite authority, Owner/agent isolation, safe-mode and temporary-chat gates, bounded parsers, idempotency/replay and no telemetry/public listener.\n\nDo not fake hardware/model success. If this machine lacks a usable microphone or offline speech provider, the real command must return an explicit degraded error and tests must exercise that path. Keep deterministic fixture tests separate and labeled. Do not add cloud SDKs, network calls, telemetry, arbitrary shell execution, broad filesystem access, raw-audio persistence, or unrelated Phase 9+ behavior. Prefer existing dependencies; add only minimal justified Windows audio dependencies and update the lockfile. Keep public APIs backward-compatible where possible.\n\nAcceptance: real Windows capture/provider code exists under cfg(windows) and a safe unsupported-platform path exists; cancellation/limits/device/provider failures are tested; no raw PCM/audio bytes are persisted or uploaded; local provider command execution is argv-based and bounded; custom consent/revocation and wake listener lifecycle are fail-closed; docs/gap matrix and UI accurately distinguish functional local implementation from remaining human hardware/quality validation.\n\nValidation required before commit: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm --filter @aip/contracts typecheck/build if affected; pnpm --filter @aip/desktop typecheck/test; pnpm secrets:scan; git diff --check. Report every command, pass/fail, remaining human-only checks, files changed, and final SHA. Commit only this Phase 8 scope with message `feat: implement phase 8 functional local voice`. Do not push, create PR, merge, tag, release, or modify unrelated files.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents.",
+    "Do not push or perform remote GitHub mutations; the control plane will publish after review.",
+    "No raw audio persistence, upload, telemetry, public listener, cloud provider, arbitrary shell, or safety weakening.",
+    "Keep fixtures explicit and separate from the real runtime path; do not report synthetic success as hardware success.",
+    "Do not implement Phase 9 or later functionality in this request.",
+    "Preserve clean ownership, safe-mode, temporary-chat, replay/idempotency, audit and bounded-input controls."
+  ],
+  "context_files": [
+    "docs/PHASE_8_VOICE_SPEC.md",
+    "docs/CORRECTIVE_GAP_MATRIX.md",
+    "apps/desktop/src-tauri/src/voice.rs",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "packages/contracts/src/index.ts",
+    "apps/desktop/src/App.tsx"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

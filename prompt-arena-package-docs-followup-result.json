@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-docs-followup-20260830",
+  "parent_request_id": "prompt-arena-package-docs-exact-head-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T05:47:28.772468+00:00",
+  "finished_at": "2026-08-30T05:51:54.501940+00:00",
+  "summary": "Implemented and committed exact-head Windows evidence refresh. Executor: biel4, Executor, authenticated App Server/headless transport, workspace-write sandbox, Windows elevated ready, approval never. Source target: 5c5de64d749674a01c31a722945c90357dfb0c2d, including source commits 75178ac60a998c3bdaec3b7522dfb7b919ef2e94 and 5c5de64d749674a01c31a722945c90357dfb0c2d. Package/bundle: 3,761,685 bytes, SHA-256 644EB56BEDF341869516F8C2E397DECA01BE6424F828B2060448D1D8560822F7. Bundled worker: 2,567,680 bytes, FC17A3D9EA80D74D0CFB5A084A5E54B0AA637AA8E619230D473DA5CA7C9E232B. Tracked sidecar: 2,544,640 bytes, 22E02E062C03BA96B54284DC81B03108F9550A4DAC7398306D8D8175A00D529B. Manifest SHA: 31DC7ECCBB699467A6F7F77811381E0B74CD1BE0E0D613AEC523C06E3F1ECB07. Verifier SHA: 9F410C6F8B1E8F1225C30FBD16F8A7BE7F0AD1B6E0091F1203E7016FEE7693C1. Commit: 1edcdc22da8550b041031f588f9ba8a4805d532e. No source implementation files changed; no build rerun, push, release, deploy, merge, amend, rebase, reset, or publication occurred.",
+  "files_changed": [
+    "checksums-sha256.txt",
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "npm run verify:package -- --platform windows --smoke",
+    "Get-FileHash artifact, bundle, worker, sidecar, checksum manifest, and package-verification files",
+    "git diff --check",
+    "git add docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md docs/DELIVERY_MATRIX.md checksums-sha256.txt package-verification.txt",
+    "git commit -m \"docs: refresh exact-head Windows evidence\"",
+    "Post-commit git status, scope guard, stale af1ff483 scan, hash verification, and protected-worktree status checks"
+  ],
+  "tests": [
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum verification, NSIS clean install, executable start, restart, and silent uninstall passed; MSI unavailable."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "Artifact hash and size verification",
+      "status": "passed",
+      "details": "All required artifact, worker, sidecar, manifest, and verifier measurements matched."
+    },
+    {
+      "command": "Source-change and protected-worktree guards",
+      "status": "passed",
+      "details": "Only three evidence files committed; protected worktrees unchanged. The known six-file source patch and PR#28 native-smoke WIP remain."
+    },
+    {
+      "command": "Full Tauri build, npm test, typecheck, cargo test, visual/native QA",
+      "status": "not_run",
+      "details": "Existing successful evidence reused as requested; no expensive build or human/native session rerun."
+    }
+  ],
+  "remaining_issues": [
+    "PENDING_HUMAN_QA remains: no installed visual/native/full Tauri Arena or human QA claim.",
+    "Docker remains BLOCKED_EXTERNAL_RUNTIME; Windows MSI remains BLOCKED LOCALLY; Linux/remote CI remains pending/unconfirmed.",
+    "LM Studio and live llama.cpp adapters remain MISSING_IMPLEMENTATION.",
+    "Security phase remains Approved with reservations; publication verdict remains Create a sanitized public copy due internal paths/usernames/provenance.",
+    "Historical 57f02b3 evidence remains separate and is not current-head output.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T054729Z-prompt-arena-package-docs-followup-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T054729Z-prompt-arena-package-docs-followup-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T054729Z-prompt-arena-package-docs-followup-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T054729Z-prompt-arena-package-docs-followup-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05135-6712-7b41-8b1d-add67cbfad80",
+  "app_server_turn_id": "01a05135-67bb-70c3-ab71-d38989aeb422",
+  "app_server_process_id": "1296",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T054729Z-prompt-arena-package-docs-followup-20260830.md",
+  "task_sha256": "0047f1ca82e9d4e5c7c277f13bd0ea791c899e5651e380b7905d025632f71347",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

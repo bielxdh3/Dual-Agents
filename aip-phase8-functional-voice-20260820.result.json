@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase8-functional-voice-20260820",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 1,
+  "started_at": "2026-08-20T16:57:54.809282+00:00",
+  "finished_at": "2026-08-20T17:07:55.976286+00:00",
+  "summary": "Codex executor failed; repository modifications, if any, were preserved.",
+  "files_changed": [
+    "apps/desktop/src-tauri/Cargo.toml",
+    "apps/desktop/src-tauri/src/database.rs",
+    "apps/desktop/src-tauri/src/voice.rs",
+    "apps/desktop/src-tauri/migrations/0022_phase8_voice_runtime.sql"
+  ],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "git_status": " M apps/desktop/src-tauri/Cargo.toml\n M apps/desktop/src-tauri/src/database.rs\n M apps/desktop/src-tauri/src/voice.rs\n?? apps/desktop/src-tauri/migrations/0022_phase8_voice_runtime.sql\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T165755Z-aip-phase8-functional-voice-20260820\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T165755Z-aip-phase8-functional-voice-20260820",
+  "executor_report_file": "",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T165755Z-aip-phase8-functional-voice-20260820\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "",
+  "app_server_turn_id": "",
+  "app_server_process_id": "",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260820T165755Z-aip-phase8-functional-voice-20260820.md",
+  "task_sha256": "56df96b01834b665a82b8a524295e11a48edb4701479d4b02c65b73723e28075",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor exited with code 1."
+}

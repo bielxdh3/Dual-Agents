@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-g-20260831",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Read the complete goal at C:/Users/bielx/.codex/attachments/bf0f727e-7197-435f-a1ee-ec7731fd15a9/goal-objective.md and E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md. Implement only Phase G — final responsive/accessibility/motion/CSS architecture pass — on branch cdx/aip-ui-reset at current SHA a76f67808d85b7036856b2ee9684371334f17efa. Audit the complete desktop UI after Phases B–F. Consolidate App.css into a coherent layered foundation rather than appending another override block: keep one canonical rule family for reset/tokens, typography, layout, controls, sidebar/chat, forms/settings, appearance/pixel, local capabilities, overlays/bubble, and motion. Remove or retire provably obsolete competing selectors and raw per-component palette values while preserving geometry and behavior that are required for canvas rendering, overlays, menus, portals, and safe-mode surfaces. CSS hex colors should be limited to token definitions (and transparent/intentional canvas exceptions only when CSS cannot use a semantic variable); component rules must consume semantic variables so light/dark themes remain correct. Verify responsive behavior at 320px, 480px, 680px, 900px, and desktop widths: no accidental horizontal overflow, sidebar and conversation list retain the flexible allocation, navigation can collapse without hiding essential actions, controls remain usable and comfortable, and settings/resources/pixel/bubble surfaces stack intentionally. Verify accessibility contracts: semantic labels/aria relationships remain intact, every interactive control has a visible keyboard focus state, disabled and status text remain legible, targets are at least 36px where practical, contrast is not weakened, no hover-only essential state, and structural icons are not emoji. Unify reduced-motion handling with the persisted/theme data-motion state and prefers-reduced-motion: no shiny animation or idle animation when reduced, no unnecessary transition delays, and no duplicate contradictory motion rules. Do not change Rust/IPC/product logic; only make minimal presentation-linked markup/test edits if an accessibility or active-state contract is demonstrably missing. Add focused static/DOM tests only if useful; avoid brittle pixel snapshots. Preserve all prior phase behavior and commit the coherent cleanup locally.",
+  "constraints": [
+    "Required skills: E:/AIP/.agents/skills/aip-implementation/SKILL.md, E:/AIP/.agents/skills/aip-phase-review/SKILL.md, E:/AIP/.agents/skills/aip-security-review/SKILL.md, E:/AIP/.agents/skills/aip-publication-check/SKILL.md, C:/CodexGlobal/skills/ponytail/SKILL.md, and C:/CodexGlobal/skills/ui-ux-pro-max/SKILL.md; read each fully before work.",
+    "Use only the configured Biel4 App Server/headless Executor and remain the same Executor identity for corrections. Do not use native subagents, create_thread, another backend, alternate account, or manual/direct implementation fallback.",
+    "Work only on E:/AIP branch cdx/aip-ui-reset. Preserve unrelated work; do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Use existing React/TypeScript/CSS and installed dependencies. Do not add dependencies or copy Claude/React Bits branding/assets.",
+    "AIP remains standalone/local-first. Preserve security/privacy/accessibility, temporary-chat memory-only behavior, model routing/policy, persistence, runtime degradation, safe mode, overlay transparency/hit-testing, pointer gestures, pixel editing, and all IPC contracts.",
+    "Do not expose or commit secrets, credentials, databases, local histories/memories, model files, voice samples, exports, backups, private media, or personal paths in product docs.",
+    "Do not push, create/update PR, merge, tag, release, deploy, or perform destructive remote actions. Commit with message style: consolidate AIP responsive accessibility foundation.",
+    "Run desktop tests covering theme, shared controls, conversation/sidebar, settings/resources, pixel/bubble/overlay, plus typecheck, formatting/lint checks, secrets scan, and git diff --check; report any environment or human-QA limitation precisely."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/theme.tsx",
+    "E:/AIP/apps/desktop/src/Overlay.tsx",
+    "E:/AIP/apps/desktop/src/Bubble.tsx",
+    "E:/AIP/apps/desktop/src/theme.test.tsx",
+    "E:/AIP/apps/desktop/src/shared-controls.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/phase-d-sidebar-state.test.tsx",
+    "E:/AIP/apps/desktop/src/settings-model-policy.test.tsx",
+    "E:/AIP/apps/desktop/src/local-capabilities.test.tsx",
+    "E:/AIP/apps/desktop/src/pixel-editor.test.tsx",
+    "E:/AIP/apps/desktop/src/bubble.test.tsx",
+    "E:/AIP/apps/desktop/src/overlay-input.test.ts",
+    "E:/AIP/apps/desktop/src/overlay-gesture.test.ts"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

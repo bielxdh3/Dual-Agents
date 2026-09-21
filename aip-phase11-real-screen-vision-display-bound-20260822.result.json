@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-display-bound-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-review-correction-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T14:55:04.971345+00:00",
+  "finished_at": "2026-08-22T14:57:19.928789+00:00",
+  "summary": "Aligned Rust and TypeScript screen-vision collection bounds at 18 total records: two synthetic fixtures plus up to 16 real Windows displays. Enumeration stops at the real-display bound, the Rust result is defensively truncated, contract tests cover four/eighteen/nineteen records, and the bound is documented. Commit: 6cb6a2eb2e74e3de2df4fac2aac102c2544696dc.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/screen_vision.rs",
+    "packages/contracts/src/index.ts",
+    "packages/contracts/tests/contracts.test.ts",
+    "docs/PHASE_11_SCREEN_VISION_SPEC.md",
+    "docs/KNOWN_LIMITATIONS.md"
+  ],
+  "commands_run": [
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "cargo test --locked --lib screen_vision::tests",
+    "pnpm --filter @aip/contracts typecheck",
+    "pnpm --filter @aip/contracts build",
+    "pnpm --filter @aip/contracts test",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop test",
+    "pnpm --filter @aip/desktop build",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"fix: bound phase 11 display metadata\""
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "125 passed, 1 ignored."
+    },
+    {
+      "command": "cargo test --locked --lib screen_vision::tests",
+      "status": "passed",
+      "details": "6 focused tests passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "not_run",
+      "details": "Attempted, but combined host validation output was interrupted by the secrets-scan process restriction."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts build",
+      "status": "not_run",
+      "details": "Attempted, but combined host validation output was interrupted by the secrets-scan process restriction."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test",
+      "status": "not_run",
+      "details": "Host process-spawn restrictions prevented retaining a successful Vitest result."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "not_run",
+      "details": "Attempted, but combined host validation output was interrupted by the secrets-scan process restriction."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop test",
+      "status": "not_run",
+      "details": "Blocked by Vite/Vitest process-spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop build",
+      "status": "not_run",
+      "details": "Blocked by Vite process-spawn EPERM."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "not_run",
+      "details": "Blocked by secrets scanner spawnSync git EPERM."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    }
+  ],
+  "remaining_issues": [
+    "Node-based tests/builds and secrets scanning remain blocked or unverifiable under the host sandbox process-spawn EPERM policy.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T145505Z-aip-phase11-real-screen-vision-display-bound-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T145505Z-aip-phase11-real-screen-vision-display-bound-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T145505Z-aip-phase11-real-screen-vision-display-bound-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T145505Z-aip-phase11-real-screen-vision-display-bound-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029f7-e08b-7b21-afdc-59f9fa8d8630",
+  "app_server_process_id": "15600",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T145505Z-aip-phase11-real-screen-vision-display-bound-20260822.md",
+  "task_sha256": "358db09daa5af14cd56ace5a52a3485301939e19e755aece9c1cf120ce6bcdf4",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

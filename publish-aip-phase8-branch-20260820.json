@@ -1,0 +1,14 @@
+{
+  "operation": "create_branch",
+  "mission_id": "aip-phase8-branch-20260820",
+  "authorization_reference": "aip-phase8-branch-20260820",
+  "repository": "E:\\AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "branch": "feat/phase-8-functional-voice",
+  "expected_remote_state": "absent",
+  "expected_base_sha": "42c52e26ac3ffb01adeb06db7fa0e0f00798abe1",
+  "new_sha": "42c52e26ac3ffb01adeb06db7fa0e0f00798abe1",
+  "authorization": {
+    "allowed_actions": ["create_branch"]
+  }
+}

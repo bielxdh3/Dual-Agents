@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-local-adapters-correction2-20260830",
+  "parent_request_id": "prompt-arena-local-adapters-correction-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated Dual Codex App Server/headless path. Continue the same Prompt Arena local-adapter task in E:\\Prompt Arena-live-telemetry-i18n-commit2 on branch completion/windows-qa-live-telemetry-i18n. The existing adapter patch is preserved in this dirty clone; do not duplicate or reimplement it. Do not touch E:\\Prompt Arena, E:\\Prompt Arena-live-telemetry-i18n, or E:\\Prompt Arena-pr28. Fix only the two concrete compile findings from the prior review: the private MAX_STREAMED_RESPONSE_BYTES import that makes cargo check fail, and the unused imports. Preserve the existing response bounds by using a narrow pub(crate) interface or an equivalent local constant tied to the existing bound. Then run cargo fmt, cargo check/test focused on the new provider, full cargo test --manifest-path src-tauri/Cargo.toml --all-targets, npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check serially. If a directly-caused compile/test defect appears, fix only that defect and report it. Do not update packaging or claim native/human QA; update docs/DELIVERY_MATRIX.md only if the adapter implementation and tests genuinely justify changing its row. Stage only the adapter implementation/tests and justified matrix change and create at most one normal local commit feat: wire local OpenAI-compatible adapters. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use an alternate backend/path. Provenance handling: the authenticated wrapper records executor account biel4, executor role, App Server transport and IDs, workspace-write, Windows sandbox elevated/readiness ready, and approval never in its result metadata. Treat that wrapper metadata as authoritative; do not abort merely because PowerShell shell snapshots are unsupported or because read-only checks of protected worktrees report Git dubious-ownership. Report the captured wrapper fields in the structured result. Only if the wrapper itself genuinely lacks one of those fields should you stop without a commit and report PROMPT_ARENA_BLOCKED_BY_PROVENANCE.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI/native_tui, fallback backend, alternate account, or danger-full-access.",
+    "Preserve the existing patch and protected worktrees; no duplicate implementation or unrelated telemetry/i18n changes.",
+    "Fix only the reported private-constant and unused-import defects, plus directly-caused compile/test failures; retain all security and size limits.",
+    "Treat wrapper-captured provenance as authoritative and do not self-block on unsupported PowerShell snapshots or protected-worktree dubious ownership.",
+    "Run requested checks serially; no push, tag, release, deploy, merge, amend, rebase, or reset."
+  ],
+  "review_findings": [
+    {"title":"Private response-size constant blocks compilation","details":"Independent cargo check --manifest-path src-tauri/Cargo.toml --all-targets fails with E0603 because openai_compatible.rs imports MAX_STREAMED_RESPONSE_BYTES while ollama.rs keeps it private. Make the bound available narrowly or avoid the import without weakening the limit.","severity":"blocking"},
+    {"title":"Unused imports in adapter patch","details":"The compiler reports unused parse_openai_model_info in model_library.rs and MAX_LOCAL_MODEL_METADATA_BYTES/ResponseFormat in openai_compatible.rs. Remove them and leave cargo fmt/check clean.","severity":"important"}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\openai_compatible.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\ollama.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\model_library.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\orchestration.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\run-plan.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\run-plan.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

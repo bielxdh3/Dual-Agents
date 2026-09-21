@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-byok-core-finalize-20260828",
+  "parent_request_id": "prompt-arena-p5-byok-core-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize the preserved P5 BYOK work, currently only src-tauri/src/external_providers.rs exists and is untracked. Inspect it critically before integrating. Complete a bounded, compiling P5 slice: register the module and Tauri commands/bridge, expose a usable Settings BYOK panel for all four providers with configure/remove/test, OS-secure credential state, explicit network consent, and cost policy/estimate controls; add provider-specific request/response normalization and an explicit execute/test path using a bounded transport abstraction (tests use a local mock only, never real providers). Preserve local Ollama. Ensure no plaintext credential fallback, no secret values in errors/logs/exports/records, and fail closed on unsupported secure storage, missing prices/usage, invalid policy, absent consent, or budget ceiling. Add focused Rust/TypeScript tests. Run npm run typecheck, npm test, npm run build, cargo fmt --all -- --check, cargo check, cargo test, and git diff --check from the correct directories. If all pass, commit only the P5 slice with a descriptive message. Do not reset or discard the existing external_providers.rs; no P6/P7, no merge/tag/release/deploy.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session with --allow-dirty; preserve HEAD ff4ace5 and prior P1-P4 commits",
+    "no direct Architect implementation, no TUI/native_tui/fallback/substitute, no external provider calls during tests",
+    "no secret or credential values in source reports, logs, errors, exports, snapshots, or Git; no plaintext credential storage",
+    "no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/external_providers.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/runtime.rs", "E:/Prompt Arena/src/provider-foundation.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/Cargo.toml"],
+  "review_findings": [{"severity": "blocking", "title": "P5 core module preserved but not integrated or validated", "details": "Integrate and validate the existing secure provider core in a bounded user-facing slice."}],
+  "max_correction_cycles": 0
+}

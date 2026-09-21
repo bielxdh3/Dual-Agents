@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-fix-20260826-correction-2",
+  "parent_request_id": "bielos-responsible-assignment-fix-20260826-correction",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T00:18:00.057119+00:00",
+  "finished_at": "2026-08-27T00:18:56.296790+00:00",
+  "summary": "Updated only the test assertion to accept plain or HTML-escaped apostrophes. Provenance: account desktop-6nummdh\\bielx; label/role Biel4 App Server Executor / executor; backend/transport unconfirmed; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; repository=E:/BielOS; request=bielos-responsible-assignment-fix-20260826-correction-2; thread=01a0408f-2146-7e43-8e3b-32113ec1a527; turn/result IDs unavailable. Git status remains unstaged with unrelated dirty paths preserved; no commit or publication.",
+  "files_changed": [
+    "apps/hub/src/app/core/projects/project-admin-controls.test.tsx"
+  ],
+  "commands_run": [
+    "npx tsx --test --test-concurrency=1 apps/hub/src/app/core/projects/feedback.test.ts apps/hub/src/app/core/projects/project-admin-controls.test.tsx apps/hub/src/app/core/projects/access-policy.test.ts apps/hub/src/app/core/projects/detail-policy.test.ts apps/hub/src/app/core/projects/validation.test.ts",
+    "npm run typecheck --workspace @bielos/hub",
+    "npx eslint apps/hub/src/app/core/projects/project-admin-controls.test.tsx --max-warnings=0",
+    "git diff --check",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck --workspace @bielos/hub",
+      "status": "passed",
+      "details": "tsc --noEmit passed."
+    },
+    {
+      "command": "npx eslint apps/hub/src/app/core/projects/project-admin-controls.test.tsx --max-warnings=0",
+      "status": "passed",
+      "details": "Focused lint passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "Focused project unit suite",
+      "status": "not_run",
+      "details": "All five tests were blocked before execution because Node test workers returned spawn EPERM."
+    }
+  ],
+  "remaining_issues": [
+    "Focused tests remain unconfirmed due the executor's spawn EPERM limitation; no other concrete type or lint errors were found.",
+    "App Server backend/transport and turn/result correlation are not exposed by runtime metadata and are intentionally unasserted."
+  ],
+  "git_status": " M apps/hub/src/app/core/integration/project-access.db.test.ts\n M apps/hub/src/app/core/integration/trusted-browser.db.test.ts\n M apps/hub/src/app/core/projects/[projectId]/page.tsx\n M apps/hub/src/app/core/projects/actions.ts\n M apps/hub/src/app/core/projects/detail-policy.ts\n M apps/hub/src/app/core/projects/page.tsx\n M apps/hub/src/app/core/projects/project-admin-controls.tsx\n M apps/hub/src/app/globals.css\n M apps/hub/src/app/gymforge/page.tsx\n M docs/auth-hardening.md\n M docs/production.md\n M docs/security.md\n M package.json\n M packages/auth/src/cleanup-sessions.ts\n M packages/auth/src/index.ts\n M packages/auth/src/rate-limit-config.ts\n M packages/auth/src/security.ts\n?? apps/hub/src/app/core/projects/feedback.test.ts\n?? apps/hub/src/app/core/projects/feedback.ts\n?? apps/hub/src/app/core/projects/project-admin-controls.test.tsx\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T001800Z-bielos-responsible-assignment-fix-20260826-correction-2\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T001800Z-bielos-responsible-assignment-fix-20260826-correction-2",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T001800Z-bielos-responsible-assignment-fix-20260826-correction-2\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T001800Z-bielos-responsible-assignment-fix-20260826-correction-2\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0408f-2146-7e43-8e3b-32113ec1a527",
+  "app_server_turn_id": "01a04094-afef-7203-813b-bb89b8540807",
+  "app_server_process_id": "15460",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T001800Z-bielos-responsible-assignment-fix-20260826-correction-2.md",
+  "task_sha256": "79a4f37e33fdff6c554f2b232c14f498aa1a4b24a56b62392f1f13b8df981501",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

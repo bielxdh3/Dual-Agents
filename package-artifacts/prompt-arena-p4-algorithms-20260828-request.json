@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-algorithms-20260828",
+  "parent_request_id": "prompt-arena-p4-preflight-retry-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement the first P4 Advanced Arena slice on branch completion/advanced-arena, preserving HEAD 1e2e40ac560973e102f44a6b7cb9ed70d5a68800 and all P1-P3 work. Add a bounded deterministic TypeScript module plus focused tests operating on existing ArenaExecution/ArenaSummary evidence: rankings by category and metric (objective pass rate, duration, tokens/s, human score) with sample size, uncertainty, and explicit ties; baseline/candidate regression comparisons with deltas and insufficient-data status; deterministic Tournament Mode scheduling for 1v1, bounded round-robin, and single-elimination; blind-ranking aggregation; optional AI-judge score input boundary (no network or fabricated scores); calibration agreement/disagreement metrics. Enforce max 8 competitors, max 64 matches, score/range/ID limits and no unsupported statistical significance. Integrate only the minimal UI/bridge seams needed to exercise these workflows from real Arena evidence, but do not implement P5 providers, credential storage, or P7 packaging. Run npm typecheck, npm test, npm run build, git diff --check, then create one focused local commit. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/advanced-arena; preserve P1/P2/P3 commits and draft PRs",
+    "local deterministic evidence only; no secrets/cloud calls/AI fabrication",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/arena-runner.test.ts", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src-tauri/src/storage.rs"],
+  "review_findings": [{"severity": "blocking", "title": "P4 advanced workflows remain absent", "details": "Preflight is green; implement the bounded deterministic ranking/regression/tournament/calibration core now, with tests and only minimal user-facing seams."}],
+  "max_correction_cycles": 0
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-transport-core-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Implement the Phase 12 desktop transport core on branch feat/phase-12-android-companion at current commit b60bd0b. The Android JSON-line codec is now defined in Protocol.kt and docs/PHASE_12_ANDROID_SPEC.md. Add a focused Rust module (companion_transport.rs) with a shared serde_json WireFrame matching exactly: protocol, kind, clientId, sessionId nullable, nonce, counter, payload string, mac lowercase hex. Encode/read one newline-delimited JSON frame; enforce MAX_FRAME=16384, MAX_PAYLOAD=8192, bounded field lengths, protocol `aip-companion-v1`, non-negative counter, nonce length, strict JSON/unknown/missing field rejection. Canonical HMAC bytes must exactly join protocol, kind, clientId, sessionId-or-empty, nonce, counter decimal, and payload with U+001F separators as documented. Implement HMAC-SHA-256 using existing sha2 (or a minimal dependency), constant-time MAC comparison, challenge helper, monotonic counter and nonce replay guard, explicit rotation and revocation, typed errors, and no secret logging.\n\nAdd an actual bounded local/private TCP listener core with explicit start/stop handle, per-connection read/write timeouts, one-frame request/response lifecycle, graceful shutdown, and no public/broad bind: validate 127.0.0.1 by default; permit only RFC1918 addresses when a separate explicit flag is true; reject 0.0.0.0, loopback aliases outside policy, multicast, link-local, and public addresses. Keep secrets ephemeral in memory. This core may expose a callback/trait for the next integration commit; do not fake history/queue effects or claim Android delivery yet.\n\nAdd deterministic Rust unit tests for canonical MAC vector, JSON round-trip, malformed/oversized/unknown fields, wrong version/MAC, counter/nonce replay, rotation/revocation, bind-policy validation, and an actual TcpListener loopback exchange using an ephemeral port and bounded frame. Preserve all existing fixture companion/gateway behavior. Add only necessary source/Cargo changes, run cargo fmt/check/clippy/focused+full Rust tests and git diff --check, and commit this core with exact message `feat: implement phase 12 transport core`. Do not add Tauri commands/UI, Android edits, remote mutation, PR/merge, relay, telemetry, raw-secret persistence, Python exposure, BielOS change, native subagents, or direct edits outside the Executor; those are subsequent scoped work.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Match the committed Kotlin JSON-line canonicalization exactly; no second wire format.",
+    "Transport core is real but must be bounded, explicit, local/private-only, authenticated, replay-safe, and fail-closed.",
+    "No durable/raw secrets, public listener, relay, telemetry, Python exposure, BielOS import, or existing fixture changes."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "review_findings": [
+    {
+      "title": "Desktop transport was blocked until a shared Android/Rust wire contract existed",
+      "severity": "blocking",
+      "details": "Commit b60bd0b now defines the bounded JSON-line envelope and canonical HMAC in Kotlin/docs. Implement the Rust core against that exact contract with loopback tests before integrating Tauri/database operations."
+    }
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/android/app/src/main/java/com/aip/companion/Protocol.kt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_12_ANDROID_SPEC.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/companion.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/Cargo.toml",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "max_correction_cycles": 0
+}

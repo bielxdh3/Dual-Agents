@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-core-correction-20260828",
+  "action": "correct",
+  "parent_request_id": "aip-productization-core-20260828",
+  "repository": "E:/AIP",
+  "task": "Continue and complete the interrupted core productization lot on branch fix/productize-local-capabilities. The parent executor timed out after leaving an uncommitted partial diff in six Rust/contract files (chat.rs, extensions.rs, lib.rs, screen_vision.rs, voice.rs, packages/contracts/src/index.ts) and no UI, tests, or commit. Preserve safe useful primitives only when they compile and are used; otherwise remove incomplete additions. Finish the approved Phase A fixes: visible keyboard-accessible Portuguese Recursos locais navigation; truthful compact capability status center; Voice setup/status without hidden env-only knowledge while preserving bounded local references and gates; Supervised Tools buildInput cases for workspace.inspect_local and workspace.organize_local with root readiness and existing approval/compensation; visible closed declarative Extensions workflow with one safe repository-owned example, strict import if needed, lifecycle/re-review/rollback/disable and fixture labeling; focused deterministic tests and truthful roadmap/limitations vocabulary. Integrate or correct the partial provider/import commands so there are no dead Tauri commands or untested contract types. Keep Rust authoritative, local-first/no-upload, safe mode, temporary chat, explicit approvals, bounded paths/capture, no shell/network/credentials/delete/overwrite/native extension code. Run focused formatting, TypeScript/UI/contract tests, Rust fmt/check/tests for touched modules and git diff --check. Create one focused local commit with an explanatory message. Do not push, create/update PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests and remaining_issues plus commit_sha.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md, .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "Ponytail full: reuse existing primitives; no speculative abstractions or dependencies.",
+    "This is a correction of parent_request_id aip-productization-core-20260828; preserve unrelated user work and do not reset or discard the partial diff blindly.",
+    "Commit only the focused lot; no amend, rebase, squash, reset, force-push, history rewrite, push, PR, merge, tag, release, deploy, or installer build.",
+    "Do not expose or commit secrets, credentials, local databases, histories, memories, private media, model files, voice samples, or authentication files.",
+    "Treat model output/imported extension data as untrusted; validate paths, capabilities, hashes, modes, approvals and ownership at Rust boundary.",
+    "If focused validation is blocked by Windows spawn EPERM, record the exact blocker and retain safe deterministic checks; do not weaken controls."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/tools.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/extensions.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/screen_vision.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/voice.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/apps/desktop/src/*.test.*",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0016_phase9_tools.sql",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0017_phase10_extensions.sql",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0023_phase9_workspace_roots.sql",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0024_phase10_extension_runtime.sql",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [
+    {"title": "Interrupted partial implementation", "severity": "blocking", "details": "Parent request timed out after modifying six Rust/contract files without touching App.tsx/App.css, adding no tests, running no validation, and creating no commit. Complete the approved visible productization lot or remove dead primitives safely."},
+    {"title": "Missing Voice status command", "severity": "important", "details": "voice.rs defines VoiceProviderStatus and lib.rs imports it, but no get_voice_provider_status Tauri command is exposed; integrate it with the status center or remove the unused type."},
+    {"title": "Existing local tool UI is non-executable", "severity": "blocking", "details": "ToolControls renders workspace.inspect_local and workspace.organize_local, while buildInput lacks cases. Add bounded contract inputs and deterministic tests without weakening approval/root gates."},
+    {"title": "Advanced capability controls remain hidden", "severity": "blocking", "details": "App.css sets .agent-tools to display:none and App.tsx mounts Voice, Tools, Extensions and later capability panels only there. Add visible keyboard-accessible Recursos locais navigation/status and preserve advanced disclosure semantics."}
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

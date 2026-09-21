@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-b-20260831",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Read the complete goal at C:/Users/bielx/.codex/attachments/bf0f727e-7197-435f-a1ee-ec7731fd15a9/goal-objective.md and the Phase A design specification at E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md. Implement only Phase B of that mission on branch cdx/aip-ui-reset at starting SHA ff640da3b50e2770a826254d52e2d5652961d18a. Replace the rejected competing visual foundation with one coherent layered AIP design system while preserving all existing React/Tauri behavior and selectors needed by later phases. Scope: reset/base styles; Times New Roman as the default theme font with safe allowlisted font customization preserved; independently designed dark and light semantic surface/text/border/accent tokens; spacing/type/radius/motion tokens; shared button, icon-button, input, textarea, custom select, menu/popover, dialog, checkbox/toggle, and custom file-picker families. Keep menus/floating layers viewport-safe and keyboard-visible. Add or update focused theme/control tests for the Times New Roman default, persisted theme choices, reduced-motion token behavior, focus visibility, and no native-select/file-picker regression where practical. Do not implement sidebar/page migration in this phase except any shared selector normalization required by the foundation. Do not remove IPC, persistence, model/runtime logic, overlays, pixel behavior, accessibility semantics, or security boundaries.",
+  "constraints": [
+    "Required skills: E:/AIP/.agents/skills/aip-implementation/SKILL.md, E:/AIP/.agents/skills/aip-phase-review/SKILL.md, E:/AIP/.agents/skills/aip-security-review/SKILL.md, E:/AIP/.agents/skills/aip-publication-check/SKILL.md, C:/CodexGlobal/skills/ponytail/SKILL.md, and C:/CodexGlobal/skills/ui-ux-pro-max/SKILL.md; read each fully before work.",
+    "Use only the configured Biel4 App Server/headless Executor. Do not use native subagents, create_thread, another backend, alternate account, or manual/direct implementation fallback.",
+    "Work only on E:/AIP branch cdx/aip-ui-reset from the verified live origin/main base plus the committed Phase A spec. Preserve unrelated work; do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Use existing React/TypeScript, Rust/Tauri, CSS, installed dependencies, and theme storage contracts. Do not add dependencies or speculative abstractions.",
+    "AIP remains standalone and local-first. Rust/SQLite stays authoritative, Python remains replaceable inference only, temporary chat remains memory-only, and runtime failure must not block the UI.",
+    "Do not expose or commit secrets, credentials, databases, local histories/memories, model files, voice samples, exports, backups, private media, or personal paths in product docs.",
+    "Commit the coherent phase locally with message style: establish AIP visual foundation. Do not push, create/update PR, merge, tag, release, deploy, or perform destructive remote actions.",
+    "Run focused validation only: git diff --check, relevant desktop theme/shared-control tests, and typecheck/build if proportional. Report any Windows/tooling blocker precisely and never weaken controls."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/theme.tsx",
+    "E:/AIP/apps/desktop/src/shared-controls.tsx",
+    "E:/AIP/apps/desktop/src/main.tsx",
+    "E:/AIP/apps/desktop/src/theme.test.tsx",
+    "E:/AIP/apps/desktop/src/shared-controls.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

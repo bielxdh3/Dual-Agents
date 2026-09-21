@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-qa-phase1-correction-20260829",
+  "action": "correct",
+  "parent_request_id": "prompt-arena-windows-qa-phase1-20260829",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Continue the same Phase 1 Windows/UI remediation in the current dirty isolated worktree. Review the preserved changes from the parent turn against the attached mission and make only necessary corrections. In particular, ensure the console-window fix uses release GUI subsystem and hidden child creation without weakening worker isolation, ensure horizontal overflow is fixed by actual min-size/track/ownership constraints rather than merely clipping, ensure scrollbar styling is accessible and theme-compatible, ensure the external-evidence card is compact/content-driven, provider titles wrap at word boundaries with readable badges, and active sidebar navigation has no full border while focus remains visible. Add or adjust the smallest focused tests for changed Rust behavior and run them plus TypeScript typecheck/tests/build and git diff --check as feasible. Do not implement telemetry or i18n yet. Do not touch E:\\Prompt Arena or E:\\Prompt Arena-pr28. Do not commit, push, or perform remote operations. Return a complete structured report with exact provenance metadata including executor account, role, App Server transport, sandbox mode, Windows sandbox and readiness, approval policy, thread/turn IDs, files, commands, tests, and remaining issues.",
+  "constraints": [
+    "Preserve unrelated work and the current product branch.",
+    "Local mutation only; no commit, push, PR, merge, tag, release, deploy, or settings changes.",
+    "Do not weaken security, blind-evaluation, cancellation, process-isolation, or no-secret boundaries.",
+    "Do not use coordinate automation or retry exhausted CDP/UIA paths."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\main.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs"
+  ],
+  "review_findings": [
+    {
+      "title": "Parent turn timed out before validation",
+      "details": "The parent preserved changes but returned failed at the 600-second App Server timeout with no commands/tests and incomplete sandbox/readiness metadata. Reconcile the current diff, correct any issues, and run the focused validation requested in the task.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Complete provenance and report",
+      "details": "The correction result must include authoritative account, role, App Server transport, workspace-write sandbox, elevated Windows sandbox, ready readiness, approval never, and thread/turn metadata where exposed.",
+      "severity": "blocking"
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

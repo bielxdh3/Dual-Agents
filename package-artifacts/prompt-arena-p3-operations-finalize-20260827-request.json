@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-operations-finalize-20260827",
+  "parent_request_id": "prompt-arena-p3-operations-20260827",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize the preserved P3 model-operation diff on completion/model-library. Inspect the existing edits in src-tauri/src/model_library.rs and storage.rs from the timed-out operation turn. Complete only what is needed for a compiling, bounded backend for Ollama download/import operations with persisted progress and cancellation, and secure managed GGUF removal with content-hash audit evidence. Reuse existing primitives; no UI or bridge. Run cargo fmt/check/test and git diff --check, add focused tests for the implemented operation paths and security boundaries, then create one focused local commit. Preserve all prior commits; no merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/model-library; preserve HEAD a5e0cd2 and current intentional dirty operation diff",
+    "managed model root only; no arbitrary delete/read; loopback-only endpoints; no secrets/cloud APIs",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/model_library.rs", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/ollama.rs", "E:/Prompt Arena/src-tauri/src/runtime.rs", "E:/Prompt Arena/src-tauri/src/domain.rs"],
+  "review_findings": [{"severity": "blocking", "title": "Operation turn timed out with preserved uncommitted changes", "details": "Complete and validate the existing bounded operation diff; do not broaden scope."}],
+  "max_correction_cycles": 0
+}

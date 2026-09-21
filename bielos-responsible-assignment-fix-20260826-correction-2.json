@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-fix-20260826-correction-2",
+  "parent_request_id": "bielos-responsible-assignment-fix-20260826-correction",
+  "action": "correct",
+  "repository": "E:\\BielOS",
+  "task": "Continue with the same Biel4 App Server Executor. Architect reran npm run test:core:unit after the explicit React import; only one new test assertion fails because renderToStaticMarkup HTML-escapes the apostrophe in the ownerHelp copy. In apps/hub/src/app/core/projects/project-admin-controls.test.tsx line 89, make the assertion compatible with the encoded static markup (for example assert the encoded apostrophe form or use a regex that accepts both plain and HTML-escaped apostrophes). Do not change production behavior for this test-only encoding issue. Inspect only for other concrete test/type errors, preserve unrelated dirty paths, and do not commit or publish. Run the focused project unit tests if the executor environment allows; report any spawn EPERM limitation truthfully with full App Server provenance.",
+  "constraints": [
+    "Use only the same configured biel4 App Server Executor; no native subagents or alternate backend.",
+    "Minimal test-only correction; no unrelated source/docs/auth/GymForge changes.",
+    "No commit, push, PR, merge, deploy, rebuild, restart, or production mutation.",
+    "Return structured result and trustworthy App Server provenance."
+  ],
+  "review_findings": [
+    {
+      "title": "Static-markup assertion does not accept HTML-escaped apostrophe",
+      "details": "npm run test:core:unit has one failure: expected /OWNER defines this project's responsible owner/ but rendered markup contains OWNER defines this project&#x27;s responsible owner. Adjust only the test assertion to match the actual safe static markup encoding.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "apps/hub/src/app/core/projects/project-admin-controls.test.tsx"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation"]
+  },
+  "max_correction_cycles": 0
+}

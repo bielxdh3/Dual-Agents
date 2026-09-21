@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-fallback-coverage-20260830",
+  "parent_request_id": "prompt-arena-package-after-i18n-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T07:59:09.128424+00:00",
+  "finished_at": "2026-08-30T08:04:09.881970+00:00",
+  "summary": "Implemented and committed complete PT-BR fallback coverage in E:\\Prompt Arena-live-telemetry-i18n-commit2 on completion/windows-qa-live-telemetry-i18n. Started clean at a4cc4ce600e7b0b56a0c0f12eed47c40e1b37af5; final clean HEAD is fe5c28644b7aea01f7077bbb0e73ef73605255f2. Provenance: canonical BL4/biel4 Executor, authenticated App Server/headless transport and wrapper IDs, canonical executor profile when available, workspace-write, Windows elevated readiness ready, approval never. No packaging, UI automation, Computer Use, telemetry, adapter, Rust, or protected-worktree changes.",
+  "files_changed": [
+    "src/i18n.ts",
+    "src/i18n.test.ts",
+    "src/App.tsx",
+    "scripts/ui-contracts.test.mjs"
+  ],
+  "commands_run": [
+    "git status --porcelain=v1 --branch; git rev-parse HEAD",
+    "npm test -- --run src/i18n.test.ts scripts/ui-contracts.test.mjs",
+    "npm test -- --run",
+    "npm run typecheck",
+    "npm run build",
+    "npm run check:boundaries",
+    "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
+    "git diff --check",
+    "git commit -m \"fix: complete PT-BR fallback coverage\"",
+    "post-commit git status/rev-parse/show inspection"
+  ],
+  "tests": [
+    {
+      "command": "npm test -- --run src/i18n.test.ts scripts/ui-contracts.test.mjs",
+      "status": "passed",
+      "details": "2 files and 13 tests passed."
+    },
+    {
+      "command": "npm test -- --run",
+      "status": "passed",
+      "details": "19 files and 116 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript check passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed; existing large-chunk warning only."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Repository boundary check passed."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
+      "status": "passed",
+      "details": "Rust formatting check passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only line-ending conversion warnings."
+    },
+    {
+      "command": "Windows package validation",
+      "status": "not_run",
+      "details": "Explicitly not run per task scope; no package artifacts were changed."
+    }
+  ],
+  "remaining_issues": [
+    "PENDING_HUMAN_QA remains; no native/UI automation or screenshot evidence was attempted in this turn.",
+    "BLOCKED_EXTERNAL_RUNTIME remains for Docker; BLOCKED LOCALLY/MSI remains; Linux and remote CI remain pending/unconfirmed.",
+    "Live LM Studio/llama.cpp service validation remains pending. No push, tag, release, deploy, merge, amend, rebase, reset, cargo clean, or broad deletion occurred.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T075909Z-prompt-arena-i18n-fallback-coverage-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T075909Z-prompt-arena-i18n-fallback-coverage-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T075909Z-prompt-arena-i18n-fallback-coverage-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T075909Z-prompt-arena-i18n-fallback-coverage-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0517a-f89e-7ff1-be7e-d7314d0027bb",
+  "app_server_turn_id": "01a051ad-f8bf-7d73-922a-fa2aa2b74537",
+  "app_server_process_id": "16152",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T075909Z-prompt-arena-i18n-fallback-coverage-20260830.md",
+  "task_sha256": "21415422d27857bc616397386f71d472b45d717f9b26bdeb9bf647ec6d93a04d",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

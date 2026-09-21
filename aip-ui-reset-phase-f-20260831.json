@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-f-20260831",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Read the complete goal at C:/Users/bielx/.codex/attachments/bf0f727e-7197-435f-a1ee-ec7731fd15a9/goal-objective.md and E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md. Implement only Phase F — appearance/pixel editor and floating overlay/bubble surfaces — on branch cdx/aip-ui-reset at current SHA 89bfc20e3bd553dc8b20b5f5f5bed04866b8236f. Recompose the Appearance workspace and PixelDocumentEditor so the 64×64 canvas is the visual focal point, tools are grouped as Desenho, Seleção/Transformar/Visualizar, Histórico, and Arquivo, layers are legible, the source editor is clearly advanced, and the editor remains usable at compact widths. Restyle Overlay.tsx and Bubble.tsx via App.css for a restrained local desktop presence: transparent overlay backgrounds must remain transparent and hit-testing/gesture regions must remain unchanged; the sprite, label, thinking indicator, bubble states (compact/minimized/expanded), heading actions, preview, message scroll, cancel action, composer, and open-chat action must have clear hierarchy, contrast, focus states, and 36px+ controls. Preserve every invoke call, pointer gesture, sprite mask, interactive-region calculation, safe-mode behavior, and temporary/runtime degradation contract. Use semantic theme variables and warm-paper/graphite surfaces where a surface exists; no neon dashboard treatment, no emoji as structural icons, no dependency, no copied branding/assets. Respect reduced motion and do not claim native/browser visual QA. Add focused tests only if needed for aria labels, state classes, and transparent overlay semantics. Commit the coherent phase locally.",
+  "constraints": [
+    "Required skills: E:/AIP/.agents/skills/aip-implementation/SKILL.md, E:/AIP/.agents/skills/aip-phase-review/SKILL.md, E:/AIP/.agents/skills/aip-security-review/SKILL.md, E:/AIP/.agents/skills/aip-publication-check/SKILL.md, C:/CodexGlobal/skills/ponytail/SKILL.md, and C:/CodexGlobal/skills/ui-ux-pro-max/SKILL.md; read each fully before work.",
+    "Use only the configured Biel4 App Server/headless Executor and remain the same Executor identity for corrections. Do not use native subagents, create_thread, another backend, alternate account, or manual/direct implementation fallback.",
+    "Work only on E:/AIP branch cdx/aip-ui-reset. Preserve unrelated work; do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Use existing React/TypeScript and CSS/theme variables. Do not add dependencies or copy Claude/React Bits branding/assets.",
+    "AIP remains standalone/local-first. Preserve security/privacy/accessibility, overlay transparency and hit testing, gesture behavior, safe mode, temporary chat, and all IPC contracts.",
+    "Do not expose or commit secrets, credentials, databases, local histories/memories, model files, voice samples, exports, backups, private media, or personal paths in product docs.",
+    "Do not push, create/update PR, merge, tag, release, deploy, or perform destructive remote actions. Commit with message style: refine AIP appearance and overlays.",
+    "Run focused appearance/pixel/bubble/overlay tests, desktop typecheck, formatting/lint checks proportional to changed files, and git diff --check; report blockers precisely."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/Overlay.tsx",
+    "E:/AIP/apps/desktop/src/Bubble.tsx",
+    "E:/AIP/apps/desktop/src/pixel-document.ts",
+    "E:/AIP/apps/desktop/src/pixel-editor.test.tsx",
+    "E:/AIP/apps/desktop/src/bubble.test.tsx",
+    "E:/AIP/apps/desktop/src/overlay-input.test.ts",
+    "E:/AIP/apps/desktop/src/overlay-gesture.test.ts"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

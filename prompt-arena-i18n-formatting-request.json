@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-formatting-20260829",
+  "parent_request_id": "prompt-arena-docs-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Complete only the locale-formatting wiring for the existing i18n phase in the isolated worktree. Preserve behavior, canonical stored values, telemetry/blind/security boundaries, and all existing translations. Use the existing formatLocaleNumber, formatLocalePercent, formatLocaleCurrency, formatLocaleDate, and formatLocaleDuration helpers from src/i18n.ts in user-facing App.tsx and advanced-arena-view.tsx display paths where appropriate: Arena/result/telemetry durations and counts, percentages, dates/timestamps, Advanced Arena scores/metrics, Settings/BYOK USD cost displays, and hardware/model numeric summaries. Replace direct toFixed/toLocaleString/date display only for presentation; do not translate or reformat IDs, paths, protocol names, raw evidence/code, prompts, responses, or stored payloads. Keep English and pt-BR switching reactive through the existing active locale/provider. Add or extend focused tests only if needed for one representative UI formatting helper; do not add dependencies or refactor unrelated logic. No commits or remote operations; report exact validation and complete BL4 provenance.",
+  "constraints": [
+    "Canonical biel4 App Server/headless executor, workspace-write, Windows elevated readiness ready, approval never.",
+    "Do not change data schemas or immutable evidence; presentation only.",
+    "Run npm run typecheck and focused tests; report exact outcomes."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.test.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

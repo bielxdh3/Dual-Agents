@@ -12,6 +12,8 @@ import time
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
+from .bootstrap import canonical_instructions_root
+from .codex import configured_actor_provenance
 from .codex import run_codex_exec as _run_codex_exec_legacy
 from .codex import run_codex_app_server
 from .codex import run_codex_terminal
@@ -33,6 +35,12 @@ from .report import (
 
 def run_codex_exec(**kwargs):
     """Select the configured structured backend while preserving the TUI seam."""
+    requested_role = kwargs.get("role", "executor")
+    if requested_role != "executor":
+        raise DelegationError(
+            "The executor delegation adapter cannot satisfy a configured non-executor role; "
+            "no native or implicit fallback is permitted."
+        )
     config = kwargs.get("config")
     agent = kwargs.get("agent")
     if agent is not None and agent.backend == "antigravity":
@@ -645,6 +653,16 @@ def _result(
     executor_approval_policy: str = "",
     executor_role: str = "",
     executor_provider: str = "",
+    executor_actor_id: str = "",
+    executor_configured_actor: bool = False,
+    executor_adapter: str = "",
+    executor_backend: str = "",
+    executor_model: str = "",
+    executor_reasoning_effort: str = "",
+    executor_state_root_identity: str = "",
+    canonical_instructions_root: str = "",
+    canonical_bootstrap_required: bool = False,
+    delegation_transport: str = "",
     antigravity_conversation_id: str = "",
     antigravity_terminal_status: str = "",
     task_transport: str = "",
@@ -688,6 +706,16 @@ def _result(
             "executor_approval_policy": executor_approval_policy,
             "executor_role": executor_role,
             "executor_provider": executor_provider,
+            "executor_actor_id": executor_actor_id,
+            "executor_configured_actor": executor_configured_actor,
+            "executor_adapter": executor_adapter,
+            "executor_backend": executor_backend,
+            "executor_model": executor_model,
+            "executor_reasoning_effort": executor_reasoning_effort,
+            "executor_state_root_identity": executor_state_root_identity,
+            "canonical_instructions_root": canonical_instructions_root,
+            "canonical_bootstrap_required": canonical_bootstrap_required,
+            "delegation_transport": delegation_transport,
             "antigravity_conversation_id": antigravity_conversation_id,
             "antigravity_terminal_status": antigravity_terminal_status,
             "task_transport": task_transport,
@@ -1437,6 +1465,18 @@ def delegate(
                 progress=lambda message: _emit(output, started, f"[3/5] {message}"),
                 reuse_existing=reuse_existing,
             )
+            try:
+                canonical_root = canonical_instructions_root()
+            except OSError:
+                canonical_root = None
+            command_result.metadata.update(
+                configured_actor_provenance(
+                    agent=agent,
+                    role="executor",
+                    repository=request.repository,
+                    canonical_root=canonical_root,
+                )
+            )
             stdout_path = run_dir / "executor.stdout.log"
             stderr_path = run_dir / "executor.stderr.log"
             _write_text(stdout_path, command_result.stdout)
@@ -1509,7 +1549,20 @@ def delegate(
                     if command_result.metadata.get("executor_provider") == "antigravity"
                     else "",
                 ),
-                executor_provider=command_result.metadata.get("executor_provider", ""),
+                executor_provider=command_result.metadata.get("executor_provider", "")
+                or ("antigravity" if agent.backend == "antigravity" else ""),
+                executor_actor_id=command_result.metadata.get("actor_id", executor_account),
+                executor_configured_actor=bool(command_result.metadata.get("configured_actor", False)),
+                executor_adapter=command_result.metadata.get("adapter", ""),
+                executor_backend=command_result.metadata.get("backend", agent.backend),
+                executor_model=command_result.metadata.get("model", agent.model),
+                executor_reasoning_effort=command_result.metadata.get("reasoning_effort", agent.reasoning_effort),
+                executor_state_root_identity=command_result.metadata.get("state_root_identity", ""),
+                canonical_instructions_root=command_result.metadata.get("canonical_instructions_root", ""),
+                canonical_bootstrap_required=bool(
+                    command_result.metadata.get("canonical_bootstrap_required", False)
+                ),
+                delegation_transport=command_result.metadata.get("delegation_transport", "antigravity"),
                 antigravity_conversation_id=command_result.metadata.get(
                     "antigravity_conversation_id", ""
                 ),

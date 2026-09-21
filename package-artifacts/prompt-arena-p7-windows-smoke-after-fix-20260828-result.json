@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-windows-smoke-after-fix-20260828",
+  "parent_request_id": "prompt-arena-p7-uninstall-smoke-fix-20260828",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T20:03:19.354979+00:00",
+  "finished_at": "2026-08-28T20:05:47.139665+00:00",
+  "summary": "Windows smoke partially passed at 8058d28f3ffa8cefef7d926d81755069d544a276: NSIS install, start, and restart passed, but uninstall failed the executable-absence assertion. The unique temp directory was removed; no tracked files changed. Native provenance: Windows PowerShell, completion/desktop-delivery.",
+  "files_changed": [
+    "package-verification.txt"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "node scripts/package-artifacts.mjs --platform windows --bundle-root \"E:\\Prompt Arena\\src-tauri\\target\\release\\bundle\" --output-directory \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-ac72197644d34cc497a5d10624adff0f\\artifacts\" --manifest-path \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-ac72197644d34cc497a5d10624adff0f\\checksums-sha256.txt\"",
+    "node scripts/verify-package.mjs --platform windows --artifact-directory \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-ac72197644d34cc497a5d10624adff0f\\artifacts\" --manifest-path \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-ac72197644d34cc497a5d10624adff0f\\checksums-sha256.txt\" --evidence-file \"C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-p7-windows-smoke-ac72197644d34cc497a5d10624adff0f\\package-verification.txt\" --smoke",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "Existing NSIS installer check",
+      "status": "passed",
+      "details": "src-tauri/target/release/bundle/nsis/Prompt Arena_0.1.0_x64-setup.exe exists."
+    },
+    {
+      "command": "package-artifacts.mjs",
+      "status": "passed",
+      "details": "Prepared one NSIS artifact; MSI unavailable as optional."
+    },
+    {
+      "command": "verify-package.mjs --platform windows --smoke",
+      "status": "failed",
+      "details": "Clean install, executable start, and restart passed. NSIS uninstall ran but the final installed-executable absence check failed."
+    },
+    {
+      "command": "Repository tracked-file status",
+      "status": "passed",
+      "details": "No tracked files changed; verifier created untracked package-verification.txt in the repository root on failure."
+    }
+  ],
+  "remaining_issues": [
+    "NSIS uninstall still leaves the installed executable behind.",
+    "The verifier wrote failure evidence to the repository root despite the temporary --evidence-file path.",
+    "No package rebuild or second smoke attempt was performed."
+  ],
+  "git_status": "?? package-verification.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T200319Z-prompt-arena-p7-windows-smoke-after-fix-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T200319Z-prompt-arena-p7-windows-smoke-after-fix-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T200319Z-prompt-arena-p7-windows-smoke-after-fix-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T200319Z-prompt-arena-p7-windows-smoke-after-fix-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a049d5-80b7-78a1-af9c-d95d81969102",
+  "app_server_turn_id": "01a049f8-3bc6-74b1-b279-67dc6f140b35",
+  "app_server_process_id": "16736",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T200319Z-prompt-arena-p7-windows-smoke-after-fix-20260828.md",
+  "task_sha256": "4341b9f4011cde2eaa4ba685f52004e767927769564b271475c9817bd39db947",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-harness-commit-20260829",
+  "action": "correct",
+  "parent_request_id": "prompt-arena-native-harness-fix-20260829",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are the same BL4/biel4 implementation Executor through the configured App Server/headless transport. The prior request implemented the correct two-line native harness fix but could not commit because E:\\Prompt Arena-pr28 was a linked worktree whose shared .git ACL denied index/object writes. Work now in the standalone clone E:\\Prompt Arena-pr28-bl4 on branch validation/native-tauri-acceptance at clean HEAD 687db83dcdad050c914ca6ea8dcfd555e44cb28f. Reapply only the previously reviewed minimal changes to scripts/native-ui-smoke.mjs: use a unique writable Windows WebView2 userDataFolder through tauri:options.webviewOptions, and change benchmarkVersionId from native-ui-smoke-v1 to the valid deterministic identity native-ui-smoke@1. Do not change assertions or product behavior. Run node --check scripts/native-ui-smoke.mjs and git diff --check, then create one normal commit with the harness fix. Do not attempt a network push in this App Server turn (credentials are unavailable); report the exact commit SHA and structured evidence. Report only validations actually run; do not add not_run test entries. No TUI, native_tui, fallback, browser-only substitute, other executor, or native subagent.",
+  "constraints": [
+    "BL4/biel4 App Server/headless is the only allowed implementation Executor; fail closed if provenance is not proven.",
+    "Scope is scripts/native-ui-smoke.mjs only; preserve the existing acceptance chain and all assertions.",
+    "No workflow weakening, mocks, paid APIs, dependency additions, product changes, merge, tag, release, deploy, force-push, or network push in this turn."
+  ],
+  "context_files": [
+    "scripts/native-ui-smoke.mjs",
+    ".github/workflows/native-ui.yml",
+    "src-tauri/src/orchestration.rs",
+    "src-tauri/src/domain.rs"
+  ],
+  "review_findings": [
+    {
+      "title": "Commit the reviewed harness fix in an independent checkout",
+      "details": "The code diff is correct and minimal, but the prior linked-worktree ACL prevented commit/object writes and the push was not authorized by App Server credentials. Reapply the same two changes in E:\\Prompt Arena-pr28-bl4 and create a normal commit so the architect can independently review and publish the exact SHA.",
+      "severity": "blocking"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/product-polish",
+  "base_branch": "completion/byok",
+  "title": "feat: complete Prompt Arena product polish",
+  "body": "## P6 — Product polish\n\nStacked after the P5 BYOK slice; PRs #17–#20 remain draft.\n\n- expands Overview into a local-data dashboard with actionable navigation and recent Arena evidence\n- adds local diagnostics for bridge, storage, runtime, capabilities, platform, protocol, and network boundaries\n- improves persisted Runs/Arena-summary history, verified response visibility, accessible states, and bounded evidence tables\n- adds sanitized deterministic JSON, Markdown, and CSV exports for persisted Arena summaries\n- preserves browser-preview honesty, local appearance/reduced-motion controls, and no hidden network calls\n- removes stale provider foundation copy\n- validates with 74 TypeScript tests, 99 Rust tests, typecheck, Vite build, cargo fmt/check, and diff checks via canonical BL4 app_server\n\nP6 remains IN PROGRESS pending native Tauri/WebView accessibility and smoke review, security review, and publication gates.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

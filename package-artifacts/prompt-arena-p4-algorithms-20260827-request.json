@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-algorithms-20260827",
+  "parent_request_id": "prompt-arena-p4-core-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement only the P4 deterministic advanced-arena algorithms on completion/advanced-arena, preserving HEAD 1e2e40ac560973e102f44a6b7cb9ed70d5a68800. Add a focused TypeScript module and tests (src/advanced-arena.ts and test) that operate on existing ArenaExecution/ArenaSummary evidence: rankings by category and metric (objective pass rate, duration, tokens/s, human score) with sample size/uncertainty/tie handling; regression comparisons between baseline and candidate summaries with deltas and comparable/insufficient-data status; bounded Tournament Mode scheduler for 1v1, round-robin, and single-elimination match plans; blind ranking aggregation; optional judge score ingestion as explicit score inputs only; calibration agreement/disagreement metrics and a clear disagreement status. Validate limits (max 8 competitors, max 64 matches, score ranges, no fake significance), deterministic ordering, and immutable IDs. Do not add persistence, commands, UI, external network, or AI calls in this turn. Run npm typecheck/test/build and git diff --check, then create one focused local commit. No P5/P6/P7, no merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/advanced-arena; preserve all P1/P2/P3 commits and PRs",
+    "local deterministic evidence only; no secrets/cloud calls/AI fabrication",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/arena-runner.test.ts", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/App.tsx"],
+  "review_findings": [{"severity": "blocking", "title": "P4 core turn produced no changes", "details": "Implement the bounded deterministic algorithm slice only; keep persistence/UI for later turns."}],
+  "max_correction_cycles": 0
+}

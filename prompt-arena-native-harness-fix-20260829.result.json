@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-harness-fix-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T03:40:54.119921+00:00",
+  "finished_at": "2026-08-29T03:49:20.921254+00:00",
+  "summary": "Implemented the native harness fix. Linux identity is now deterministic; Windows uses a unique writable WebView2 profile via tauri:options. Phase review: Approved with reservations. Security: no confirmed findings. Publication: Full-history verification still required.",
+  "files_changed": [
+    "scripts/native-ui-smoke.mjs"
+  ],
+  "commands_run": [
+    "node --check scripts/native-ui-smoke.mjs",
+    "npm test -- --run",
+    "git diff --check",
+    "git commit-tree ...",
+    "git push origin 351324dd5161fc1a1325f7d6753fbde4c1a18faa:refs/heads/pr-28"
+  ],
+  "tests": [
+    {
+      "command": "node --check scripts/native-ui-smoke.mjs",
+      "status": "passed",
+      "details": "Syntax valid."
+    },
+    {
+      "command": "Native smoke harness contract checks",
+      "status": "passed",
+      "details": "Deterministic ID, WebView2 profile, and acceptance assertions verified."
+    },
+    {
+      "command": "npm test -- --run",
+      "status": "not_run",
+      "details": "Vitest unavailable: 'vitest' is not recognized."
+    },
+    {
+      "command": "Native Tauri acceptance",
+      "status": "not_run",
+      "details": "Requires Windows/Linux CI environment and built native app."
+    }
+  ],
+  "remaining_issues": [
+    "Commit object dae7169f60efd5fdc48d0490881a2ab5fc383971 was created with the requested parent, but the linked worktree cannot update its shared branch ref.",
+    "Normal push to origin/pr-28 failed with SEC_E_NO_CREDENTIALS; PR #28 was not rerun. Draft state was unchanged.",
+    "Remote CI remains unconfirmed."
+  ],
+  "git_status": " M scripts/native-ui-smoke.mjs\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T034054Z-prompt-arena-native-harness-fix-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T034054Z-prompt-arena-native-harness-fix-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T034054Z-prompt-arena-native-harness-fix-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T034054Z-prompt-arena-native-harness-fix-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04b9b-2ce6-7122-af68-e0198d643b09",
+  "app_server_turn_id": "01a04b9b-2e2c-7ff3-a763-471525b32b53",
+  "app_server_process_id": "13112",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T034054Z-prompt-arena-native-harness-fix-20260829.md",
+  "task_sha256": "ba8b2a6f14f522007c2df7e034f66a188f6e37a38126346eb5873e2b984d6f29",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-scope-cleanup-20260827",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T14:49:17.261040+00:00",
+  "finished_at": "2026-08-27T14:52:59.823643+00:00",
+  "summary": "Created follow-up commit 44c9bf2575caf929002c25fc06ed2c2c8399000b. Net diff against 9a77344 preserves all 8 expected files and regressions; follow-up changes only App.css/App.tsx, removing unrelated formatting. Worktree clean.",
+  "files_changed": [
+    "apps/desktop/src/App.css",
+    "apps/desktop/src/App.tsx"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git diff --stat fc2280f^ fc2280f",
+    "git diff --unified=2 fc2280f^ -- apps/desktop/src/App.css apps/desktop/src/App.tsx",
+    "git diff --check",
+    "git add -- apps/desktop/src/App.css apps/desktop/src/App.tsx",
+    "git diff --cached --check",
+    "git commit -m \"chore: narrow Big Smoke regression diff\"",
+    "git diff --stat fc2280f^ HEAD",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check fc2280f^ HEAD",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "Desktop tests and builds",
+      "status": "not_run",
+      "details": "Intentionally omitted per scope-only instructions."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T144917Z-aip-big-smoke-scope-cleanup-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T144917Z-aip-big-smoke-scope-cleanup-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T144917Z-aip-big-smoke-scope-cleanup-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T144917Z-aip-big-smoke-scope-cleanup-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a043ad-2e58-7053-8a44-7d794be4500c",
+  "app_server_turn_id": "01a043b2-5d83-78d0-9d9b-00932bd022b3",
+  "app_server_process_id": "17376",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T144917Z-aip-big-smoke-scope-cleanup-20260827.md",
+  "task_sha256": "6e0a73db35d6833b645b63148beb8359f5edd73445cd09e1ba2649b9d1be2c75",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

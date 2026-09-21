@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-pinned-fallback-fix",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T21:53:34.986715+00:00",
+  "finished_at": "2026-08-28T21:56:24.400816+00:00",
+  "summary": "Corrigido o fallback para priorizar conversas fixadas e adicionado teste cobrindo arquivamento e exclusão do ativo. Commit criado: 61ccbdb543522347ae349b0700d355fd47b67bec.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/database.rs"
+  ],
+  "commands_run": [
+    "cargo fmt --check",
+    "cargo check",
+    "cargo test database::tests::",
+    "cargo test",
+    "git diff --check",
+    "git commit -m \"fix: prefer pinned conversation fallback\"",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Formatação limpa."
+    },
+    {
+      "command": "cargo check",
+      "status": "passed",
+      "details": "Compilação Rust concluída."
+    },
+    {
+      "command": "cargo test database::tests::",
+      "status": "passed",
+      "details": "36 passaram, incluindo o novo teste pinned-first."
+    },
+    {
+      "command": "cargo test",
+      "status": "passed",
+      "details": "155 passaram, 0 falharam, 1 ignorado por exigir Ollama local."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Diff sem erros."
+    }
+  ],
+  "remaining_issues": [
+    "Um teste permanece ignorado porque requer o modelo Ollama local.",
+    "Validação do overlay no Windows instalado, packaging e CI remoto permanecem gates separados e não foram executados.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215335Z-aip-desktop-conversation-ux-architecture-20260828-pinned-fallback-fix\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215335Z-aip-desktop-conversation-ux-architecture-20260828-pinned-fallback-fix",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215335Z-aip-desktop-conversation-ux-architecture-20260828-pinned-fallback-fix\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215335Z-aip-desktop-conversation-ux-architecture-20260828-pinned-fallback-fix\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04a44-41dc-7291-b61f-65b62802dc47",
+  "app_server_turn_id": "01a04a5d-2e7c-7852-9c15-60ef21e5fb75",
+  "app_server_process_id": "24420",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T215335Z-aip-desktop-conversation-ux-architecture-20260828-pinned-fallback-fix.md",
+  "task_sha256": "3c4545d1d0d87115747f57f58d5aebd05d5f5d22f2ab54a278accd38afa17dd1",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

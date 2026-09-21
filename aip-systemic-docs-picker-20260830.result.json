@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-docs-picker-20260830",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T06:20:01.311943+00:00",
+  "finished_at": "2026-08-30T06:27:30.278617+00:00",
+  "summary": "Concluído e commitado localmente em f941a54. Documentação reconciliada e ModelPicker agora bloqueia opções indisponíveis por mouse e teclado, preservando opções válidas.",
+  "files_changed": [
+    "apps/desktop/src/App.css",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/model-picker.test.tsx",
+    "docs/DATA_MODEL.md",
+    "docs/PRODUCT_SPEC.md"
+  ],
+  "commands_run": [
+    "pnpm --filter @aip/desktop test -- model-picker.test.tsx profile-form.test.tsx state-memory-guidance.test.tsx",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm lint",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"docs: close identity state and model availability\""
+  ],
+  "tests": [
+    {
+      "command": "focused desktop tests",
+      "status": "passed",
+      "details": "3 arquivos, 11 testes aprovados."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "TypeScript aprovado."
+    },
+    {
+      "command": "pnpm lint",
+      "status": "passed",
+      "details": "ESLint aprovado sem warnings."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "passed",
+      "details": "185 arquivos verificados."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Nenhum erro de whitespace."
+    }
+  ],
+  "remaining_issues": [
+    "Aceitação visual em Windows instalado permanece como gate humano não verificado.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062001Z-aip-systemic-docs-picker-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062001Z-aip-systemic-docs-picker-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062001Z-aip-systemic-docs-picker-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062001Z-aip-systemic-docs-picker-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05125-780c-7ea1-a51a-7cea6f813658",
+  "app_server_turn_id": "01a05153-33f2-77a1-bb3d-41f794312758",
+  "app_server_process_id": "25824",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T062001Z-aip-systemic-docs-picker-20260830.md",
+  "task_sha256": "0d1223826d189d1d086d2a2985a2a497bbd1198816bbefc032d4ff1fc1ec9dcf",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

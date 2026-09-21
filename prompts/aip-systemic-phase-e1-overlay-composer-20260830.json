@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-e1-overlay-composer-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Required skills at top: E:/AIP/.agents/skills/aip-implementation/SKILL.md; E:/AIP/.agents/skills/aip-phase-review/SKILL.md; E:/AIP/.agents/skills/aip-security-review/SKILL.md; E:/AIP/.agents/skills/aip-publication-check/SKILL.md; C:/CodexGlobal/skills/ponytail/SKILL.md (read each fully). Execute only bounded Phase E overlay/window/composer work from C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md. Start from branch fix/systemic-desktop-ux-and-generation at HEAD c631462625a0ee6479e3b3ebcb80eef997fff4ba, clean; preserve all commits and do not reset/discard. Inspect apps/desktop/src-tauri/src/overlays.rs, tauri.conf.json, native overlay helpers, App.css overlay/bubble rules, Overlay.tsx, Bubble.tsx, ConversationSurface and existing overlay/bubble/conversation tests. Implement the smallest coherent correction for: (1) native overlay and conversation bubble windows plus html/body/#root/container keep transparent outside intentional agent pixels or the designed bubble panel, preserving native hit-region/pass-through behavior and safe-mode handling; (2) expanded bubble popup gets sensible minimum/content-fitting height and width, no clipped primary controls, intentional internal scrolling when content exceeds available space, and monitor-work-area positioning remains correct; (3) document/enforce the preferred serialized-generation UX: drafting remains possible, but ordinary Send is disabled while any active/queued request for the agent exists; Cancel remains available; Send re-enables after terminal completion/cancel/failure; keyboard Enter must obey the same guard in both full conversation and Bubble. Keep provider health, temporary chat, queue/cancellation and request tracing unchanged. Add focused deterministic tests for send guard, cancel/next-send behavior and overlay/bubble transparency/sizing helpers where existing test infrastructure supports. Do not change database, profile/state/memories/calendar/model picker/modal/lifecycle, or unrelated features. Run pnpm --filter @aip/desktop typecheck, focused conversation/bubble/overlay tests, cargo fmt --check, focused Rust overlay tests, git diff --check, and pnpm secrets:scan. Commit locally with an explanatory message. Do not push, PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues; browser/installed-Windows acceptance remains unclaimed.",
+  "constraints": [
+    "Use only configured Biel4 App Server/headless Executor with elevated/ready Windows sandbox. No native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Keep diff strictly Phase E1. Preserve hit testing, alpha transparency, safe mode, managed runtime, and no arbitrary generation timeout.",
+    "No amend, rebase, squash, force-push, or remote publication; preserve unrelated owner work."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/apps/desktop/src-tauri/src/overlays.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/native_overlay_region.rs",
+    "E:/AIP/apps/desktop/src-tauri/tauri.conf.json",
+    "E:/AIP/apps/desktop/src/Overlay.tsx",
+    "E:/AIP/apps/desktop/src/Bubble.tsx",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/overlay-input.ts",
+    "E:/AIP/apps/desktop/src/overlay-gesture.ts",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/overlay-input.test.ts",
+    "E:/AIP/apps/desktop/src/overlay-gesture.test.ts",
+    "E:/AIP/apps/desktop/src/bubble.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

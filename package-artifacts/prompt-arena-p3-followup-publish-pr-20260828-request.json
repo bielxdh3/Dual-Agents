@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/model-library-followup",
+  "base_branch": "completion/advanced-arena-followup",
+  "title": "feat: make local model profiles runtime-aware",
+  "body": "## P3 follow-up — Full Model Library\n\nStacked after PR #23 (`completion/advanced-arena-followup`); PRs #17–#23 remain draft.\n\n- preserves Ollama, LM Studio, and llama.cpp/GGUF identity in immutable profile revisions and effective run configuration\n- makes runtime-specific download/removal capabilities explicit in the UI; no unsupported remote download is invented\n- blocks managed-model removal while an operation is queued/running and retains persisted progress/cancellation/removal audit\n- keeps loopback-only discovery, bounded GGUF paths, duplicate grouping, and quantization-distinct records\n- validated by canonical BL4 app_server: 81 TypeScript tests, 103 Rust tests, typecheck, Vite build, cargo fmt/check, and diff checks\n\nP3 remains IN PROGRESS pending real native runtime acceptance and remaining security/publication gates.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

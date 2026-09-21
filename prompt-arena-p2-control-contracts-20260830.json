@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-control-contracts-20260830",
+  "action": "implement",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "Continue the Prompt Arena mission on the clean isolated checkout at current HEAD ad60e86a173f38a4bd40280d82a64d23ed22e602. Work only as the canonical BL4 Executor through the configured App Server/headless path. Close the remaining concrete P2 control/test gap without changing backend semantics, blind integrity, security boundaries, or unrelated work. The supplied human-QA brief reports that the Arena Task/Case dropdown still exposes raw native/WebView styling. Inspect the current implementation and replace only the primary Arena Task and Case ArenaSelect controls with one reusable accessible custom listbox control if it can preserve the existing contract: visible label and placeholder, selected value/detail, click and outside-click behavior, ArrowUp/ArrowDown/Home/End navigation, Enter/Space selection, Escape close, focus management, disabled state, aria-haspopup=listbox, aria-expanded, aria-controls, role=listbox/option, aria-selected, and stable no-layout-shift styling. Keep other native selects where they are not the reported control so accessibility is not broadened speculatively. Add a small pure keyboard/navigation helper module with focused tests for all key transitions and disabled/empty behavior, and add focused static contract tests for the implemented desktop/mobile comparison overflow ownership and reduced-motion selectors (do not invent a browser harness). Keep the existing responsive CSS and neutral blind labels intact; do not expose identity-sensitive data. Run npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check if practical. Do not modify E:/Prompt Arena or E:/Prompt Arena-pr28. Do not commit, push, tag, release, deploy, merge, or create/update PRs; leave the target changes uncommitted for BL3 review. Return a structured report with summary, files_changed, commands_run, tests, provenance, and remaining_issues.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; backend app_server; task transport app_server; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Preserve the clean current source/docs state and do not reset, stash, or overwrite unrelated work.",
+    "No backend redesign, no forced reload, no unsafe HTML/eval, no global overflow masking, and no identity-sensitive blind telemetry.",
+    "Do not revisit exhausted CDP/UIA/browser-coordinate automation paths.",
+    "Only the primary Arena Task/Case dropdowns may become custom; preserve native control accessibility elsewhere unless required by the existing implementation.",
+    "Leave all product changes uncommitted for BL3 review."
+  ],
+  "context_files": [
+    "C:/Users/bielx/.codex/attachments/b16592b6-1f9f-44ec-b685-bd314cdb2e10/pasted-text.txt",
+    "E:/Prompt Arena-live-telemetry-i18n/src/App.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/styles.css",
+    "E:/Prompt Arena-live-telemetry-i18n/src/i18n.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/arena-runner.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/model-library.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/*.test.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/docs/DELIVERY_MATRIX.md",
+    "E:/Prompt Arena-live-telemetry-i18n/docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

@@ -1,0 +1,15 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "aip-phase9-pr-create-20260820",
+  "authorization_reference": "aip-phase9-pr-create-20260820",
+  "repository": "E:\\AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "branch": "feat/phase-9-supervised-tools",
+  "base_branch": "main",
+  "title": "feat: functional supervised local tools",
+  "body": "## Summary\n\nPhase 9 adds a bounded, Owner-supervised local-tool boundary while preserving the standalone AIP scope. Workspace inspection is metadata-only; local organization is limited to an explicitly configured Owner root with preview, approval, second confirmation, dry-run, source-identity revalidation, safe moves, rollback, and compensation. Calendar and messaging remain provider-neutral fixture mocks.\n\n## Implementation\n\n- `f5ec675` implements the Phase 9 supervised tool catalog, sessions, permissions, actions, audit, migration, and fixture adapters.\n- `7324801` hardens root policy, symlink/reparse checks, canonical containment, and partial-move safety.\n- `23cbdeb` wires the TypeScript contracts, Tauri UI, local-root controls, and Phase 9 documentation.\n- `a665850` adds stable per-move compensation identity and fail-closed compensation preflight.\n- `dfeee2f` bounds nullable audit action/session identifiers.\n- `3ae7a9e` bounds all supervised-tool collections at the contract boundary.\n- `77b65d2` persists Rust-captured source identity and enforces Rust collection maxima.\n- `5864d52` ignores caller-supplied source identity for authority.\n- `9a77344` rejects nested symlink/junction/reparse components before canonicalization.\n\n## Evidence\n\n- Final HEAD: `9a7734460dded5469acd5e746f3118c9e3d28054`; remote branch was fast-forwarded from `06414e05765fe96f3e6fd736775c70e21187d5bb` and exact SHA reverified.\n- Direct local gates: Rust fmt/check/clippy passed; `cargo test --locked --lib` passed `120`, failed `0`, with `1` optional Ollama test ignored; contracts typecheck/build/tests passed (`17`); desktop typecheck/tests/build passed (`49` + Vite build); `pnpm secrets:scan` passed (`148` files); `git diff --check` passed.\n- Distinct Biel4 read-only final review: `approved_with_reservations`, no code findings.\n- Codex Security diff scan `d0f1d38e-b294-4851-be22-60904fd16761` for `06414e0..9a77344`: complete coverage, zero findings. TAC advisory connector was unavailable (`USER_NOT_LOGGED_IN`).\n\n## Boundaries and status\n\nRust/SQLite remain authoritative. No shell execution, network/provider access, upload, telemetry, watcher, public listener, credential storage, raw-content persistence, or Phase 10+ behavior was added. The documentation and gap matrix keep stable-release approval and packaged Windows/manual UX validation explicitly pending. Remote CI is not yet confirmed.\n\nThis PR is a functional Phase 9 checkpoint, not a stable-release claim. Packaged Windows 10 x64/manual filesystem and Owner-confirmation UX checks remain human reservations; merge must wait for protected remote CI and normal repository review.",
+  "draft": true,
+  "authorization": {
+    "allowed_actions": ["draft_pr_create"]
+  }
+}

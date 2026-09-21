@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-ollama-worker-smoke-correction-20260830",
+  "parent_request_id": "prompt-arena-live-ollama-worker-smoke-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:44:55.819277+00:00",
+  "finished_at": "2026-08-30T02:48:34.099421+00:00",
+  "summary": "Six sequential live worker GenerateOnce calls passed at HEAD 73991b03282e3ec766ab824f6bdfb9ff8e4c616a. Both requested models completed all three calls with usage and timing metrics present. No worker processes or listeners leaked; repository remained clean.",
+  "files_changed": [],
+  "commands_run": [
+    "Read AGENTS.md and required skill files",
+    "Inspected worker protocol, RunPlan, runtime configuration, and worker handling",
+    "Verified HEAD, branch, and clean status before execution",
+    "Verified http://127.0.0.1:11434 health",
+    "Executed six sequential GenerateOnce requests through the packaged worker binary",
+    "Verified final HEAD and clean status"
+  ],
+  "tests": [
+    {
+      "command": "Live Ollama health check",
+      "status": "passed",
+      "details": "HTTP status 200 from the loopback endpoint."
+    },
+    {
+      "command": "Six sequential packaged-worker GenerateOnce calls",
+      "status": "passed",
+      "details": "6 requested, 6 completed, 0 failed. qwen3.5:0.8b completed 3/3; llama3.2:1b completed 3/3. Every call exited 0 with usage=True and timing=True. Elapsed times were 8512, 1220, 928, 4220, 591, and 259 ms."
+    },
+    {
+      "command": "Worker leak check",
+      "status": "passed",
+      "details": "Zero worker processes remained; no listener was created by the smoke."
+    },
+    {
+      "command": "Final HEAD and working-tree verification",
+      "status": "passed",
+      "details": "HEAD remained 73991b03282e3ec766ab824f6bdfb9ff8e4c616a and status remained clean."
+    }
+  ],
+  "remaining_issues": [
+    "No full Arena UI, persistence, blind-evaluation, visual, or human QA was performed.",
+    "No failure was induced; isolation was observed through independent sequential worker processes, not a forced failing-model scenario.",
+    "No npm or cargo suites were rerun per correction scope."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T024456Z-prompt-arena-live-ollama-worker-smoke-correction-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T024456Z-prompt-arena-live-ollama-worker-smoke-correction-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T024456Z-prompt-arena-live-ollama-worker-smoke-correction-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T024456Z-prompt-arena-live-ollama-worker-smoke-correction-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0508e-4709-70e0-8a01-0feb6d834fef",
+  "app_server_process_id": "6296",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T024456Z-prompt-arena-live-ollama-worker-smoke-correction-20260830.md",
+  "task_sha256": "2bc9d768f482edf143efb596ebcf12fd8c5cb7c2fcfad27785a4c4b32ecfd833",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes."
+}

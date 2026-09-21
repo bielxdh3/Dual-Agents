@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-correction-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T14:31:54.146733+00:00",
+  "finished_at": "2026-08-22T14:34:27.374736+00:00",
+  "summary": "Added a Windows-only bounded GDI screen-capture provider with deterministic fixture provider, explicit unavailable/model-degraded behavior, transient byte cleanup, primary-display discovery, truthful UI labels, and widened contracts. Committed as 9827ee4a649fedd39d97a6fc886d7005a9b8019c.",
+  "files_changed": [
+    "apps/desktop/src-tauri/Cargo.toml",
+    "apps/desktop/src-tauri/src/screen_vision.rs",
+    "apps/desktop/src/App.tsx",
+    "packages/contracts/src/index.ts"
+  ],
+  "commands_run": [
+    "git switch -c feat/phase-11-real-screen-vision",
+    "cargo fmt --check",
+    "cargo fmt",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "cargo test --locked --lib screen_vision::tests",
+    "pnpm --filter @aip/contracts typecheck",
+    "pnpm --filter @aip/contracts test",
+    "pnpm --filter @aip/contracts build",
+    "git diff --check",
+    "git commit -m \"feat: add bounded phase 11 screen capture provider\"",
+    "git rev-parse HEAD"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Passed on Windows host."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "Previous full suite passed: 123 tests passed, 1 ignored."
+    },
+    {
+      "command": "cargo test --locked --lib screen_vision::tests",
+      "status": "passed",
+      "details": "5 tests passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts build",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test",
+      "status": "not_run",
+      "details": "Blocked by sandbox process policy: Vitest worker spawn failed with EPERM."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    }
+  ],
+  "remaining_issues": [
+    "The visual adapter remains unavailable/degraded; no local visual model is packaged.",
+    "Full Tauri command/UI execution wiring, cancellation persistence integration, resource serialization coverage, and Phase 11 documentation were not completed.",
+    "Desktop typecheck/tests/build and secrets scan were not run.",
+    "The commit contains the bounded capture/provider increment but does not satisfy every requested Phase 11 product-surface item.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T143154Z-aip-phase11-real-screen-vision-correction-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T143154Z-aip-phase11-real-screen-vision-correction-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T143154Z-aip-phase11-real-screen-vision-correction-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T143154Z-aip-phase11-real-screen-vision-correction-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029e2-a812-72e1-b5bc-82ef61b9ad36",
+  "app_server_process_id": "12632",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T143154Z-aip-phase11-real-screen-vision-correction-20260822.md",
+  "task_sha256": "8f555f917c641862f9c7d7d0ed4213da41fe4cbf6dfd3d9f3d76264655defcec",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-driver-toolchain-variable-correction-20260829",
+  "parent_request_id": "prompt-arena-driver-toolchain-version-correction-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T13:21:59.870943+00:00",
+  "finished_at": "2026-08-29T13:22:58.028194+00:00",
+  "summary": "Corrected only the stale manifest variable and committed as 55d685fbdbd927a5ab195ab141fa76ea823acf96. The tauri-driver binary entry now uses verified tauriDriverPackageVersion; all source-SHA, EdgeDriver, hash, artifact, and security behavior is preserved. Provenance: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4/biel4 Executor\",\"task_transport\":\"App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"turn_id\":\"not exposed in Executor transport\",\"workspace\":\"E:\\\\Prompt Arena-pr28-bl4\",\"workspace_write\":\"verified\",\"windows_sandbox\":\"elevated (control-plane asserted)\",\"readiness\":\"ready (control-plane asserted)\",\"approval\":\"never\",\"commit\":\"55d685fbdbd927a5ab195ab141fa76ea823acf96\"}. No push attempted.",
+  "files_changed": [
+    ".github/workflows/native-driver-toolchain.yml"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "rg -n -C 3 tauriDriverPackageVersion ...",
+    "python YAML and variable consistency check",
+    "embedded PowerShell syntax check",
+    "git diff --check",
+    "git diff inspection",
+    "git add -- .github/workflows/native-driver-toolchain.yml",
+    "git commit -m \"fix: use verified tauri driver package version\"",
+    "git diff HEAD^ HEAD --check",
+    "git show --stat --oneline --decorate HEAD"
+  ],
+  "tests": [
+    {
+      "command": "YAML and variable consistency check",
+      "status": "passed",
+      "details": "Verified package-version variable is used and removed tauriDriverVersion manifest assignment is absent; probe, EdgeDriver compatibility, and hashing controls remain."
+    },
+    {
+      "command": "embedded PowerShell syntax check",
+      "status": "passed",
+      "details": "Workflow PowerShell block parsed successfully."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "git diff HEAD^ HEAD --check",
+      "status": "passed",
+      "details": "Committed one-line correction is clean."
+    }
+  ],
+  "remaining_issues": [
+    "The workflow has not been rerun on a remote Windows runner.",
+    "No push, merge, release, tag, or deploy was performed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T132200Z-prompt-arena-driver-toolchain-variable-correction-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T132200Z-prompt-arena-driver-toolchain-variable-correction-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T132200Z-prompt-arena-driver-toolchain-variable-correction-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T132200Z-prompt-arena-driver-toolchain-variable-correction-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04daf-2c6d-7b20-b5ef-3ec77135637f",
+  "app_server_process_id": "19912",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T132200Z-prompt-arena-driver-toolchain-variable-correction-20260829.md",
+  "task_sha256": "b2953b4f90c6b06a8ab14510c80cb5af7bbbb2fd5235cc37bb22eefcae4c3d0f",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

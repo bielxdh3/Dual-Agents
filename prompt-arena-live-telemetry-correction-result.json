@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-telemetry-correction-20260829",
+  "parent_request_id": "prompt-arena-live-telemetry-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T17:27:47.048387+00:00",
+  "finished_at": "2026-08-29T17:35:49.005582+00:00",
+  "summary": "Corrected unused test symbols, enforced blind-result anonymity until immutable reveal, hid blind wall time, and limited ETA to successful measured samples. No i18n, commits, or remote operations. Review: Approved with reservations; security controls preserved. Provenance: biel4 Executor, App Server/headless, workspace-write, Windows elevated/ready, approval never; thread/turn IDs unavailable in executor metadata.",
+  "files_changed": [
+    "src-tauri/src/commands.rs",
+    "src-tauri/src/main.rs",
+    "src-tauri/src/storage.rs",
+    "src/App.tsx",
+    "src/arena-runner.test.ts",
+    "src/arena-runner.ts",
+    "src/bridge.ts",
+    "src/styles.css"
+  ],
+  "commands_run": [
+    "npm run typecheck",
+    "npm test -- --run src/arena-runner.test.ts",
+    "npm run build",
+    "npm test",
+    "npm run check:boundaries",
+    "cargo test --target-dir C:\\Users\\bielx\\AppData\\Local\\DualCodex\\npm-cache\\eb180965876a25c3\\prompt-arena-cargo-target",
+    "git diff --check"
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript check passed."
+    },
+    {
+      "command": "npm test -- --run src/arena-runner.test.ts",
+      "status": "passed",
+      "details": "8/8 tests passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production frontend build passed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "87/87 tests passed."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Repository boundary check passed."
+    },
+    {
+      "command": "cargo test --target-dir C:\\Users\\bielx\\AppData\\Local\\DualCodex\\npm-cache\\eb180965876a25c3\\prompt-arena-cargo-target",
+      "status": "passed",
+      "details": "107 Rust tests passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "cargo test",
+      "status": "failed",
+      "details": "Default target lock access denied; equivalent redirected-target validation passed."
+    }
+  ],
+  "remaining_issues": [
+    "Windows human QA and fresh NSIS packaging were not run; exhausted CDP/UIA paths were not revisited.",
+    "Default Cargo target remains permission-blocked; redirected target was used successfully.",
+    "Publication review remains Full-history verification still required; no publication or remote action was performed."
+  ],
+  "git_status": " M src-tauri/src/commands.rs\n M src-tauri/src/main.rs\n M src-tauri/src/storage.rs\n M src/App.tsx\n M src/arena-runner.test.ts\n M src/arena-runner.ts\n M src/bridge.ts\n M src/styles.css\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T172747Z-prompt-arena-live-telemetry-correction-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T172747Z-prompt-arena-live-telemetry-correction-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T172747Z-prompt-arena-live-telemetry-correction-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T172747Z-prompt-arena-live-telemetry-correction-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04e90-3198-7f52-a9f0-dc8508106a2a",
+  "app_server_turn_id": "01a04e90-322e-73e3-b25f-3dc1c6fe1236",
+  "app_server_process_id": "7992",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T172747Z-prompt-arena-live-telemetry-correction-20260829.md",
+  "task_sha256": "b32d0df9a8bc638c6a2e57d8d292d6a6995caf989252b9858d6e5677983d1d33",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

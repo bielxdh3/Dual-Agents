@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-runtime-evidence-docs-20260830",
+  "parent_request_id": "prompt-arena-live-ollama-worker-smoke-correction-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Update only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md with the new live local runtime evidence. Use canonical BL4/biel4 App Server/headless, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read required AGENTS.md and skills first. Verify current HEAD before editing and preserve source target 838d952/package evidence checkout f393e. Record that `cargo test --manifest-path src-tauri/Cargo.toml --all-targets` definitively passed 109 tests plus two zero-test targets, including the live Ollama health test taking the healthy endpoint branch. Record the bounded live worker smoke: HTTP 200 from http://127.0.0.1:11434; six sequential packaged-worker GenerateOnce calls at HEAD 73991b0; qwen3.5:0.8b 3/3 and llama3.2:1b 3/3 completed, all exited 0 with usage and timing metrics, elapsed 8512/1220/928/4220/591/259 ms, zero worker/listener leaks, no model mutation. This is worker/runtime evidence only and must not claim full Arena UI, persistence, blind-evaluation, responsiveness, or human QA. Update the matrix/checklist so Ollama is no longer marked BLOCKED_EXTERNAL_RUNTIME: mark live health/worker evidence complete or pending Tauri discovery/full Arena native smoke as appropriate. Keep Docker as BLOCKED_EXTERNAL_RUNTIME, MSI blocked, Linux/remote CI pending, PENDING_HUMAN_QA for visual/accessibility/native controls/reduced motion/i18n and full Arena behavior. Preserve fresh NSIS COMPLETE and historical 57f02b3 separation, phase Approved with reservations, publication Create a sanitized public copy. Do not modify source/tests/generated/package/history/remotes/tags/releases/deploys or other worktrees; leave a precise docs diff and do not commit.",
+  "constraints": [
+    "Only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md may change.",
+    "Do not overstate worker smoke as full Arena/Tauri or human evidence.",
+    "No source/generated/remote/tag/release/deploy/other-worktree changes."
+  ],
+  "review_findings": [
+    {
+      "title": "Live Ollama runtime became available and worker smoke passed",
+      "details": "Canonical BL4 correction completed 6/6 sequential GenerateOnce calls across two installed local models with usage/timing metrics and no leaked processes/listeners."
+    },
+    {
+      "title": "Documentation still labels Ollama as externally blocked",
+      "details": "The matrix/checklist should distinguish the now-available local Ollama runtime from the remaining Tauri Arena/native/human and Docker gates."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\prompt-arena-rust-runtime-tests-20260830.result.json",
+    "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\prompt-arena-live-ollama-worker-smoke-correction-20260830.result.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

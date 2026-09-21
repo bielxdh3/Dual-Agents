@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-tests-20260829",
+  "parent_request_id": "prompt-arena-i18n-build-fix-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Add a focused repo-native test file src/i18n.test.ts for the existing i18n implementation only. Preserve product behavior and all boundaries; no commits or remote operations and no changes to original worktrees. Cover normalizeAppLocale accepting only en/pt-BR with English fallback; load/save persistence through a fake Storage; translateText English fallback and representative PT-BR translations; locale number/percent/currency/duration formatting; and telemetry labels such as arenaTelemetryLabel in both locales if importable without React. Do not add dependencies or redesign i18n. Run the focused test and npm run typecheck, report exact outcomes and complete BL4 provenance.",
+  "constraints": [
+    "Canonical biel4 App Server/headless executor with workspace-write, elevated readiness ready, approval never.",
+    "Tests must not inspect or mutate secrets, credentials, immutable evidence, or remote state."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

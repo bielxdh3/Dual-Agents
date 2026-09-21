@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-driver-toolchain-workflow-retry-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Read and apply C:\\CodexGlobal\\AGENTS.md and the required skills C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are BL4/biel4 Executor on the current configured App Server/headless transport. The control-plane envelope will be independently reviewed by BL3 for provenance; do not block solely because those fields are not visible inside your turn. Work in clean checkout E:\\Prompt Arena-pr28-bl4, branch validation/native-tauri-acceptance, exact HEAD f3048a61f45cdb6b29f362444f3d32646edf4943. Add only .github/workflows/native-driver-toolchain.yml as a temporary diagnostic workflow for PR #28. Use workflow_dispatch and pull_request triggers, windows-latest, bounded timeout, checkout, stable Rust, cargo install tauri-driver --locked, cargo install --git https://github.com/chippers/msedgedriver-tool, invoke the matching-driver tool, and locate actual tauri-driver.exe and msedgedriver.exe; fail closed if either is absent. Record tool versions, source commit, github.run_id, x64 architecture, UTC timestamp, and SHA-256 for both executables in a manifest JSON. Enforce known local compatibility by requiring EdgeDriver version prefix 151.0.4129 (fourth component may differ); refuse artifact if the first three components differ. Upload only the binaries and manifest under artifact name prompt-arena-windows-native-driver-toolchain-${{ github.sha }} with short retention. No Release, tag, deploy, or product/harness changes. Run YAML/format-focused checks available locally and git diff --check. Create one normal commit exactly `ci: publish Windows native driver toolchain artifact`; do not push. Report changed file, commit SHA, validation, and exact artifact/manifest behavior. Preserve all unrelated files.",
+  "constraints": [
+    "Only the configured BL4/biel4 App Server Executor may implement; no native subagents, TUI/native_tui, browser-only fallback, or direct BL3 edits.",
+    "Only .github/workflows/native-driver-toolchain.yml may change. No registry policy changes, TLS weakening, source edits, or unrelated refactors.",
+    "Authorize local_mutation and local_commit only; no push, merge, release, tag, deploy, or force-push."
+  ],
+  "context_files": [
+    ".github/workflows/native-ui.yml",
+    "scripts/native-ui-smoke.mjs",
+    "docs/DELIVERY_MATRIX.md",
+    "docs/SECURITY.md"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

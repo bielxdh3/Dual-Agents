@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-human-qa-checklist-20260829",
+  "parent_request_id": "prompt-arena-windows-uia-discovery-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills before acting: C:\\CodexGlobal\\AGENTS.md; C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full); C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md; C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md. BL3 review finding from the parent UIA discovery: the normal release app stayed alive but Windows UI Automation exposed only one unnamed ControlType.Pane (`Tao Thread Event Target`), no meaningful controls, and a black 16x16 window; the required boundary is WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE. Implement only documentation, delegated through canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; return result metadata with real thread_id and turn_id. Do not modify product source, tests, runtime configuration, packaging, or lockfiles. Do not touch E:\\Prompt Arena original WIP. Do not use WebDriver, CDP, remote debugging, browser flags, coordinate automation, TUI/native_tui, another executor, or fallback. Do not install anything. Create a short reproducible human-native QA checklist at docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md, organized into small sequential batches rather than asking for all phases at once. Every checklist item must contain action -> expected result -> evidence to capture -> PASS/FAIL. Focus only on desktop-interactive gates not covered by CI/unit/integration: P1/P2 Arena end-to-end, progress/comparison/blind-reveal, history/reopen/export, cancellation/recovery; P3 real Model Library discovery/operation; P4 Advanced Arena save/reopen/disagreement; P5 BYOK settings without secret exposure plus provider/history surfaces; P6 resize/scroll/keyboard/focus/appearance/accessibility; P7 installer/clean install/Start Menu/persistence/uninstall. Keep Docker-only, official judge integration, and MSI/WiX limitations classified separately and do not ask for unavailable external runtimes unless explicitly labeled. Update docs/DELIVERY_MATRIX.md with a concise evidence entry linking the discovery artifacts and formally reclassifying the Windows native gate as PENDING_HUMAN_QA due to WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE, while preserving per-requirement statuses and the existing fail-closed/security wording. Record that no acceptance marker was produced and that this is not a product-failure claim. Do not commit or push; leave only the minimal documentation diff for BL3 review. Validate Markdown structure and inspect the final diff; no build or application tests are required for this documentation-only change.",
+  "constraints": [
+    "Documentation-only; minimal diff; no product implementation or harness.",
+    "Canonical BL4/biel4 Executor only; App Server/headless; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No commit, push, merge, release, tag, deploy, global install, WebDriver/CDP, or coordinate automation.",
+    "Preserve existing security controls and individual P1-P7 statuses; distinguish PENDING_HUMAN_QA, BLOCKED_EXTERNAL_RUNTIME, and BLOCKED_ENVIRONMENT.",
+    "Artifacts and provenance must be reported by result metadata, not self-report alone."
+  ],
+  "context_files": [
+    "docs/DELIVERY_MATRIX.md",
+    "ROADMAP.md",
+    "docs/SECURITY.md",
+    "C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-windows-uia-final-30f38f3b37f143b2bd6113cce43c1463\\discovery-output.txt",
+    "C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-windows-uia-final-30f38f3b37f143b2bd6113cce43c1463\\uia-tree.txt"
+  ],
+  "review_findings": [
+    {"severity": "blocking", "title": "UIA inner tree unavailable", "details": "UIA discovery produced only an unnamed Pane and zero meaningful inner controls; emit WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE and formalize human native QA."},
+    {"severity": "blocking", "title": "No acceptance claim", "details": "Do not claim WINDOWS_NATIVE_UIA_NAVIGATION_PASS or WINDOWS_NATIVE_TAURI_ACCEPTANCE_LOCAL_PASS."},
+    {"severity": "important", "title": "Separate environment limitation", "details": "Keep the CDP/WebDriver environment classification separate from product behavior."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

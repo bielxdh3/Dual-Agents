@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-e-20260831",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-31T21:23:19.154796+00:00",
+  "finished_at": "2026-08-31T21:27:27.062304+00:00",
+  "summary": "Implementada e commitada a Phase E no commit 89bfc20, com restyling de settings, administração e recursos locais sem alterações de lógica ou contratos.",
+  "files_changed": [
+    "apps/desktop/src/App.css"
+  ],
+  "commands_run": [
+    "pnpm exec prettier --write apps/desktop/src/App.css",
+    "pnpm --filter @aip/desktop exec vitest run src/settings-model-policy.test.tsx src/local-capabilities.test.tsx src/theme.test.tsx src/shared-controls.test.tsx",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm exec eslint apps/desktop/src --max-warnings=0",
+    "pnpm exec prettier --check apps/desktop/src/App.css",
+    "pnpm --filter @aip/desktop exec vitest run --passWithNoTests",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"refine AIP settings and local resources\""
+  ],
+  "tests": [
+    {
+      "command": "focused desktop Vitest",
+      "status": "passed",
+      "details": "4 arquivos, 12 testes aprovados."
+    },
+    {
+      "command": "desktop Vitest completo",
+      "status": "passed",
+      "details": "30 arquivos, 118 testes aprovados."
+    },
+    {
+      "command": "desktop typecheck",
+      "status": "passed",
+      "details": "tsc --noEmit concluído sem erros."
+    },
+    {
+      "command": "ESLint desktop",
+      "status": "passed",
+      "details": "Concluído sem avisos ou erros."
+    },
+    {
+      "command": "Prettier check",
+      "status": "passed",
+      "details": "App.css está formatado."
+    },
+    {
+      "command": "secrets scan",
+      "status": "passed",
+      "details": "200 arquivos verificados."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Nenhum erro de whitespace."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T212319Z-aip-ui-reset-phase-e-20260831\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T212319Z-aip-ui-reset-phase-e-20260831",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T212319Z-aip-ui-reset-phase-e-20260831\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T212319Z-aip-ui-reset-phase-e-20260831\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05910-09d5-7723-9116-e11fbee1ea5e",
+  "app_server_turn_id": "01a059b4-8d24-7ae0-9a2c-b92f47af56ac",
+  "app_server_process_id": "1496",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260831T212319Z-aip-ui-reset-phase-e-20260831.md",
+  "task_sha256": "15a99f9918177c0b77b0b2db17b673ab90b1ab215a4ce4ba3e9483c1331adc2e",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

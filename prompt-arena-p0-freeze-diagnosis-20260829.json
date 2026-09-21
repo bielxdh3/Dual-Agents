@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p0-freeze-diagnosis-20260829",
+  "parent_request_id": null,
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Read-only root-cause diagnosis of the critical human-QA finding WINDOWS_QA_FINDING_ARENA_UI_FREEZES_DURING_BENCHMARK in the exact current Prompt Arena checkout. Before any repository inspection, read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md, C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md, C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\index\\SKILL.md, and C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\audit\\SKILL.md. Use only canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never, and preserve the exact repository/branch/HEAD. Do not edit application files, tests, docs, generated outputs, remotes, tags, releases, or worktrees; do not run native TUI or alternate backends. Trace React/UI -> Tauri IPC -> Rust commands/events -> worker/sidecar -> runtime -> telemetry -> persistence -> UI reconciliation. Inspect and run only safe focused diagnostics/tests; if a real local runtime is already available, you may attempt a bounded two-competitor/three-sample benchmark and a repeat, but never download models, invoke paid/cloud providers, add arbitrary sleeps/timeouts, suppress not-responding symptoms, or change update frequency blindly. Investigate synchronous invokes, blocking Rust/fs/db/child processes, stdout/stderr pipe backpressure, mutex contention, serialization, event/listener floods, React rerender/DOM/markdown growth, persistence cadence, sampling/polling, and cancellation. Report concrete evidence before/after only if no edits are made (existing baseline plus measured diagnostics), exact files and line ranges, likely root cause(s), safe fix boundary, reproducibility status, runtime availability, commands/tests, and full control-plane provenance including real thread_id and turn_id if exposed. Return status failed if no code mutation was requested, but include the diagnosis in summary and structured fields.",
+  "constraints": [
+    "Read-only diagnosis; no repository or remote mutation.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "Do not mask the symptom with sleeps, arbitrary timeouts, or blind event suppression.",
+    "No native TUI, native_tui, danger-full-access fallback, alternate executor, model downloads, or paid/cloud calls.",
+    "Preserve E:\\Prompt Arena original WIP and all other worktrees."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\bridge.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\orchestration.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\worker.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\storage.rs"
+  ],
+  "review_findings": [
+    {
+      "title": "Human QA reports Prompt Arena Not responding while inference continues",
+      "details": "The app freezes during a real benchmark while Windows and the runtime remain responsive. This is a critical execution-path defect, not an acceptable hardware limitation."
+    },
+    {
+      "title": "Current frontend visibly updates Arena progress through React state",
+      "details": "The current code calls onProgress synchronously from executeArena for preparing/generating/terminal states and applies full telemetry sample arrays in App.tsx; inspect whether this combines with IPC/event/persistence or response rendering to starve the renderer."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": { "allowed_actions": [] }
+}

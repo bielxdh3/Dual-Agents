@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-client-v5-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 1,
+  "started_at": "2026-08-22T15:41:21.956775+00:00",
+  "finished_at": "2026-08-22T15:51:23.491271+00:00",
+  "summary": "Codex executor failed; repository modifications, if any, were preserved.",
+  "files_changed": [
+    ".tooling/",
+    "android/",
+    "docs/PHASE_12_ANDROID_IMPLEMENTATION.md"
+  ],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "git_status": "?? .tooling/\n?? android/\n?? docs/PHASE_12_ANDROID_IMPLEMENTATION.md\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T154122Z-aip-phase12-android-client-v5-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T154122Z-aip-phase12-android-client-v5-20260822",
+  "executor_report_file": "",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T154122Z-aip-phase12-android-client-v5-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "",
+  "app_server_turn_id": "",
+  "app_server_process_id": "",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T154122Z-aip-phase12-android-client-v5-20260822.md",
+  "task_sha256": "719a6eef0254d5b3a41094f5850839c10f588ea3a284ccb066390839fe6f4687",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor exited with code 1."
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-ci-tooling-audit-drift-correction-20260827",
+  "parent_request_id": "bielos-ci-tooling-audit-drift-review-20260827",
+  "action": "correct",
+  "repository": "E:/BielOS",
+  "task": "Apply the narrowly authorized correction for the exact-SHA Prisma tooling audit metadata drift found by the parent review. The repository is currently at HEAD 367ff05e1d696f1c48081a444a9666a92c949b14 with all unrelated WIP selectively stashed. Update only scripts/tooling-audit-policy.mjs and scripts/fixtures/tooling-audit/accepted.json so the expected prisma vulnerability range matches the live npm audit advisory range >=6.13.0-dev.1. Preserve every other advisory field, exact counts, fail-closed production gate, matching semantics, package versions, package-lock.json, workflow, runtime, and security boundaries. Do not touch any unrelated WIP, responsible-assignment files, or any other file. Run the focused tooling audit policy tests and git diff --check. Do not stage, commit, push, rebuild, restart, or mutate runtime. Return structured findings, files_changed, commands_run, tests, and full trustworthy App Server provenance.",
+  "constraints": [
+    "Use only the same configured Biel4 App Server Executor with task_transport app_server; no native subagents or alternate backend.",
+    "This is a minimal tooling-policy metadata correction, not a Prisma/package or dependency update.",
+    "Do not change package.json, package-lock.json, workflow files, production audit logic, or any responsible-assignment or WIP path.",
+    "Fail closed and stop with BIELOS_BLOCKED_REASON=prisma_advisory_security_semantics_changed if advisory identity, path, severity, fix data, or security meaning materially differs from the parent review.",
+    "No commit, push, PR, runtime restart, production mutation, force push, reset, rebase, amend, or history rewrite."
+  ],
+  "context_files": [
+    "E:/BielOS/scripts/tooling-audit-policy.mjs",
+    "E:/BielOS/scripts/fixtures/tooling-audit/accepted.json",
+    "E:/BielOS/scripts/tooling-audit-policy.test.mjs",
+    "E:/BielOS/.github/workflows/ci.yml",
+    "E:/BielOS/package-lock.json",
+    "E:/BielOS/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Upstream Prisma advisory range metadata drift blocks exact CI",
+      "details": "Parent read-only review proved that CI run 33082119121 at SHA 367ff05e1d696f1c48081a444a9666a92c949b14 fails only because live npm audit reports prisma.range >=6.13.0-dev.1 while scripts/tooling-audit-policy.mjs and scripts/fixtures/tooling-audit/accepted.json still expect 6.13.0-dev.1 - 7.10.0-integration-fix-prisma-publish-token.1. The accepted three-high advisory set, package paths, severity, via/effects/nodes, fixAvailable, and deepmerge advisory semantics are unchanged. Update only those two expected range literals and prove the focused tests pass.",
+      "severity": "blocking"
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation"]
+  }
+}

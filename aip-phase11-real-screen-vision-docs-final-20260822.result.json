@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-docs-final-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-display-bound-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T14:59:36.925398+00:00",
+  "finished_at": "2026-08-22T15:00:37.291241+00:00",
+  "summary": "Corrected stale Phase 11 Known Limitations wording to document bounded Windows display enumeration and explicit Owner-confirmed GDI capture with transient non-persistent pixels, while retaining unavailable-model, packaged Windows, privacy/UX, cancellation-under-load, visual-quality, no-upload, no-continuous-capture, and release reservations. Commit: f2b2f84c53ae1ef43e0075dd67bb132fa0cbcdd6.",
+  "files_changed": [
+    "docs/KNOWN_LIMITATIONS.md"
+  ],
+  "commands_run": [
+    "git diff --check",
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib screen_vision::tests",
+    "pnpm --filter @aip/contracts typecheck",
+    "pnpm --filter @aip/contracts build",
+    "pnpm --filter @aip/contracts test",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop test",
+    "pnpm --filter @aip/desktop build",
+    "pnpm secrets:scan",
+    "git commit -m \"docs: reconcile phase 11 capture limitations\""
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib screen_vision::tests",
+      "status": "passed",
+      "details": "Focused screen-vision tests passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "not_run",
+      "details": "Host validation output was interrupted by the process-spawn restriction."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts build",
+      "status": "not_run",
+      "details": "Host validation output was interrupted by the process-spawn restriction."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test",
+      "status": "not_run",
+      "details": "Blocked by Vitest worker spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "not_run",
+      "details": "Host validation output was interrupted by the process-spawn restriction."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop test",
+      "status": "not_run",
+      "details": "Blocked by Vite/Vitest spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop build",
+      "status": "not_run",
+      "details": "Blocked by Vite spawn EPERM."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "not_run",
+      "details": "Blocked by secrets scanner spawnSync git EPERM."
+    }
+  ],
+  "remaining_issues": [
+    "Node-based validation and secrets scanning remain blocked by the host sandbox process-spawn EPERM policy.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T145937Z-aip-phase11-real-screen-vision-docs-final-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T145937Z-aip-phase11-real-screen-vision-docs-final-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T145937Z-aip-phase11-real-screen-vision-docs-final-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T145937Z-aip-phase11-real-screen-vision-docs-final-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029fc-06dc-7783-bec1-9dd704fe23e0",
+  "app_server_process_id": "11216",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T145937Z-aip-phase11-real-screen-vision-docs-final-20260822.md",
+  "task_sha256": "10e5d8ce869c29c351b94825c2241ff1e07875a8fa06da0921659197285e5a43",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

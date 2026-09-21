@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-desktop-delivery-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement the remaining P7 desktop-delivery slice on clean completion/desktop-delivery from the current HEAD. Audit the existing src-tauri/tauri.conf.json, scripts/prepare-worker-sidecar.mjs, package.json, and .github/workflows/package.yml first and reuse the current Tauri configuration. Deliver a bounded, real packaging path: NSIS .exe mandatory; MSI attempted when technically viable without making NSIS fail; Linux deb and AppImage targets; deterministic target-specific worker sidecar preparation; Start Menu/uninstall metadata through Tauri bundle config; upgrade-safe app data location/persistence; exact artifact naming and SHA256 checksum manifest. Add a repository-native clean-install smoke/verification script and wire it into the package workflow so Windows validates the produced NSIS/MSI artifacts and launches the installed executable when the runner permits, while Linux validates deb/AppImage outputs and performs a non-interactive package/app smoke when the runner permits. Keep workflow dispatch exact-ref behavior, unsigned artifacts, artifact upload, and no GitHub Release. Make workflow failures honest when platform tooling is unavailable; MSI may remain continue-on-error only with explicit evidence. Do not add telemetry, cloud calls, secrets, releases, tags, deploys, or page-transition motion. Add focused tests for sidecar/artifact/checksum helpers. Update ROADMAP.md honestly: P7 remains IN PROGRESS until real clean-install/start/restart/uninstall and Linux launch evidence is confirmed; do not call P7 DONE based only on configuration. Run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Commit one focused P7 implementation on completion/desktop-delivery and return exact native provenance.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "clean target completion/desktop-delivery; preserve P1-P6 commits; no reset/clean/discard",
+    "no merge/tag/release/deploy/public release; unsigned CI artifacts only",
+    "no secrets, telemetry, cloud calls, paid-provider calls, or page-transition motion"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/tauri.conf.json", "E:/Prompt Arena/scripts/prepare-worker-sidecar.mjs", "E:/Prompt Arena/package.json", "E:/Prompt Arena/.github/workflows/package.yml", "E:/Prompt Arena/ROADMAP.md"],
+  "max_correction_cycles": 1
+}

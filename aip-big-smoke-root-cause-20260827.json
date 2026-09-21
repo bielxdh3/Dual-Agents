@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-root-cause-20260827",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Perform the mandatory root-cause phase for the AIP installed-Windows Big Smoke UI regression mission. Do not modify files, create branches, commit, push, open PRs, merge, or build installers in this phase. Inspect the current repository implementation at branch feat/phase-9-supervised-tools, HEAD 9a7734460dded5469acd5e746f3118c9e3d28054, while preserving the expected main baseline d4dd31faad762102d15eea3763116b5b204c67b1 and all Phase 7-13 behavior. Investigate all five authoritative Owner-observed bugs: (1) agent sprite transparency/alpha regression, (2) giant visible square/bounding box around the agent, (3) Pencil tool corrupts the character preview or shared state, (4) Selection anchor is pinned to a fixed corner instead of pointer-down, and (5) conversation list/creation controls render as raw HTML. Inspect the relevant pixel editor/document and layer/composite/ImageData flow, pointer and selection handlers, overlay/sprite rendering, canvas/CSS/Tauri transparency/container rules, App.tsx and related components, conversation markup, stylesheet imports/selectors, and packaging/build stylesheet paths. For each bug, report exact affected code path and file/line evidence, likely root cause, smallest correct fix, regression-test strategy, and risk to existing behavior. Identify the focused tests and broader validations that should run after implementation. Return a structured executor report with summary, files_changed (must be empty), commands_run, tests, root_causes, acceptance_criteria, and remaining_issues. This is evidence gathering only; do not implement fixes.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md and the required AIP skills already supplied by the orchestrator.",
+    "Ponytail full: understand the end-to-end flow, reuse existing primitives, and propose the smallest root-cause fix.",
+    "No file edits or generated artifacts in E:/AIP during this phase.",
+    "Do not use native subagents or a fallback backend; this run must use the configured Biel4 App Server/headless executor.",
+    "Do not expose secrets, credentials, local databases, private media, or authentication files.",
+    "Do not redesign the interface, change cognitive semantics, or touch unrelated Phase 7-13 behavior."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/.agents/skills/aip-implementation/SKILL.md",
+    "E:/AIP/.agents/skills/aip-phase-review/SKILL.md",
+    "E:/AIP/.agents/skills/aip-security-review/SKILL.md",
+    "E:/AIP/.agents/skills/aip-publication-check/SKILL.md",
+    "C:/Users/bielx/.codex/attachments/6cd6b1a1-7f60-490d-8246-36367010c788/pasted-text-1.txt"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

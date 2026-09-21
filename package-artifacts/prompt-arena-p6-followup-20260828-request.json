@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-followup-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Continue P6 from the current clean completion/product-polish-followup HEAD, preserving all existing P1-P5 and P7 work. Implement only the remaining user-facing P6 gaps explicitly recorded in ROADMAP.md: (1) safe local retention/cleanup controls for app-owned persisted records with preview, bounded confirmation, immutable-source protections, and honest empty/error/loading states; (2) richer appearance settings import/export using a bounded, versioned, sanitized JSON preference payload, local download/import controls, validation/normalization, and reset behavior. Keep all existing Dashboard, Runs/history/results, diagnostics, accessibility semantics, exports, reduced-motion preference, and BYOK boundaries intact. Do not implement page-transition motion, telemetry, cloud sync, hidden network calls, paid-provider calls, P7 packaging, or any direct shell/native fallback. Add focused TypeScript/Rust tests for retention safety, bounded payload validation, import/export normalization, and no-secret/no-record-loss behavior. Run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Commit one focused P6 follow-up only if all checks pass. Keep P6 IN PROGRESS in ROADMAP.md because native Tauri/WebView acceptance, security review, and publication gates remain pending. No push, merge, tag, release, deploy, or public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/product-polish-followup; preserve existing commits and clean state",
+    "no page-transition motion, secrets, telemetry, cloud calls, paid-provider calls, P7 work, merge/tag/release/deploy/public release",
+    "do not weaken immutable storage, Docker boundary, OS credential storage, or browser-preview restrictions"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "E:/Prompt Arena/ROADMAP.md",
+    "E:/Prompt Arena/src/App.tsx",
+    "E:/Prompt Arena/src/appearance.ts",
+    "E:/Prompt Arena/src/bridge.ts",
+    "E:/Prompt Arena/src-tauri/src/commands.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/src-tauri/src/lib.rs"
+  ],
+  "review_findings": [
+    {
+      "severity": "important",
+      "title": "Finish recorded P6 retention and appearance import/export gaps",
+      "details": "The product-polish phase already has dashboard, diagnostics, history, exports, and accessibility foundations; ROADMAP still names retention/cleanup and richer appearance import/export as missing. Implement those bounded user-facing paths without changing existing trust boundaries, then validate and commit only the focused follow-up."
+    }
+  ],
+  "max_correction_cycles": 1
+}

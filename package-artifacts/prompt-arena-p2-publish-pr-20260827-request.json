@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/verification-packs",
+  "base_branch": "completion/core-arena",
+  "title": "feat: complete verification packs and persisted arena evidence",
+  "body": "## P2 — Verification, packs, Docker boundary, and statistics\n\nStacked on PR #17 (`completion/core-arena`).\n\n- expands bounded objective verifiers and immutable policy evidence\n- adds deterministic seeded official-pack materialization with persistence\n- marks programming cases Docker-required with no host fallback\n- persists Arena repetition summaries, uncertainty, tie margins, and sample evidence\n- adds usable pack materialization, Arena summary history, and Docker-blocked UI states\n- validates with Vitest, TypeScript build, boundary fixtures, Rust fmt/check/tests\n\nP2 remains IN PROGRESS pending native Tauri/WebView QA and remote CI.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

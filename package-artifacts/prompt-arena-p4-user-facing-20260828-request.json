@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-user-facing-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Complete P4 Advanced Arena user-facing functionality on top of the existing algorithm slice. Implement a usable desktop UI integrated into the existing Arena view (or a clearly reachable Advanced Arena surface) for rankings by category/metric, regression comparison workflows, Tournament Mode with 1v1, blind ranking and round-robin/single-elimination scheduling, optional offline AI-judge score entry with explicit provenance/network-off boundary, calibration and disagreement handling. Reuse existing immutable Arena summaries/evidence and bridge contracts where possible; persist user-created advanced results only through existing app-owned durable storage or add a bounded migration/command if needed. No network calls, no secrets, no page-transition motion, no scaffold/foundation copy. Preserve existing Core Arena behavior and accessibility. Add focused tests for all new interaction/validation paths and update any existing tests as needed.",
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "constraints": [
+    "All implementation is performed in this BL4 app_server session using account biel4 and role Executor/Reviewer.",
+    "The Advanced Arena surface is reachable from normal navigation and is usable in the real desktop UI, with loading/empty/error/success states and keyboard labels.",
+    "Rankings expose quality/latency/throughput/human categories, explicit metric direction and insufficient-data/tie handling.",
+    "Regression workflow compares baseline and candidate with improved/regressed/tie/insufficient-data outcomes and sample counts.",
+    "Tournament scheduler exposes 1v1, blind ranking, round-robin and single-elimination choices, bounded competitor count/matches, byes and a transparent schedule.",
+    "AI judge is optional, accepts bounded offline/manual scores only, labels source and explicitly states no network was used; invalid/disagreement cases are visible.",
+    "Calibration displays agreement rate, MAE, bias and disagreement samples with insufficient-data handling.",
+    "Existing npm typecheck/test/build and Rust fmt/check/test pass; add focused tests for the P4 surface/helpers.",
+    "Commit only this P4 user-facing slice with a descriptive message; do not alter prior commits or publish anything."
+  ],
+  "context_files": ["E:/Prompt Arena/src/advanced-arena.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs"],
+  "review_findings": [{"severity": "blocking", "title": "P4 user-facing Advanced Arena remains incomplete", "details": "Implement the requested end-to-end UI and durable integration without broadening into P5/P6/P7."}],
+  "max_correction_cycles": 1
+}

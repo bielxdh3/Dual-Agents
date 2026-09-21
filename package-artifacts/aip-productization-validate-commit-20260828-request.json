@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-validate-commit-20260828",
+  "action": "implement",
+  "repository": "E:\\AIP",
+  "task": "Você é o Biel4 Executor. Trabalhe diretamente no checkout E:\\AIP, branch fix/productize-local-capabilities, preservando todo o diff existente desta missão. Faça uma validação focada e correção mínima do lote atual de productização local: (1) leia C:\\CodexGlobal\\AGENTS.md, E:\\AIP\\AGENTS.md, C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\AGENTS.md e as skills aip-implementation, aip-phase-review, aip-security-review, aip-publication-check e ponytail antes de agir; (2) inspecione apenas o diff atual em App.tsx/App.css, contracts e Rust; (3) corrija erros de compilação/tipagem, chamadas Tauri inexistentes, estados impossíveis ou cópia enganosa, mantendo limites safe-mode/temporary-chat; (4) garanta que Recursos locais seja alcançável na navegação e que os seis painéis tenham estados honestos, sem afirmar provider real quando só fixture/env existe; (5) execute pnpm --filter @aip/desktop typecheck, pnpm --filter @aip/contracts test e cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check; se barato, execute cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml; (6) não redesenhe nem implemente os lotes restantes, não faça push/PR/merge/package e não use fallback; (7) faça um commit local único somente se as correções estiverem coerentes, com mensagem fix: validate local capability surface. Relate comandos, testes e SHA.",
+  "constraints": [
+    "Use Biel4 App Server/headless Code mode with provenanced executor metadata; fail closed if provenance is unavailable.",
+    "Do not create a native subagent, TUI fallback, worktree, branch, push, PR, merge, tag, release, or package.",
+    "Preserve unrelated user WIP and do not reset or discard the existing diff.",
+    "Use apply_patch for edits and keep changes minimal and repo-native.",
+    "No arbitrary shell/network/credential capability may be introduced."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\.codex\\attachments\\247a3d80-bcc3-4e72-a5e0-c8799a7b8958\\pasted-text-1.txt"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

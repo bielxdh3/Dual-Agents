@@ -1,0 +1,12 @@
+{
+  "operation": "create_branch",
+  "mission_id": "aip-phase13-branch-create-20260822",
+  "authorization_reference": "aip-phase13-branch-create-20260822",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "repository_full_name": "bielxdh3/AIP",
+  "branch": "feat/phase-13-gateway",
+  "expected_remote_state": "absent",
+  "expected_base_sha": "cbbe814283cfe91034ba8315e0d6f32955d3f8bc",
+  "new_sha": "f39f6d2b1cfdddfcc7e839bf4d22d2cbe0fa8020",
+  "authorization": {"allowed_actions": ["create_branch"]}
+}

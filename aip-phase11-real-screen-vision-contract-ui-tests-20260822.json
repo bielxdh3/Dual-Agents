@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-contract-ui-tests-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-testfix-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Fix the two host-test regressions on the current Phase 11 branch without weakening the real-vs-fixture contract. Host evidence: @aip/contracts tests fail because tests/contracts.test.ts still expects parseScreenVisionFixture({...metadataOnly:false}) to be null, although Phase 11 now intentionally accepts bounded real display records; update the test to accept a valid real display and continue rejecting pixel/screenshot/durable fields. apps/desktop src/screen-vision.test.tsx fails because it still expects the old Portuguese metadata-only heading/text; update assertions to the shipped truthful on-demand display/capture wording while preserving Owner-scoped command and safety assertions. Keep production code unchanged unless a parser/test mismatch requires a minimal fix. Run cargo fmt/check/clippy/full/focused, contracts typecheck/build/tests, desktop typecheck/tests/build, secrets scan and diff check; use host reruns and report any blocked command. Commit the test correction with a descriptive message. Do not push or publish.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits outside the Executor.",
+    "Real display records (synthetic:false, metadataOnly:false) must remain accepted; do not reintroduce metadata-only-only validation.",
+    "No change to privacy, Owner confirmation, safe-mode, idempotency, capture bounds, adapter degradation, or lifecycle semantics.",
+    "Do not modify Phase 12 Android or Phase 13 gateway behavior; do not push, merge, tag, release or deploy."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/tests/contracts.test.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src/screen-vision.test.tsx",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/screen_vision.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Contracts test rejects the shipped real-display shape",
+      "severity": "blocking",
+      "details": "pnpm --filter @aip/contracts test fails at tests/contracts.test.ts:906 because the assertion still expects metadataOnly:false to be invalid. The parser was intentionally widened for real Windows displays; update the test to validate real records and reject only unsafe extra payload fields."
+    },
+    {
+      "title": "Desktop screen-vision test expects removed copy",
+      "severity": "blocking",
+      "details": "pnpm --filter @aip/desktop test has 48 passed and one failure because src/screen-vision.test.tsx expects 'Visão de tela (fixture)' and the old no-capture disclaimer. The UI now truthfully says on-demand displays/capture; update the assertions."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

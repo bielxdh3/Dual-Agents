@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-human-qa-0.1.2-implement",
+  "action": "implement",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "Read and execute the complete mission objective at C:\\Users\\bielx\\.codex\\attachments\\472d0c0f-7aee-4933-935c-26b69ea8f998\\goal-objective.md. You are BL4 / biel4 Executor only; implement the scoped Prompt Arena human-QA correction pass in the current repository, starting from HEAD bbd893973e362eaf1f48a224beafa273b0eb1e36c on branch completion/windows-qa-live-telemetry-i18n. Load and follow these exact skills before editing: C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md, and C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.53\\skills\\design-qa\\SKILL.md; use Ponytail full. Apply only the requested corrections and directly related consistency work. Do not use Computer Use, browser automation, or claim visual/human acceptance. Do not push, tag, create a release, deploy, merge, rebase, force-push, or alter repository settings in this request. Do not modify the protected root worktree E:\\Prompt Arena. Preserve existing persistence, identifiers, blind-evaluation integrity, Arena/model semantics, and the required Settings status block. Implement the smallest safe diff, keep all user-facing controls styled and accessible (including custom keyboard-operable listboxes where native select popup styling is insufficient), add tests for non-trivial behavior, run focused frontend/typecheck/boundary/Rust checks and a real MSI build if WiX is available. Increment synchronized app metadata from 0.1.1 to 0.1.2 only if the implementation/package flow can be validated; never substitute NSIS for MSI. Commit the reviewed implementation changes locally with a clear message, but leave remote publication for the architect after independent review. Return the required structured JSON report.",
+  "constraints": [
+    "BL4 executor only; no architect/reviewer simulation and no direct edits by BL3.",
+    "Workspace-write in the target worktree only; preserve unrelated work and keep git status auditable.",
+    "No raw/default interactive control remains in user-facing paths; preserve keyboard, ARIA, focus-visible, disabled, loading, and reduced-motion behavior.",
+    "Remove only the redundant Settings copy and complete preview block; keep the visible Settings status block and its meaning.",
+    "Use centralized design tokens/resources for contrast, motion, and i18n; use Critérios de avaliação in pt-BR while preserving stored technical IDs.",
+    "Do not perform subjective visual acceptance; stop/report remaining human Windows QA as a limitation."
+  ],
+  "context_files": [
+    "C:/Users/bielx/.codex/attachments/472d0c0f-7aee-4933-935c-26b69ea8f998/goal-objective.md",
+    "E:/Prompt Arena-live-telemetry-i18n/src/App.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/styles.css",
+    "E:/Prompt Arena-live-telemetry-i18n/src/appearance.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/i18n.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/benchmark-authoring.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/version-contract.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/build-windows-msi.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/release-windows.mjs"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

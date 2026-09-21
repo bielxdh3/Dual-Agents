@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-motion-ui-rebuild-20260902",
+  "action": "implement",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "BL4 / biel4 Executor: implement only the four focused Prompt Arena motion UI corrections from the supplied mission. Start from branch completion/windows-qa-live-telemetry-i18n at baseline HEAD 6970084aefeb2b5c83dfa89685de662ed8c5d27d. First read the complete mission text at C:\\Users\\bielx\\.codex\\attachments\\fe79f5ac-befe-4291-b733-57af516e2e75\\pasted-text.txt, E:\\Prompt Arena-live-telemetry-i18n\\AGENTS.md if present, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full, use full mode), and C:\\CodexGlobal\\skills\\ui-ux-pro-max\\SKILL.md (full); use the existing Prompt Arena visual language and the UI skill's reduced-motion/accessibility guidance. Fix only: (1) remove the unwanted duplicate/extra horizontal bar or range control in the Settings motion section, leaving exactly one visible and focusable motion-duration slider and no hidden range input/spacer; (2) ensure DOM/visual order is motion scale title/value, slider, explanatory text, then Reduce motion control and its description, with clean keyboard order and responsive spacing; (3) remap the centralized finite/discretionary motion-token system so the shipped 100% default is exactly 5x the currently shipped 100% baseline, with 0% effectively eliminating finite discretionary motion, 200% approximately 2x the new baseline, persistence intact, and Reduce Motion / prefers-reduced-motion absolute precedence. Do not hand-edit unrelated durations; migrate only real outliers into shared tokens; (4) delete the current PA orbit animation implementation and rebuild it from zero using CSS/SVG/ring-only treatment: static central PA, visibly rotating rings themselves, no dots/balls/particles/beads/detached markers/fake indicators/full-logo rotation, asymmetric/non-uniform ring treatment and/or differing orientations/speeds/phases so rotation is unmistakable, smooth, stable, GPU-friendly, no React state per frame or JS loop, and stopped/effectively static under Reduce Motion. Update only directly relevant tests/contracts. Preserve Arena/model execution, benchmarks, persistence, packaging/release tooling, dropdowns, localization architecture, and unrelated UI. Do not add dependencies. Inspect every existing motion consumer and the current orbit implementation before editing. Commit the intended local changes with a clear message after validation; do not merge, tag, release, deploy, or force-push. Normal push to origin/completion/windows-qa-live-telemetry-i18n is authorized only after Architect review, not by this request unless the launcher workflow explicitly performs it.",
+  "constraints": [
+    "BL4 executor only; use the configured authenticated app_server executor biel4 and do not substitute native subagents, another backend, or direct implementation.",
+    "Use the target worktree E:/Prompt Arena-live-telemetry-i18n only; do not edit E:/Prompt Arena or the Dual Codex control plane beyond request/result artifacts.",
+    "Do not expand scope into Arena logic, model execution, benchmarks, persistence semantics, packaging behavior, release tooling, dropdowns, localization architecture, or unrelated UI.",
+    "No invisible focusable range controls, empty spacers, duplicate motion sliders, particles, dots, balls, beads, detached markers, fake orbital indicators, or full-logo rotation.",
+    "Keep keyboard accessibility, checkbox semantics, responsive behavior, no layout shift, no React state per animation frame, and reduced-motion precedence.",
+    "Run focused UI tests/contracts, npm test, typecheck, boundaries, frontend build, git diff --check, and version consistency if applicable. Run Rust checks only if Rust files change. Do not claim rendered/native success from static checks.",
+    "Return structured evidence with summary, files_changed, commands_run, tests, remaining_issues, git status, diff path, executor identity/backend/sandbox, and commit SHA. Report rendered/native human QA as pending when it cannot be proven."
+  ],
+  "context_files": [
+    "C:/Users/bielx/.codex/attachments/fe79f5ac-befe-4291-b733-57af516e2e75/pasted-text.txt",
+    "E:/Prompt Arena-live-telemetry-i18n/src/App.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/styles.css",
+    "E:/Prompt Arena-live-telemetry-i18n/src/appearance.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/appearance.test.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/ui-contracts.test.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/package.json"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-correction-20260829",
+  "parent_request_id": "prompt-arena-i18n-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Complete and correct the PT-BR + English i18n implementation in the current isolated product worktree. Preserve the already implemented Windows/UI remediation and live Arena telemetry. Do not modify E:\\Prompt Arena or E:\\Prompt Arena-pr28. Local mutation only; no commits, pushes, PRs, merges, tags, releases, deploys, or settings changes. Run the exact validation commands below and report them honestly with authoritative BL4 provenance.",
+  "review_findings": [
+    {"title":"Incomplete UI translation coverage","details":"The first i18n pass timed out and only partially translated the product. A read-only scan still shows extensive user-facing English literals in App.tsx and advanced-arena-view.tsx, including Advanced Arena headings/buttons/forms/tables, Models, Runs, blind review, Settings, BYOK/provider controls, diagnostics, validation/errors, empty states, and telemetry/result surfaces. Section 12 requires complete user-facing coverage in pt-BR and en, so finish all visible text and aria labels/tooltips/options/actions/statuses/errors/empty states."},
+    {"title":"Dictionary and formatting coverage","details":"The untracked src/i18n.ts provides a typed dictionary and persistence, but coverage is incomplete. Keep safe English fallback, exact locale set en and pt-BR, persisted localStorage choice, locale-aware number/percent/date/duration/currency formatting, and never translate identifiers, paths, protocol names, code, or user content."},
+    {"title":"Locale switching reactivity","details":"Ensure every component that renders translated text reacts to locale switching without reload, including AdvancedArenaView and nested surfaces. Do not rely on a stale module-global locale as the only reactivity mechanism; use the provider/hook or otherwise prove rerender behavior."},
+    {"title":"i18n tests","details":"Add or extend focused tests for locale normalization/persistence, switching and fallback, formatting, complete key coverage/no raw translation keys on important surfaces, and telemetry labels in both languages. Tests must remain repo-native with no dependency."},
+    {"title":"Security boundaries","details":"Preserve blind-evaluation anonymity before reveal, no-secret/BYOK boundaries, immutable evidence, cancellation/error behavior, and technical IDs/user-provided content exactly as-is. Do not interpolate untrusted HTML."}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md"
+  ],
+  "constraints": [
+    "Use the canonical Dual Codex executor only: biel4 App Server/headless, workspace-write, Windows elevated sandbox readiness ready, approval never.",
+    "No giant locale ternary chains; use maintainable centralized resources and safe English fallback.",
+    "Do not translate model/provider/runtime/benchmark/profile IDs, file paths, protocol names, code, or user-provided content.",
+    "No raw translation keys in shipped UI when a key is missing.",
+    "Run npm run typecheck; npm test -- --runInBand if supported or npm test; npm run build; npm run check:boundaries; git diff --check; and any focused i18n tests. Report exact outcomes and remaining limitations."
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

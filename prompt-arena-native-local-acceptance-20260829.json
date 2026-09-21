@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-acceptance-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-native-local-20260829-pr",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are the same BL4/biel4 implementation Executor through the configured App Server/headless transport. Work only in the clean isolated clone E:\\Prompt Arena-native-local-20260829-pr at exact HEAD f3048a61f45cdb6b29f362444f3d32646edf4943 on branch validation/native-tauri-acceptance. This is Mission 1 local Windows native acceptance, not a product-code change. Install repository dependencies with npm ci --no-audit --no-fund, install tauri-driver with cargo install tauri-driver --locked, install the matching WebView2 driver tool from https://github.com/chippers/msedgedriver-tool with cargo install --git https://github.com/chippers/msedgedriver-tool, run msedgedriver-tool to obtain the driver matching the installed Edge/WebView2 runtime, and use the resulting cargo-bin tools. Capture preflight versions and paths with where.exe tauri-driver, tauri-driver --version, where.exe msedgedriver, msedgedriver --version, Edge/WebView2 versions, and RemoteDebuggingAllowed policy values without changing registry policy. Build the real Windows Tauri app using npm run tauri:build -- --no-bundle, stage the worker sidecar exactly as .github/workflows/native-ui.yml does (copy the Windows prompt-arena-worker-*.exe to src-tauri/target/release/prompt-arena-worker.exe if needed), then execute node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe. Preserve and verify the complete real chain: Tauri WebView UI, bridge/invoke, Rust command, app-owned worker sidecar, persistence, close/reopen, and persisted run after reopen. Capture exact stdout/stderr, marker NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED, persisted run_id, absolute exe and worker paths, exact SHA, OS/Edge/WebView2/driver/tauri-driver/node/rust versions, and the BL4 App Server thread/turn metadata in the result. If RemoteDebuggingAllowed is explicitly disabled, fail closed and classify the runtime blocker without changing policy. If the local smoke passes, explicitly classify hosted Windows DevToolsActivePort failures as CI_HOSTED_WINDOWS_WEBDRIVER_POLICY_LIMITATION and do not modify source to chase hosted policy. If it fails for a genuine harness defect, apply only the smallest directly justified harness/workflow fix in scripts/native-ui-smoke.mjs or .github/workflows/native-ui.yml, then rerun the real smoke; otherwise leave source unchanged and report the exact blocker. Do not use browser-only tests, mocks, fallback drivers, TUI/native_tui, other executors, native subagents, or policy workarounds. Do not push, merge, tag, release, deploy, or alter the original E:\\Prompt Arena WIP. Commit is not required for a validation-only result; if and only if a directly necessary source fix is proven, make one normal commit and report it. Run focused validation and git status/diff to prove no unrelated source changes. Return a detailed evidence report with status, commands, versions, paths, marker/run id, limitations, and all provenance fields.",
+  "constraints": [
+    "BL4/biel4 App Server/headless is the only allowed implementation Executor; fail closed if provenance is not proven.",
+    "Use workspace-write with windows.sandbox=elevated, readiness=ready, approval=never.",
+    "Scope is the isolated clone only; do not touch E:\\Prompt Arena, do not weaken assertions, and do not change registry policy.",
+    "No merge, tag, release, deploy, force-push, browser-only fallback, TUI/native_tui, or native subagents."
+  ],
+  "context_files": [
+    ".github/workflows/native-ui.yml",
+    "scripts/native-ui-smoke.mjs",
+    "src-tauri/tauri.conf.json",
+    "src-tauri/src/lib.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation",
+      "local_commit"
+    ]
+  }
+}

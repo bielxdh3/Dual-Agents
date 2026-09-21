@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-telemetry-final-correction-20260829",
+  "action": "correct",
+  "parent_request_id": "prompt-arena-live-telemetry-correction-20260829",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Apply only the corrections below to the current isolated worktree, then run the exact focused validations listed. Do not implement i18n, do not commit, and do not perform remote operations. Return a completed structured report only if the tests actually pass, with authoritative App Server provenance metadata including account biel4, executor role, task transport app_server, workspace-write, Windows elevated/ready, approval never, and thread/turn/process IDs.",
+  "constraints": [
+    "Do not touch E:\\Prompt Arena or E:\\Prompt Arena-pr28.",
+    "Local mutation only; no commit, push, PR, merge, tag, release, deploy, or repository settings.",
+    "Preserve sequential fairness, immutable evidence, cancellation, process isolation, blind integrity, and no-secret boundaries.",
+    "Do not use coordinate automation or revisit exhausted CDP/UIA paths."
+  ],
+  "review_findings": [
+    {
+      "title": "Fix invalid repetitions in telemetry test",
+      "details": "The executor's own stderr recorded npm test failure: the new progress/ETA test uses repetitions: 2, but executeArena intentionally accepts only 1, 3, 5, or 10. Change that test to a valid repetition count while retaining meaningful sample-counter and ETA assertions.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Do not misreport validation",
+      "details": "Run npm run typecheck, npm test -- --run src/arena-runner.test.ts, npm run build, npm test, npm run check:boundaries, a redirected-target cargo test that avoids the known E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target lock permission issue, and git diff --check. Report any default cargo permission failure honestly; do not list failed commands as passed.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Preserve blind post-execution anonymity",
+      "details": "Keep the current request.blind guard in ArenaResultsSurface so blind execution remains hidden until the immutable reveal lock succeeds. Recheck that hidden state does not render identity-sensitive summary metrics or export actions prematurely.",
+      "severity": "important"
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\storage.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

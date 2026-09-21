@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p0-fixes-correction-20260829",
+  "parent_request_id": "prompt-arena-p0-fixes-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T00:56:14.955244+00:00",
+  "finished_at": "2026-08-30T00:59:40.483282+00:00",
+  "summary": "Reviewed the six-file P0 diff; no additional source changes were necessary. Requested commit was blocked because Git metadata/object storage is outside the writable sandbox. Commit SHA unavailable. Provenance IDs were not exposed.",
+  "files_changed": [
+    "src-tauri/src/commands.rs",
+    "src/App.tsx",
+    "src/arena-runner.test.ts",
+    "src/results-ui.test.ts",
+    "src/results-ui.ts",
+    "src/styles.css"
+  ],
+  "commands_run": [
+    "npm test -- --run src/results-ui.test.ts src/arena-runner.test.ts",
+    "npm run typecheck",
+    "cargo test --manifest-path src-tauri/Cargo.toml --lib commands::tests",
+    "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
+    "git diff --check",
+    "git add -- src-tauri/src/commands.rs src/App.tsx src/arena-runner.test.ts src/results-ui.test.ts src/results-ui.ts src/styles.css"
+  ],
+  "tests": [
+    {
+      "command": "npm test -- --run src/results-ui.test.ts src/arena-runner.test.ts",
+      "status": "passed",
+      "details": "2 files, 16 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript compilation passed."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --lib commands::tests",
+      "status": "passed",
+      "details": "14 command tests passed."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
+      "status": "passed",
+      "details": "Formatting check passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only CRLF conversion warnings."
+    }
+  ],
+  "remaining_issues": [
+    "Commit creation blocked by permission denied for E:\\Prompt Arena\\.git\\worktrees\\...\\index.lock and E:\\Prompt Arena\\.git\\objects.",
+    "Ollama endpoint, browser/component harness, and installed Windows native UI remain external human-QA gates.",
+    "Product-design index/audit skill files were unavailable in configured skill roots.",
+    "Remote CI was not run or confirmed."
+  ],
+  "git_status": " M src-tauri/src/commands.rs\n M src/App.tsx\n M src/arena-runner.test.ts\n M src/results-ui.test.ts\n M src/results-ui.ts\n M src/styles.css\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T005615Z-prompt-arena-p0-fixes-correction-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T005615Z-prompt-arena-p0-fixes-correction-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T005615Z-prompt-arena-p0-fixes-correction-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T005615Z-prompt-arena-p0-fixes-correction-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0502a-c6be-72b2-9a3b-94161ff734b6",
+  "app_server_turn_id": "01a0502a-c778-70a2-b786-5e3c92978978",
+  "app_server_process_id": "14704",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T005615Z-prompt-arena-p0-fixes-correction-20260829.md",
+  "task_sha256": "9907fe0b87b8962170a11c11738588bae169976bdce8ff821527d4c600be0612",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

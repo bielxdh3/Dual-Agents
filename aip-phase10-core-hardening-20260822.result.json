@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase10-core-hardening-20260822",
+  "parent_request_id": "aip-phase10-core-correction-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T13:55:08.331399+00:00",
+  "finished_at": "2026-08-22T13:58:03.566108+00:00",
+  "summary": "Hardened host context and added focused deterministic package/execution tests. Committed as e6b3e16d453245ddff63988c7f96f53a4ef904ef.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/extensions.rs"
+  ],
+  "commands_run": [
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "cargo test --locked --lib extensions::tests",
+    "git diff --check",
+    "git commit -m \"fix: harden phase 10 extension runtime core\""
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "123 passed, 1 ignored."
+    },
+    {
+      "command": "cargo test --locked --lib extensions::tests",
+      "status": "passed",
+      "details": "6 passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    }
+  ],
+  "remaining_issues": [
+    "Cancellation/termination persistence and suspended/disabled/stale-revision paths are implemented but do not each have dedicated new focused assertions in this correction.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T135508Z-aip-phase10-core-hardening-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T135508Z-aip-phase10-core-hardening-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T135508Z-aip-phase10-core-hardening-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T135508Z-aip-phase10-core-hardening-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029c0-ff3a-79b1-9b63-3e5a6d04acee",
+  "app_server_process_id": "16052",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T135508Z-aip-phase10-core-hardening-20260822.md",
+  "task_sha256": "2deed414779ff2b4dccf2b2a7a897d3dc2c93d9c2c770919e252df587f3d9999",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

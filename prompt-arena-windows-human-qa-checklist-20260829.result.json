@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-human-qa-checklist-20260829",
+  "parent_request_id": "prompt-arena-windows-uia-discovery-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T15:18:43.936564+00:00",
+  "finished_at": "2026-08-29T15:24:20.808196+00:00",
+  "summary": "Added the requested documentation-only human QA handoff and matrix evidence. Seven sequential batches contain 24 checklist items, each with action, expected result, evidence, and PASS/FAIL or explicit blocker states. The matrix records WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE, PENDING_HUMAN_QA, the discovery artifact paths, no acceptance marker, and no product-failure claim; existing P1-P7 and installer statuses/security wording are unchanged. No commit or push was performed. Provenance: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4/biel4 Executor\",\"task_transport\":\"App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"turn_id\":\"not exposed by Executor transport\",\"workspace\":\"E:\\\\Prompt Arena-pr28-bl4\",\"workspace_write\":\"workspace-write\",\"windows.sandbox\":\"elevated (control-plane asserted)\",\"readiness\":\"ready (control-plane asserted)\",\"approval\":\"never\"}.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "Get-Content -LiteralPath C:\\CodexGlobal\\AGENTS.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\ponytail\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md -Raw",
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "Get-Content docs/DELIVERY_MATRIX.md, ROADMAP.md, docs/SECURITY.md, scripts/native-ui-smoke.mjs, and discovery artifacts",
+    "Apply documentation patch for docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "git diff --check",
+    "PowerShell bounded Markdown scope/status/checklist structure check",
+    "PowerShell final whitespace, checklist structure, matrix classification, and exact scope check",
+    "git diff -- docs/DELIVERY_MATRIX.md",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors in the tracked documentation diff."
+    },
+    {
+      "command": "Bounded Markdown scope/status/checklist structure check",
+      "status": "passed",
+      "details": "Only the two requested documentation files changed; matrix statuses are unchanged; seven batches and 24 checklist items contain the required fields; blocker classifications and no-marker wording are present."
+    },
+    {
+      "command": "Final whitespace and documentation structure check",
+      "status": "passed",
+      "details": "Both documentation files are whitespace-clean; PENDING_HUMAN_QA and WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE are present; no acceptance marker was added."
+    },
+    {
+      "command": "Initial inline checker attempts",
+      "status": "failed",
+      "details": "Early checker attempts failed due PowerShell checker syntax/line-wrap assumptions; no repository mutation resulted, and the corrected bounded checks passed."
+    },
+    {
+      "command": "Build and application tests",
+      "status": "not_run",
+      "details": "Not required for this documentation-only change."
+    }
+  ],
+  "remaining_issues": [
+    "The underlying Windows UIA boundary remains: only an unnamed Tao Thread Event Target Pane was exposed, so native Windows acceptance is still unproven.",
+    "The checklist requires a supported interactive Windows host and does not authorize WebDriver, CDP, browser flags, coordinate automation, or fallback harnesses.",
+    "The real turn_id is not exposed by the configured Executor transport.",
+    "Changes remain uncommitted and unpushed as required."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n?? docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T151844Z-prompt-arena-windows-human-qa-checklist-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T151844Z-prompt-arena-windows-human-qa-checklist-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T151844Z-prompt-arena-windows-human-qa-checklist-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T151844Z-prompt-arena-windows-human-qa-checklist-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04e1a-0b85-73e2-9b7b-957f12fc0859",
+  "app_server_process_id": "16216",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T151844Z-prompt-arena-windows-human-qa-checklist-20260829.md",
+  "task_sha256": "335373f9199f438771ad35b71f8998fe8e1953fbc032795ee02b9a93a08e5f0b",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

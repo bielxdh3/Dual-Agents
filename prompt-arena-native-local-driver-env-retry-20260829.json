@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-driver-env-retry-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-native-local-20260829-pr",
+  "task": "Required skills first: read and apply C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are BL4/biel4 through the configured App Server/headless transport, the only Executor. This is a final environment-only retry for local Windows native acceptance in E:\\Prompt Arena-native-local-20260829-pr at exact HEAD f3048a61f45cdb6b29f362444f3d32646edf4943. No source edits, commit, push, policy change, or original-WIP access are allowed. The app and worker are already built and verified. Because the prior attempt could not install tauri-driver due Schannel SEC_E_NO_CREDENTIALS and Cargo Git cache access denied, set a fresh CARGO_HOME and CARGO_TARGET_DIR inside the workspace clone (for example .native-driver-cargo and .native-driver-target), set CARGO_NET_GIT_FETCH_WITH_CLI=true, and retry cargo install tauri-driver --locked and cargo install --git https://github.com/chippers/msedgedriver-tool. This is only a normal writable-cache/environment setup, not a browser or policy workaround. If installation succeeds, run the matching driver tool, capture exact tauri-driver/msedgedriver paths and versions, and execute node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe. Verify the full real Tauri WebView -> bridge -> Rust -> app-owned sidecar -> persistence -> close/reopen chain and capture NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED with run_id. If installation still fails, capture the exact errors and stop without changing code. Capture branch/SHA, artifact paths and SHA-256, node/rust/Edge/WebView2 versions, RemoteDebuggingAllowed policy values (read-only), git status/diff, and all provenance fields including executor_account, executor_role, task_transport, app_server_thread_id/turn_id, windows.sandbox=elevated, readiness=ready, approval=never. Hosted DevToolsActivePort CI failures remain external and must not be chased in source.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; no native subagents, TUI/native_tui, browser-only fallback, mocks, or alternate drivers.",
+    "Only workspace-local cargo cache/environment mutation is permitted; preserve source semantics and the original WIP.",
+    "No merge, tag, release, deploy, force-push, commit, registry-policy change, or source edit."
+  ],
+  "context_files": [
+    ".github/workflows/native-ui.yml",
+    "scripts/native-ui-smoke.mjs",
+    "src-tauri/tauri.conf.json",
+    "src-tauri/src/lib.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation"
+    ]
+  }
+}

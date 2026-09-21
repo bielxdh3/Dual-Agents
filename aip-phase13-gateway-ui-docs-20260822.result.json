@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase13-gateway-ui-docs-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T17:57:41.258121+00:00",
+  "finished_at": "2026-08-22T18:01:06.215481+00:00",
+  "summary": "Added explicit Owner-confirmed Phase 13 gateway listener lifecycle UI and truthful functional-checkpoint documentation. Committed as a1bec8b and f39f6d2 with clean status.",
+  "files_changed": [
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/gateway.test.tsx",
+    "docs/PHASE_13_GATEWAY_SPEC.md",
+    "docs/ROADMAP.md",
+    "docs/KNOWN_LIMITATIONS.md",
+    "docs/CORRECTIVE_GAP_MATRIX.md",
+    "README.md"
+  ],
+  "commands_run": [
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop test",
+    "pnpm --filter @aip/desktop build",
+    "pnpm --filter @aip/contracts typecheck",
+    "pnpm --filter @aip/contracts test",
+    "pnpm secrets:scan",
+    "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check",
+    "cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "git diff --check",
+    "git commit -m \"feat: expose phase 13 gateway lifecycle\"",
+    "git commit -m \"docs: mark phase 13 gateway functional\"",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "TypeScript compilation passed as part of the desktop build command."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop test",
+      "status": "not_run",
+      "details": "Vitest could not start because the executor blocks child-process creation with Windows spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop build",
+      "status": "not_run",
+      "details": "TypeScript passed, but Vite config loading failed with Windows spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "passed",
+      "details": "Contracts TypeScript check passed before Vitest startup failure."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test",
+      "status": "not_run",
+      "details": "Vitest worker creation failed with Windows spawn EPERM."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "not_run",
+      "details": "The scanner could not spawn git; Windows spawn EPERM."
+    },
+    {
+      "command": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check",
+      "status": "passed",
+      "details": "Formatting check passed."
+    },
+    {
+      "command": "cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml",
+      "status": "passed",
+      "details": "Compilation passed."
+    },
+    {
+      "command": "cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Clippy passed with warnings denied."
+    },
+    {
+      "command": "cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml",
+      "status": "passed",
+      "details": "145 passed, 1 ignored, 0 failed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff errors; final status clean."
+    }
+  ],
+  "remaining_issues": [
+    "Frontend Vitest/build and secrets scan remain unvalidated due executor Windows spawn EPERM restrictions.",
+    "No hardware, private-LAN, Cloudflare, BielOS, public relay, or stable-release validation was claimed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T175741Z-aip-phase13-gateway-ui-docs-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T175741Z-aip-phase13-gateway-ui-docs-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T175741Z-aip-phase13-gateway-ui-docs-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T175741Z-aip-phase13-gateway-ui-docs-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a63-9209-7be2-8af4-08b9c61c3fa5",
+  "app_server_turn_id": "01a02a9f-0e67-71a2-b657-2f46ec5082d1",
+  "app_server_process_id": "17576",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T175741Z-aip-phase13-gateway-ui-docs-20260822.md",
+  "task_sha256": "51c1d3736d93b0154855fa84c062f094a0928591a991d3ace00b24f398b408bd",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

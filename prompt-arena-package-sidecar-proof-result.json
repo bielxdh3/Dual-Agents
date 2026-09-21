@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-sidecar-proof-20260829",
+  "parent_request_id": "prompt-arena-package-smoke-20260829",
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:50:49.338575+00:00",
+  "finished_at": "2026-08-29T19:53:32.291306+00:00",
+  "summary": "Sidecar inclusion proof passed at exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a before and after. The existing installer was silently installed, both executables were found and hashed, the worker was confirmed in the installed tree, silent uninstall succeeded, both executables disappeared, and the temporary directory was removed. Installer SHA-256 remained 755BC8C48FD8912A4C8E07BB4C8ED11938D5022F63DBE800800BE69CCD05991C. BL4 provenance: biel4 Executor, App Server/headless, workspace-write, Windows elevated, readiness ready, approval never. No human UI QA is claimed.",
+  "files_changed": [
+    "checksums-sha256.txt",
+    "package-verification.txt"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "Start-Process package-artifacts\\prompt-arena-0.1.0-windows-nsis.exe /S /D=<temporary-install-directory>",
+    "Get-ChildItem <temporary-install-directory> -Recurse -File",
+    "Get-FileHash <installed-prompt-arena.exe> -Algorithm SHA256",
+    "Get-FileHash <installed-prompt-arena-worker.exe> -Algorithm SHA256",
+    "Start-Process <installed-uninstall.exe> /S",
+    "[IO.Directory]::Delete(<temporary-proof-directory>, $true)",
+    "git rev-parse HEAD"
+  ],
+  "tests": [
+    {
+      "command": "Temporary NSIS sidecar inclusion proof",
+      "status": "passed",
+      "details": "Main: C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-sidecar-proof-20260829\\installed\\prompt-arena.exe, 12975104 bytes, SHA-256 EA599701D5AF9F8CFA86630AE521E68B2AEB4151CB41361FB66B708EBCE39C03. Worker: C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-sidecar-proof-20260829\\installed\\prompt-arena-worker.exe, 2570752 bytes, SHA-256 31FDC12F505EF00A15D56AF2C9CF3DFB5C3BA33428C8B3D4D29B784454A7D437. Worker present in installed tree. Silent uninstall exit code 0; main and worker disappeared; TEMP_CLEANED=True."
+    }
+  ],
+  "remaining_issues": [
+    "None for the requested automated sidecar proof. Native human UI QA remains separate and unperformed."
+  ],
+  "git_status": "?? checksums-sha256.txt\n?? package-verification.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T195049Z-prompt-arena-package-sidecar-proof-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T195049Z-prompt-arena-package-sidecar-proof-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T195049Z-prompt-arena-package-sidecar-proof-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T195049Z-prompt-arena-package-sidecar-proof-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ef8-9d5b-7451-8733-b9d0ad9288e4",
+  "app_server_turn_id": "01a04f13-2630-7b70-9510-bbdb9ffc054a",
+  "app_server_process_id": "11560",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T195049Z-prompt-arena-package-sidecar-proof-20260829.md",
+  "task_sha256": "9ebeaceaa304c90931e074be2b72d4ac18adafb7c038ca3bd99361a24a17f800",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

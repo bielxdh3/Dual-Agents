@@ -1,0 +1,61 @@
+{
+  "verdict": "findings",
+  "blocking_findings": [
+    {
+      "severity": "High",
+      "finding": "Local compensation does not verify file identity before reversing a move. It only checks bounded paths and renames the current destination back to the original path. A substituted or attacker-replaced destination could therefore be moved, contradicting the documented 'still-matching' rollback guarantee.",
+      "evidence": "apps/desktop/src-tauri/src/tools.rs:1008-1012"
+    }
+  ],
+  "important_findings": [
+    {
+      "severity": "Medium",
+      "finding": "Tool contract parsers accept unbounded strings for action inputs, affected resources, summaries, IDs, and audit fields. Rust performs authoritative validation, but the TypeScript boundary is weaker than the documented bounded contract.",
+      "evidence": "packages/contracts/src/index.ts:2215-2230, 2610-2865"
+    },
+    {
+      "severity": "Low",
+      "finding": "PHASE_9_TOOLS_SPEC.md still states that migration 0016 adds the catalog/session/action tables, while Phase 9 workspace-root compatibility is implemented through migration 0023. This is historical wording but should be clarified.",
+      "evidence": "docs/PHASE_9_TOOLS_SPEC.md:78-83; apps/desktop/src-tauri/migrations/0023_phase9_workspace_roots.sql"
+    }
+  ],
+  "evidence": [
+    "Owner-scoped opaque workspace roots are persisted in SQLite and exposed without raw paths.",
+    "Root validation rejects drive roots, configured broad/system roots, symlinks, Windows reparse points, and canonical containment escapes.",
+    "Local actions use relative paths only; preview and execution revalidate root and child paths.",
+    "Moves use rename only, reject existing destinations, do not delete or overwrite, and record failed/partial outcomes.",
+    "Multi-move execution attempts reverse-order rollback after failure.",
+    "Migration 0023 rebuilds affected tables while preserving populated v22 data; reopen and foreign-key compatibility tests are present.",
+    "Rust remains authoritative for ownership, safe mode, temporary-chat blocking, permissions, approval, confirmation, execution, persistence, and audit.",
+    "Fixture adapters remain distinguishable from local filesystem adapters; calendar and messaging remain mocks.",
+    "No Phase 10+ execution, network listener, shell command, upload, telemetry, watcher, provider credential, or raw-content persistence was found in the reviewed Phase 9 scope.",
+    "Documentation explicitly keeps packaged Windows/manual UX pending and does not claim stable release."
+  ],
+  "validation_run": {
+    "git_diff_check": "passed",
+    "secrets_scan": "not completed: pnpm secrets:scan failed because child-process git execution returned EPERM in the restricted environment",
+    "tests": "not run",
+    "remote_ci": "Remote CI not confirmed."
+  },
+  "remaining_human_checks": [
+    "Packaged Windows validation and Owner confirmation UX remain pending.",
+    "Live provider behavior is intentionally out of scope and remains unvalidated.",
+    "After fixing rollback identity verification, rerun the focused Rust and contract gates."
+  ],
+  "provenance": {
+    "repository": "E:\\AIP",
+    "base": "06414e05765fe96f3e6fd736775c70e21187d5bb",
+    "head": "23cbdeb77018ff1e8e5c28320992c7d2abe6c2ab",
+    "commits_reviewed": [
+      "f5ec675",
+      "7324801",
+      "23cbdeb"
+    ],
+    "mode": "read-only",
+    "skills": [
+      "aip-phase-review",
+      "aip-security-review",
+      "aip-publication-check"
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-core-continuity-model-state-20260830",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:58:30.808782+00:00",
+  "finished_at": "2026-08-30T02:59:40.113478+00:00",
+  "summary": "Updated only the two evidence documents with live Ollama worker-runtime evidence and corrected Ollama/Docker gate wording. The host unexpectedly committed the changes as 3116640308eb51c1fd30d686d207820dfb607240 despite no commit command being issued.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "Read AGENTS.md and required skill files",
+    "Verified initial HEAD, branch, and clean status",
+    "Inspected both evidence documents",
+    "Applied documentation-only patch",
+    "git diff --check",
+    "Verified final commit scope and clean status"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "npm/cargo test suites",
+      "status": "not_run",
+      "details": "Not run for this documentation-only update."
+    }
+  ],
+  "remaining_issues": [
+    "The host-created commit 3116640308eb51c1fd30d686d207820dfb607240 conflicts with the requested uncommitted state; no history rewrite was performed.",
+    "Full Tauri discovery/Arena behavior, visual/accessibility/native-control/reduced-motion/i18n human QA remain pending.",
+    "Docker remains BLOCKED_EXTERNAL_RUNTIME; MSI remains BLOCKED LOCALLY; Linux CI and remote CI remain pending or unconfirmed."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T025831Z-prompt-arena-core-continuity-model-state-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T025831Z-prompt-arena-core-continuity-model-state-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T025831Z-prompt-arena-core-continuity-model-state-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T025831Z-prompt-arena-core-continuity-model-state-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0509a-b83f-7913-93cf-7a3f5b722d09",
+  "app_server_process_id": "9184",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T025831Z-prompt-arena-core-continuity-model-state-20260830.md",
+  "task_sha256": "4849ad37c40b12fba4bfd05def3162b9ca1f5df3a0dd27d54324d1d256acf91f",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

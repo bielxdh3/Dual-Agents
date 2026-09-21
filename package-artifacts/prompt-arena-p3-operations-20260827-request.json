@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-operations-20260827",
+  "parent_request_id": "prompt-arena-p3-adapters-finalize-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement the next P3 backend slice on completion/model-library: bounded model operations for local Ollama downloads and managed GGUF import/removal. Reuse existing OllamaProvider::pull_model and CancellationToken primitives; add typed request/result or operation APIs that persist queued/running/completed/cancelled/failed progress in model_operations, expose safe cancellation, and make managed-file removal secure and auditable through model_removals/content hashes. Enforce loopback-only runtime endpoints, app-managed relative paths, size/name/count limits, no arbitrary filesystem paths, no cloud APIs, no secrets, and never delete un-managed runtime models. Keep quantization variants distinct. Add focused Rust tests covering progress/cancellation/error states, path/symlink traversal rejection, bounded managed removal, and audit evidence. Run cargo fmt/check/test and git diff --check, then create one focused local commit. Do not implement UI/bridge in this turn. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/model-library; preserve HEAD a5e0cd2 and all prior P1/P2 work",
+    "no arbitrary filesystem reads/deletes; managed model root only; no secrets/cloud APIs",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/model_library.rs", "E:/Prompt Arena/src-tauri/src/ollama.rs", "E:/Prompt Arena/src-tauri/src/runtime.rs", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/storage/migrations/0006_model_library.sql"],
+  "review_findings": [{"severity": "blocking", "title": "P3 operations absent", "details": "Model catalog adapters exist, but user-facing download/progress/cancel and safe managed removal still need a bounded backend primitive before command/UI wiring."}],
+  "max_correction_cycles": 0
+}

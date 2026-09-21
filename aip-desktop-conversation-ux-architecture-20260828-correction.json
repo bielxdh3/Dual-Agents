@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-correction",
+  "parent_request_id": "aip-desktop-conversation-ux-architecture-20260828",
+  "action": "correct",
+  "repository": "E:/AIP",
+  "task": "Finish the same complete /goal AIP desktop conversation UX architecture mission on branch fix/desktop-conversation-ux-architecture. The prior Biel4 run timed out at 600 seconds after preserving a substantial uncommitted diff. Inspect and keep valid work; make only the corrections required by the review findings below and complete the missing navigation/CSS/docs/tests necessary for the original acceptance bar. Read the original specification at C:/Users/bielx/.codex/attachments/c745ef0b-8fb9-46af-8219-9df4bb212ea3/pasted-text-1.txt and all required skills before editing. Ensure old horizontal workspace-tabs are removed as primary navigation and the final sidebar/secondary-surface hierarchy is coherent; preserve agent isolation, temporary-chat safety, Rust authority, overlay transparency/hit-test safeguards and productization behavior. Complete formatting, focused UI/contract/Rust tests, TypeScript typecheck and appropriate migration checks, inspect the final diff for scope/security, then create one local commit with message `fix: restructure desktop conversation UX`. Do not push, create/update a PR, merge, tag, release, deploy, or build installers in this correction turn. Return a structured report with summary, files_changed, commands_run, tests, commit_sha, and remaining_issues.",
+  "constraints": [
+    "Use only the same configured Biel4 App Server/headless Executor; no native subagents, alternate backend, account, or manual/direct implementation fallback.",
+    "Preserve valid existing changes from the parent run; no reset, discard, amend, rebase, squash, force-push, or history rewrite.",
+    "Use existing dependencies and repository-native patterns; no speculative abstractions or unrelated refactors. Do not expose or commit secrets, databases, histories, memories, models, voice samples, exports, backups, private media, or authentication files.",
+    "Temporary Chat remains in memory only and fail-closed for durable/external mutations; Rust/SQLite remains authoritative; no raw provider IDs or executable paths in ordinary UX; do not claim STT/TTS bundled.",
+    "Keep installed-Windows overlay validation honestly human-only; do not weaken native region/click-through or alpha controls. If a check is blocked by Windows spawn/permission, record the exact blocker and run safe deterministic alternatives.",
+    "No stable tag, GitHub release, or prerelease. Commit only this corrective mission locally."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/Overlay.tsx",
+    "E:/AIP/apps/desktop/src/Bubble.tsx",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-state.test.ts",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/apps/desktop/src/profile-localization.ts",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0026_conversation_organization.sql",
+    "E:/AIP/apps/desktop/src-tauri/src/overlays.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/native_overlay_region.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/packages/contracts/tests/contracts.test.ts",
+    "E:/AIP/docs/ARCHITECTURE.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "TypeScript typecheck is blocking",
+      "details": "After the parent diff adds isPinned to PhaseOneConversation, pnpm --filter @aip/desktop typecheck fails in apps/desktop/src/conversation-state.test.ts because its PhaseOneConversation fixture omits isPinned. Update affected fixtures/tests or the model consistently, preserving the contract.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Renamed overlay command/listener leaves stale callers",
+      "details": "The parent diff renames the registered Tauri command open_main_conversation to open_agent_conversations and emits open-agent-conversations, but apps/desktop/src/Overlay.tsx and apps/desktop/src/Bubble.tsx still invoke open_main_conversation and App.tsx still listens for open-conversation. Update every caller/listener consistently or retain a safe compatibility path; add a focused regression check so overlay clicks still open the selected agent conversation.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Old top navigation and styling remain incomplete",
+      "details": "The parent diff changes ConversationSurface/Profile/ConversationList markup but leaves the old workspace-tabs primary nav in App.tsx and its CSS, and does not add the needed App.css styles for profile-form, trait-grid, conversation actions, model selector and responsive sidebar. Complete the requested agent/conversation-first hierarchy and accessible responsive styling without copying ChatGPT branding.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Parent run has no executor report, tests, or commit",
+      "details": "The App Server run ended at 600 seconds with no report and no commit. Run focused UI/contract tests, migration/Rust checks proportional to touched code, format/typecheck and git diff --check; inspect scope and commit only after they pass or record exact blockers.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Migration and delete semantics need explicit safety coverage",
+      "details": "Review migration 0026 and database delete/archive behavior for deterministic legacy-main conversion, active-conversation fallback, foreign-key cascade/set-null and agent isolation. Add or update restart/migration tests; do not delete legacy data merely to remove the main UX.",
+      "severity": "important"
+    },
+    {
+      "title": "Roadmap/local-resources/overlay requirements still need verification",
+      "details": "Inspect the final tree against the original mission: truthful future bundled/managed offline STT+TTS roadmap entry, concise Local Resources/Voice default hierarchy, advanced diagnostics hidden by default, and actual overlay alpha/hitbox logic preserved with deterministic tests. Implement only missing scoped pieces.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-targetdir-20260829",
+  "parent_request_id": "prompt-arena-package-retry-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:03:39.829004+00:00",
+  "finished_at": "2026-08-29T19:04:10.846305+00:00",
+  "summary": "Exact HEAD confirmed as be1007f99814f004e384abae6acd986e5bcaa521. Retry stopped before Tauri because creating the requested fresh target directory failed with `Access to the path 'C:\\Users\\bielx\\AppData\\Local\\DualCodex\\prompt-arena-target-be1007f' is denied.` No source, docs, history, or remote state changed. BL4 provenance: canonical biel4 App Server/headless, workspace-write, Windows elevated readiness ready, approval never.",
+  "files_changed": [
+    "src-tauri/Cargo.toml"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "New-Item -ItemType Directory -Path C:\\Users\\bielx\\AppData\\Local\\DualCodex\\prompt-arena-target-be1007f -Force"
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis --target-dir C:\\Users\\bielx\\AppData\\Local\\DualCodex\\prompt-arena-target-be1007f",
+      "status": "not_run",
+      "details": "Blocked before invocation because the requested target directory could not be created."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows --bundle-root C:\\Users\\bielx\\AppData\\Local\\DualCodex\\prompt-arena-target-be1007f\\release\\bundle",
+      "status": "not_run",
+      "details": "Stopped after target-directory permission failure."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows",
+      "status": "not_run",
+      "details": "Stopped after target-directory permission failure."
+    },
+    {
+      "command": "Windows NSIS clean-install/launch/restart/uninstall smoke",
+      "status": "not_run",
+      "details": "No package was produced."
+    }
+  ],
+  "remaining_issues": [
+    "The requested fresh target directory cannot be created under C:\\Users\\bielx\\AppData\\Local\\DualCodex due to Windows access denial, so packaging and smoke validation could not start.",
+    "No NSIS installer, checksum manifest, package artifact, sidecar evidence from this retry, or automated smoke result was produced."
+  ],
+  "git_status": " M src-tauri/Cargo.toml\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190340Z-prompt-arena-package-targetdir-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190340Z-prompt-arena-package-targetdir-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190340Z-prompt-arena-package-targetdir-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190340Z-prompt-arena-package-targetdir-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ed8-00cd-7cf3-911d-b4bbaf1e09d0",
+  "app_server_turn_id": "01a04ee7-fa27-79d2-b5f4-f7e8877767c4",
+  "app_server_process_id": "16684",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T190340Z-prompt-arena-package-targetdir-20260829.md",
+  "task_sha256": "2981ac72d4de9126e0915a30eab29c15383dde7436918b9f867c316f6f27e737",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

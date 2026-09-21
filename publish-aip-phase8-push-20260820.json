@@ -1,0 +1,14 @@
+{
+  "operation": "normal_push",
+  "mission_id": "aip-phase8-functional-voice-push-20260820",
+  "authorization_reference": "aip-phase8-functional-voice-push-20260820",
+  "repository": "E:\\AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "remote": "origin",
+  "branch": "feat/phase-8-functional-voice",
+  "expected_remote_old_sha": "42c52e26ac3ffb01adeb06db7fa0e0f00798abe1",
+  "new_sha": "6ce6ed6d9b7c4b2eadd00835624923157f4549ba",
+  "authorization": {
+    "allowed_actions": ["normal_push"]
+  }
+}

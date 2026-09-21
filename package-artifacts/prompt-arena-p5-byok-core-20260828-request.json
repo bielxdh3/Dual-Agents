@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-byok-core-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement the P5 BYOK core on top of completion/advanced-arena at HEAD ff4ace5. Add an app-owned provider module and Tauri bridge/commands for OpenAI-compatible, OpenAI, Anthropic, and Gemini configuration and execution boundaries. Credentials must be stored/retrieved through OS-protected credential storage (Windows Credential Manager/DPAPI or an equivalent OS-native backend; on unsupported platforms fail closed rather than writing plaintext). Never return or log secret values; list/read operations expose only redacted metadata. Add bounded provider endpoint/model validation, explicit external-network consent/notice, request timeouts and response-size limits, provider-specific request/response normalization, and tests using local/mock transports only (no real provider calls). Add cost estimation from dated price snapshots, actual usage/cost when a response reports usage, confirmation thresholds, hard budget ceilings, and fail-closed handling for missing/invalid prices or usage. Preserve the local Ollama runtime and existing run persistence; do not weaken sandboxing or expose secrets in run records/exports. Add a usable Settings BYOK panel wired to the bridge with configure/remove/test controls, secure-storage state, network warning, cost policy controls, and clear unavailable/error states. Do not implement P6 dashboard polish, P7 packaging, or page-transition motion.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "all implementation through the same BL4 app_server Executor; no direct Architect implementation, TUI/native_tui/fallback/substitute",
+    "preserve P1/P2/P3 and P4 commits; target completion/advanced-arena; no reset/clean/discard",
+    "external provider calls must require explicit user action and be isolated behind bounded adapters; tests must not contact external services",
+    "no secrets in logs, exports, errors, snapshots, Git, or reports; no plaintext credential fallback",
+    "no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/provider-foundation.ts", "E:/Prompt Arena/src/provider-foundation.test.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/runtime.rs", "E:/Prompt Arena/src-tauri/Cargo.toml"],
+  "review_findings": [{"severity": "blocking", "title": "P5 is still foundation-only", "details": "Implement the secure BYOK controls, provider boundaries, and cost guardrails as a bounded user-facing slice."}],
+  "max_correction_cycles": 0
+}

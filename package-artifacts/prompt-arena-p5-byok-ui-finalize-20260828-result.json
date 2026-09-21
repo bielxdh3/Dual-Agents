@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-byok-ui-finalize-20260828",
+  "parent_request_id": "prompt-arena-p5-byok-ui-20260828",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T15:57:14.362544+00:00",
+  "finished_at": "2026-08-28T16:00:02.450275+00:00",
+  "summary": "Approved. Committed d09f0a3 with the validated P5 BYOK UI slice; worktree is clean.",
+  "files_changed": [
+    "src/App.tsx",
+    "src/styles.css",
+    "src/byok-ui.ts",
+    "src/byok-ui.test.ts"
+  ],
+  "commands_run": [
+    "npm run typecheck",
+    "npm test",
+    "npm run build",
+    "cargo fmt --all -- --check (src-tauri)",
+    "cargo check (src-tauri)",
+    "cargo test (src-tauri)",
+    "git diff --check",
+    "git show --format= HEAD --check"
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript passed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "15 files, 74 tests passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed."
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "status": "passed",
+      "details": "Passed from src-tauri."
+    },
+    {
+      "command": "cargo check",
+      "status": "passed",
+      "details": "Rust check passed."
+    },
+    {
+      "command": "cargo test",
+      "status": "passed",
+      "details": "99 tests passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    }
+  ],
+  "remaining_issues": [
+    "Remote CI was not run or confirmed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T155714Z-prompt-arena-p5-byok-ui-finalize-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T155714Z-prompt-arena-p5-byok-ui-finalize-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T155714Z-prompt-arena-p5-byok-ui-finalize-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T155714Z-prompt-arena-p5-byok-ui-finalize-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04916-eff8-7270-977b-6dad61010ab7",
+  "app_server_turn_id": "01a04916-f09c-71b1-ab95-49b2a2b31167",
+  "app_server_process_id": "8096",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T155714Z-prompt-arena-p5-byok-ui-finalize-20260828.md",
+  "task_sha256": "62568fbe67411396a0df526f2df1dcb6521628f93fc3e7544a7b2b85e6907033",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

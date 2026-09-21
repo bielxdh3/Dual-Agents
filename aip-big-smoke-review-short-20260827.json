@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-review-short-20260827",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Perform a bounded but explicit read-only Reviewer gate for the AIP Big Smoke fix on branch fix/big-smoke-ui-regressions at HEAD 9bd6076, comparing net diff against 9a77344. Do not edit files or run tests/builds. Inspect only the eight changed files and report a concise verdict exactly approved, approved_with_reservations, or changes_requested. Check each of the five bugs once: AgentSprite alpha-aware SVG fill and PNG RGBA serialization; absence of opaque overlay square and correct CSS/Tauri transparency scope; immutable Pencil active-layer update and undo/redo; pointer-down selection anchor with reverse/repeated/clamped/end/cancel behavior; ConversationList styling hooks, focus/accessibility, and stylesheet scope. Check that tests cover the claimed behavior and that the net diff has no unrelated semantic changes. If blocked, state the exact blocker. Return JSON-like structured text with verdict, findings, tests_reviewed, files_reviewed, and remaining_issues in the final response within this turn.",
+  "constraints": [
+    "Use configured Biel4 App Server/headless Reviewer only; no native subagents or fallback backend.",
+    "Read E:/AIP/AGENTS.md and preserve all Phase 7-13/security/privacy/accessibility invariants.",
+    "No mutations, generated files, commits, publication, or remote actions.",
+    "Do not expose secrets, credentials, local databases, histories, memories, private media, or authentication files."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.tsx",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.test.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.test.ts",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/pixel-editor.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-commit-current-20260828",
+  "parent_request_id": "prompt-arena-p7-desktop-delivery-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "The current completion/desktop-delivery working tree contains the intended P7 desktop-delivery diff from the previous canonical BL4 turn: .github/workflows/package.yml, package.json, src-tauri/tauri.conf.json, ROADMAP.md, scripts/package-artifacts.mjs, scripts/package-artifacts.test.mjs, and scripts/verify-package.mjs. Treat this exact diff as the complete scope. Do not reset, clean, discard, or redesign. Inspect the new scripts for minimal correctness, add all intended files, and run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Fix only minimal defects revealed by these checks. Do not run actual installer smoke locally unless the existing scripts require it; CI workflow must remain the place for platform clean-install smoke. If checks pass, create one focused commit on completion/desktop-delivery. Keep P7 IN PROGRESS in ROADMAP until real clean-install/start/restart/uninstall and Linux launch evidence is confirmed. No P8, merge, tag, release, deploy, public release, secrets, telemetry, cloud calls, paid-provider calls, or page-transition motion. Return the required JSON report and exact native provenance.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "preserve current dirty P7 diff exactly; no reset/clean/discard",
+    "no merge/tag/release/deploy/public release; unsigned artifacts only",
+    "no secrets, telemetry, cloud calls, paid-provider calls, or page-transition motion"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/.github/workflows/package.yml", "E:/Prompt Arena/package.json", "E:/Prompt Arena/src-tauri/tauri.conf.json", "E:/Prompt Arena/ROADMAP.md", "E:/Prompt Arena/scripts/package-artifacts.mjs", "E:/Prompt Arena/scripts/package-artifacts.test.mjs", "E:/Prompt Arena/scripts/verify-package.mjs"],
+  "review_findings": [{"severity": "blocking", "title": "P7 diff is present but unvalidated and uncommitted after interruption", "details": "Preserve the current packaging diff, run bounded checks, stage intended new files, and commit the focused slice."}],
+  "max_correction_cycles": 0
+}

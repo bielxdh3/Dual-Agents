@@ -1,0 +1,17 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "aip-phase13-pr-create-20260822",
+  "authorization_reference": "aip-phase13-pr-create-20260822",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "repository_full_name": "bielxdh3/AIP",
+  "branch": "feat/phase-13-gateway",
+  "base_branch": "main",
+  "title": "feat: functional phase 13 local gateway",
+  "body": "## Summary\n\nPhase 13 promotes the AIP-side gateway from metadata-only to a functional authenticated local/private checkpoint. It adds bounded `aip-gateway-v1` TCP framing, HMAC session protection, explicit Tauri lifecycle controls, and real Rust/SQLite authority routing without importing BielOS or enabling Cloudflare relay/public exposure.\n\n## Implementation\n\n- Added newline-framed `aip-gateway-v1` transport with strict JSON fields, canonical U+001F HMAC-SHA256, lowercase constant-time MAC verification, frame/payload/response limits, localhost/private bind policy, per-client/session counter and nonce replay protection, one-time in-memory pairing, revocation/rotation primitives, and idempotent connection shutdown.\n- Added Tauri gateway start/stop/status lifecycle with explicit Owner confirmation, Luma fixture/ownership, temporary-chat and safe-mode fail-closed gates, transient pairing-code display, and cleanup on application exit.\n- Routed authenticated protocol/accounts/transfers/sessions/recovery/audit/revocation operations to existing SQLite authority methods with strict request deserialization and no external effects.\n- Added a temporary SQLite TCP integration round trip plus wrong-MAC, replay, unknown-field, temporary/safe-mode, revocation, and port-closure coverage; added React lifecycle tests and Phase 13 documentation alignment.\n\n## Evidence\n\n- Final HEAD: `f39f6d2b1cfdddfcc7e839bf4d22d2cbe0fa8020`; remote branch was created from merged Phase 12 `main` `cbbe814283cfe91034ba8315e0d6f32955d3f8bc` and exact SHA parity was reverified.\n- Host Rust gates passed: fmt check, locked check, clippy with `-D warnings`, and locked tests (`145 passed; 0 failed; 1 ignored; 146 total`).\n- Host JS gates passed: desktop typecheck/tests/build (`51` desktop tests), contracts typecheck/build/tests (`19` tests), and `pnpm secrets:scan` (`168` repository files). `git diff --check` passed.\n- Distinct Biel4 read-only fast review: `approved_with_reservations`, no blocking findings.\n- Codex Security diff scan `656ae8d3-ecca-4612-bcc9-82f89d952898` for `cbbe814..f39f6d2`: complete coverage, zero findings. TAC advisory was unavailable because the connector was not authenticated; it did not block the local scan.\n\n## Boundaries\n\nThis is a functional local/private checkpoint, not stable-release approval. Physical-device/private-LAN validation, manual Owner/recovery/browser ceremony, release signing/packaging, remote CI confirmation, Cloudflare credentials/tunnel/relay, public internet exposure, BielOS ownership exchange, and external transfer effects remain explicitly reserved. `pnpm format:check` remains a pre-existing broad baseline failure outside this focused change; no broad formatting rewrite was introduced.",
+  "draft": true,
+  "authorization": {
+    "allowed_actions": [
+      "draft_pr_create"
+    ]
+  }
+}

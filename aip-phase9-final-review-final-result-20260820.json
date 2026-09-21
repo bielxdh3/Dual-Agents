@@ -1,0 +1,51 @@
+{
+  "verdict": "findings",
+  "blocking_findings": [
+    {
+      "severity": "important",
+      "finding": "TypeScript contract validation does not enforce all required collection bounds.",
+      "evidence": [
+        "parseToolActionInput accepts workspaceOrganize.moves of arbitrary length; it validates items but has no <=32 check.",
+        "parseWorkspaceRoots, parseToolCatalog, parseToolSessions, and parseToolAudit accept arrays of arbitrary length.",
+        "parseToolSession accepts an arbitrary permissions array despite the Rust MAX_SESSION_PERMISSIONS bound."
+      ],
+      "impact": "The UI boundary can accept unbounded tool action/session/audit/root payload collections, contrary to the requested bounded contract guarantees.",
+      "required_fix": "Add explicit maximum lengths matching Rust/database limits and add rejection tests for oversized move, permission, root, catalog, session, and audit arrays."
+    }
+  ],
+  "important_findings": [],
+  "evidence": [
+    "The complete diff is limited to Phase 9 Rust/SQLite/Tauri tools, TypeScript contracts/UI, Phase 9 docs, and Cargo dependency configuration. No Phase 10 behavior, shell execution, network, upload, telemetry, watcher, public listener, provider credentials, or raw-content persistence was found.",
+    "Rust remains authoritative for manifests, sessions, permissions, actions, results, compensation, audit, safe mode, temporary-chat rejection, and Owner/agent isolation.",
+    "Workspace roots are owner-scoped and opaque at the contract boundary; Rust rejects drive roots, broad/system roots, symlinks, junction/reparse points, unsafe components, traversal, and canonical containment escapes.",
+    "Local inspection is metadata-only. Local moves use relative paths, immediate source/destination revalidation, no overwrite, no delete, and bounded move counts.",
+    "Multi-move execution rolls back completed moves in reverse order and records failed versus partial failure with bounded untrusted results and audit.",
+    "Local compensation stores stable per-move identities, preflights all reverse moves before renaming, rejects substituted destinations, and does not recreate an original source when verification fails. The compensation failure path now updates the action and writes an audit event.",
+    "Fixture workspace/calendar/messaging adapters remain distinct from local filesystem adapters; fixture results report changed=false while local moves report changed=true only after a bounded host move.",
+    "Migration 0023 rebuilds/preserves the Phase 9 schema, restores foreign keys and indexes, adds workspace_roots, and registers migration 23. Database initialization includes migration and reopen/idempotency coverage.",
+    "UI actions invoke Tauri commands and do not directly grant approval or bypass Rust gates. Local UI inputs are relative action paths; absolute paths are only used when the Owner configures a root."
+  ],
+  "validation_run": [
+    "Read AGENTS.md, the required AIP phase/security/publication review skills, Phase 9 specification, corrective gap matrix, all changed files, and relevant Rust/TypeScript supporting code.",
+    "git diff --check passed.",
+    "Static searches found no prohibited shell/network/upload/telemetry/watcher/listener/provider-credential patterns in the reviewed Phase 9 scope.",
+    "Rust and TypeScript test suites were not executed in this review environment; Remote CI not confirmed."
+  ],
+  "remaining_human_checks": [
+    "After correcting contract collection bounds and tests, run the Rust and contract test suites.",
+    "Perform packaged Windows/manual UX validation, including drive/system-root, junction/reparse, substitution, rollback, and confirmation flows.",
+    "UI/docs/contract integration is otherwise appropriately included in this pass; the documentation still correctly states that release approval and packaged Windows UX validation are pending."
+  ],
+  "provenance": {
+    "base": "06414e05765fe96f3e6fd736775c70e21187d5bb",
+    "head": "dfeee2fa6d9ce264938d369f7a2e3e029ddb52b0",
+    "commits_reviewed": [
+      "f5ec675",
+      "7324801",
+      "23cbdeb",
+      "a665850",
+      "dfeee2f"
+    ],
+    "mode": "read-only"
+  }
+}

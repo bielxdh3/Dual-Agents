@@ -1,0 +1,30 @@
+[orchestrator]
+repository = "C:/Users/bielx/3D Objects/Dual-Codex-worktree"
+runs_dir = "runs"
+max_correction_cycles = 1
+require_clean_git = false
+codex_command = "codex"
+
+[accounts."biel3"]
+label = "bielxdh3@gmail.com"
+codex_home = "C:\\Users\\bielx\\3D Objects\\CodexProfiles\\architect"
+model = ""
+reasoning_effort = "high"
+backend = "windows"
+service_tier = ""
+network_access = false
+
+[accounts."biel4"]
+label = "bielxdh4@gmail.com"
+codex_home = "C:\\Users\\bielx\\3D Objects\\CodexProfiles\\executor"
+model = "gpt-5.6-luna"
+reasoning_effort = "low"
+backend = "app_server"
+service_tier = "priority"
+network_access = true
+
+[roles]
+architect = "biel3"
+executor = "biel4"
+orchestrator = "biel3"
+reviewer = "biel4"

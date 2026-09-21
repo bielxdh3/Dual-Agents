@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-multi-voice-phase1-20260830",
+  "action": "implement",
+  "repository": "C:/IA DE VOZ",
+  "task": "Required skills at top: C:/CodexGlobal/skills/ponytail/SKILL.md; C:/CodexGlobal/skills/project-phase-review/SKILL.md; C:/CodexGlobal/skills/project-security-review/SKILL.md. Read each fully and report resolved paths. Execute Phase 1 (profile architecture, schema, and migration design) of C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md. Do not implement code or mutate C:/IA DE VOZ in this phase. Independently trace app.py end to end and produce one concise, evidence-backed design report in the Executor JSON summary (no new target files required): stable voice_id schema and persistence, active-profile state flow, profile storage layout, legacy single-voice migration plan preserving every real artifact, explicit profile-sensitive call sites, shared model/cache boundaries, path-containment and reparse-point controls, stale callback/job ownership rules, GUI surfaces, backward-compatibility strategy, and a bounded validation matrix. Derive all decisions from actual files and current legacy inventory; do not guess speaker identity; explicitly mark impossible/unavailable provenance fields. Confirm the Phase 0 inventory and hashes remain unchanged. Return exactly one JSON object containing summary, files_changed, commands_run, tests, and remaining_issues, and include phase_id/phase_title/objective/scope/non_goals/security_constraints/implementation_contract/required_skills/expected_evidence/validation/acceptance_boundary plus project-phase/security verdicts in summary or remaining_issues. No migration, dataset preparation, training, generation, dependency changes, commit, push, PR, publication, or deletion.",
+  "constraints": [
+    "Use only the existing biel4 App Server/headless Executor session and isolated CODEX_HOME; no native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Read-only design phase. Preserve all real user audio and artifacts exactly; do not add files to C:/IA DE VOZ.",
+    "Do not infer speaker identity or accept self-reported provenance. Record unavailable control-plane fields explicitly.",
+    "No commit, push, PR, merge, release, tag, deployment, publication, dependency changes, or destructive Git/data action."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/INICIAR.bat",
+    "C:/IA DE VOZ/README_PTBR.md",
+    "C:/IA DE VOZ/input_audio",
+    "C:/IA DE VOZ/dataset",
+    "C:/IA DE VOZ/training",
+    "C:/IA DE VOZ/generated",
+    "C:/IA DE VOZ/config",
+    "C:/IA DE VOZ/logs"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

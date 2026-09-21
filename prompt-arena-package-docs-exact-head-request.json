@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-docs-exact-head-20260830",
+  "parent_request_id": "prompt-arena-i18n-dynamic-followup-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated App Server/headless path. Work from the clean exact reviewed source HEAD 5c5de64d749674a01c31a722945c90357dfb0c2d on branch completion/windows-qa-live-telemetry-i18n. This is the required packaging/evidence and documentation step; do not change source implementation. Verify clean status and exact HEAD first. Run cargo clean --manifest-path src-tauri/Cargo.toml, npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}', npm run package:artifacts -- --platform windows, and npm run verify:package -- --platform windows --smoke. Capture exact NSIS artifact/bundle/bundled-worker/source-sidecar sizes and SHA-256 values, checksum manifest hash, package-verification output, and lifecycle smoke results. Then update only the evidence documentation/checksum files needed to reflect the reviewed source HEAD and this exact package: docs/DELIVERY_MATRIX.md, docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md, checksums-sha256.txt, and package-verification.txt if the verifier generated it. Replace stale af1ff483 source-head references with the full 5c5de64 SHA and mention the two new source commits 75178ac and 5c5de64, 111 automated tests, and the centralized PT-BR live-monitor/finite-label coverage without overstating native acceptance. Keep all PENDING_HUMAN_QA, BLOCKED_EXTERNAL_RUNTIME, BLOCKED LOCALLY/MSI, Linux/remote-CI, and security/publication reservations accurate. Reference artifact paths under E:\\Prompt Arena-live-telemetry-i18n-commit2 and do not claim a visual/native/full Tauri Arena run. Preserve historical evidence separately. Verify no source files changed, no protected E:\\Prompt Arena, E:\\Prompt Arena-live-telemetry-i18n, or E:\\Prompt Arena-pr28 worktree changed, run git diff --check, and create one normal local commit with message docs: refresh exact-head Windows evidence. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use an alternate execution path. Report full structured provenance including executor account, role, App Server transport, workspace-write sandbox, Windows elevated/ready, approval never, exact source/package SHA, artifact hashes/sizes, commands, docs scope, and remaining gates.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI, fallback backend, or danger-full-access.",
+    "Exact source HEAD 5c5de64 must be verified before packaging; no source implementation mutation.",
+    "Only evidence documentation/checksum files may change; preserve historical evidence and explicit QA/security/publication boundaries.",
+    "Original E:\\Prompt Arena, source E:\\Prompt Arena-live-telemetry-i18n, and PR #28 worktree must remain unchanged.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, or reset."
+  ],
+  "review_findings": [],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package.json",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\scripts\\verify-package.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\checksums-sha256.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package-verification.txt"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-backend-commit-20260827",
+  "parent_request_id": "prompt-arena-p2-review-correction-20260827",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Consolidate the current backend P2 changes already present on completion/verification-packs. Do not add UI or new scope in this turn. Run cargo fmt --all -- --check, cargo check --all-targets, cargo test --all-targets and git diff --check; fix only concrete Rust compile/test failures. Then create one focused local commit for the backend pack materialization, deterministic seed metadata, immutable evidence storage, verifier-policy persistence, and Docker boundary work. Return exact test outcomes and commit SHA with wrapper provenance. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/verification-packs; preserve all current intentional P2 backend changes",
+    "all edits/tests/commit in BL4; no Architect implementation",
+    "no paid APIs or secrets; no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src-tauri/src/official_packs.rs", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/storage/migrations/0005_p2_evidence.sql", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src-tauri/src/orchestration.rs", "E:/Prompt Arena/packs/official"],
+  "review_findings": [{"severity": "blocking", "title": "Backend P2 diff is uncommitted after timeout", "details": "The prior turn implemented backend materialization/storage/pack changes but timed out before tests and commit. Consolidate this exact work now."}],
+  "max_correction_cycles": 0
+}

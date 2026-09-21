@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-ci-tooling-audit-drift-correction-20260827",
+  "parent_request_id": "bielos-ci-tooling-audit-drift-review-20260827",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T15:35:10.252368+00:00",
+  "finished_at": "2026-08-27T15:36:40.697425+00:00",
+  "summary": "Applied only the authorized Prisma advisory range correction in the policy and fixture. Both now expect >=6.13.0-dev.1; all other advisory fields, counts, versions, lockfile, workflow, and security semantics are unchanged. HEAD remains 367ff05e1d696f1c48081a444a9666a92c949b14. Provenance: account desktop-6nummdh\\bielx; label/role Biel4 App Server Executor / executor; task_transport=app_server; backend metadata not independently exposed; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; CODEX_PROFILE unset; repository=E:/BielOS; request=bielos-ci-tooling-audit-drift-correction-20260827; thread=01a0408f-2146-7e43-8e3b-32113ec1a527; turn/result IDs unavailable. No alternate backend or subagents used.",
+  "files_changed": [
+    "scripts/tooling-audit-policy.mjs",
+    "scripts/fixtures/tooling-audit/accepted.json"
+  ],
+  "commands_run": [
+    "git status --short",
+    "git rev-parse HEAD; git branch --show-current",
+    "npm audit --package-lock-only --json",
+    "node scripts/tooling-audit-policy.mjs",
+    "node scripts/tooling-audit-policy.mjs with accepted fixture override",
+    "node --test scripts/tooling-audit-policy.test.mjs",
+    "node scripts/tooling-audit-policy.test.mjs",
+    "git diff --check",
+    "git diff --stat; git diff -- scripts/tooling-audit-policy.mjs scripts/fixtures/tooling-audit/accepted.json",
+    "node --version; npm --version",
+    "safe App Server provenance checks"
+  ],
+  "tests": [
+    {
+      "command": "node scripts/tooling-audit-policy.test.mjs",
+      "status": "passed",
+      "details": "All 5 focused policy tests passed."
+    },
+    {
+      "command": "tooling-audit-policy.mjs with accepted fixture override",
+      "status": "passed",
+      "details": "Policy evaluation passed with the corrected expected range and installed tooling versions."
+    },
+    {
+      "command": "npm audit --package-lock-only --json",
+      "status": "passed",
+      "details": "Structured audit data confirmed 3 high findings with unchanged identity, paths, severity, via/effects, nodes, and fix data; live prisma range is >=6.13.0-dev.1."
+    },
+    {
+      "command": "node --test scripts/tooling-audit-policy.test.mjs",
+      "status": "not_run",
+      "details": "CI-style runner was blocked before test execution by spawn EPERM."
+    },
+    {
+      "command": "node scripts/tooling-audit-policy.mjs",
+      "status": "not_run",
+      "details": "Live script invocation could not spawn npm in this executor and reported no structured JSON."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    }
+  ],
+  "remaining_issues": [
+    "Exact CI was not rerun locally; the direct focused test invocation passed, while Node's CI-style test runner remains blocked by executor spawn EPERM.",
+    "Turn/result correlation and independent backend metadata are unavailable at runtime; they are intentionally not asserted."
+  ],
+  "git_status": " M scripts/fixtures/tooling-audit/accepted.json\n M scripts/tooling-audit-policy.mjs\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T153510Z-bielos-ci-tooling-audit-drift-correction-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T153510Z-bielos-ci-tooling-audit-drift-correction-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T153510Z-bielos-ci-tooling-audit-drift-correction-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T153510Z-bielos-ci-tooling-audit-drift-correction-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0408f-2146-7e43-8e3b-32113ec1a527",
+  "app_server_turn_id": "01a043dc-66aa-79b1-bfb4-b5e1bb00cdb4",
+  "app_server_process_id": "5088",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T153510Z-bielos-ci-tooling-audit-drift-correction-20260827.md",
+  "task_sha256": "507206d63ee65d110ffa4321bdf2658a899a0b3a4de6c4bf1d5b6cfb5b119874",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

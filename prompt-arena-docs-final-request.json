@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-docs-final-20260829",
+  "parent_request_id": "prompt-arena-i18n-formatting-fix-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Make a documentation-only correction in the isolated worktree. Do not modify source code or use remote operations. Update docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md to identify the current exact source review commit as dd74a26 (full SHA may be read with git rev-parse HEAD), include the locale-formatting presentation phase and its validation (npm run typecheck and npm test 92 passed; build/boundaries/Rust 107 passed at the preceding source state), and preserve precise statuses: human/native QA pending, Windows NSIS blocked by Acesso negado (os error 5) with no installer/hash/smoke, MSI blocked locally, Linux CI pending. Do not claim a fresh artifact or installed success. Keep the checklist short and pending-only. Run git diff --check and report exact files/provenance.",
+  "constraints": [
+    "Canonical biel4 App Server/headless executor, workspace-write, Windows elevated readiness ready, approval never.",
+    "Documentation only; no source, history, or remote mutation beyond the requested local doc edit."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

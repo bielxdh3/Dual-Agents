@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-transport-integration-v3-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T16:21:00.888123+00:00",
+  "finished_at": "2026-08-22T16:22:40.661263+00:00",
+  "summary": "Implemented the minimal core-native persistent session registry and tests, but stopped before the requested Tauri/SQLite/Android integration because that integration is not complete and must not be falsely claimed. Changes remain uncommitted.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/companion_transport.rs"
+  ],
+  "commands_run": [
+    "cargo fmt",
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib companion_transport",
+    "cargo test --locked --lib",
+    "git diff --check"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Formatting passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Rust crate check passed."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Clippy passed without warnings."
+    },
+    {
+      "command": "cargo test --locked --lib companion_transport",
+      "status": "passed",
+      "details": "6 focused tests passed, including cross-connection replay persistence and independent client sessions."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "131 passed, 1 ignored, 0 failed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "Tauri/SQLite/Android integration gates",
+      "status": "not_run",
+      "details": "The requested manager, Tauri commands, database callback routing, Android socket integration, UI, contracts, docs, and end-to-end integration test were not completed."
+    }
+  ],
+  "remaining_issues": [
+    "No integration commit was created because the requested Phase 12 integration is incomplete.",
+    "Tauri/SQLite authority wiring, explicit Owner-confirmed lifecycle commands, Android explicit socket flow, contracts/UI/docs updates, and full cross-layer validation remain outstanding.",
+    "The working tree contains the uncommitted core session-registry correction."
+  ],
+  "git_status": " M apps/desktop/src-tauri/src/companion_transport.rs\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T162101Z-aip-phase12-transport-integration-v3-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T162101Z-aip-phase12-transport-integration-v3-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T162101Z-aip-phase12-transport-integration-v3-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T162101Z-aip-phase12-transport-integration-v3-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a2d-a524-7c21-955c-f7cf0ed10fa3",
+  "app_server_turn_id": "01a02a46-8de6-7a42-b7c8-ee336c33275a",
+  "app_server_process_id": "15548",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T162101Z-aip-phase12-transport-integration-v3-20260822.md",
+  "task_sha256": "0033be55405b45a5a12e536ffd04e623cbad801024affd5ee81da5b01bbdbc66",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

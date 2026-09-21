@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-byok-core-finalize-20260828",
+  "parent_request_id": "prompt-arena-p5-byok-core-20260828",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 1,
+  "started_at": "2026-08-28T14:51:38.825066+00:00",
+  "finished_at": "2026-08-28T15:01:40.003846+00:00",
+  "summary": "Codex executor failed; repository modifications, if any, were preserved.",
+  "files_changed": [
+    "src-tauri/src/external_providers.rs"
+  ],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "git_status": "?? src-tauri/src/external_providers.rs\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T145139Z-prompt-arena-p5-byok-core-finalize-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T145139Z-prompt-arena-p5-byok-core-finalize-20260828",
+  "executor_report_file": "",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T145139Z-prompt-arena-p5-byok-core-finalize-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "",
+  "app_server_turn_id": "",
+  "app_server_process_id": "",
+  "executor_windows_sandbox": "",
+  "executor_windows_sandbox_readiness": "not_checked",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T145139Z-prompt-arena-p5-byok-core-finalize-20260828.md",
+  "task_sha256": "eb3925acf798e2a20bb3df69d2e57fd0c39408b395bd36166a555ddc146d0bac",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor exited with code 1."
+}

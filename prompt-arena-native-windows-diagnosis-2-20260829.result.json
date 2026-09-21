@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-windows-diagnosis-2-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T04:27:16.265114+00:00",
+  "finished_at": "2026-08-29T04:30:11.674820+00:00",
+  "summary": "No repository change was justified. The harness already forwards WebView2 capabilities, and the workflow downloads the WebView2-matched driver. The remaining DevToolsActivePort failure is an external Windows runner prerequisite: matching Edge/WebView2/EdgeDriver versions and remote debugging allowed. [Tauri driver](https://github.com/tauri-apps/tauri/blob/dev/crates/tauri-driver/src/server.rs) [Microsoft version requirements](https://learn.microsoft.com/en-us/microsoft-edge/webdriver/) [RemoteDebuggingAllowed](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-policies/remotedebuggingallowed)",
+  "files_changed": [],
+  "commands_run": [
+    "node --check scripts/native-ui-smoke.mjs",
+    "git diff --check",
+    "focused harness invariants",
+    "git status --short --branch",
+    "git rev-parse HEAD"
+  ],
+  "tests": [
+    {
+      "command": "node --check scripts/native-ui-smoke.mjs",
+      "status": "passed",
+      "details": "Syntax validation passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "focused harness invariants",
+      "status": "passed",
+      "details": "Confirmed atomic UDF creation, WebView2 capability wiring, and valid benchmark identity."
+    }
+  ],
+  "remaining_issues": [
+    "Windows acceptance remains blocked by an unverified runner/runtime condition; ensure EdgeDriver matches the installed WebView2 Runtime and RemoteDebuggingAllowed is enabled.",
+    "Working tree is clean at 5aa76dd6e62a760c8481340dd5014cbfe7c6a23f; no commit or push was made."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T042716Z-prompt-arena-native-windows-diagnosis-2-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T042716Z-prompt-arena-native-windows-diagnosis-2-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T042716Z-prompt-arena-native-windows-diagnosis-2-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T042716Z-prompt-arena-native-windows-diagnosis-2-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04bc5-9f5b-70b2-823b-1f480d176423",
+  "app_server_process_id": "21372",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T042716Z-prompt-arena-native-windows-diagnosis-2-20260829.md",
+  "task_sha256": "dc742f841c2f9244412c1fc9afd5ec7628af4ee7ba9de50fb55da3ea64888631",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

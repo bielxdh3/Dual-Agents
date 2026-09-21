@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-followup-close-20260828",
+  "parent_request_id": "prompt-arena-p4-followup-resume-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Close the existing partial P4 diff on completion/advanced-arena-followup. Do not design or add new features. Inspect only the currently modified P4 files and migration. Run npm run typecheck first, then npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Fix only compile/test failures caused by the existing diff. If all checks pass and the implementation is coherent, commit the existing focused P4 changes with one commit. If the diff cannot be made coherent within this bounded closeout, safely revert only the current P4 files/migration to the clean HEAD 081db3ec4a1ca29972a0ec84f298076411b98014 and report that rollback; do not touch any other files. No push, merge, tag, release, deploy, or paid-provider/network calls.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "start from the preserved partial diff; allow-dirty explicitly authorized",
+    "no unrelated file changes; no generated evidence files committed"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "E:/Prompt Arena/src-tauri/src/commands.rs",
+    "E:/Prompt Arena/src-tauri/src/lib.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/src-tauri/src/storage/migrations/0007_advanced_arena.sql",
+    "E:/Prompt Arena/src/advanced-arena-ui.test.ts",
+    "E:/Prompt Arena/src/advanced-arena-view.tsx",
+    "E:/Prompt Arena/src/advanced-arena.ts",
+    "E:/Prompt Arena/src/bridge.ts"
+  ],
+  "review_findings": [
+    {
+      "severity": "important",
+      "file": "P4 partial diff",
+      "title": "Close or roll back the timed-out partial implementation",
+      "details": "The previous BL4 attempts timed out before producing tests or provenance. Validate the existing diff only; commit it only if the required checks pass, otherwise revert only those P4 files to the clean starting commit."
+    }
+  ],
+  "max_correction_cycles": 0
+}

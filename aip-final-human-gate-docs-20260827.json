@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-final-human-gate-docs-20260827",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Work only on the existing clean branch docs/final-human-gate-preparation at HEAD cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4. This is Stage A/B documentation preparation for the AIP final human gate. Read the repository instructions and required skills first. Record the Owner-attested installed-Windows Big Smoke Round 2 result exactly as PASS, dated 2026-08-27, for only these five defects: transparency/alpha, giant square/bounding box, Pencil corruption, pointer-down selection anchor, and Conversation List/creation styling. Include tested SHA cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4, CI 33089533701, exact MSI/NSIS filenames and hashes supplied in the task. Do not invent observations and do not repeat those five checks as pending. Reconcile docs/ROADMAP.md, docs/KNOWN_LIMITATIONS.md, docs/CORRECTIVE_GAP_MATRIX.md, docs/RELEASE_CHECKLIST.md, and a focused validation/release-candidate record according to existing conventions. Produce a truthful Phase 0-13 status matrix and a concise Portuguese human checklist containing only genuinely pending human/device/subjective checks, each with number, exact action, expected result, and PASS/FAIL criterion. Explicitly separate optional/external BielOS, Cloudflare/provider credentials, public relay, and production Android signing from mandatory standalone release gates where current scope allows. Preserve historical failures/reservations as superseded; do not mark remaining human checks passed. Do not run the broad automated suite in this turn; leave validation for a separate executor request. Do not create stable tags/releases, merge, or publish assets. Commit only these focused documentation changes with exact message test: record approved Big Smoke validation and leave the branch clean.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor through the Dual Codex launcher; no native subagents, alternate backend, or fallback.",
+    "Read E:/AIP/AGENTS.md, .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "No force-push, reset, rebase, amend, squash, history rewrite, or unrelated cleanup.",
+    "Do not expose or commit secrets, credentials, databases, histories, memories, backups, models, media, private paths, or generated artifacts.",
+    "Documentation-only scope; do not alter product code or future-phase behavior."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md",
+    "E:/AIP/docs/CORRECTIVE_GAP_MATRIX.md",
+    "E:/AIP/docs/RELEASE_CHECKLIST.md",
+    "E:/AIP/docs/V0_1_MANUAL_VALIDATION.md",
+    "E:/AIP/docs/PHASE_7F_VALIDATION.md",
+    "E:/AIP/docs/PHASE_8_VOICE_SPEC.md",
+    "E:/AIP/docs/PHASE_9_TOOLS_SPEC.md",
+    "E:/AIP/docs/PHASE_10_EXTENSIONS_SPEC.md",
+    "E:/AIP/docs/PHASE_11_SCREEN_VISION_SPEC.md",
+    "E:/AIP/docs/PHASE_12_ANDROID_SPEC.md",
+    "E:/AIP/docs/PHASE_13_GATEWAY_SPEC.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

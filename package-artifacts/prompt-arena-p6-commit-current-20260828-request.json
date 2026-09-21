@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-commit-current-20260828",
+  "parent_request_id": "prompt-arena-p6-product-polish-correct-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "The current completion/product-polish working tree contains the intended P6 product-polish diff in ROADMAP.md, src/App.tsx, src/arena-runner.ts, src/run-plan.ts, and src/styles.css. Treat that diff as the complete scope. Do not add features, redesign, refactor, or touch P7. Do not reset, clean, discard, or rewrite. Run only: npm run typecheck; npm test; npm run build; cargo fmt --manifest-path src-tauri/Cargo.toml -- --check; cargo check --manifest-path src-tauri/Cargo.toml --all-targets; cargo test --manifest-path src-tauri/Cargo.toml --all-targets; git diff --check. Fix only minimal compile/test defects in the current diff. If all checks pass, create one focused commit on completion/product-polish. Return the required JSON report and exact native provenance. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "preserve current dirty P6 diff exactly; no reset/clean/discard",
+    "do not add P7, page-transition motion, telemetry, cloud calls, paid-provider calls, merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/ROADMAP.md", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/run-plan.ts", "E:/Prompt Arena/src/styles.css"],
+  "review_findings": [{"severity": "blocking", "title": "P6 diff is present but unvalidated and uncommitted", "details": "Run the bounded validation list and commit the existing slice only."}],
+  "max_correction_cycles": 0
+}

@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-uia-discovery-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T15:08:47.078386+00:00",
+  "finished_at": "2026-08-29T15:15:07.039510+00:00",
+  "summary": "Read-only Windows UI Automation discovery completed. Verdict: Approved with reservations. Repository remained unchanged at HEAD 3233896eaaf1cd734d728704a42c1ef2d0b7f3c5. The requested release artifact was executed from E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe; product commit f3048a61f45cdb6b29f362444f3d32646edf4943 resolved successfully and the artifact SHA-256 was BC632933E2B5DAD72EF907522B10D1E16D5869EEAFDAE714DCB133D74C4C361E. `winapp` was unavailable. The app process stayed alive/responding with a nonzero window handle, but the window was blank/unnamed and only 16x16 at (0,0); no direct msedgewebview2 child was observed. UIA exposed exactly one unnamed `ControlType.Pane`, class `Tao Thread Event Target`, with zero meaningful controls/content. The exact boundary is `WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE`; no UIA harness is justified and no acceptance marker was produced. Artifacts are outside the repository at C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-windows-uia-final-30f38f3b37f143b2bd6113cce43c1463\\discovery-output.txt, `uia-tree.txt`, and `prompt-arena-window.png`; the screenshot is a black 16x16 capture. Provenance metadata: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4/biel4 Executor\",\"task_transport\":\"App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"turn_id\":\"not exposed by Executor transport\",\"session_id\":\"01a04b96-5081-7d13-9440-9d24c5daab27\",\"workspace\":\"E:\\\\Prompt Arena-pr28-bl4\",\"workspace_write\":\"workspace-write\",\"windows.sandbox\":\"elevated (control-plane asserted)\",\"readiness\":\"ready (control-plane asserted)\",\"approval\":\"never\"}.",
+  "files_changed": [],
+  "commands_run": [
+    "Get-Content -LiteralPath C:\\CodexGlobal\\AGENTS.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\ponytail\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md -Raw",
+    "where.exe winapp",
+    "winapp --help",
+    "PowerShell/.NET discovery: verify product commit and artifact SHA-256, probe winapp, start the release executable directly, inspect process/window/WebView2 descendants, inspect UIA tree to depth 8, capture screenshot, and clean up only task-started processes",
+    "PowerShell/.NET native user32 PrintWindow retry with outside-repository artifacts",
+    "view_image on prompt-arena-window.png",
+    "Get-ChildItem and Get-Content on temporary discovery artifacts",
+    "Get-Process cleanup check for task-started PIDs 18304, 4032, and 11520",
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "rg -n for native acceptance markers, UIA-relevant context, phase statuses, and security controls"
+  ],
+  "tests": [
+    {
+      "command": "where.exe winapp",
+      "status": "failed",
+      "details": "Exit code 1; no winapp executable was found."
+    },
+    {
+      "command": "winapp --help",
+      "status": "failed",
+      "details": "Command unavailable; no installation was attempted."
+    },
+    {
+      "command": "Release artifact and product revision verification",
+      "status": "passed",
+      "details": "The requested executable existed, f3048a61f45cdb6b29f362444f3d32646edf4943 resolved to a Git commit, and the executable SHA-256 was recorded."
+    },
+    {
+      "command": "Direct release process liveness and window probe",
+      "status": "passed",
+      "details": "The process remained alive and responding with a nonzero window handle; usable application content was not present and the window bounds were only 16x16."
+    },
+    {
+      "command": "PowerShell/.NET UI Automation discovery",
+      "status": "failed",
+      "details": "One unnamed Pane (`Tao Thread Event Target`) and zero meaningful controls/content; emitted WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE."
+    },
+    {
+      "command": "Native PrintWindow screenshot capture",
+      "status": "passed",
+      "details": "Screenshot artifact was written outside the repository; PrintWindow returned true for the 16x16 blank window."
+    },
+    {
+      "command": "Task-started process cleanup",
+      "status": "passed",
+      "details": "All three task-started PIDs were absent after cleanup; no pre-existing matching application process remained."
+    },
+    {
+      "command": "Native UIA navigation and acceptance chain",
+      "status": "not_run",
+      "details": "Discovery stopped at the unavailable inner UIA tree; no controls were interacted with and no acceptance marker was claimed."
+    }
+  ],
+  "remaining_issues": [
+    "WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE: the release app did not expose real Overview, Arena, Advanced Arena, Benchmarks, Models, Runs, Settings, buttons, inputs, lists, or status/text controls through UIA.",
+    "WebView2 startup was not confirmed as a descendant process; the observed process/window boundary was a responding blank 16x16 window.",
+    "No Windows native acceptance was performed or claimed.",
+    "The real turn_id is not exposed by the configured Executor transport.",
+    "No publication action occurred; full-history publication verification remains outside this read-only discovery."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T150847Z-prompt-arena-windows-uia-discovery-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T150847Z-prompt-arena-windows-uia-discovery-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T150847Z-prompt-arena-windows-uia-discovery-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T150847Z-prompt-arena-windows-uia-discovery-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04e10-f149-7370-8667-0b96fec04e23",
+  "app_server_process_id": "10228",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T150847Z-prompt-arena-windows-uia-discovery-20260829.md",
+  "task_sha256": "86c8627ac1d4551dc0833b18b985141392d7d3beaf497e0f42ddb598cd93afd4",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

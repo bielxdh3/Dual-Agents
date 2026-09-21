@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-d-20260831",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Read the complete goal at C:/Users/bielx/.codex/attachments/bf0f727e-7197-435f-a1ee-ec7731fd15a9/goal-objective.md and E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md. Implement only Phase D — core content pages — on branch cdx/aip-ui-reset at current SHA a163be5396620abe927811e908948500165909aa. Build on the accepted foundation and sidebar. Recompose ConversationSurface and ConversationDraftSurface visually as a calm content-first workspace: readable header hierarchy, clear provider/recovery states, distinct message blocks and actions, a purposeful composer with model picker, and no browser-native gray chrome. Preserve every existing message, retry, edit, branch, model override, temporary-chat, queue/cancel, accessibility, and runtime-degraded behavior. During an active generation request, add a semantic generation-state class/element so the Portuguese status “Gerando resposta…” receives a restrained moving shiny-text highlight inspired by React Bits; the effect must disappear for success/failure/cancel, stay legible, use theme tokens, and be disabled/reduced by prefers-reduced-motion and the persisted reduced-motion preference. Migrate Memories, State, and Profile/Onboarding surfaces to the new layout language: page title/description, aligned sections, readable helper text, grouped controls, responsive field grids, and intentional empty/loading/error states. Keep logic and IPC untouched except minimal presentation-linked generation-state hooks. Add focused tests for generation-only shiny markup and preservation of core surface semantics; avoid brittle pixel snapshots.",
+  "constraints": [
+    "Required skills: E:/AIP/.agents/skills/aip-implementation/SKILL.md, E:/AIP/.agents/skills/aip-phase-review/SKILL.md, E:/AIP/.agents/skills/aip-security-review/SKILL.md, E:/AIP/.agents/skills/aip-publication-check/SKILL.md, C:/CodexGlobal/skills/ponytail/SKILL.md, and C:/CodexGlobal/skills/ui-ux-pro-max/SKILL.md; read each fully before work.",
+    "Use only the configured Biel4 App Server/headless Executor and remain the same Executor identity for corrections. Do not use native subagents, create_thread, another backend, alternate account, or manual/direct implementation fallback.",
+    "Work only on E:/AIP branch cdx/aip-ui-reset. Preserve unrelated work; do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Use existing React/TypeScript, CSS, theme variables, contracts, installed dependencies, and portal logic. Do not add dependencies or copy Claude/React Bits branding/assets.",
+    "AIP remains standalone/local-first; Rust/SQLite authority, managed runtime degradation, temporary-chat memory-only behavior, model policy, accessibility semantics, and security boundaries must remain intact.",
+    "Do not expose or commit secrets, credentials, databases, local histories/memories, model files, voice samples, exports, backups, private media, or personal paths in product docs.",
+    "Commit the coherent phase locally with message style: refine AIP core workspace surfaces. Do not push, create/update PR, merge, tag, release, deploy, or perform destructive remote actions.",
+    "Run focused desktop conversation/memory/state/profile tests, desktop typecheck, git diff --check, and formatting/lint checks proportional to changed files; report blockers precisely."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/docs/AIP_UI_RESET_DESIGN_SPEC.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/theme.tsx",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-draft.test.tsx",
+    "E:/AIP/apps/desktop/src/state-memory-guidance.test.tsx",
+    "E:/AIP/apps/desktop/src/profile-form.test.tsx",
+    "E:/AIP/apps/desktop/src/model-picker.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-companion-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T15:28:19.688272+00:00",
+  "finished_at": "2026-08-22T15:29:00.638119+00:00",
+  "summary": "Blocked before implementation: branch feat/phase-12-android-companion was created at the exact requested SHA d0021802288136ffe4da1f3b91356722b015270f, but the environment has no Java, Gradle, Android SDK, or ANDROID_HOME/ANDROID_SDK_ROOT. The requested real Android project, authenticated transport, APK, and validation gates cannot be completed truthfully without that toolchain. No files were changed and no commit was created.",
+  "files_changed": [],
+  "commands_run": [
+    "git cat-file -t d0021802288136ffe4da1f3b91356722b015270f",
+    "git switch -c feat/phase-12-android-companion d0021802288136ffe4da1f3b91356722b015270f",
+    "git status --short",
+    "git branch --show-current",
+    "git rev-parse HEAD",
+    "Get-Command java,gradle,adb",
+    "Test-Path ANDROID_HOME",
+    "Test-Path ANDROID_SDK_ROOT"
+  ],
+  "tests": [
+    {
+      "command": "Android unit tests/lint/assembleDebug",
+      "status": "not_run",
+      "details": "Blocked: Java, Gradle, and Android SDK are unavailable."
+    },
+    {
+      "command": "cargo/contract/desktop validation",
+      "status": "not_run",
+      "details": "No implementation changes were made; full requested Phase 12 scope remains unimplemented."
+    }
+  ],
+  "remaining_issues": [
+    "Install and configure a supported JDK, Gradle/Android Gradle Plugin toolchain, Android SDK platforms/build-tools, and emulator or device tooling.",
+    "Implement the scoped Android companion, Keystore custody, authenticated loopback transport, desktop transport integration, UI/contracts/migration/docs/CI changes, tests, APK generation, and hash validation.",
+    "No commit was created because producing a partial or metadata-only Phase 12 implementation would violate the task requirements.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T152820Z-aip-phase12-android-companion-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T152820Z-aip-phase12-android-companion-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T152820Z-aip-phase12-android-companion-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T152820Z-aip-phase12-android-companion-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a02a16-5551-71d1-b808-b44e25a085bf",
+  "app_server_process_id": "1048",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T152820Z-aip-phase12-android-companion-20260822.md",
+  "task_sha256": "7e46eca6473f8dc200272f8ed95d120a4cdb8ba9dc538fdabd8ed144e59ee839",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

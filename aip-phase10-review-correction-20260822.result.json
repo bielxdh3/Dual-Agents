@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase10-review-correction-20260822",
+  "parent_request_id": "aip-phase10-review-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T14:11:38.402756+00:00",
+  "finished_at": "2026-08-22T14:13:06.399196+00:00",
+  "summary": "Enforced strictly lowercase hexadecimal extension integrity hashes and added a Rust regression test. Commit: f2975033ae602c7ef14e1dbcc7d68694f8093ac0.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/extensions.rs"
+  ],
+  "commands_run": [
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "cargo test --locked --lib extensions::tests",
+    "pnpm --filter @aip/contracts typecheck",
+    "pnpm --filter @aip/contracts test -- --pool=threads",
+    "git diff --check",
+    "git commit -m \"fix: enforce lowercase extension integrity\""
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "123 passed, 1 ignored."
+    },
+    {
+      "command": "cargo test --locked --lib extensions::tests",
+      "status": "passed",
+      "details": "6 passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test -- --pool=threads",
+      "status": "passed",
+      "details": "19 passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T141138Z-aip-phase10-review-correction-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T141138Z-aip-phase10-review-correction-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T141138Z-aip-phase10-review-correction-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T141138Z-aip-phase10-review-correction-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029d0-1aab-7dc1-9480-a2c5093ea25e",
+  "app_server_process_id": "1444",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T141138Z-aip-phase10-review-correction-20260822.md",
+  "task_sha256": "02654a0abca9fafd0b65e2ded3ff181e8d9c9ae906cdc8b550c39b1ce31285da",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

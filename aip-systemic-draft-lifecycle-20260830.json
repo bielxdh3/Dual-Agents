@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-draft-lifecycle-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Continue the clean AIP branch fix/systemic-desktop-ux-and-generation at current HEAD 9fdb15b4be6b0241650bf8d1613af57ee19d5b7a. Implement the missing conversation lifecycle acceptance from the attached systemic desktop UX goal: clicking the sidebar new-conversation action must create only a local draft surface and must not invoke create_agent_conversation or create a database row. The draft must be discarded without persistence when the Owner navigates away, switches agent/workspace, or abandons it. It becomes persisted exactly when the Owner either (a) sends the first message, in which case create the conversation with a bounded fallback title and then send through the normal Rust ChatCoordinator path, or (b) explicitly saves a non-empty conversation name, in which case create/select it with no message. Keep the existing 7-day empty persisted-chat TTL as the cleanup guard for explicitly named empty chats. Make sidebar and active surface converge immediately after either trigger; selecting an existing conversation must close the local draft. Preserve temporary chat, agent isolation, model/provider gates, queue/cancel semantics, and Rust authority. Implement a small, accessible PT-BR draft UI with title editing, explicit `Salvar nome`, first-message composer, loading/error copy, and no fake message/history. Add focused React tests covering no create invoke on new draft, abandon/no row, first-message persistence+send, explicit empty save, and selecting an existing conversation. Update docs/PRODUCT_SPEC.md so the lifecycle wording is exact (new draft is not persisted; explicit name or first message persists; only explicitly named empty persisted chats use 7-day TTL). Do not redesign unrelated UX or alter migration history. Run focused desktop tests, TypeScript typecheck, secrets scan, git diff --check, and commit one coherent change as `feat: implement local conversation drafts`; do not push, PR, merge, tag, release, deploy, or build installers. Return a structured report with summary, files_changed, commands_run, tests, commit_sha, and remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor; no native subagents, alternate backend, account, or manual/direct implementation fallback.",
+    "Preserve existing commits and unrelated WIP. Do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Use React/TypeScript and existing repository dependencies; keep the patch minimal and secure. Do not commit secrets, databases, memories, model files, exports, backups, or auth material.",
+    "Do not create a persisted row merely to render a draft. Do not infer identity or change temporary-chat boundaries.",
+    "Installed-Windows visual behavior remains a human gate; do not claim it verified from static tests."
+  ],
+  "context_files": [
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/use-phase-one.ts",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/docs/PRODUCT_SPEC.md",
+    "E:/AIP/docs/UI_BEHAVIOR.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

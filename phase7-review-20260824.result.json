@@ -1,0 +1,63 @@
+## Status
+
+Reviewed base `f9e5df1` → head `0e45820` read-only.
+
+## Commit
+
+`0e458203c665ebad3985e1e7c34979feb214e33c` — `fix: close phase 7 lifecycle validation`
+
+## Files changed
+
+11 files: the four requested source/test files plus seven Phase 7 documentation files. No later-phase source files changed.
+
+## Behavior changed
+
+- Fail-closed owned, confirmed-memory and completed-public-conversation/message references ([cognitive.rs:1187](C:/Users/bielx/3D%20Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/cognitive.rs:1187)).
+- Transactional memory invalidation with opinion and six-dimension relationship recomputation ([database.rs:914](C:/Users/bielx/3D%20Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/database.rs:914), [cognitive.rs:1244](C:/Users/bielx/3D%20Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/cognitive.rs:1244)).
+- Deterministic goal/activity expiry and fictional-only lifecycle controls ([cognitive.rs:2908](C:/Users/bielx/3D%20Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/cognitive.rs:2908)).
+- Temporary-chat gates and Owner-visible provenance, relationship dimensions, schedules, and activity controls ([App.tsx:2842](C:/Users/bielx/3D%20Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src/App.tsx:2842)).
+
+## Review verdict
+
+**Approved with reservations**
+
+## Issues found
+
+Blocking findings: None.
+
+Important findings:
+
+- HUMAN_VALIDATION_REQUIRED remains for installed-Windows interaction, packaged restart/recovery, Owner smoke workflow, and subjective Portuguese/accessibility review.
+- Remote CI was not independently confirmed.
+- My local Rust validation attempt was blocked by access denied on Cargo’s existing `.cargo-build-lock`; therefore I do not independently claim those commands passed. The supplied current-host evidence is internally consistent with the implementation and documentation.
+
+Optional notes:
+
+- The App.tsx change is appropriately limited to activity wiring and Owner-visible provenance/lifecycle display, though some JSX remains densely formatted.
+- Public conversation consent, revocation, termination, and resource boundaries are implemented in the existing conversation path and remain within Phase 7E scope.
+
+## Scope and later-phase regression assessment
+
+Scope is consistent with Phase 7B–7F. The diff contains no material BielOS, Android, remote-access, voice, marketplace, vision, export/import, or other later-phase implementation. App.tsx changes are minimal and do not introduce a new autonomy or external-action path.
+
+## CI/validations
+
+Independently checked:
+
+- Exact commit, branch diff, changed-file list, and scope.
+- Source-level fail-closed references, transactional invalidation, projection recomputation, expiry, lifecycle, temporary-chat, and UI provenance paths.
+- Seven Phase 7 documentation updates.
+- No edits, commits, branch changes, or publication actions performed.
+
+Reported but not independently rerun due environment restrictions:
+
+- Rust format/check/tests.
+- Contracts and desktop typecheck/test/build.
+- Python checks, secrets scan, focused ESLint.
+- Codex Security diff scan.
+
+Known reservations remain: global lint/Prettier baseline failures and unavailable Android Gradle due missing `JAVA_HOME`.
+
+## Next recommended phase
+
+Proceed only after the documented HUMAN_VALIDATION_REQUIRED gates are completed and recorded.

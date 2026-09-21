@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p0-score-diagnosis-20260829",
+  "parent_request_id": "prompt-arena-p0-freeze-diagnosis-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Read-only root-cause diagnosis of the critical human-QA finding WINDOWS_QA_FINDING_EVALUATION_SCORE_CAUSES_BLACK_SCREEN in the exact current Prompt Arena checkout. Before inspection, read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md, C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md, C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\index\\SKILL.md, and C:\\Users\\bielx\\.codex\\plugins\\cache\\openai-curated-remote\\product-design\\0.1.52\\skills\\audit\\SKILL.md. Use only canonical BL4/biel4 Executor through App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Do not edit files, commit, push, merge, release, tag, deploy, or touch other worktrees. Trace score select/control -> React handler -> evaluation state -> Tauri invoke/persistence -> stored evaluation -> response reconciliation -> next evaluation -> render. Inspect ArenaResultsSurface, RunsView, BlindEvaluationPanel, results-ui, bridge, Rust evaluation commands/storage/migrations, and tests. Reproduce with focused unit/typecheck tests or a safe component/state harness if available; do not force reloads or change state to hide the issue. Investigate uncaught exceptions, invalid indexes/null current item, stale closure, route state, premature lock/reveal, duplicate mutation, save/render race, unstable keys, malformed payload, invoke rejection/error boundary, blind identity corruption, and recovery/resume semantics. Report exact likely root cause(s), files/line ranges, current state machine, tests run, whether runtime/browser reproduction is possible in this environment, safe fix boundary, and full provenance including thread_id/turn_id if exposed. Return diagnosis only with no repository mutation; status may be failed because no mutation was authorized.",
+  "constraints": [
+    "Read-only diagnosis; no repository or remote mutation.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No forced reload, F5 workaround, route reset, arbitrary timeout, or suppression of renderer errors.",
+    "No native TUI, native_tui, danger-full-access fallback, alternate executor, paid/cloud calls, or other worktree changes."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\bridge.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\evaluation.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\storage.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\storage\\migrations\\0004_blind_evaluations.sql",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.test.ts"
+  ],
+  "review_findings": [
+    {
+      "title": "Human QA reports score selection black-screens the evaluation view",
+      "details": "After a completed benchmark, selecting a score for one anonymous response turns the content black until F5, even though the result appears persisted. Evaluation continuity is broken."
+    },
+    {
+      "title": "Current panel mutates discriminated evaluation state from score controls",
+      "details": "BlindEvaluationPanel setScore calls updateState({...state, scores: ...}); updateState also calls the parent onStatusChange and RunsView conditionally hides attempt evidence based on that status. Audit this reconciliation and all subsequent render paths for exceptions or invalid state."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": { "allowed_actions": [] }
+}

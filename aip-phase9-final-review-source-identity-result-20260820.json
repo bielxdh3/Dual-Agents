@@ -1,0 +1,124 @@
+{
+  "verdict": "findings",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "finding": "Reparse-point rejection is incomplete for nested path components. safe_child canonicalizes the candidate/parent and checks only the final entry or immediate parent, so an intermediate symlink/junction/reparse component can be traversed if canonical containment remains inside the configured root. This does not verify the required rejection of symlink/junction/reparse paths at every component.",
+      "evidence": [
+        "apps/desktop/src-tauri/src/tools.rs:1350-1392",
+        "validate_existing_components is applied to the root, but not to the original relative path components used by safe_child",
+        "No focused test covers nested symlink/junction/reparse components"
+      ]
+    }
+  ],
+  "important_findings": [
+    {
+      "severity": "note",
+      "finding": "The Rust implementation otherwise establishes strong authority boundaries: Owner-scoped configured roots, canonical containment, no overwrite/delete, preview-time Rust identity capture, immediate pre-rename identity checks, bounded multi-move execution, rollback attempts, compensation identity checks, and persisted failure/audit state.",
+      "evidence": [
+        "tools.rs:339-418",
+        "tools.rs:2211-2405",
+        "tools.rs:1025-1160",
+        "tools.rs:2724-2919"
+      ]
+    },
+    {
+      "severity": "note",
+      "finding": "The caller-supplied sourceIdentity is ignored during preview and replaced with Rust-captured identity. Compatibility parsing remains optional and bounded in the TypeScript contract.",
+      "evidence": [
+        "tools.rs:2259-2274",
+        "packages/contracts/src/index.ts",
+        "packages/contracts/tests/contracts.test.ts:558-564"
+      ]
+    },
+    {
+      "severity": "note",
+      "finding": "Collection limits are present for moves, permissions, roots, catalog, sessions, and audit, including insertion/list enforcement where inspected.",
+      "evidence": [
+        "tools.rs:22-25",
+        "tools.rs:364-392",
+        "tools.rs:418-426",
+        "tools.rs:512-529",
+        "tools.rs:1202-1218",
+        "contracts.test.ts:563-583"
+      ]
+    },
+    {
+      "severity": "note",
+      "finding": "Migration 0023 rebuilds the tool tables while preserving existing rows and adds local workspace manifests/roots. The reviewed code keeps SQLite/Rust authoritative.",
+      "evidence": [
+        "migrations/0023_phase9_workspace_roots.sql",
+        "docs/PHASE_9_TOOLS_SPEC.md:92-105"
+      ]
+    },
+    {
+      "severity": "note",
+      "finding": "Documentation correctly marks Phase 9 as functional with human validation pending and does not claim stable release.",
+      "evidence": [
+        "docs/CORRECTIVE_GAP_MATRIX.md:13",
+        "docs/PHASE_9_TOOLS_SPEC.md"
+      ]
+    }
+  ],
+  "evidence": {
+    "commit_range": "06414e05765fe96f3e6fd736775c70e21187d5bb..5864d526eb07aa2c8b15973dfd5c44c2275bb799",
+    "commits_reviewed": [
+      "f5ec675",
+      "7324801",
+      "23cbdeb",
+      "a665850",
+      "dfeee2f",
+      "3ae7a9e",
+      "77b65d2",
+      "5864d52"
+    ],
+    "changed_files": 10,
+    "scope_checks": [
+      "No network, shell execution, upload, telemetry, watcher, public listener, raw-content persistence, provider credentials, or Phase 10+ behavior found in the reviewed Phase 9 changes.",
+      "UI invokes Rust commands and cannot independently approve, confirm, execute, or compensate actions.",
+      "Fixture adapters and local filesystem adapters are distinct in Rust and UI labels."
+    ],
+    "security_checks": [
+      "Absolute and traversal paths are rejected by relative-path validation.",
+      "Broad/system roots are rejected.",
+      "Canonical containment is enforced.",
+      "Destinations must not already exist.",
+      "Source substitutions are rejected before rename and revalidated immediately before each rename.",
+      "Compensation preflights all reverse moves and validates stable destination identities."
+    ]
+  },
+  "validation_run": {
+    "repository_status": "No worktree changes were reported.",
+    "pnpm_contracts_test": "Not completed: Vitest worker creation failed with spawn EPERM in the restricted environment.",
+    "pnpm_secrets_scan": "Not completed: child-process git invocation failed with spawnSync EPERM in the restricted environment.",
+    "remote_ci": "Remote CI not confirmed.",
+    "manual_source_review": "Completed for the requested diff, supporting Rust, TypeScript contracts, migration, UI integration, and Phase 9 documentation."
+  },
+  "remaining_human_checks": [
+    "Fix or explicitly close the nested reparse-point gap, then add Windows tests for intermediate symlink, junction, and reparse components.",
+    "Run Rust, contract, UI, migration/reopen, and full repository validations in an unrestricted environment.",
+    "Perform packaged Windows 10 x64 and manual Owner confirmation UX validation.",
+    "Validate live Windows filesystem behavior for junctions, mount points, race conditions, and rollback/partial-failure audit presentation.",
+    "Remote CI remains unconfirmed."
+  ],
+  "provenance": {
+    "review_mode": "read-only",
+    "skills_loaded": [
+      ".agents/skills/aip-phase-review/SKILL.md",
+      ".agents/skills/aip-security-review/SKILL.md",
+      ".agents/skills/aip-publication-check/SKILL.md"
+    ],
+    "files_read": [
+      "AGENTS.md",
+      "docs/PHASE_9_TOOLS_SPEC.md",
+      "docs/CORRECTIVE_GAP_MATRIX.md",
+      "apps/desktop/src-tauri/migrations/0023_phase9_workspace_roots.sql",
+      "apps/desktop/src-tauri/src/tools.rs",
+      "apps/desktop/src-tauri/src/database.rs",
+      "apps/desktop/src-tauri/src/lib.rs",
+      "apps/desktop/src/App.tsx",
+      "packages/contracts/src/index.ts",
+      "packages/contracts/tests/contracts.test.ts"
+    ]
+  }
+}

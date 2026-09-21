@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-adapters-finalize-20260827",
+  "parent_request_id": "prompt-arena-p3-adapters-20260827",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize only the preserved P3 model-library adapter diff on completion/model-library. Fix the current compile errors in src-tauri/src/model_library.rs (pattern guard binding, private Ollama validation access, GGUF quantization type conversion) with minimal repo-native changes. Keep the existing bounded loopback-only Ollama/LM Studio/llama.cpp discovery, GGUF metadata bounds, source identity, duplicate grouping, and storage changes intact. Do not add downloads, removal, UI, or unrelated scope. Run cargo fmt, cargo check, cargo test, and git diff --check. Add or adjust focused Rust tests only if needed for these fixes, then create one focused local commit. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/model-library; preserve commit 0df436f1dfbb639fba55169909661e54f9abd132 and all prior P1/P2 work",
+    "loopback-only local discovery; GGUF paths constrained to app-managed root; no secrets or cloud APIs",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/model_library.rs", "E:/Prompt Arena/src-tauri/src/ollama.rs", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/domain.rs"],
+  "review_findings": [{"severity": "blocking", "title": "Preserved P3 adapter diff does not compile", "details": "Cargo check reports six minimal compile errors in model_library.rs; fix only those errors and commit the adapter slice."}],
+  "max_correction_cycles": 0
+}

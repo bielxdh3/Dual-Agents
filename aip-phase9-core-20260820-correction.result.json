@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-core-20260820-correction",
+  "parent_request_id": "aip-phase9-core-20260820",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-20T18:11:10.731269+00:00",
+  "finished_at": "2026-08-20T18:15:45.558347+00:00",
+  "summary": "Correções da Fase 9 aplicadas e commit local criado: f5ec6759e67550d1e6f75d8dd59fcd51aafea587.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/database.rs",
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src-tauri/src/tools.rs",
+    "apps/desktop/src-tauri/migrations/0023_phase9_workspace_roots.sql"
+  ],
+  "commands_run": [
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"feat: implement phase 9 supervised local tools\""
+  ],
+  "tests": [
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "116 passed, 0 failed, 1 ignored (Ollama)."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "not_run",
+      "details": "Bloqueado pelo ambiente: spawnSync git EPERM."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Sem erros."
+    }
+  ],
+  "remaining_issues": [
+    "A verificação pnpm secrets:scan precisa ser repetida em um ambiente que permita ao Node executar git.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T181110Z-aip-phase9-core-20260820-correction\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T181110Z-aip-phase9-core-20260820-correction",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T181110Z-aip-phase9-core-20260820-correction\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T181110Z-aip-phase9-core-20260820-correction\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0205e-aff2-7cb0-a414-12bebdfa9e5a",
+  "app_server_turn_id": "01a0205e-b090-7940-b395-a702beeb0469",
+  "app_server_process_id": "24428",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260820T181110Z-aip-phase9-core-20260820-correction.md",
+  "task_sha256": "40bd3435c05994bdd2ab8fb27f2c3ce776e6fd3962daf8aebab7a2ed4039013e",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

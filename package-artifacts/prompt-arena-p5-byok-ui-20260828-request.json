@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-byok-ui-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "On completion/advanced-arena at HEAD 39de323, add a usable Settings BYOK panel wired to the existing external provider bridge. Cover OpenAI-compatible, OpenAI, Anthropic, and Gemini. Load and display only redacted metadata (configured/storage status/endpoint/model/identity), allow configure/update cost policy/remove, accept the API key only in a password field and never retain it after submission, expose explicit external-network consent before a test/generation action, show cost threshold and hard ceiling controls, and provide an explicit generation/test form using executeExternalGeneration with a user-supplied dated price snapshot and confirmation when required. Render loading/unsupported/error/success states, sanitized usage/cost/identity evidence, and clear no-secret/no-export messaging. Preserve existing Settings appearance controls, Core Arena, Advanced Arena, and browser preview honesty; do not call external providers automatically and do not store secrets in localStorage. Add focused TypeScript tests for validation/rendering helpers; no P6 dashboard/polish or P7 packaging. Commit only this UI slice after npm typecheck/test/build and cargo fmt/check/test/diff checks.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; preserve HEAD 39de323 and prior P1-P5 commits",
+    "no direct Architect implementation, no TUI/native_tui/fallback/substitute",
+    "no secret values in logs, errors, tests, exports, snapshots, or reports; no localStorage credential storage",
+    "no automatic or test-time external network calls; explicit user consent required",
+    "no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/provider-foundation.ts", "E:/Prompt Arena/src-tauri/src/external_providers.rs"],
+  "review_findings": [{"severity": "blocking", "title": "P5 secure adapter exists but Settings has only catalog-only provider copy", "details": "Replace the foundation-only BYOK panel with usable secure configuration and explicit consent/cost controls."}],
+  "max_correction_cycles": 0
+}

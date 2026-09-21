@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-contract-count-test-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-contract-ui-tests-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T14:45:04.344897+00:00",
+  "finished_at": "2026-08-22T14:45:50.898378+00:00",
+  "summary": "Updated the contract test to accept the supported maximum of three screen-vision records and reject a fourth. Production parser bounds and real-display acceptance are unchanged. Commit: f584259f5379d9d54f4f409f78415babe6ed5ef1.",
+  "files_changed": [
+    "packages/contracts/tests/contracts.test.ts"
+  ],
+  "commands_run": [
+    "pnpm --filter @aip/contracts typecheck",
+    "pnpm --filter @aip/contracts build",
+    "pnpm --filter @aip/contracts test",
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "cargo test --locked --lib screen_vision::tests",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop test",
+    "pnpm --filter @aip/desktop build",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"test: enforce bounded phase 11 fixture count\""
+  ],
+  "tests": [
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts build",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test",
+      "status": "not_run",
+      "details": "Blocked by Vitest worker spawn EPERM."
+    },
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib screen_vision::tests",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop test",
+      "status": "not_run",
+      "details": "Blocked by Vite/Vitest process-spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop build",
+      "status": "not_run",
+      "details": "Blocked by Vite process-spawn EPERM."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "not_run",
+      "details": "Blocked by secrets scanner spawnSync git EPERM."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    }
+  ],
+  "remaining_issues": [
+    "Contract tests, desktop tests/build, and secrets scanning require a host without the sandbox process-spawn EPERM restriction.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T144504Z-aip-phase11-real-screen-vision-contract-count-test-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T144504Z-aip-phase11-real-screen-vision-contract-count-test-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T144504Z-aip-phase11-real-screen-vision-contract-count-test-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T144504Z-aip-phase11-real-screen-vision-contract-count-test-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029ee-b69a-7a02-9560-7f98c9e87d94",
+  "app_server_process_id": "11884",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T144504Z-aip-phase11-real-screen-vision-contract-count-test-20260822.md",
+  "task_sha256": "3df78813ff54df6e09f55c47e49c2eddd475fd2df789b180c730310b6dc2b670",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

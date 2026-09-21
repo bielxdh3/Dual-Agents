@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-user-facing-finalize-20260828",
+  "parent_request_id": "prompt-arena-p4-user-facing-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize the preserved P4 Advanced Arena user-facing diff. Inspect src/advanced-arena-view.tsx, src/advanced-arena-ui.ts, their tests, and App.tsx/styles.css integration. Do not redesign or broaden into P5/P6/P7. Run npm run typecheck, npm test, npm run build, cargo fmt --all -- --check, cargo check, cargo test, and git diff --check. If failures are caused by this diff, fix them in the same P4 files; then commit only the P4 user-facing slice with a descriptive message. Preserve prior commits and do not reset, discard, or clean unrelated work. No network calls, no secrets, no TUI/native_tui/fallback, no merge/tag/release/deploy.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; use --allow-dirty because the preserved implementation diff is intentional",
+    "target completion/advanced-arena; preserve HEAD 422e94e and all P1/P2/P3 commits",
+    "no direct Architect implementation; no external calls; no page-transition motion",
+    "commit only files belonging to the P4 user-facing slice and leave the worktree clean after commit"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/advanced-arena-view.tsx", "E:/Prompt Arena/src/advanced-arena-ui.ts", "E:/Prompt Arena/src/advanced-arena-view.test.tsx", "E:/Prompt Arena/src/advanced-arena-ui.test.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/styles.css"],
+  "review_findings": [{"severity": "blocking", "title": "P4 user-facing implementation was preserved after executor timeout", "details": "Run full validation and commit only this preserved slice."}],
+  "max_correction_cycles": 1
+}

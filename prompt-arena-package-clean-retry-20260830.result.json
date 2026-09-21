@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-clean-retry-20260830",
+  "parent_request_id": "prompt-arena-package-20260829",
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T02:13:38.767969+00:00",
+  "finished_at": "2026-08-30T02:22:35.429588+00:00",
+  "summary": "Fresh exact-HEAD NSIS packaging succeeded after Cargo cleanup. Installer, artifact checksum, worker sidecar, clean install, launch, restart, and uninstall verification all passed. HEAD remained f393e9023b2f1d28de27ce34b73eff83f9a2af45; only generated package/checksum outputs changed. No visual or human QA is claimed.",
+  "files_changed": [
+    "src-tauri/target/release/bundle/nsis/Prompt Arena_0.1.0_x64-setup.exe",
+    "package-artifacts/prompt-arena-0.1.0-windows-nsis.exe",
+    "checksums-sha256.txt",
+    "package-verification.txt",
+    "src-tauri/binaries/prompt-arena-worker-x86_64-pc-windows-msvc.exe"
+  ],
+  "commands_run": [
+    "Read AGENTS.md and required skills",
+    "git rev-parse HEAD and git status --short",
+    "cargo clean --manifest-path src-tauri/Cargo.toml",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows --smoke",
+    "SHA-256 and generated evidence inspection",
+    "Final HEAD and source-scope verification"
+  ],
+  "tests": [
+    {
+      "command": "cargo clean --manifest-path src-tauri/Cargo.toml",
+      "status": "passed",
+      "details": "Removed 10,371 generated files and 7.0 GiB."
+    },
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+      "status": "passed",
+      "details": "NSIS bundle created at E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target\\release\\bundle\\nsis\\Prompt Arena_0.1.0_x64-setup.exe."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "passed",
+      "details": "Prepared the Windows NSIS artifact; MSI was unavailable."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum passed; clean install, executable start, restart, and silent uninstall passed."
+    },
+    {
+      "command": "SHA-256 and scope verification",
+      "status": "passed",
+      "details": "Installer/artifact size 3,756,114 bytes; SHA-256 085c1bf1ec49d6b8c5701ac4412dba5fce53989c2a075c2bb7e1768ff5ffcf62. Worker sidecar size 2,544,640 bytes; SHA-256 c42f5c56c18daf36455d2062498fa7de66cb5bb730ae58dfe4a1db45f549bab0. Manifest SHA-256 f052e25cdda301c094a54053119c7492550f4bc5d38e1a91e3b3d92b2b1de72c."
+    }
+  ],
+  "remaining_issues": [
+    "MSI remains unavailable; no MSI artifact was produced.",
+    "No visual, human, live-runtime, or remote-CI QA was performed or claimed.",
+    "Historical 57f02b3 installer evidence remains historical and was not relabeled.",
+    "Generated checksum manifest is Git-visible as the only tracked mutation; no source, history, or configuration files changed."
+  ],
+  "git_status": " M checksums-sha256.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T021339Z-prompt-arena-package-clean-retry-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T021339Z-prompt-arena-package-clean-retry-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T021339Z-prompt-arena-package-clean-retry-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T021339Z-prompt-arena-package-clean-retry-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a05071-a48f-7113-bbc8-67179a064700",
+  "app_server_process_id": "6400",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T021339Z-prompt-arena-package-clean-retry-20260830.md",
+  "task_sha256": "bc33904728767cf807901923130360771cf146dd2d203547134a3ebf6cf6bac8",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

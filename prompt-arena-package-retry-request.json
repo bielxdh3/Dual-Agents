@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-retry-20260829",
+  "parent_request_id": "prompt-arena-package-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Retry the Windows NSIS packaging flow for exact HEAD be1007f in the isolated worktree. The prior attempt built frontend/Rust successfully but Tauri failed while recreating a missing NSIS directory with Acesso negado (os error 5). The generated directory E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target\\release\\bundle\\nsis now exists and is writable. Do not modify source/docs/history or use remote operations. Run npm run tauri:build -- --bundles nsis, then package:artifacts and verify:package for windows; capture artifact/hash/sidecar and automated smoke if produced. If it still fails, report the exact error and stop. Canonical biel4 App Server/headless, workspace-write, elevated readiness ready, approval never, complete provenance.",
+  "review_findings": [
+    {"title":"NSIS directory recreation permission failure","details":"Previous package attempt: Tauri compilation succeeded, then failed at 'Warn NSIS directory is missing some files. Recreating it.' with Acesso negado. (os error 5); no installer or checksum manifest exists. Retry now that the generated NSIS directory was explicitly created in the isolated target."},
+    {"title":"No source changes","details":"Keep this retry packaging-only. Do not alter source/docs/commits/remotes. Preserve the exact reviewed commit be1007f."}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

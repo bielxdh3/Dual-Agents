@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-sidecar-proof-20260829",
+  "parent_request_id": "prompt-arena-package-smoke-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Perform a packaging-only sidecar inclusion proof for the existing exact-HEAD Windows NSIS artifact in E:\\Prompt Arena-live-telemetry-i18n. Do not modify source files, docs, repository history, remotes, settings, or the installer/checksum contents. Confirm HEAD remains 57f02b35abacce6a0a1ed64a5f952d29a710614a. Use a temporary directory: silently install package-artifacts\\prompt-arena-0.1.0-windows-nsis.exe with /S and /D=<temp>, locate the installed prompt-arena-worker.exe and prompt-arena.exe (excluding uninstallers), record their exact paths, sizes, and SHA-256 hashes, confirm the worker is present in the installed tree, silently uninstall with the installed uninstaller, and confirm the installed executable and worker disappear. Clean the temporary directory afterward. Do not claim native human UI QA. Use canonical biel4 Executor through App Server/headless with workspace-write, Windows elevated readiness ready, approval never, and complete provenance metadata.",
+  "constraints": [
+    "No source, docs, history, remote, tag, release, deploy, settings, or package-content changes.",
+    "Temporary installation output must be removed after the proof.",
+    "Preserve exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a."
+  ],
+  "review_findings": [
+    {
+      "title": "Automated lifecycle smoke passed but did not enumerate the worker",
+      "details": "The repository-native --smoke check passed clean install, launch, restart, and silent uninstall. The result records the prepared/release sidecar hashes but does not explicitly prove the worker exists in the installed tree."
+    },
+    {
+      "title": "Sidecar proof must be temporary and non-mutating",
+      "details": "Use only the existing installer and a temporary install directory, hash the installed main and worker executables, uninstall, and clean up. Do not edit source/docs/history/remotes or claim human UI QA."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\package-artifacts\\prompt-arena-0.1.0-windows-nsis.exe",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-ci-modefix-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T17:21:27.565600+00:00",
+  "finished_at": "2026-08-22T17:22:03.354381+00:00",
+  "summary": "Made android/gradlew executable without changing file contents. Committed as 42bb333 with clean status.",
+  "files_changed": [
+    "android/gradlew"
+  ],
+  "commands_run": [
+    "git update-index --chmod=+x android/gradlew",
+    "git diff --cached --check",
+    "./gradlew.bat testDebugUnitTest",
+    "./gradlew.bat lintDebug",
+    "./gradlew.bat assembleDebug",
+    "git commit -m \"fix: make android gradle wrapper executable\"",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "git diff --cached --summary --numstat",
+      "status": "passed",
+      "details": "Mode-only change: 100644 => 100755; 0 insertions, 0 deletions."
+    },
+    {
+      "command": "git diff --cached --check",
+      "status": "passed",
+      "details": "No diff errors."
+    },
+    {
+      "command": "testDebugUnitTest",
+      "status": "passed",
+      "details": "BUILD SUCCESSFUL."
+    },
+    {
+      "command": "lintDebug",
+      "status": "passed",
+      "details": "BUILD SUCCESSFUL."
+    },
+    {
+      "command": "assembleDebug",
+      "status": "passed",
+      "details": "BUILD SUCCESSFUL."
+    },
+    {
+      "command": "File SHA-256 comparison",
+      "status": "passed",
+      "details": "Content preserved; SHA-256 A3648413B47EF77AF21D5EBC36C687C7D103AAEF3E17F33DE7D4F080A6F300A3."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T172127Z-aip-phase12-ci-modefix-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T172127Z-aip-phase12-ci-modefix-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T172127Z-aip-phase12-ci-modefix-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T172127Z-aip-phase12-ci-modefix-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a63-9209-7be2-8af4-08b9c61c3fa5",
+  "app_server_turn_id": "01a02a7d-e4bb-7432-9983-ef79249d2160",
+  "app_server_process_id": "16008",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T172127Z-aip-phase12-ci-modefix-20260822.md",
+  "task_sha256": "365361db7420b2d7a7f6ce07b1c0121135dfde775e24ea9903ada787490e91ab",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

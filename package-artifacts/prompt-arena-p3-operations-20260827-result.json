@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-operations-20260827",
+  "parent_request_id": "prompt-arena-p3-adapters-finalize-20260827",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 1,
+  "started_at": "2026-08-27T22:52:15.158139+00:00",
+  "finished_at": "2026-08-27T23:02:16.628661+00:00",
+  "summary": "Codex executor failed; repository modifications, if any, were preserved.",
+  "files_changed": [
+    "src-tauri/src/model_library.rs",
+    "src-tauri/src/storage.rs"
+  ],
+  "commands_run": [],
+  "tests": [],
+  "remaining_issues": [],
+  "git_status": " M src-tauri/src/model_library.rs\n M src-tauri/src/storage.rs\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T225215Z-prompt-arena-p3-operations-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T225215Z-prompt-arena-p3-operations-20260827",
+  "executor_report_file": "",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T225215Z-prompt-arena-p3-operations-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "",
+  "app_server_turn_id": "",
+  "app_server_process_id": "",
+  "executor_windows_sandbox": "",
+  "executor_windows_sandbox_readiness": "not_checked",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T225215Z-prompt-arena-p3-operations-20260827.md",
+  "task_sha256": "5ecacc2ff79f33a00eee0eaed682671e4d35264418646cac6ffdca27cf0c3dea",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor exited with code 1."
+}

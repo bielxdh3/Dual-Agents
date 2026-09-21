@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-state-wording-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Continue the clean AIP branch fix/systemic-desktop-ux-and-generation at current HEAD f941a5429e295ed08e2830bd15b4e4bf8c6d0dfd. Make one documentation/UI wording correction only: ensure the State guidance in apps/desktop/src/App.tsx and docs/PRODUCT_SPEC.md describes shipped behavior without implying unimplemented features. The current Rust paths persist normal/voice_muted/silent modes; direct Phase One text remains governed by normal Rust/provider/suspension gates, voice-muted suppresses synthesized voice, silent blocks agent-initiated cognitive/public conversation and voice-setting mutations, and wake-now only adjusts fictional sleep/energy without removing suspension. State energy/mood/sleep are fictional simulated values, not health telemetry. Keep future-oriented mode descriptions explicitly future/planned. Do not change runtime behavior, persistence, or unrelated UX. Add/adjust the smallest focused assertion/test if useful. Run focused desktop tests, TypeScript typecheck, lint, secrets scan, and git diff --check. Commit one local change as `docs: clarify current state behavior`; do not push, PR, merge, tag, release, deploy, or build installers. Return a structured report with summary, files_changed, commands_run, tests, commit_sha, and remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor; no native subagents, alternate backend, account, or manual/direct implementation fallback.",
+    "Preserve existing commits and unrelated WIP. Do not reset, discard, amend, rebase, squash, force-push, or rewrite history.",
+    "Keep the patch minimal and repository-native. Do not add dependencies or secrets.",
+    "Installed-Windows visual behavior remains a human gate and must not be claimed verified from static tests."
+  ],
+  "context_files": [
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/state-memory-guidance.test.tsx",
+    "E:/AIP/docs/PRODUCT_SPEC.md",
+    "E:/AIP/apps/desktop/src-tauri/src/conversation.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/voice.rs"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

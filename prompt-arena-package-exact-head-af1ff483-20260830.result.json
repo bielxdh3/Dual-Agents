@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-exact-head-af1ff483-20260830",
+  "parent_request_id": null,
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T04:24:59.110838+00:00",
+  "finished_at": "2026-08-30T04:33:03.681954+00:00",
+  "summary": "Windows packaging completed on canonical BL4/biel4 App Server/headless provenance at exact HEAD af1ff48361341fa661a296955e7186a72f7caf2a, branch completion/windows-qa-live-telemetry-i18n. NSIS bundle and packaged artifact are 3,759,179 bytes with SHA-256 61727FB27548B69E6D113B534C64F8616DFB560DD5C0DBEC75F9755382DA2B01. Bundled worker is 2,567,680 bytes with SHA-256 7C939E9C234FE3D0476F38D9FBCA3E96D2D617834D54959B678498B1DEED0742. Tracked source sidecar remains separate at 2,544,640 bytes with SHA-256 9D1C253668743ECC08752BB7D07ABCF78ACF1CAF68654677CC988D77D848912D. Checksum manifest is 102 bytes with SHA-256 FA8BC8939FA8F3F0237A7B090550A504E8857ED044E971DACAFD4E1D2F663D41. Only checksums-sha256.txt changed, as permitted.",
+  "files_changed": [
+    "checksums-sha256.txt"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD; git branch --show-current; git status --short",
+    "cargo clean --manifest-path src-tauri/Cargo.toml",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows --smoke",
+    "Get-Content scripts/package-artifacts.mjs; Get-Content scripts/verify-package.mjs; Get-Content checksums-sha256.txt; Get-Content package-verification.txt",
+    "Get-FileHash for NSIS bundle, packaged artifact, bundled worker, source sidecar, checksum manifest, and package-verification.txt",
+    "git status --short; git diff --check; git diff -- checksums-sha256.txt package-verification.txt",
+    "rg -n -i \"MSI|Docker|remote|CI|Linux|visual|human|native\" docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md package-verification.txt",
+    "git log -1 --format=commit=%H%nsubject=%s; git branch --show-current; git status --porcelain=v1; node --version; npm --version; cargo --version; rustc --version"
+  ],
+  "tests": [
+    {
+      "command": "cargo clean --manifest-path src-tauri/Cargo.toml",
+      "status": "passed",
+      "details": "Removed 5,319 files and 2.3 GiB of prior Rust build output."
+    },
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+      "status": "passed",
+      "details": "Clean x64 NSIS build completed successfully."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "passed",
+      "details": "Prepared one Windows artifact and wrote checksums-sha256.txt; MSI optional artifact unavailable."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum manifest passed; NSIS clean install, installed executable start, restart, and silent uninstall all passed. Result: passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed; Git reported expected LF-to-CRLF working-copy warnings."
+    }
+  ],
+  "remaining_issues": [
+    "MSI remains unavailable due the existing local WiX limitation; no MSI artifact was produced.",
+    "Docker runtime is unavailable, Linux deb/AppImage require a Linux runner, and remote CI is unconfirmed.",
+    "Native visual, accessibility, and full Tauri Arena human QA remain pending; no such QA is claimed.",
+    "Build emitted existing linker and large JavaScript chunk warnings. Changes remain uncommitted for BL3 review."
+  ],
+  "git_status": " M checksums-sha256.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T042459Z-prompt-arena-package-exact-head-af1ff483-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T042459Z-prompt-arena-package-exact-head-af1ff483-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T042459Z-prompt-arena-package-exact-head-af1ff483-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T042459Z-prompt-arena-package-exact-head-af1ff483-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a050ba-4de9-7700-acdb-1fde982ab13b",
+  "app_server_turn_id": "01a050e9-e0c0-7640-9739-c9adda108619",
+  "app_server_process_id": "25408",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T042459Z-prompt-arena-package-exact-head-af1ff483-20260830.md",
+  "task_sha256": "b8ad3d49d9a82d588fc67ac3e9551cf9588fe1549e8842ebc675e25eb20cdcbd",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

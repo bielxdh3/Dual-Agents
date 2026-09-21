@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-model-operation-selection-correction-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Continue the same Prompt Arena core-continuity/model-state correction as the canonical BL4 Executor only through App Server/headless. The target worktree intentionally contains the uncommitted source/test changes from the immediately preceding BL4 turn. Review the current diff and make only a necessary follow-up correction: verify that findModelOperation/model action derivation cannot hide an active download/import when a newer or concurrent terminal operation for the same model is present. If operation ordering can make an active install invisible, prioritize a matching active install operation before terminal history and add a focused test; otherwise leave this part unchanged and explain why. Preserve installed Use/Remove, failed Retry, removal guards, path validation, blind state, and no invented downloads. Do not alter docs, do not broaden the UI work, and do not commit. Run the focused model-library/results tests and typecheck if practical, then return the required structured report with provenance and exact files/commands/results.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Preserve the current uncommitted changes; do not reset, stash, or commit them.",
+    "No changes to E:\\Prompt Arena or E:\\Prompt Arena-pr28.",
+    "No push, tag, release, deploy, merge, PR, or UI automation."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.test.ts"
+  ],
+  "review_findings": [
+    {
+      "title": "Active install selection precedence",
+      "details": "Potential remaining edge: findModelOperation currently returns only the newest matching operation, so an active install could be hidden by a newer terminal record; verify against storage ordering and fix only if real.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "parent_request_id": "prompt-arena-core-continuity-model-state-retry-20260830",
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

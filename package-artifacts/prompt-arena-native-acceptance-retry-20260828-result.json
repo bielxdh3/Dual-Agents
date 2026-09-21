@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-acceptance-retry-20260828",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T21:56:50.985369+00:00",
+  "finished_at": "2026-08-28T21:57:10.597955+00:00",
+  "summary": "Blocked and failed closed: the authoritative app_server control-plane launcher exposing exact thread_id and turn_id was unavailable. No provenance was inferred, and no repository or native-app work was performed.",
+  "files_changed": [],
+  "commands_run": [],
+  "tests": [
+    {
+      "command": "Native Tauri/WebView acceptance",
+      "status": "not_run",
+      "details": "Blocked because the required control-plane wrapper metadata was unavailable."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "not_run",
+      "details": "Stopped before repository validation per task instructions."
+    },
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Stopped before repository validation per task instructions."
+    },
+    {
+      "command": "npm run build",
+      "status": "not_run",
+      "details": "Stopped before repository validation per task instructions."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+      "status": "not_run",
+      "details": "Stopped before repository validation per task instructions."
+    },
+    {
+      "command": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "not_run",
+      "details": "Stopped before repository validation per task instructions."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "not_run",
+      "details": "Stopped before repository validation per task instructions."
+    }
+  ],
+  "remaining_issues": [
+    "The canonical control-plane wrapper did not expose the authoritative app_server thread_id and turn_id launcher metadata required to begin work."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215651Z-prompt-arena-native-acceptance-retry-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215651Z-prompt-arena-native-acceptance-retry-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215651Z-prompt-arena-native-acceptance-retry-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T215651Z-prompt-arena-native-acceptance-retry-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04a43-d35d-72d2-b67b-c13dab282a0d",
+  "app_server_turn_id": "01a04a60-2bb3-74a3-b9a5-d90e9440e645",
+  "app_server_process_id": "24460",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T215651Z-prompt-arena-native-acceptance-retry-20260828.md",
+  "task_sha256": "e5f49762c6aa6b103f4e3bdd00904117ae43fd25677f03505cece829039d8b6a",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

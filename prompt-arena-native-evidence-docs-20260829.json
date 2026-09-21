@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-evidence-docs-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Update only the product evidence documentation in E:\\Prompt Arena-pr28-bl4 to record the current native-driver artifact and Windows acceptance truth. Do not edit application/source code, scripts, workflows, policies, tests, package files, or unrelated docs. In docs/DELIVERY_MATRIX.md, preserve the existing P1-P7 IN PROGRESS truth and add the exact current evidence: PR #28 head 55d685fbdbd927a5ab195ab141fa76ea823acf96; Windows native driver toolchain workflow run 33254907801 succeeded and produced artifact prompt-arena-windows-native-driver-toolchain-55d685fbdbd927a5ab195ab141fa76ea823acf96 with manifest sourceCommit 55d685fbdbd927a5ab195ab141fa76ea823acf96, tauri-driver package 2.0.6, EdgeDriver 151.0.4129.101, x64, hashes verified locally; hosted Windows native run 33254907800 failed at WebDriver POST /session with `session not created: DevToolsActivePort file doesn't exist` and must be explicitly classified as `CI_HOSTED_WINDOWS_WEBDRIVER_POLICY_LIMITATION`; local artifact-backed run used product SHA f3048a61f45cdb6b29f362444f3d32646edf4943 and failed at the same session boundary with `session not created from chrome not reachable`, while the read-only diagnosis observed DevToolsActivePort creation and repeated WebView2 GPU exits `STATUS_ACCESS_DENIED (0xC0000022)`, so classify that separately as a local Windows WebView2/GPU host limitation, not product acceptance. State that no native acceptance marker was produced and bridge/Rust/sidecar/persistence/reopen assertions remain unexercised on Windows; Linux hosted native evidence remains whatever the existing matrix records. Keep unsigned artifact/no release/tag/deploy and no merge claims. Update docs/SECURITY.md only if needed to keep its residual native-host policy wording consistent; do not invent a security finding. Use concise factual wording and exact run links already used by the repository. Commit the documentation-only change locally with message `docs: record native driver artifact and Windows host limitation` so BL3 can independently review before any brokered push. Do not push, merge, release, tag, deploy, or touch E:\\Prompt Arena original WIP.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; workspace-write, windows.sandbox=elevated, readiness=ready, approval=never required in result metadata.",
+    "Documentation-only implementation; preserve P1-P7 incomplete status and security controls.",
+    "No remote action; no original-WIP access; no source/workflow/test/policy changes."
+  ],
+  "context_files": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/SECURITY.md",
+    "scripts/native-ui-smoke.mjs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_commit"]}
+}

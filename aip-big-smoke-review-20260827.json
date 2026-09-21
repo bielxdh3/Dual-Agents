@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-review-20260827",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Act as the distinct Biel4 Reviewer for the AIP Big Smoke UI regression correction. Review the clean branch fix/big-smoke-ui-regressions at HEAD 9bd6076 (commits fc2280f and 44c9bf2 plus the scope cleanup 9bd6076) against parent 9a77344. Do not modify files, create commits, push, open/update PRs, merge, tag, release, deploy, or build installers. Perform a deep technical review of all five Owner-observed bugs and the final net diff: (1) sprite transparency/alpha and SVG compositing, including PNG import alpha preservation; (2) giant square/bounding-box risk across AgentSprite, overlay/Tauri transparency, editor canvas, and CSS; (3) Pencil isolation, immutable document/layer state, preview/composite aliasing, and undo/redo; (4) Selection pointer-down anchor, arbitrary/reverse/repeated drags, edge clamping, pointer end/cancel, and coordinate math; (5) ConversationList styling hooks, hierarchy/layout, browser-default controls, keyboard accessibility, focus/hover/disabled behavior, and CSS import/packaging. Inspect the exact source and tests, verify the tests are deterministic and non-brittle, check for regressions in existing tools/layers/palette/eraser/fill/eyedropper/mirror/zoom/import/agent switching/conversation operations/safe mode/temporary chat/Phase 7-13 wiring, and inspect the net diff for unrelated formatting or security/privacy issues. For each bug explicitly state whether the fix addresses the root cause, cite files/lines, identify any blocking or important finding, and give a final verdict exactly one of approved, approved_with_reservations, or changes_requested. Return a structured reviewer report with summary, verdict, findings (severity/title/details), tests_reviewed, files_reviewed, and remaining_issues. Evidence only; no edits.",
+  "constraints": [
+    "Use the same configured Biel4 App Server/headless Reviewer identity; do not use native subagents or a fallback backend.",
+    "Read and honor E:/AIP/AGENTS.md and the AIP implementation, phase-review, security-review, publication-check, and Ponytail instructions.",
+    "Review the final net diff against 9a77344, not only the latest formatting cleanup commit.",
+    "No file edits or generated artifacts in E:/AIP during this review.",
+    "Do not expose secrets, credentials, local databases, histories, memories, private media, or authentication files.",
+    "Treat default Vitest fork-pool spawn EPERM as an environment limitation; verify the passing threads-pool focused suite separately and do not weaken coverage."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.tsx",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.test.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.test.ts",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/pixel-editor.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

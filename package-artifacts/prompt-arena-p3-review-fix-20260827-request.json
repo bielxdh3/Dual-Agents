@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-review-fix-20260827",
+  "parent_request_id": "prompt-arena-p3-ui-finalize-20260827",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Address the independent P3 Architect review findings on completion/model-library with a focused same-BL4 correction. Add focused TypeScript tests in src/model-library.test.ts for unified catalog filtering/source labels, loopback and managed-GGUF validation, operation request builders, duplicate/quantization distinctness, and operation progress labels. In the Models UI, visibly summarize catalog duplicateGroups and render available format/license/source/location metadata from the normalized record metadata when present, while keeping unknown metadata explicit and avoiding guesses. Do not broaden to P4/P5/P6/P7. Run npm typecheck, npm test, npm run build, cargo fmt/check/test, and git diff --check, then create one focused local commit. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/model-library; preserve HEAD 0f25594 and current clean worktree",
+    "do not weaken loopback/path/removal boundaries; no secrets/cloud APIs",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/model-library.test.ts", "E:/Prompt Arena/src/model-library.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/src/domain.rs"],
+  "review_findings": [{"severity": "important", "title": "P3 acceptance visibility/tests incomplete", "details": "Catalog duplicate groups and optional format/license/source metadata are not visible in the UI, and new TypeScript helper/request boundaries lack focused tests."}],
+  "max_correction_cycles": 0
+}

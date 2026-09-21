@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-a3-generation-core-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Required skills at top: E:/AIP/.agents/skills/aip-implementation/SKILL.md; E:/AIP/.agents/skills/aip-phase-review/SKILL.md; E:/AIP/.agents/skills/aip-security-review/SKILL.md; E:/AIP/.agents/skills/aip-publication-check/SKILL.md; C:/CodexGlobal/skills/ponytail/SKILL.md (all fully). Execute only the smallest remaining Phase A generation-core correction from the goal C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md. Start from the current branch fix/systemic-desktop-ux-and-generation at c8dcbcd128e4f2babc2d4ebe27259f28529cef81 with the preserved uncommitted four-line chat.rs context bound. Do not reread the whole repository or implement later phases. Inspect only the current diff plus these generation files: apps/desktop/src-tauri/src/chat.rs, apps/desktop/src-tauri/src/lib.rs, apps/desktop/src-tauri/src/runtime.rs if present, the managed runtime protocol/sidecar files under apps/runtime, and the narrow frontend event consumer in apps/desktop/src. Trace the concrete request path far enough to identify one evidence-backed stalled boundary (queue/request construction, stdio framing/flush, Ollama stream/terminal, Rust event acceptance/persistence, or frontend finalization). Fix that root cause with the minimum coherent edit and add focused deterministic regression tests for the behavior. Preserve local-first security, managed stdio, Rust authority, request/sequence validation, temporary chat, cancellation recovery, provider health, and privacy. If the current code already handles the boundary, do not invent a watchdog; report the exact evidence and leave code unchanged except for the existing valid context bound. Run only focused tests/format checks and a bounded direct Ollama health/model check if already available; do not log prompt/response content. Commit the focused Phase A change locally with an explanatory message. Do not push, PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues, including root-cause evidence in summary/remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor with elevated/ready Windows sandbox. No native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Preserve valid filesystem progress and unrelated owner work; do not reset, discard, amend, rebase, squash, force-push, or weaken security controls.",
+    "Keep the diff Phase A-only and minimal; no broad UX or documentation phases yet.",
+    "Do not claim a real end-to-end AIP/Ollama success without running it; mark unavailable or blocked explicitly."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/apps/desktop/src-tauri/src/chat.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/runtime.rs",
+    "E:/AIP/apps/runtime",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/packages/contracts/src/index.ts"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

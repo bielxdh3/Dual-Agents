@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-final-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-correction-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T14:35:48.890501+00:00",
+  "finished_at": "2026-08-22T14:39:18.331526+00:00",
+  "summary": "Completed and committed the Phase 11 bounded screen-vision checkpoint. Added replaceable deterministic/local visual adapters, real-job unavailable degradation with cleaned failure lifecycle, transient capture handling, resource gating, and truthful documentation. Commit: 2beca1fe70606b4fdb7fa0d268b77f9ea23a82a3.",
+  "files_changed": [
+    "README.md",
+    "apps/desktop/src-tauri/src/screen_vision.rs",
+    "docs/CORRECTIVE_GAP_MATRIX.md",
+    "docs/KNOWN_LIMITATIONS.md",
+    "docs/PHASE_11_SCREEN_VISION_SPEC.md",
+    "docs/ROADMAP.md"
+  ],
+  "commands_run": [
+    "cargo fmt",
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "cargo test --locked --lib screen_vision::tests",
+    "pnpm --filter @aip/contracts typecheck",
+    "pnpm --filter @aip/contracts build",
+    "pnpm --filter @aip/contracts test",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop build",
+    "pnpm --filter @aip/desktop test",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"feat: complete phase 11 screen vision checkpoint\""
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "cargo test --locked --lib screen_vision::tests",
+      "status": "passed",
+      "details": "5 focused tests passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts build",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test",
+      "status": "not_run",
+      "details": "Blocked by Vitest worker spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "TypeScript check completed before build startup failure."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop build",
+      "status": "not_run",
+      "details": "Blocked by Vite spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop test",
+      "status": "not_run",
+      "details": "Blocked by Vitest/Vite spawn EPERM."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "not_run",
+      "details": "Blocked by secrets scanner spawnSync git EPERM."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    }
+  ],
+  "remaining_issues": [
+    "A local visual model is not configured, so real display analysis intentionally returns a bounded unavailable/degraded error.",
+    "Node-based tests, desktop build/tests, and secrets scan require a host without the sandbox process-spawn EPERM restriction.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T143549Z-aip-phase11-real-screen-vision-final-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T143549Z-aip-phase11-real-screen-vision-final-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T143549Z-aip-phase11-real-screen-vision-final-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T143549Z-aip-phase11-real-screen-vision-final-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029e6-4044-7d11-a03c-ad0ba468fb83",
+  "app_server_process_id": "11964",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T143549Z-aip-phase11-real-screen-vision-final-20260822.md",
+  "task_sha256": "461bf824cd3a9c774245912917e7c5c1bc4809da53b5071049ba890a74c18f31",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

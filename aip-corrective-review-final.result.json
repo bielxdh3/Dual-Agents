@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "request_id": "aip-corrective-final-review-78b9294",
+  "verdict": "approved_with_reservations",
+  "summary": "No actionable defect found in the reviewed corrective diff. The requested status-vocabulary correction is present. Human and environment validation reservations remain.",
+  "findings": [],
+  "phase_status": {
+    "phase_8": "FUNCTIONAL — HUMAN VALIDATION PENDING",
+    "phase_9": "FUNCTIONAL — HUMAN VALIDATION PENDING",
+    "phase_10": "FUNCTIONAL — AUTOMATED VALIDATION COMPLETE",
+    "phase_11": "FUNCTIONAL — HUMAN VALIDATION PENDING",
+    "phase_12": "FUNCTIONAL — HUMAN VALIDATION PENDING",
+    "phase_13": "FUNCTIONAL — HUMAN VALIDATION PENDING"
+  },
+  "validation_evidence": [
+    "Reviewed origin/main..HEAD, current code, changed specifications, roadmap, and corrective mission attachment.",
+    "Confirmed bounded waveIn/waveOut enumeration, capture/playback, provider boundaries, local custom voice metadata restrictions, supervised filesystem effects, closed declarative extension VM, GDI capture/provider protocol, Android transport, and authenticated loopback/private gateway boundaries.",
+    "pnpm secrets:scan was attempted but blocked by reviewer-environment spawnSync git EPERM.",
+    "Focused cargo test could not run because the reviewer environment denied access to the Cargo build lock. Remote CI was not confirmed.",
+    "Manual repository secret/path scans found no obvious committed credentials, private keys, databases, models, backups, or personal media."
+  ],
+  "human_validation": [
+    "Windows hardware and packaged voice validation",
+    "Filesystem confirmation UX and packaged Windows behavior",
+    "Extension package usability and Owner review",
+    "Screen privacy, visual quality, provider/model installation, and packaged UX",
+    "Physical Android device, private-LAN, notification, and release-signing validation",
+    "Gateway private-network behavior and recovery UX"
+  ],
+  "publication_readiness": "Public-ready with normal caution; release artifact review and human validation remain required. Not release-ready.",
+  "provenance": {
+    "reviewer_role": "Biel4 Reviewer",
+    "backend": "Configured Biel4 App Server/headless Code mode, fast mode",
+    "repository": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\aip-phase10-checkout",
+    "head": "78b9294e0bee64d266567be3132841ddb2291f09",
+    "base": "origin/main at 711ab24126a9667e47216dba6b06e10a59040847",
+    "identity_source": "User-provided review context"
+  },
+  "reviewer_report_file": null,
+  "git_status": "clean"
+}

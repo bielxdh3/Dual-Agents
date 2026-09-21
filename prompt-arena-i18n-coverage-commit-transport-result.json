@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-coverage-commit-transport-20260830",
+  "parent_request_id": "prompt-arena-i18n-coverage-followup-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T05:08:18.520720+00:00",
+  "finished_at": "2026-08-30T05:13:26.741455+00:00",
+  "summary": "Committed exact six-file patch as 75178ac60a998c3bdaec3b7522dfb7b919ef2e94 on completion/windows-qa-live-telemetry-i18n. Executor: BL4/biel4, authenticated App Server/headless Executor, workspace-write Windows sandbox ready, approval policy never. Patch ID: 104cd0ed1cc10a842ec9ac3faf78e9da5de458cc. Protected worktrees unchanged.",
+  "files_changed": [
+    "scripts/ui-contracts.test.mjs",
+    "src/App.tsx",
+    "src/advanced-arena-view.tsx",
+    "src/arena-runner.test.ts",
+    "src/arena-runner.ts",
+    "src/i18n.ts"
+  ],
+  "commands_run": [
+    "npm ci",
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "npm run check:boundaries",
+    "git diff --check",
+    "git add -- six files",
+    "git commit -m \"fix: complete localized Arena monitor coverage\""
+  ],
+  "tests": [
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Initial attempt unavailable because vitest was not installed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "19 files; 111 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Passed; existing chunk-size warning only."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed; line-ending warnings only."
+    }
+  ],
+  "remaining_issues": [
+    "Installed/native/human QA remains pending and was not claimed. Remote CI unconfirmed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T050818Z-prompt-arena-i18n-coverage-commit-transport-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T050818Z-prompt-arena-i18n-coverage-commit-transport-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T050818Z-prompt-arena-i18n-coverage-commit-transport-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T050818Z-prompt-arena-i18n-coverage-commit-transport-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05111-8aab-7400-a2c4-c64c8beb51ed",
+  "app_server_turn_id": "01a05111-8b45-70c1-aa6a-8d2e41d88a27",
+  "app_server_process_id": "16000",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T050818Z-prompt-arena-i18n-coverage-commit-transport-20260830.md",
+  "task_sha256": "2b8aad2fb5845bb446c312106c044eeaca1b405a509b9bedb0ec3cf39907fca6",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-pinned-fallback-fix",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Apply one minimal follow-up fix to clean AIP branch fix/desktop-conversation-ux-architecture at HEAD 78d38a19d1357a068b00b1d98995fb6448de1eaa. The distinct Biel4 Reviewer returned changes_requested with one blocking data-model issue: Database::main_conversation() currently orders only updated_at DESC, id ASC, while list/fallback semantics promise pinned-first; after archiving or deleting the active conversation, an older pinned conversation can be skipped in favor of a newer unpinned one. Update the main_conversation fallback query to order is_pinned DESC, updated_at DESC, id ASC, preserving agent isolation and legacy-main compatibility. Add a focused Rust regression test proving pinned fallback wins after deleting/archiving the active conversation, then run cargo fmt --check, cargo check, the relevant database tests and full cargo test if feasible, plus git diff --check. Create one new local commit with message `fix: prefer pinned conversation fallback`. Do not push, create/update a PR, merge, tag, release, deploy or build installers. Return a structured report with summary, files_changed, commands_run, tests, commit_sha and remaining_issues.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor; no native subagents, alternate backend, account or manual/direct implementation fallback.",
+    "Preserve the accepted parent commits and all existing UX/security/temporary-chat/overlay/data behavior. No reset, discard, amend, rebase, squash, force-push or history rewrite.",
+    "Use existing Rust/SQLite patterns and no new dependency. Do not expose or commit secrets, credentials, databases, histories, memories, model files, voice samples, exports, backups, private media or authentication files.",
+    "Installed-Windows overlay, packaging and remote CI remain separate human/CI gates; do not claim them verified here. No stable tag/release."
+  ],
+  "context_files": [
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0026_conversation_organization.sql",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs"
+  ],
+  "review_findings": [
+    {
+      "title": "Pinned conversation is skipped by active fallback",
+      "details": "Reviewer evidence: main_conversation() selects ORDER BY updated_at DESC, id ASC, while conversations() and archive fallback use is_pinned DESC first. After excluding the active conversation, a pinned older conversation can lose to a newer unpinned row. Align main_conversation ordering and add regression coverage.",
+      "severity": "blocking"
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "operation": "normal_push",
+  "mission_id": "aip-phase9-final-push-20260820",
+  "authorization_reference": "aip-phase9-final-push-20260820",
+  "repository": "E:\\AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "branch": "feat/phase-9-supervised-tools",
+  "expected_remote_state": "exists",
+  "expected_remote_old_sha": "06414e05765fe96f3e6fd736775c70e21187d5bb",
+  "new_sha": "9a7734460dded5469acd5e746f3118c9e3d28054",
+  "authorization": {
+    "allowed_actions": ["normal_push"]
+  }
+}

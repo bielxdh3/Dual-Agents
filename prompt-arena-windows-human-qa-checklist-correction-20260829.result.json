@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-human-qa-checklist-correction-20260829",
+  "parent_request_id": "prompt-arena-windows-human-qa-checklist-20260829",
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T15:27:21.773331+00:00",
+  "finished_at": "2026-08-29T15:28:50.470244+00:00",
+  "summary": "Applied only the two requested documentation corrections. Marker semantics are now batch-scoped for WINDOWS_NATIVE_UIA_NAVIGATION_PASS, while broader markers require complete criteria and the current unavailable discovery emits none. The matrix now links the human QA checklist. Existing classifications, statuses, and security wording are preserved. Changes remain uncommitted and unpushed. Provenance: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4/biel4 Executor\",\"task_transport\":\"App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"turn_id\":\"not exposed by Executor transport\",\"workspace\":\"E:\\\\Prompt Arena-pr28-bl4\",\"workspace_write\":\"workspace-write\",\"windows.sandbox\":\"elevated (control-plane asserted)\",\"readiness\":\"ready (control-plane asserted)\",\"approval\":\"never\"}.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "Get-Content -LiteralPath C:\\CodexGlobal\\AGENTS.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\ponytail\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md -Raw",
+    "Get-Content -LiteralPath C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md -Raw",
+    "git status --short --branch",
+    "rg -n for existing marker rules and matrix evidence",
+    "Apply documentation-only correction patch",
+    "git diff --check",
+    "PowerShell focused scope, status-preservation, marker-semantics, checklist-structure, and whitespace check",
+    "git diff --unified=2 -- docs/DELIVERY_MATRIX.md",
+    "Get-Content docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors in the tracked documentation diff."
+    },
+    {
+      "command": "Focused Markdown and scope consistency check",
+      "status": "passed",
+      "details": "Only the two allowed documentation files are changed; matrix statuses are unchanged; all 24 checklist items retain required fields; batch-scoped marker semantics, handoff link, unavailable-UIA marker, and no-acceptance wording are present."
+    }
+  ],
+  "remaining_issues": [
+    "Windows UIA discovery remains unavailable and no acceptance marker was emitted.",
+    "The real turn_id is not exposed by the configured Executor transport.",
+    "Changes are intentionally left uncommitted and unpushed for BL3 review."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n?? docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T152722Z-prompt-arena-windows-human-qa-checklist-correction-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T152722Z-prompt-arena-windows-human-qa-checklist-correction-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T152722Z-prompt-arena-windows-human-qa-checklist-correction-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T152722Z-prompt-arena-windows-human-qa-checklist-correction-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04e21-f29e-7503-b96c-6d9cf8a1394b",
+  "app_server_process_id": "11116",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T152722Z-prompt-arena-windows-human-qa-checklist-correction-20260829.md",
+  "task_sha256": "4a3b1e625fe462c28cf37d860a0b8a2f0b4f04565cf5ebaaa116feebb7116a9a",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

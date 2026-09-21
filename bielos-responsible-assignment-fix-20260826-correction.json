@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-fix-20260826-correction",
+  "parent_request_id": "bielos-responsible-assignment-fix-20260826",
+  "action": "correct",
+  "repository": "E:\\BielOS",
+  "task": "Continue the same Biel4 App Server Executor correction in the current E:\\BielOS worktree. The first implementation added the intended Core project assignment feedback/read-back changes and focused tests, but Architect review found a concrete blocking test failure: npm run test:core:unit fails both new project-admin-controls tests with ReferenceError: React is not defined at apps/hub/src/app/core/projects/project-admin-controls.tsx because the JSX file imports named React APIs only indirectly and the test renderer requires the React binding. Add the minimal repo-native fix (explicit React import or equivalent compatible with this repo), inspect the current diff for any other concrete compile/test issue, and do not revert the implementation. Preserve all unrelated pre-existing dirty paths.\n\nRe-run the focused unit suite (at minimum the project feedback, project-admin-controls, access-policy, detail-policy, and validation tests; npm run test:core:unit is preferred) and the project-access database integration suite if available. Run typecheck for @bielos/hub or the materially affected workspace if useful. Do not change schema/dependencies, security boundaries, ownership model, or unrelated auth/rate-limit/GymForge/docs files. No commit, push, PR, merge, tag, release, deploy, production rebuild/restart, or production DB mutation.\n\nReturn a structured executor report with summary, files_changed, commands_run, tests, remaining_issues, git_status, diff_file, and executor_report_file, plus trustworthy App Server provenance: executor account/label, role, backend/transport, CODEX_HOME/profile, repository, and thread/turn/result correlation. If no further source change is needed beyond the import, still report the validation truthfully. Remove no user changes and fail closed on provenance uncertainty.",
+  "constraints": [
+    "Use only the same configured biel4 App Server Executor; no native subagents or alternate backend.",
+    "Apply only the minimal correction to the existing responsible-assignment implementation; preserve unrelated dirty paths.",
+    "No commit or publication action; no production or destructive mutation.",
+    "Run and report focused validation and trustworthy App Server provenance."
+  ],
+  "review_findings": [
+    {
+      "title": "New project-admin-controls tests crash because React binding is missing",
+      "details": "npm run test:core:unit reports ReferenceError: React is not defined at CoreProjectAdminControls in project-admin-controls.tsx when renderToStaticMarkup invokes JSX. Add the smallest explicit React import compatible with the existing tsx setup and rerun the tests.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "apps/hub/src/app/core/projects/project-admin-controls.tsx",
+    "apps/hub/src/app/core/projects/project-admin-controls.test.tsx",
+    "apps/hub/src/app/core/projects/feedback.ts",
+    "apps/hub/src/app/core/projects/feedback.test.ts",
+    "apps/hub/src/app/core/integration/project-access.db.test.ts"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation"]
+  },
+  "max_correction_cycles": 0
+}

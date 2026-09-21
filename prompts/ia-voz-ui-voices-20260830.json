@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-ui-voices-20260830",
+  "action": "implement",
+  "parent_request_id": "ia-voz-multi-voice-phase3-hardening-20260830",
+  "repository": "C:/IA DE VOZ",
+  "task": "Improve the Gradio voice/profile UX so a non-technical user immediately understands which voice is active, what Existing Voice means, where to put audio, and that audio counts are isolated per voice. Use the existing profile architecture and helpers; keep the change local and minimal. Add an explicit per-active-profile drag-and-drop upload area in the ÁUDIOS tab using gr.File with multiple files and the already-supported extensions (.wav, .mp3, .flac, .m4a, .aac, .ogg, .opus, .wma, .webm, .mp4). Implement a copy-only upload handler that accepts filepath(s), rejects unsupported extensions and MP4 without usable audio, rejects reparse/traversal/outside paths, never overwrites an existing different file (use a deterministic suffix), verifies copied hashes, and returns a clear status plus refreshed active-profile inventory. Add concise Portuguese copy: Existing Voice is the automatically migrated legacy voice; new audio belongs only to the selected active voice; switch the selector before uploading to another voice. Add a per-voice overview in VOZES showing display name, active marker, isolated audio count/total duration/size, and folder path. Keep the existing per-profile table, ATUALIZAR, ABRIR PASTA DE ÁUDIOS, migration, lifecycle actions, and security guards. Make the top-level active voice panel friendly: display name first, voice_id secondary/collapsed in copy, and a short next-step instruction. Wire profile selection/create/rename/delete/migration refreshes to update overview, help text, active audio inventory and checkpoint choices without stale profile routing. Do not change data layout, dependencies, model behavior, training, migration, or original audio files.",
+  "constraints": [
+    "Use only the canonical biel4 App Server/headless Executor with the existing isolated CODEX_HOME; no native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Only edit C:/IA DE VOZ/app.py and focused tests under C:/IA DE VOZ/tests; no dependency changes, no .git metadata changes, no commit/push in the Executor task.",
+    "Never move, rename, delete, or mutate existing audio/profile data. Upload copies only; input files remain untouched.",
+    "Keep all path, reparse, cross-profile, stale-callback and authorization protections fail-closed. Do not execute PREPARE DATASET, training, generation, or migration on real data.",
+    "Return exactly one JSON object with summary, files_changed, commands_run, tests, remaining_issues and provenance/phase/security fields."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/tests/test_phase2_profiles.py",
+    "C:/IA DE VOZ/tests/test_phase3_hardening.py",
+    "C:/IA DE VOZ/voices",
+    "C:/IA DE VOZ/input_audio"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-bl4-operational-preflight-20260827",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T20:56:05.530159+00:00",
+  "finished_at": "2026-08-27T20:57:06.151599+00:00",
+  "summary": "BL4 operational preflight passed under canonical wrapper provenance: account=biel4; role=Executor/Reviewer; backend=app_server; task_transport=app_server; repository=E:/Prompt Arena.",
+  "files_changed": [],
+  "commands_run": [
+    "Get-Location",
+    "git rev-parse --show-toplevel",
+    "git branch --show-current",
+    "git rev-parse HEAD",
+    "git status --short --branch",
+    "node -e \"const {spawnSync}=require('child_process');const r=spawnSync('cmd.exe',['/c','echo BL4_CHILD_PROCESS_OK'],{encoding:'utf8'});console.log(r.status,r.error?.message||null,r.stdout?.trim());process.exit(r.status??1)\"",
+    "node -e 'const {spawnSync}=require(\"child_process\");const r=spawnSync(process.execPath,[\"-e\",\"console.log(\\\"BL4_NODE_CHILD_OK\\\")\"],{encoding:\"utf8\"});console.log(r.status,r.error?.message||null,r.stdout?.trim());process.exit(r.status??1)'"
+  ],
+  "tests": [
+    {
+      "command": "Get-Location",
+      "status": "passed",
+      "details": "Exit status 0; raw output: Path / E:\\Prompt Arena"
+    },
+    {
+      "command": "git rev-parse --show-toplevel",
+      "status": "passed",
+      "details": "Exit status 0; raw output: E:/Prompt Arena"
+    },
+    {
+      "command": "git branch --show-current",
+      "status": "passed",
+      "details": "Exit status 0; raw output: completion/core-arena"
+    },
+    {
+      "command": "git rev-parse HEAD",
+      "status": "passed",
+      "details": "Exit status 0; raw output: 8a7b6bd76f275e57a65f3541a46703868ea8cc77"
+    },
+    {
+      "command": "git status --short --branch",
+      "status": "passed",
+      "details": "Exit status 0; raw output: ## completion/core-arena"
+    },
+    {
+      "command": "cmd.exe child_process.spawnSync gate",
+      "status": "passed",
+      "details": "Exit status 0; raw output: 0 null BL4_CHILD_PROCESS_OK"
+    },
+    {
+      "command": "node child_process.spawnSync gate",
+      "status": "passed",
+      "details": "Exit status 0; raw output: 0 null BL4_NODE_CHILD_OK"
+    }
+  ],
+  "remaining_issues": [],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T205605Z-prompt-arena-bl4-operational-preflight-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T205605Z-prompt-arena-bl4-operational-preflight-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T205605Z-prompt-arena-bl4-operational-preflight-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T205605Z-prompt-arena-bl4-operational-preflight-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a044e3-b948-7213-8581-6643bc5cc365",
+  "app_server_turn_id": "01a04502-2fe4-7003-ba55-8eba096a13a5",
+  "app_server_process_id": "3780",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T205605Z-prompt-arena-bl4-operational-preflight-20260827.md",
+  "task_sha256": "85c25fe8c22b5640a5bf0ec6751265bb101029e8d079f281455a575b18c5a5da",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes."
+}

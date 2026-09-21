@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-app-settings-20260829",
+  "parent_request_id": "prompt-arena-i18n-app-core-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Perform a narrow i18n-only edit pass in the isolated worktree, touching only Settings, appearance, retention, diagnostics, and BYOK/provider JSX portions of src/App.tsx (roughly lines 4000-5050). Preserve all behavior and security/no-secret boundaries. Do not modify original worktrees or use commits/remote operations. Replace every remaining user-facing English literal there (headings, help, labels, buttons, options, captions, aria labels, statuses, validation/errors, empty states and provider consent copy) with the existing translate(...) helper and add missing PT_BR_MESSAGES entries in src/i18n.ts. Keep provider/model IDs, endpoints, USD/technical identifiers, paths, and user-entered prompts unchanged. Do not redesign i18n. Run npm run typecheck only if quick and report exact files/provenance.",
+  "constraints": [
+    "Canonical biel4 App Server/headless executor, workspace-write, elevated sandbox readiness ready, approval never.",
+    "No untrusted HTML interpolation; no behavior refactor."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

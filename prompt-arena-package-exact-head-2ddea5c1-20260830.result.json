@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-exact-head-2ddea5c1-20260830",
+  "parent_request_id": null,
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T03:57:37.296571+00:00",
+  "finished_at": "2026-08-30T04:04:10.991373+00:00",
+  "summary": "Built and verified the Windows NSIS package from clean exact HEAD 2ddea5c1b77d2132a091df43bf06bc2dd5947b5e as canonical BL4/biel4 via App Server/headless. Source/tests/docs were untouched; only the packaging checksum evidence changed and remains uncommitted.",
+  "files_changed": [
+    "checksums-sha256.txt"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "git status --short",
+    "cargo clean --manifest-path src-tauri/Cargo.toml",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows --smoke",
+    "Get-Item/Get-FileHash artifact verification",
+    "git diff --check"
+  ],
+  "tests": [
+    {
+      "command": "Exact HEAD verification",
+      "status": "passed",
+      "details": "HEAD matched 2ddea5c1b77d2132a091df43bf06bc2dd5947b5e and worktree was clean before build."
+    },
+    {
+      "command": "cargo clean --manifest-path src-tauri/Cargo.toml",
+      "status": "passed",
+      "details": "Removed 5,319 generated files."
+    },
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+      "status": "passed",
+      "details": "Produced the NSIS bundle successfully."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "passed",
+      "details": "Prepared one Windows artifact and updated checksums-sha256.txt."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum manifest, clean install, installed executable start, restart, and silent uninstall all passed."
+    },
+    {
+      "command": "Produced artifact metadata",
+      "status": "passed",
+      "details": "NSIS artifact and bundle: 3,756,859 bytes, SHA-256 97B41A805000FA6775703B13F59886D61D793E3EA7FEBC2E246E4C66E2D9B41A. Bundled worker: 2,567,680 bytes, SHA-256 7E72937C562922A78503E2B1285FE34B3094F314AC1929C9728B081A58364CDA. Tracked source sidecar remains separate: 2,544,640 bytes, SHA-256 13F9231926998E00BE5373B4A06B16868638CE52CAB3AB839C9C3BAD65DF45C6. Manifest SHA-256: 06D40806D350C1D5F3A750605D1B973D7B9C5B3C0B5C50DAFB2461305E30D5F3."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    }
+  ],
+  "remaining_issues": [
+    "MSI remains unavailable; packaging reported Optional artifacts unavailable: msi.",
+    "Native visual/accessibility/full Tauri Arena QA remains pending; package smoke does not cover those gates.",
+    "Linux deb/AppImage requires the Linux runner; remote CI remains unconfirmed. Docker runtime remains unavailable."
+  ],
+  "git_status": " M checksums-sha256.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T035737Z-prompt-arena-package-exact-head-2ddea5c1-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T035737Z-prompt-arena-package-exact-head-2ddea5c1-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T035737Z-prompt-arena-package-exact-head-2ddea5c1-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T035737Z-prompt-arena-package-exact-head-2ddea5c1-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a050ba-4de9-7700-acdb-1fde982ab13b",
+  "app_server_turn_id": "01a050d0-d3a5-7700-85b7-f1fca7fd0983",
+  "app_server_process_id": "24996",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T035737Z-prompt-arena-package-exact-head-2ddea5c1-20260830.md",
+  "task_sha256": "b4036919377aaa47cd3df1a5d46c405f6c21326418bfb8a9ae2d63511ac2c139",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-real-flow-fix-correction-3-20260829",
+  "parent_request_id": "bielos-responsible-assignment-real-flow-fix-correction-2-20260829",
+  "action": "correct",
+  "repository": "E:/BielOS",
+  "task": "Repair the current correction so the actual regression test and implementation are valid. The new wrapper DB test is now in the integration glob, but npm run test:core:db:integration fails before tests with ERR_INVALID_ARG_VALUE because mock.method receives the ESM namespace returned by createRequire (its exports are getters, not methods). Keep the wrapper boundary coverage without requiring an unsupported top-level-await/CJS combination: expose the action runtime dependencies through a patchable plain object and have actions use that object, or use another existing-compatible test seam. Do not weaken the production Cloudflare, CSRF, session, OWNER authorization, scoped elevation, serializable mutation, audit, isolation, or last-owner protections. Preserve the validated fixed-scope UX: project link must preselect PROJECT_OWNER_ACCESS_CHANGE through a fixed internal query, while direct admin visits retain the generic default and invalid query scopes fail closed to that default. Ensure the wrapper DB test passes in the normal npm run test:core:db:integration command and proves canonical form -> actual setCoreProjectAccess wrapper -> persisted/read-back/redirect/revalidation. Do not touch the nine unrelated WIP paths, add dependencies, commit, push, publish, deploy, restart, or mutate production. Run the focused unit and DB suites, typecheck/lint where feasible, and git diff --check; return the structured executor JSON report only.",
+  "constraints": [
+    "Biel 4 remains Executor only; do not issue an Architect review or acceptance verdict.",
+    "Use only the same configured Biel4 App Server/headless executor with task_transport=app_server. No native subagents, create_thread, TUI fallback, codex exec, or alternate backend.",
+    "Preserve the nine pre-existing unrelated dirty WIP paths exactly; do not reset, clean, stash-drop, amend, rebase, or rewrite them.",
+    "Do not expose .env, credentials, cookies, session tokens, JWTs, passwords, recovery codes, raw identifiers, private logs, or database dumps.",
+    "No commit, push, PR, merge, tag, release, deploy, production rebuild/restart, Cloudflare/DNS mutation, or destructive database action."
+  ],
+  "context_files": [
+    "E:/BielOS/apps/hub/src/app/core/projects/action-runtime.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/actions.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-access-action.ts",
+    "E:/BielOS/apps/hub/src/app/core/integration/project-access-action-wrapper.db.test.ts",
+    "E:/BielOS/apps/hub/src/app/core/security/admin/elevation-scope.ts",
+    "E:/BielOS/apps/hub/src/app/core/security/admin/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-panel.tsx",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-admin-controls.tsx",
+    "E:/BielOS/package.json"
+  ],
+  "review_findings": [
+    {
+      "title": "Blocking: wrapper regression fails at test setup",
+      "details": "npm run test:core:db:integration currently aborts with ERR_INVALID_ARG_VALUE at mock.method(actionRuntime, ...) because createRequire returns a transpiled module namespace whose exports are getters. The added wrapper test therefore provides no evidence. Make the runtime seam a patchable plain object or otherwise use a compatible existing mock seam, and verify the normal integration runner passes.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Blocking: do not lose the real-flow correction",
+      "details": "Retain fixed internal scope preselection for the project link, allowlisted query parsing, and generic default behavior. The active elevation guard and canonical action wrapper must remain unchanged in security semantics.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Important: minimality and WIP separation",
+      "details": "Only touch the intended project/elevation/test files; preserve the nine pre-existing dirty WIP paths and do not publish.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

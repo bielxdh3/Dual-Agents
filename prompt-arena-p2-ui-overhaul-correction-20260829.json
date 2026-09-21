@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-ui-overhaul-correction-20260829",
+  "parent_request_id": "prompt-arena-p2-ui-overhaul-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Review and complete the existing P2 UI/UX diff in the current dirty checkout using canonical BL4/biel4 App Server/headless, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Read C:\\CodexGlobal\\AGENTS.md and required ponytail, project-phase-review, project-security-review, project-publication-check, product-design/index, and product-design/audit SKILL.md files first. Preserve all existing P0/P1 commits and the four-file P2 diff; do not reset or discard. The previous cycle timed out before tests/commit and left src/App.tsx, src/i18n.ts, src/i18n.test.ts, and src/styles.css modified. Inspect the actual diff and make only focused corrections needed to satisfy the supplied P2 findings. Known issue to fix: styles.css currently sets `.workspace { overflow-x: auto; }`, which violates the requirement that the shell never horizontally scroll; restore bounded shell sizing/overflow-x hidden or clip only after ensuring child content has min-width:0 and the Arena comparison workspace alone owns justified horizontal scroll. Verify no global clipping masks long content. Ensure active sidebar has no persistent border/left bar; controls have stable button affordances/focus/disabled/loading; contrast and motion/reduced-motion are coherent; Models metadata is progressive-disclosure with primary installed/use actions from P1; hardware primary overview is Platform/CPUs/RAM/GPU/VRAM with source/confidence in Advanced; Settings advanced panels remain semantically accessible; Arena comparison and live telemetry use horizontal desktop density with responsive narrow fallback; blind identity/telemetry rules, local model safety, and i18n remain intact. If the current code cannot safely replace raw task/case selects with a custom listbox, keep native controls consistently styled and record the exact human-QA limitation rather than using an inaccessible div. Add/update pure/helper tests only where they provide real coverage; do not invent snapshots. Run npm test, npm run typecheck, npm run build, cargo tests only if Rust touched, git diff --check, and inspect changed-file scope. Create one normal local commit with message `feat: overhaul Prompt Arena desktop experience` if all validations pass. Do not push, merge, tag, release, deploy, modify docs/generated artifacts, or touch other worktrees. Report exact changed files, tests, commit SHA if host commit is blocked, and remaining human visual/native gates with full provenance.",
+  "constraints": [
+    "Preserve current P2 changes; no destructive reset or unrelated backend changes.",
+    "Shell-level horizontal overflow must be eliminated without clipping child content; comparison workspace remains the only intentional horizontal owner.",
+    "Preserve P0 async execution, P1 model state, blind integrity, safe local boundaries, i18n, accessibility, and reduced motion.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No forced reload, unsafe HTML, arbitrary delays, global symptom suppression, native TUI, cloud calls, push, merge, tag, release, or deploy."
+  ],
+  "review_findings": [
+    {
+      "title": "Shell horizontal overflow regression remains in partial diff",
+      "details": "The partial CSS sets .workspace overflow-x:auto. The user explicitly requires no shell/sidebar/content horizontal scrollbar; only the comparison surface may own horizontal scrolling."
+    },
+    {
+      "title": "Previous cycle ended before validation",
+      "details": "No tests or commit were recorded by the Executor. Re-run full frontend validation and review changed-file scope before committing."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

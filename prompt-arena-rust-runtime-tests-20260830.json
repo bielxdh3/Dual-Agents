@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-rust-runtime-tests-20260830",
+  "parent_request_id": "prompt-arena-final-review-package-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Run read-only Rust validation at exact current checkout HEAD 73991b03282e3ec766ab824f6bdfb9ff8e4c616a on completion/windows-qa-live-telemetry-i18n. Use canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read required AGENTS.md and skills first. Verify git status and HEAD, then run `cargo test --manifest-path src-tauri/Cargo.toml --all-targets` with no source/history/remote/generated mutations. The local Ollama endpoint at http://127.0.0.1:11434 is currently available; record whether the live health self-skip test observes it. Also run git diff --check and verify status remains clean. Do not run a full model Arena or mutate Ollama data; do not claim visual/human QA. Return full provenance and exact test counts/errors.",
+  "constraints": [
+    "Read-only validation only; no source, docs, package, history, remote, tag, release, deploy, or worktree changes.",
+    "Do not pull/download/delete models or modify Ollama state.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; elevated ready; approval never."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\Cargo.toml",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\ollama.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\orchestration.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": { "allowed_actions": [] }
+}

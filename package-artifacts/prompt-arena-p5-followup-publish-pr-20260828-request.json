@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "prompt-arena-product-completion-20260827",
+  "authorization_reference": "prompt-arena-product-completion-20260827",
+  "repository": "E:/Prompt Arena",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "remote": "origin",
+  "branch": "completion/byok-followup",
+  "base_branch": "completion/model-library-followup",
+  "title": "feat: persist sanitized external generation evidence",
+  "body": "## P5 follow-up — external generation history\n\nStacked after PR #24 (`completion/model-library-followup`); PRs #17–#24 remain draft.\n\n- persists successful external-generation evidence through a versioned SQLite migration and immutable content-hash records\n- stores provider/model identity and confidence, network disclosure, usage, estimated/actual cost, budget decisions, and dated price snapshot only\n- keeps prompt text, returned text, API keys, credential blobs, and headers out of storage/history/export paths\n- exposes typed desktop history reload and a usable Settings history surface; browser preview remains read-only\n- validates with 82 TypeScript tests, 105 Rust tests, typecheck, Vite build, cargo fmt/check/test, and diff checks via canonical BL4 app_server\n- no real provider or external network call was made by CI/tests\n\nP5 remains IN PROGRESS pending native Tauri/WebView acceptance, opt-in real-provider smoke, security review of the complete flow, and remote CI/publication checks.\n\nNo merge, tag, release, deploy, or public release is included.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

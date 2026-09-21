@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-delivery-matrix-linux-status-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T05:07:31.417552+00:00",
+  "finished_at": "2026-08-29T05:08:30.234167+00:00",
+  "summary": "Changed only the Linux DEB/AppImage row from CI PENDING to ARTIFACT, QA PENDING and committed as f3048a61f45cdb6b29f362444f3d32646edf4943. Metadata: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4 App Server/headless Executor\",\"task_transport\":\"App Server/headless\",\"sandbox\":\"managed workspace-write; local mutation verified\",\"repository\":\"E:\\\\Prompt Arena-pr28-bl4\",\"branch\":\"validation/native-tauri-acceptance\",\"commit\":\"f3048a61f45cdb6b29f362444f3d32646edf4943\"}. No push attempted.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "rg -n -C 2 \"Linux deb/AppImage|33213307890\" docs/DELIVERY_MATRIX.md ROADMAP.md",
+    "git diff --check",
+    "focused Linux row/evidence consistency check",
+    "git add -- docs/DELIVERY_MATRIX.md",
+    "git commit -m \"docs: reconcile Linux package status\"",
+    "git diff HEAD^ HEAD --check"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "focused Linux row/evidence consistency check",
+      "status": "passed",
+      "details": "Exactly one line changed; Linux row records 33213307890 artifact/smoke evidence and ARTIFACT, QA PENDING; no COMPLETE status introduced."
+    },
+    {
+      "command": "git diff HEAD^ HEAD --check",
+      "status": "passed",
+      "details": "Committed documentation diff is clean."
+    }
+  ],
+  "remaining_issues": [
+    "Linux native/manual QA, security, and publication gates remain pending; no phase was marked COMPLETE.",
+    "No network push, merge, release, tag, or deploy was performed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T050731Z-prompt-arena-delivery-matrix-linux-status-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T050731Z-prompt-arena-delivery-matrix-linux-status-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T050731Z-prompt-arena-delivery-matrix-linux-status-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T050731Z-prompt-arena-delivery-matrix-linux-status-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04bea-7aaf-7e71-b4ea-3dee5e2b53ac",
+  "app_server_process_id": "21492",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T050731Z-prompt-arena-delivery-matrix-linux-status-20260829.md",
+  "task_sha256": "89edbfd6d305dd6b6fd5af99d97f5891aa596fd4aa2e0ff0f8c495b673a7b91f",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

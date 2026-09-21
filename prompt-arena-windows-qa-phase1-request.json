@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-qa-phase1-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Implement the first substantive remediation phase from C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md on the isolated Prompt Arena product branch. Work as the canonical BL4 Executor only through the configured App Server/headless path. Before editing, inspect the current branch and confirm the findings against current code. Fix the confirmed Windows/UI findings together with the smallest repo-native diff: production release launch must use proper Windows GUI/no-console semantics without weakening worker isolation or failure/cancellation behavior; remove root horizontal overflow through layout ownership/min-size fixes rather than a blind global clip; add accessible theme-compatible scrollbar styling; make Settings external-generation-evidence content-driven and compact; make provider/adapter titles wrap at sensible word boundaries while badges remain readable; remove the full rounded border from active sidebar navigation while preserving hover and keyboard focus indication. Add focused tests for behavior/structure where feasible, preserve existing security and blind-evaluation boundaries, and update only implementation/test files needed for this phase. Do not implement Live Arena telemetry or i18n in this phase; those are subsequent phases. Do not modify E:\\Prompt Arena or E:\\Prompt Arena-pr28. Do not commit, push, create/update PRs, merge, tag, release, deploy, or alter repository settings. Leave changes uncommitted for Architect review. Run proportional focused validation and report exact commands, files, failures, and remaining issues in the required structured report.",
+  "constraints": [
+    "Use the exact isolated repository path and preserve unrelated work.",
+    "No commits or remote operations; local mutation only.",
+    "Do not use browser coordinate automation or revisit exhausted CDP/UIA paths.",
+    "Do not weaken input validation, process isolation, cancellation semantics, blind evaluation, or no-secret boundaries.",
+    "Do not add speculative dependencies or provider-specific line-break hacks."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\main.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

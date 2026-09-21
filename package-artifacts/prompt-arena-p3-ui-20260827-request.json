@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-ui-20260827",
+  "parent_request_id": "prompt-arena-p3-operations-finalize-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Complete the P3 Model Library user-facing slice on completion/model-library using the existing a5e0cd2 adapter backend and 81df991 operations backend. Wire Tauri commands and src/bridge.ts types/functions for unified discovery/catalog across Ollama, LM Studio, and llama.cpp, managed GGUF import, operation start/list/get/cancel, and safe managed removal; register commands in lib.rs. Use app-owned storage and the existing bounded backend APIs, never expose arbitrary filesystem deletion or remote/cloud endpoints. Update the Models view in App.tsx and model-library.ts so desktop users can configure loopback sources, search/filter the unified catalog, see source availability and metadata/quantization as distinct rows, start Ollama downloads, import managed relative GGUF, poll/show progress and cancel, and remove only managed models with explicit confirmation and audit outcome. Keep browser preview honest and do not show scaffold/foundation language. Preserve existing profiles/hardware and old Ollama start flow. Add focused TypeScript tests for bridge/model-library state helpers and command payloads, and Rust tests only if command wiring requires them. Run cargo fmt/check/test, npm typecheck, npm test, npm run build, and git diff --check, then create one focused local commit. Do not implement P4/P5/P6/P7 in this turn. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/model-library; preserve HEAD 81df991 and all prior P1/P2 work",
+    "loopback-only LM Studio/llama.cpp endpoints; GGUF imports/removal constrained to app-managed relative root; no secrets/cloud APIs",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/model_library.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/model-library.ts", "E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src-tauri/src/storage.rs"],
+  "review_findings": [{"severity": "blocking", "title": "P3 UI and command surface absent", "details": "Backend adapters and operations are committed, but the desktop user cannot discover, download/import, monitor/cancel, or safely remove models through a persisted UI yet."}],
+  "max_correction_cycles": 0
+}

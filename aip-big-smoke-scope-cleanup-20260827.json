@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-scope-cleanup-20260827",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Perform a scope-only cleanup on the existing branch fix/big-smoke-ui-regressions after commit fc2280f7ccd9ff283758bbbefa1dd370a3736a51. Do not reset, amend, rebase, or rewrite history. Compare the net branch diff against the parent of fc2280f and create one follow-up local commit that removes only unrelated Prettier reformatting from existing App.tsx/App.css sections while preserving every semantic change required for the five Big Smoke regressions and all new tests. The final net diff must keep: explicit alpha-aware AgentSprite SVG fill and PNG alpha serialization; immutable Pencil/active-layer updates; pointer-down selection anchor and helper; ConversationList semantic hooks/accessibility and scoped CSS; all associated focused tests. Use git diff and git show carefully, do not touch unrelated behavior, and do not run broad tests or builds in this scope-only pass. Run git diff --check and confirm branch status. Commit with message `chore: narrow Big Smoke regression diff`. Do not push, open/update a PR, merge, tag, release, deploy, or build installers. Return files_changed, commands_run, final net diff summary, commit SHA, and remaining_issues.",
+  "constraints": [
+    "Use the same configured Biel4 App Server/headless Executor; no native subagents or fallback backend.",
+    "No destructive Git operations: no reset, checkout, amend, rebase, squash, force-push, or history rewrite.",
+    "Only a follow-up commit is allowed; preserve the existing implementation commit and all functional tests.",
+    "Do not expose or commit secrets, credentials, local databases, histories, memories, private media, or authentication files.",
+    "Do not alter Phase 7-13 behavior outside the five confirmed UI/editor regressions."
+  ],
+  "context_files": [
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.tsx",
+    "E:/AIP/apps/desktop/src/pixel-document.ts",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.test.ts",
+    "E:/AIP/apps/desktop/src/pixel-document.test.ts",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/pixel-editor.test.tsx"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

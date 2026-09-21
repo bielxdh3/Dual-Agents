@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-verification-packs-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement the complete P2 Verification, Packs, Docker, and Statistics slice on a new local branch completion/verification-packs from the current completion/core-arena HEAD. Inspect the existing P1 implementation and preserve all existing behavior. Deliver user-facing functionality, persistence, tests, and docs—not contracts or previews only. Requirements: (1) expand objective verifiers to exact text, numeric tolerance, bounded JSON/schema, required fields, classification, and safe literal/regex patterns with explicit limits and persisted verifier policy/evidence; (2) make all three official packs executable/evaluable with materialized procedural cases and deterministic seeds, pack/task/version metadata, and saved evidence in the Rust evidence store; (3) wire programming/software-engineering tasks to a Docker-required execution boundary with clear unavailable/blocked state and absolutely no host-execution fallback; (4) support repetitions 1/3/5/10 (or existing supported set) with immutable per-sample evidence and robust summary statistics including mean/median/min/max/stddev/success rate plus uncertainty/tie margins; (5) expose these capabilities in the real React/Tauri UI so a normal user can select a pack/task/verifier/repetitions, run it, see progress and failures, inspect objective evidence and statistics, and reopen the persisted result; (6) add focused TypeScript/Rust tests for verifier edge cases, pack materialization/seeds, Docker-unavailable no-fallback behavior, persistence, statistics, and UI-facing state; (7) update ROADMAP.md and docs/DELIVERY_MATRIX.md honestly: leave P2 IN PROGRESS until native Tauri acceptance evidence exists and do not mark unrelated P3-P7 work complete. Use only existing repo-native dependencies unless strictly necessary. Do not implement page-transition motion. Do not touch PR #17 history, merge, tag, release, deploy, or modify unrelated phases. At completion, commit the implementation on completion/verification-packs with a focused message and report exact files, tests, commit SHA, remaining native QA gates, and full canonical BL4 provenance.",
+  "constraints": [
+    "canonical BL4 only: account biel4, role Executor/Reviewer, backend app_server, task_transport app_server",
+    "native provenance must be reported for account, role, CODEX_HOME, backend, task_transport, repository, thread_id, turn_id, process_id, sandbox_mode, windows.sandbox, approval_policy, writable roots, network policy, and launch arguments; fail closed if unavailable",
+    "sandbox_mode workspace-write; windows.sandbox elevated; readiness ready; approval_policy never",
+    "danger-full-access prohibited; no TUI, native_tui, fallback, or substitute executor",
+    "do not modify PR #17 or completion/core-arena; create completion/verification-packs from its current HEAD",
+    "all implementation and repository mutations must occur in this BL4 session",
+    "no merge, tag, release, deploy, or public release",
+    "no paid external API calls or secrets",
+    "Docker-required programming tasks must never fall back to the host",
+    "do not call P2 complete before native Tauri acceptance"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit", "create_branch"]},
+  "context_files": [
+    "E:/Prompt Arena/ROADMAP.md",
+    "E:/Prompt Arena/docs/DELIVERY_MATRIX.md",
+    "E:/Prompt Arena/docs/ARCHITECTURE.md",
+    "E:/Prompt Arena/docs/DATA_MODEL.md",
+    "E:/Prompt Arena/src/objective-verifiers.ts",
+    "E:/Prompt Arena/src/arena-runner.ts",
+    "E:/Prompt Arena/src/App.tsx",
+    "E:/Prompt Arena/src-tauri/src/official_packs.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/packs/official"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0
+}

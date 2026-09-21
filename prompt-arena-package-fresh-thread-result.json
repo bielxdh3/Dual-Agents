@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-fresh-thread-20260830",
+  "parent_request_id": "prompt-arena-i18n-fallback-coverage-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T08:10:13.776420+00:00",
+  "finished_at": "2026-08-30T08:19:59.672996+00:00",
+  "summary": "Completed fresh Windows NSIS package task. Provenance: biel4, Executor, authenticated Dual Codex App Server/headless, canonical Executor profile, workspace-write, Windows elevated/readiness ready, approval never. Repository E:/Prompt Arena-live-telemetry-i18n-commit2 on completion/windows-qa-live-telemetry-i18n. Package built from exact source HEAD fe5c28644b7aea01f7077bbb0e73ef73605255f2, containing baseline 8588a2d plus focused corrections 4e471224 and fe5c286. Final commit: 7df9c65c27aef90cf28de8f9c6238e9324988e43; worktree clean. Artifact/bundle: 3814606 bytes, SHA-256 19D55E79D53E3BB34C5BCF911FDCEFA48F7A5FB1520932D9FA847BBBB69F1D24. Bundled worker: 2651136 bytes, DFD1DBF13F1D7605294B32972A34B5958BAB1320DAD90021C40264EB8789C4B5. Prepared sidecar: 2629120 bytes, 352E09C15C9FD3ACAD1CF321F020597561FAF5A485D02B5A265C12A5FBAA3033. checksums-sha256.txt: 102 bytes, D4B5C8DEA9CF88702559E373C18AFD05FD1B0824F8C1961E0B9C5E2BDE8C4819. package-verification.txt: 282 bytes, 9F410C6F8B1E8F1225C30FBD16F8A7BE7F0AD1B6E0091F1203E7016FEE7693C1. Package smoke passed. Phase verdict: Approved with reservations.",
+  "files_changed": [
+    "checksums-sha256.txt",
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "git branch --show-current",
+    "git status --short",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+    "Move-Item src-tauri/target/release/prompt-arena.exe src-tauri/target/release/prompt-arena.exe.previous-build-fresh-thread-20260830",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows --smoke",
+    "node --input-type=module -e \"import { verifyChecksumManifest } from './scripts/package-artifacts.mjs'; verifyChecksumManifest('checksums-sha256.txt', 'package-artifacts');\"",
+    "git diff --check",
+    "git add -- checksums-sha256.txt docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "git commit -m \"docs: attest fresh fallback-head package provenance\"",
+    "post-commit status, scope, source-diff, checksum, and hash audit"
+  ],
+  "tests": [
+    {
+      "command": "Initial tauri:build attempt",
+      "status": "failed",
+      "details": "Failed only because the exact generated prompt-arena.exe was locked; permitted one-file fallback was used."
+    },
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+      "status": "passed",
+      "details": "Incremental NSIS build completed successfully."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "passed",
+      "details": "Prepared one NSIS artifact; optional MSI unavailable."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum, clean install, executable start, restart, and silent uninstall passed."
+    },
+    {
+      "command": "Independent checksum verifier",
+      "status": "passed",
+      "details": "Checksum manifest verified successfully."
+    },
+    {
+      "command": "git diff --check and source-scope audit",
+      "status": "passed",
+      "details": "No whitespace errors and no source, tests, Rust, telemetry, adapters, scripts, or package-manifest changes."
+    },
+    {
+      "command": "Final worktree audit",
+      "status": "passed",
+      "details": "Clean worktree; commit contains exactly the three authorized evidence files."
+    }
+  ],
+  "remaining_issues": [
+    "PENDING_HUMAN_QA remains for visual/native/accessibility/full Tauri Arena review; package smoke is not human QA.",
+    "BLOCKED_EXTERNAL_RUNTIME: Docker runtime unavailable.",
+    "BLOCKED LOCALLY/MSI: optional Windows MSI remains unavailable because of the WiX light.exe failure.",
+    "Linux DEB/AppImage and remote CI remain pending/unconfirmed.",
+    "Screenshot/UIA validation remains unavailable.",
+    "Live LM Studio/llama.cpp runtime smoke remains pending.",
+    "Publication check remains Create a sanitized public copy because internal evidence contains local paths, usernames, and operational provenance; no publication, push, tag, release, deploy, merge, amend, rebase, reset, or broad deletion occurred.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T081014Z-prompt-arena-package-fresh-thread-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T081014Z-prompt-arena-package-fresh-thread-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T081014Z-prompt-arena-package-fresh-thread-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T081014Z-prompt-arena-package-fresh-thread-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a051b8-1815-7842-a852-d3170a7962ed",
+  "app_server_turn_id": "01a051b8-18bb-7f51-8c06-979d3cce4fc3",
+  "app_server_process_id": "25308",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T081014Z-prompt-arena-package-fresh-thread-20260830.md",
+  "task_sha256": "e64776126becf2de0e2000914dc7c25df7454d2e76582d49fcd5bd72f925d7cc",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

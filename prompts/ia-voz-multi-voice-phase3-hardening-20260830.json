@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-multi-voice-phase3-hardening-20260830",
+  "action": "correct",
+  "parent_request_id": "ia-voz-multi-voice-phase2-migration-hotfix-20260830",
+  "repository": "C:/IA DE VOZ",
+  "task": "Required skills at top: C:/CodexGlobal/skills/ponytail/SKILL.md; C:/CodexGlobal/skills/project-phase-review/SKILL.md; C:/CodexGlobal/skills/project-security-review/SKILL.md. Re-read each fully. Perform only this Phase 3 isolation-hardening correction in the current C:/IA DE VOZ implementation through the same canonical biel4 App Server/headless Executor. Audit profile-sensitive readers and writers and ensure reparse-point/junction/symlink chains are rejected before audio discovery or any profile directory read/write, including audio_files, prepare_dataset, prepare_codes, generate_baseline, generated output, review audio, checkpoint enumeration and training paths. Preserve the existing root/traversal/cross-profile/stale-callback protections and do not weaken them. Add a small deterministic test using a temporary profile and a symlink/junction when supported, otherwise assert the rejection helper on a synthetic reparse marker without touching real data. Also pass the captured ctx to the final validate_jsonl call in prepare_codes and revalidate ownership before final writes where needed. Run py_compile, the focused five profile tests plus the new hardening test, and git diff --check. Do not run PREPARE DATASET, training, generation, or migration on real data; do not change dependencies or .git metadata; no commit/push/publication. Return exactly one JSON object with summary, files_changed, commands_run, tests, remaining_issues and full provenance/phase/security fields.",
+  "constraints": [
+    "Use only the same canonical biel4 App Server/headless Executor with isolated CODEX_HOME; no native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Local code/test mutation only. Preserve C:/IA DE VOZ/input_audio and all legacy/profile data exactly; no destructive actions.",
+    "Keep the correction minimal and Phase 3-only. Do not install dependencies, commit, push, publish, deploy, or rewrite .git metadata.",
+    "Fail closed on reparse points, traversal, outside-root paths, cross-profile references/checkpoints, stale ownership, and missing artifacts."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/scripts/train_runner.py",
+    "C:/IA DE VOZ/tests/test_phase2_profiles.py",
+    "C:/IA DE VOZ/voices",
+    "C:/IA DE VOZ/input_audio",
+    "C:/IA DE VOZ/dataset",
+    "C:/IA DE VOZ/training",
+    "C:/IA DE VOZ/generated"
+  ],
+  "review_findings": [
+    {"title":"Reject reparse paths at every profile boundary","details":"audio_files and several profile writers/readers do not consistently call the reparse-chain guard before traversing or creating derived directories. Harden these exact boundaries without weakening existing containment checks, and add a disposable-profile test."},
+    {"title":"Validate the owner context at the final tokenizer check","details":"prepare_codes validates its output with validate_jsonl(out) using the current active profile instead of the captured ctx; pass ctx and revalidate ownership before final writes so a profile switch cannot misroute validation."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

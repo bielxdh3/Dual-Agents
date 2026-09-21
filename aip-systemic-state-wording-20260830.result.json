@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-state-wording-20260830",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T06:28:27.056807+00:00",
+  "finished_at": "2026-08-30T06:30:19.992117+00:00",
+  "summary": "Correção concluída e commitada localmente em 3ac35a2, esclarecendo os efeitos atuais de Estado e distinguindo comportamentos futuros.",
+  "files_changed": [
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/state-memory-guidance.test.tsx",
+    "docs/PRODUCT_SPEC.md"
+  ],
+  "commands_run": [
+    "pnpm --filter @aip/desktop test -- state-memory-guidance.test.tsx",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm lint",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"docs: clarify current state behavior\""
+  ],
+  "tests": [
+    {
+      "command": "pnpm --filter @aip/desktop test -- state-memory-guidance.test.tsx",
+      "status": "passed",
+      "details": "2 testes aprovados."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "TypeScript aprovado."
+    },
+    {
+      "command": "pnpm lint",
+      "status": "passed",
+      "details": "ESLint aprovado sem warnings."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "passed",
+      "details": "185 arquivos verificados."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Nenhum erro de whitespace."
+    }
+  ],
+  "remaining_issues": [
+    "Aceitação visual em Windows instalado permanece como gate humano não verificado.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062827Z-aip-systemic-state-wording-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062827Z-aip-systemic-state-wording-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062827Z-aip-systemic-state-wording-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T062827Z-aip-systemic-state-wording-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05125-780c-7ea1-a51a-7cea6f813658",
+  "app_server_turn_id": "01a0515a-ea72-7c83-b5e6-8a6ba9c0124f",
+  "app_server_process_id": "25480",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T062827Z-aip-systemic-state-wording-20260830.md",
+  "task_sha256": "c0af8367f1f0751d272055ae15bfffed6248be056d5bbbf3338eace9c53b17ae",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

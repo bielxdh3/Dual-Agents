@@ -1,0 +1,12 @@
+{
+  "operation": "normal_push",
+  "mission_id": "aip-productization-closure-20260828",
+  "authorization_reference": "aip-productization-closure-20260828",
+  "repository": "E:/AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "remote": "origin",
+  "branch": "fix/productize-local-capabilities",
+  "expected_remote_old_sha": "711e5bb90a838bb941d9d469dd7c0a98a7121c57",
+  "new_sha": "a721f00a946d78cee7d738bdd9f4d3e0ab3a532d",
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-harness-commit-20260829",
+  "parent_request_id": "prompt-arena-native-harness-fix-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T03:51:04.390523+00:00",
+  "finished_at": "2026-08-29T03:52:35.927764+00:00",
+  "summary": "Committed the minimal native harness fix as 2395a66463534b91ec9898ad9136c0daec66f747 on validation/native-tauri-acceptance.",
+  "files_changed": [
+    "scripts/native-ui-smoke.mjs"
+  ],
+  "commands_run": [
+    "node --check scripts/native-ui-smoke.mjs",
+    "git diff --check",
+    "git commit -m \"test: stabilize native UI smoke harness\"",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "node --check scripts/native-ui-smoke.mjs",
+      "status": "passed",
+      "details": "Syntax validation passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    }
+  ],
+  "remaining_issues": [
+    "No network push or remote CI was run; remote CI remains unconfirmed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T035104Z-prompt-arena-native-harness-commit-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T035104Z-prompt-arena-native-harness-commit-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T035104Z-prompt-arena-native-harness-commit-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T035104Z-prompt-arena-native-harness-commit-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04ba4-7957-7eb2-8aed-4ef2d82aeb3c",
+  "app_server_process_id": "17600",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T035104Z-prompt-arena-native-harness-commit-20260829.md",
+  "task_sha256": "76582461039a21d752f1418a755adc1700913715037eec149911059e2d88f957",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

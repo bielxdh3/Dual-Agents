@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-final-human-gate-review-correction-20260827",
+  "action": "correct",
+  "parent_request_id": "aip-final-human-gate-review-20260827",
+  "repository": "E:/AIP",
+  "task": "Apply only the two blocking documentation corrections to the clean branch docs/final-human-gate-preparation at HEAD 403755bc827cf098bb8b0f0be96a88cdd0355dcb. Preserve the current Big Smoke Round 2 record, hashes, canonical phase matrix, seven pending checklist items, and exclusions. In docs/V0_1_MANUAL_VALIDATION.md restore the historical 2026-07-30 v0.1 manual approval and generation-cancellation/recovery evidence in a clearly labeled Historical record section, without deleting the new 2026-08-27 record and without inventing observations; use the prior content from Git history as source. Add an explicit terminal waiting-gate statement after the checklist/exclusions, stating that mandatory human validation is still pending, no item is passed by this record, and the Owner must respond exactly PASSOU TUDO, FALHOU <número>: <descrição>, or NÃO EXECUTADO <número>: <motivo> before any merge/tag/release. Do not change product code or other docs. Run only git diff --check and focused static checks. Commit the correction with exact message docs: preserve historical manual gate record. Do not push, merge, tag, or release. Return concise structured report and leave branch clean.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor through the Dual Codex launcher; no native subagents, alternate backend, or fallback.",
+    "Read E:/AIP/AGENTS.md and the required AIP implementation, phase-review, security-review, publication-check, and C:/CodexGlobal/skills/ponytail/SKILL.md instructions.",
+    "Blocking reviewer findings: preserve historical 2026-07-30 content in the current tree; add an explicit final waiting-gate statement.",
+    "No force-push, reset, rebase, amend, squash, history rewrite, unrelated cleanup, or product-code changes.",
+    "Do not expose or commit secrets, credentials, databases, histories, memories, backups, models, media, private paths, or generated artifacts."
+  ],
+  "context_files": [
+    "E:/AIP/docs/V0_1_MANUAL_VALIDATION.md",
+    "E:/AIP/docs/PHASE_1_VALIDATION.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [
+    {"severity":"blocking","title":"Historical v0.1 record overwritten","details":"The current V0_1_MANUAL_VALIDATION.md must retain the prior 2026-07-30 approval and generation recovery evidence as a clearly labeled historical section."},
+    {"severity":"blocking","title":"Missing terminal waiting gate","details":"The focused checklist must end with an explicit pending gate and exact Owner response forms before merge/tag/release."}
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

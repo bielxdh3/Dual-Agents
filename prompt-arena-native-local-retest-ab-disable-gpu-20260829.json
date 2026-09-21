@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-retest-ab-disable-gpu-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-native-local-20260829-pr",
+  "task": "Read C:\\CodexGlobal\\AGENTS.md and the required skills C:\\CodexGlobal\\skills\\ponytail\\SKILL.md, C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md before acting. The normal fresh Windows native retest has already reproduced WebView2 GPU STATUS_ACCESS_DENIED (0xC0000022) and failed at WebDriver POST /session; this is the authorized A/B follow-up. Use only canonical BL4/biel4 Executor via the configured App Server/headless transport, with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Work only in E:\\Prompt Arena-native-local-20260829-pr and never touch E:\\Prompt Arena original WIP. Product remains exact SHA f3048a61f45cdb6b29f362444f3d32646edf4943 with release app src-tauri\\target\\release\\prompt-arena.exe and worker src-tauri\\target\\release\\prompt-arena-worker.exe. Use the existing verified .native-tools tauri-driver 2.0.6 and msedgedriver 151.0.4129.101; re-verify manifest and product/tool hashes. Run the same real harness `node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe`, but for this B session set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu` only in the child process environment for the duration of this test, then clear/unset it before returning. Do not persist the flag in source, scripts, config, registry, environment, workflow, or user profile. Do not use --no-sandbox, --disable-gpu-sandbox, any other workaround, fallback driver, browser-only test, TUI/native_tui, cargo install, or policy change. If the harness passes, emit `WINDOWS_NATIVE_TAURI_ACCEPTANCE_LOCAL_PASS` and `NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED run_id=...` with exact app/worker/tool hashes, thread/turn IDs, and evidence for Tauri→WebView→bridge→Rust→sidecar→persistence→reopen. If it still fails, capture exact stage/error and read-only diagnostics. In either case report that this is an A/B diagnostic result and do not claim the normal GPU path passed. No source, docs, workflow, policy, commit, push, merge, release, tag, deploy, or original-WIP changes; only transient smoke logs may be produced. Return full control-plane provenance with real thread_id and turn_id.",
+  "constraints": [
+    "BL4/biel4 only; App Server/headless; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never. All must be visible in result metadata.",
+    "B-only A/B test: WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu is ephemeral to this child process and must be cleared before completion.",
+    "Validation-only; no product or remote changes; preserve existing untracked temporary files and do not touch original WIP."
+  ],
+  "context_files": [
+    "scripts/native-ui-smoke.mjs",
+    ".native-tools/manifest.json",
+    "src-tauri/target/release/prompt-arena.exe",
+    "src-tauri/target/release/prompt-arena-worker.exe"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

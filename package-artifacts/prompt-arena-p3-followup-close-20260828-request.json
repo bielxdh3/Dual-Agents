@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-followup-close-20260828",
+  "parent_request_id": "prompt-arena-p3-followup-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Close the existing partial P3 diff on completion/model-library-followup. Do not add new scope. Inspect only the currently modified model-library, orchestration, storage, App, and test files. Run npm run typecheck first, then npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Fix only compile/test failures caused by the existing diff. If all checks pass and the implementation is coherent, commit the existing focused P3 changes with one commit. If the diff cannot be made coherent within this bounded closeout, safely revert only the current P3 files to clean HEAD 455df511996259213ce917f1138dfcd091f7003e and report that rollback; do not touch any other files. No push, merge, tag, release, deploy, network/provider calls, or new features.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "start from the preserved partial diff on completion/model-library-followup; allow-dirty explicitly authorized",
+    "preserve unrelated files; no generated evidence files committed"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "E:/Prompt Arena/src-tauri/src/model_library.rs",
+    "E:/Prompt Arena/src-tauri/src/orchestration.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/src/model-library.ts",
+    "E:/Prompt Arena/src/model-library.test.ts",
+    "E:/Prompt Arena/src/App.tsx"
+  ],
+  "review_findings": [
+    {
+      "severity": "important",
+      "file": "P3 partial diff",
+      "title": "Validate and commit or roll back the timed-out model-library slice",
+      "details": "The prior BL4 attempt timed out before tests/provenance. Validate only the preserved runtime-aware profile and capability changes; commit only if the full required checks pass, otherwise revert only this P3 diff."
+    }
+  ],
+  "max_correction_cycles": 0
+}

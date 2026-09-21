@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-multi-voice-phase2-correction-20260830",
+  "action": "correct",
+  "parent_request_id": "ia-voz-multi-voice-phase2-20260830",
+  "repository": "C:/IA DE VOZ",
+  "task": "Required skills at top: C:/CodexGlobal/skills/ponytail/SKILL.md; C:/CodexGlobal/skills/project-phase-review/SKILL.md; C:/CodexGlobal/skills/project-security-review/SKILL.md. Re-read each fully. Correct the existing Phase 2 implementation in C:/IA DE VOZ using only the same canonical biel4 App Server/headless Executor and preserve all unrelated work. The initial implementation timed out without a report; review the current diff and fix every concrete issue below, then run focused validation. Do not broaden scope, install dependencies, commit, push, or touch real legacy audio/artifacts. Findings: (1) app.py does not compile: in start_training, `global TRAIN_PROCESS, TRAIN_OWNER` appears after those names are read; move the declaration before first use. (2) prepare_dataset still writes normalized audio to the global `CLEANED` path instead of the captured profile context (`ctx.cleaned`), violating isolation; fix and inspect sibling path uses for the same root-cause error. (3) migration metadata rewrite must cover all known speaker path fields, including review rows' `audio` and any `file`/`source`/`train_audio`/`original`/`cleaned`/`segment`/`ref_audio`/`checkpoint` fields when they contain paths, while leaving display-only filenames unchanged; never leave absolute legacy paths in profile JSON/JSONL. (4) harden destination-root/reparse checks before migration staging and writes, and ensure generated/review/checkpoint callbacks reject cross-profile or stale ownership without falling back to global paths. (5) add or repair focused deterministic tests for profile lifecycle, path traversal/absolute/UNC/drive rejection, migration copy/idempotency and legacy-path rewriting, JSONL cross-profile rejection, and profile-scoped dataset/generation/training routing; tests must use temporary disposable roots and must not mutate C:/IA DE VOZ real data. (6) run `python -m py_compile app.py scripts/train_runner.py`, the focused tests, and a bounded import/UI smoke without PREPARE DATASET, training, generation, or real-data migration. Return exactly one JSON object with summary, files_changed, commands_run, tests, remaining_issues and full provenance/phase/security fields. Mark unavailable fields honestly. Do not edit qwen3-tts or dependencies. No remote/publication actions.",
+  "constraints": [
+    "Use only the same configured biel4 App Server/headless Executor with isolated CODEX_HOME; no native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Local code/test mutation only; preserve all four input_audio files and every legacy artifact. Do not run migration or long-running workflows on the real data.",
+    "Do not change .git metadata, commit, push, publish, deploy, or install dependencies. Keep the correction minimal and Phase 2-only.",
+    "Fail closed on invalid profile paths, traversal, reparse points, cross-profile references/checkpoints, stale job ownership, or missing required artifacts."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/scripts/train_runner.py",
+    "C:/IA DE VOZ/README_PTBR.md",
+    "C:/IA DE VOZ/INICIAR.bat",
+    "C:/IA DE VOZ/input_audio",
+    "C:/IA DE VOZ/dataset",
+    "C:/IA DE VOZ/training",
+    "C:/IA DE VOZ/generated",
+    "C:/IA DE VOZ/config",
+    "C:/IA DE VOZ/logs"
+  ],
+  "review_findings": [
+    {"title":"Fix compile blocker and profile-clean path","details":"app.py has SyntaxError because start_training declares global TRAIN_PROCESS/TRAIN_OWNER after reading them; move the declaration before first use. prepare_dataset still writes normalized audio to global CLEANED instead of ctx.cleaned; fix and audit sibling writes."},
+    {"title":"Complete legacy metadata path rewrite","details":"Migration must cover all known path-bearing fields, including review rows audio and any file/source/train_audio/original/cleaned/segment/ref_audio/checkpoint fields when they contain paths, without leaving absolute legacy paths in profile JSON/JSONL."},
+    {"title":"Harden isolation and add focused tests","details":"Add destination-root/reparse checks and stale callback/job ownership guards. Add deterministic temporary-root tests for profile lifecycle, traversal/absolute/UNC/drive rejection, migration copy/idempotency and rewrite, JSONL cross-profile rejection, and profile-scoped routing. Run py_compile, focused tests, and bounded import/UI smoke only; do not touch real data or run long workflows."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase13-gateway-ui-docs-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Continue on the existing feat/phase-13-gateway branch after the backend and TCP/SQLite authority test commits. Add the desktop/UI and documentation follow-up for the now-functional gateway; do not change gateway_transport.rs, gateway.rs, Android/Phase 12 behavior, or import BielOS.\n\nIn apps/desktop/src/App.tsx, extend GatewayControls with an explicit Owner-confirmed local gateway listener lifecycle: invoke `get_gateway_transport_status` on load/refresh; add Start/Stop controls that call `start_gateway_transport` with agentId, ownerConfirmed=true only from the explicit button, privateNetworkConfirmed=false, bindAddress=127.0.0.1, port=0, temporaryChat; show enabled/endpoint/pairing-available metadata and display the one-time pairing code only in transient component state after a successful start with a clear secret-handling warning; never persist/log it or auto-start/connect. Handle blocked temporary/safe mode and typed errors fail-closed. Keep existing transfer/session/recovery controls Rust-authoritative. Replace stale copy claiming there is no listener with truthful bounded local/private authenticated TCP wording; retain Cloudflare metadata-only/no credentials/no BielOS/no relay boundaries.\n\nUpdate apps/desktop/src/gateway.test.tsx with deterministic mocks/assertions for transport status loading, explicit start with exact arguments, transient pairing display, stop, and blocked-mode no mutation. Update docs/PHASE_13_GATEWAY_SPEC.md, docs/ROADMAP.md, docs/KNOWN_LIMITATIONS.md, docs/CORRECTIVE_GAP_MATRIX.md, and README.md so Phase 13 is `FUNCTIONAL — AUTHENTICATED LOCAL/PRIVATE GATEWAY CHECKPOINT`: real `aip-gateway-v1` bounded framed HMAC TCP transport and Rust/SQLite authority are implemented and tested; local loopback is the validated path; private-LAN/hardware/manual permission/recovery/release-signing/remote CI/Cloudflare credential/BielOS/external ownership remain explicitly pending. Do not claim a public relay, tunnel, Cloudflare credential, remote account, or stable release. Preserve dense factual wording and no filler.\n\nRun pnpm --filter @aip/desktop typecheck, pnpm --filter @aip/desktop test, pnpm --filter @aip/desktop build, pnpm --filter @aip/contracts typecheck, pnpm --filter @aip/contracts test, pnpm secrets:scan, git diff --check, and the Rust fmt/check/clippy/tests gates. Commit focused changes as `feat: expose phase 13 gateway lifecycle` and `docs: mark phase 13 gateway functional`, with clean status. Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+  "constraints": [
+    "Use only configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Pairing code is transient UI memory only: never persist, telemetry-log, or include it in status responses after start.",
+    "No auto-connect, background listener start, public bind, Cloudflare credential use, BielOS import, Android/Phase 12 changes, or stable-release claim.",
+    "Keep Rust/SQLite authority and temporary-chat/safe-mode fail-closed controls intact."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src/App.tsx",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src/gateway.test.tsx",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_13_GATEWAY_SPEC.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/ROADMAP.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/KNOWN_LIMITATIONS.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/CORRECTIVE_GAP_MATRIX.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/README.md"
+  ],
+  "max_correction_cycles": 0
+}

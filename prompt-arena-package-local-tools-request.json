@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-local-tools-20260829",
+  "parent_request_id": "prompt-arena-package-cargo-env-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Make one packaging-only attempt for the current exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a in the isolated Prompt Arena worktree. Do not modify source files, docs, repository history, remotes, or settings. Confirm exact HEAD before and after. The prior NSIS failure is caused by Tauri's default tool cache under %LOCALAPPDATA%\\tauri, where the App Server sandbox has only ReadAndExecute; the project target directory has Modify. Invoke the supported Tauri config override `--config {\\\"bundle\\\":{\\\"useLocalToolsDir\\\":true}}` so NSIS/Wix tools are cached under src-tauri\\target\\.tauri, not AppData. Run the existing flow: npm run tauri:build -- --bundles nsis --config {\\\"bundle\\\":{\\\"useLocalToolsDir\\\":true}}, then npm run package:artifacts -- --platform windows and npm run verify:package -- --platform windows. Capture exact NSIS installer path, size, SHA-256/checksum manifest, bundled worker sidecar evidence, and clean install/launch/restart/uninstall smoke only if produced. If any permission or toolchain error occurs, report it verbatim and stop. Do not claim native human UI QA from automation. Use canonical biel4 Executor through App Server/headless with workspace-write, Windows elevated readiness ready, approval never, and complete provenance metadata.",
+  "constraints": [
+    "No source, docs, history, remote, tag, release, deploy, or settings changes.",
+    "Generated target/.tauri and package output may be created locally and remain ignored.",
+    "Preserve exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a."
+  ],
+  "review_findings": [
+    {
+      "title": "Default Tauri tool cache crosses the App Server sandbox boundary",
+      "details": "The canonical build reaches NSIS and reports Acesso negado while recreating the tool cache under AppData\\Local\\tauri\\NSIS. The executor sandbox has ReadAndExecute there, while the project target directory has Modify. Tauri 2.5 supports bundle.useLocalToolsDir to use target/.tauri."
+    },
+    {
+      "title": "Packaging-only exact-commit gate",
+      "details": "Source and docs are frozen. Preserve exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a and stop on any permission/toolchain error without source or history changes."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\node_modules\\@tauri-apps\\cli\\config.schema.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

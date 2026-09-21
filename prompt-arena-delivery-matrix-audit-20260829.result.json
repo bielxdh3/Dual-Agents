@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-delivery-matrix-audit-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T04:32:16.634776+00:00",
+  "finished_at": "2026-08-29T04:37:10.851253+00:00",
+  "summary": "Updated only docs/DELIVERY_MATRIX.md and committed the audit as d1a4d2165471b1b473e8f7b91ad7b02d97afff9c. Provenance: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4 implementation Executor\",\"task_transport\":\"App Server/headless\",\"sandbox\":\"managed workspace-write; repository write verified\",\"repository\":\"E:\\\\Prompt Arena-pr28-bl4\",\"branch\":\"validation/native-tauri-acceptance\",\"commit\":\"d1a4d2165471b1b473e8f7b91ad7b02d97afff9c\"}. No push attempted.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git diff --check",
+    "git add -- docs/DELIVERY_MATRIX.md",
+    "git commit -m \"docs: audit delivery evidence matrix\"",
+    "git diff HEAD^ HEAD --check"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "bounded PowerShell markdown consistency check",
+      "status": "passed",
+      "details": "26 table lines, six columns, required run evidence present, no COMPLETE status introduced."
+    },
+    {
+      "command": "git diff HEAD^ HEAD --check",
+      "status": "passed",
+      "details": "Committed documentation diff is clean."
+    }
+  ],
+  "remaining_issues": [
+    "Windows native acceptance remains unproven because run 33232495346 failed at EdgeDriver session creation with DevToolsActivePort file doesn't exist.",
+    "MSI remained unavailable with zero artifacts in packaging run 33213307890.",
+    "Native QA, security, and publication gates remain incomplete; no network push was performed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T043216Z-prompt-arena-delivery-matrix-audit-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T043216Z-prompt-arena-delivery-matrix-audit-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T043216Z-prompt-arena-delivery-matrix-audit-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T043216Z-prompt-arena-delivery-matrix-audit-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04bca-3192-7272-8ca3-c14dfff56beb",
+  "app_server_process_id": "13920",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T043216Z-prompt-arena-delivery-matrix-audit-20260829.md",
+  "task_sha256": "724e3820a5901f18156934cba32f48faef99668bc6234b9a60f96e526ff82544",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

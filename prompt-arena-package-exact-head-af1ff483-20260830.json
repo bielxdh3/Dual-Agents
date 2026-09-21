@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-exact-head-af1ff483-20260830",
+  "action": "implement",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "On the clean Prompt Arena checkout at exact source implementation HEAD af1ff483 and branch completion/windows-qa-live-telemetry-i18n, perform only the reviewed Windows packaging/evidence step. Use the canonical BL4 Executor through the configured App Server/headless path. Verify the checkout HEAD and clean status before starting, run cargo clean --manifest-path src-tauri/Cargo.toml, npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}', npm run package:artifacts -- --platform windows, and npm run verify:package -- --platform windows --smoke. Record exact artifact/bundle/bundled-worker/source-sidecar sizes and SHA-256 values, checksum manifest hash, package-verification output, git diff --check, and the provenance metadata. Do not change source files, modify E:/Prompt Arena or E:/Prompt Arena-pr28, run public CI, push, tag, release, deploy, merge, or create/update PRs. It is acceptable for the packaging script to update checksums-sha256.txt; leave that generated checksum change uncommitted for BL3 to review. Do not claim native visual or human QA; record MSI/Docker/remote-CI availability precisely. Return a structured report with commands, hashes, sizes, status, and remaining gates.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; backend app_server; task transport app_server; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Exact source implementation HEAD must remain af1ff483 before packaging; no source mutation or generated-source substitution.",
+    "Preserve E:/Prompt Arena and E:/Prompt Arena-pr28 untouched; no public publication action."
+  ],
+  "context_files": [
+    "E:/Prompt Arena-live-telemetry-i18n/package.json",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/package-artifacts.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/verify-package.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/checksums-sha256.txt",
+    "E:/Prompt Arena-live-telemetry-i18n/docs/DELIVERY_MATRIX.md",
+    "E:/Prompt Arena-live-telemetry-i18n/docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

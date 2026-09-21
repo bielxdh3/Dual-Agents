@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-implementation-correction-20260827",
+  "parent_request_id": "aip-big-smoke-implementation-20260827",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T14:43:37.498619+00:00",
+  "finished_at": "2026-08-27T14:48:00.475667+00:00",
+  "summary": "Formatação corrigida e commit local criado: fc2280f7ccd9ff283758bbbefa1dd370a3736a51. Worktree limpo na branch correta.",
+  "files_changed": [
+    "apps/desktop/src/App.css",
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/components/AgentSprite.test.ts",
+    "apps/desktop/src/components/AgentSprite.tsx",
+    "apps/desktop/src/conversation-list.test.tsx",
+    "apps/desktop/src/pixel-document.test.ts",
+    "apps/desktop/src/pixel-document.ts",
+    "apps/desktop/src/pixel-editor.test.tsx"
+  ],
+  "commands_run": [
+    "pnpm exec prettier --write <8 touched files>",
+    "pnpm exec prettier --check <8 touched files>",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm exec vitest run --configLoader native --pool=threads --maxWorkers=1 <4 focused test files>",
+    "git diff --cached --check",
+    "git commit -m \"fix: resolve Big Smoke UI regressions\"",
+    "git status --short --branch"
+  ],
+  "tests": [
+    {
+      "command": "Focused Vitest suite with threads pool",
+      "status": "passed",
+      "details": "4 files, 12 tests passed."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "tsc --noEmit passed."
+    },
+    {
+      "command": "Prettier check on all 8 touched files",
+      "status": "passed",
+      "details": "All matched files use Prettier code style."
+    },
+    {
+      "command": "Default Vitest fork pool",
+      "status": "failed",
+      "details": "Executor returned spawn EPERM before test collection; threads-pool workaround passed."
+    }
+  ],
+  "remaining_issues": [
+    "Default Vitest fork workers remain unavailable in this executor; no known code issues remain.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T144337Z-aip-big-smoke-implementation-correction-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T144337Z-aip-big-smoke-implementation-correction-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T144337Z-aip-big-smoke-implementation-correction-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T144337Z-aip-big-smoke-implementation-correction-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a043ad-2e58-7053-8a44-7d794be4500c",
+  "app_server_turn_id": "01a043ad-2f13-7e33-9081-2dffbd41ea07",
+  "app_server_process_id": "19952",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T144337Z-aip-big-smoke-implementation-correction-20260827.md",
+  "task_sha256": "aaef331c63879a300810c96772ff6765d9379ecb30f833bc259e9cdd3a9ae74b",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'. Executor changed Git HEAD; no rollback was attempted."
+}

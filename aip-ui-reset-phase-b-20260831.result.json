@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-b-20260831",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-31T20:50:58.183770+00:00",
+  "finished_at": "2026-08-31T21:00:19.821827+00:00",
+  "summary": "Implemented and committed Phase B visual foundation as add326f.",
+  "files_changed": [
+    "apps/desktop/src/App.css",
+    "apps/desktop/src/theme.tsx",
+    "apps/desktop/src/theme.test.tsx",
+    "apps/desktop/src/shared-controls.test.tsx"
+  ],
+  "commands_run": [
+    "pnpm --filter @aip/desktop test",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm exec eslint apps/desktop/src/theme.tsx apps/desktop/src/theme.test.tsx apps/desktop/src/shared-controls.test.tsx",
+    "pnpm exec prettier --check ...",
+    "git diff --check",
+    "git commit -m \"establish AIP visual foundation\""
+  ],
+  "tests": [
+    {
+      "command": "Focused theme/shared-control Vitest",
+      "status": "passed",
+      "details": "9 tests passed."
+    },
+    {
+      "command": "Full desktop Vitest",
+      "status": "passed",
+      "details": "30 files and 118 tests passed."
+    },
+    {
+      "command": "Desktop TypeScript typecheck",
+      "status": "passed",
+      "details": "tsc --noEmit passed."
+    },
+    {
+      "command": "ESLint changed TypeScript files",
+      "status": "passed",
+      "details": "No warnings or errors."
+    },
+    {
+      "command": "Prettier and git diff checks",
+      "status": "passed",
+      "details": "Formatting and whitespace checks passed."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T205058Z-aip-ui-reset-phase-b-20260831\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T205058Z-aip-ui-reset-phase-b-20260831",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T205058Z-aip-ui-reset-phase-b-20260831\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T205058Z-aip-ui-reset-phase-b-20260831\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05910-09d5-7723-9116-e11fbee1ea5e",
+  "app_server_turn_id": "01a05996-f0b3-71c3-a55b-23b8d2a6646d",
+  "app_server_process_id": "20600",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260831T205058Z-aip-ui-reset-phase-b-20260831.md",
+  "task_sha256": "136b68d5e50c3f42895b5ac484f1afe7d020eb74cc6db0ccf83951fe834d9a4d",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

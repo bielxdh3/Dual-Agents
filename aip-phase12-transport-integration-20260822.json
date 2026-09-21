@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-transport-integration-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Integrate the committed Phase 12 transport core (4535b3d) with the desktop Tauri/Rust authority and Android client on branch feat/phase-12-android-companion. Do not replace the core or fixtures. Read companion_transport.rs, companion.rs, database methods, lib.rs AppState/command registration/tests, contracts, App.tsx, Kotlin Protocol.kt/SecureStore, and Phase 12 docs.\n\nAdd an in-memory CompanionTransportManager/State around the existing core TransportHandle. Add typed request/status/response structures and Tauri commands for explicit Owner-confirmed start, stop, and status. Start must reject temporary chat/safe mode/invalid agent-owner, require ownerConfirmed=true, default bind `127.0.0.1`, allow only explicitly confirmed RFC1918 private host, reject wildcard/public, use an ephemeral or explicitly bounded port, generate a one-time pairing code kept only in memory, and return pairing metadata once without logging/persisting the raw code. Stop must close the listener and all connections; status must not expose the secret. Update AppState initialization and test_state/command registration.\n\nWire the callback to real Rust/SQLite companion authority: first authenticated `pair` frame validates bounded payload/device/fingerprint and calls existing Owner-scoped `start_companion_pairing`; a confirmed paired device can send `session`/`reconnect`, `history`, `queue_preview`, `queue_approve`, `queue_cancel`, and `queue_retry` frames whose payloads deserialize into the existing request structs and whose owner/agent/session proof/idempotency/temporary-chat/safe-mode gates are enforced by the existing Database methods. Return bounded typed JSON responses, never raw private paths/media/secrets, and never claim a queue/history effect until the database method succeeds. Add a deterministic Rust integration test that starts the real Tauri-independent manager with a temporary Database, performs authenticated pair/session/history or queue request over a real localhost TCP socket, checks replay/wrong-MAC/temporary-chat/revocation failures, then stops and verifies the port closes. If the existing core needs a safe callback API adjustment, keep it scoped and tested.\n\nUpdate Android Kotlin transport to use the shared JSON-line WireFrame, load the pairing code/secret only through SecureStore, connect with Socket timeout, perform pair/session handshake and HMAC/replay checks, parse bounded history/queue responses, and return explicit offline/degraded result on timeout or closed transport. Do not auto-connect, scan, or open a listener on Android. Add JVM tests for socket request/response against a deterministic loopback fake and offline fallback; preserve overlay/notification/queue/privacy behavior.\n\nAdd typed contracts/invoke wrappers and a small Portuguese UI/status area for transport enabled/disabled, endpoint, one-time pairing confirmation, private-binding warning, stop control, and truthful offline state. Keep secret out of React logs/audit. Update docs/PHASE_12_ANDROID_IMPLEMENTATION.md, PHASE_12_ANDROID_SPEC.md, ROADMAP.md, KNOWN_LIMITATIONS.md, CORRECTIVE_GAP_MATRIX.md, README.md to say the real APK plus authenticated local/private transport and deterministic loopback are functional; physical-device/private-LAN/manual/release signing remain reservations; Phase 13 BielOS/Cloudflare is separate and not imported.\n\nRun all gates: cargo fmt/check/clippy/full+focused tests; contracts typecheck/build/tests; desktop typecheck/tests/build; Android absolute-toolchain `gradle.bat --no-daemon testDebugUnitTest lintDebug assembleDebug`; APK SHA-256; pnpm secrets:scan (generated paths must stay ignored); git diff --check; final clean status. Commit only this integration with exact message `feat: integrate phase 12 companion transport`. Do not push/publish/PR/merge/tag/release/deploy, modify BielOS, use native subagents, or edit outside the configured Executor. If a requested external/hardware check is unavailable, record it precisely without weakening the implementation.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Use the existing core and fixtures; Rust/SQLite remains authoritative and raw secrets/media never persist.",
+    "Transport is explicit, authenticated, bounded, local/private-only by default, fail-closed, and has no relay/public listener/telemetry/Python exposure.",
+    "Use absolute checkout-local Android toolchain paths; .tooling remains ignored/untracked and never committed.",
+    "No remote mutation, BielOS import, Phase 13 external integration, or release claim."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "review_findings": [
+    {
+      "title": "Transport core lacks authority/UI/Android integration",
+      "severity": "blocking",
+      "details": "Commit 4535b3d proves a bounded authenticated loopback core only. The next required slice must connect it to Owner-scoped SQLite companion operations, Tauri start/stop/status, Android SocketTransport, typed contracts/UI, and real integration tests without exposing secrets."
+    }
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/companion_transport.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/companion.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/database.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src/App.tsx",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/android/app/src/main/java/com/aip/companion/Protocol.kt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_12_ANDROID_IMPLEMENTATION.md",
+    "C:/Users/bielx/Downloads/AIP_DUAL_CODEX_FULL_ROADMAP_AUTONOMOUS_COMPLETION.md"
+  ],
+  "max_correction_cycles": 0
+}

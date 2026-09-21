@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p7-commit-current-20260828",
+  "parent_request_id": "prompt-arena-p7-desktop-delivery-20260828",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T19:42:11.924751+00:00",
+  "finished_at": "2026-08-28T19:45:59.966293+00:00",
+  "summary": "Implemented and committed P7 desktop delivery as 05bd5bb on completion/desktop-delivery. Added stable Tauri installer metadata, deterministic artifact/checksum helpers, CI verification smoke, and focused tests. Native provenance uses src-tauri/Cargo.toml with the exact cargo commands listed below. P7 remains IN PROGRESS.",
+  "files_changed": [
+    ".github/workflows/package.yml",
+    "ROADMAP.md",
+    "package.json",
+    "src-tauri/tauri.conf.json",
+    "scripts/package-artifacts.mjs",
+    "scripts/package-artifacts.test.mjs",
+    "scripts/verify-package.mjs"
+  ],
+  "commands_run": [
+    "npm run typecheck",
+    "npm test",
+    "npm run build",
+    "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+    "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+    "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+    "git diff --check",
+    "git add .github/workflows/package.yml ROADMAP.md package.json src-tauri/tauri.conf.json scripts/package-artifacts.mjs scripts/package-artifacts.test.mjs scripts/verify-package.mjs",
+    "git commit -m \"Implement P7 desktop delivery\""
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript check passed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "78 tests passed across 16 test files, including focused packaging tests."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed."
+    },
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+      "status": "passed",
+      "details": "Rust formatting check passed."
+    },
+    {
+      "command": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "Rust check passed."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "99 tests passed; one non-failing Windows linker warning was emitted."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only LF/CRLF normalization warnings."
+    }
+  ],
+  "remaining_issues": [
+    "Native Windows clean-install/start/restart/uninstall and Linux package/app launch evidence were not run locally by instruction and remain pending in CI; P7 is intentionally still IN PROGRESS.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T194212Z-prompt-arena-p7-commit-current-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T194212Z-prompt-arena-p7-commit-current-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T194212Z-prompt-arena-p7-commit-current-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T194212Z-prompt-arena-p7-commit-current-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a049d5-80b7-78a1-af9c-d95d81969102",
+  "app_server_turn_id": "01a049e4-e5f9-79f0-a0b7-8ca59524de28",
+  "app_server_process_id": "13596",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T194212Z-prompt-arena-p7-commit-current-20260828.md",
+  "task_sha256": "46248b182689518b0ea13a9094fd6bd540e0ebfdb59d66b0e50f4b9b74b8a046",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

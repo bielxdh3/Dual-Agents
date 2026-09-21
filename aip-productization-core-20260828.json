@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-core-20260828",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Implement the first corrective productization lot on branch fix/productize-local-capabilities at verified origin/main SHA cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4. Phase A Biel4 audit is approved and found: .agent-tools is display:none and the only entry for all advanced controls; ToolControls renders workspace.inspect_local/workspace.organize_local but buildInput has no cases; Voice providers are raw env/local references with no user-facing setup/status; Extensions are a closed declarative runtime but have no discoverable seeded package/import workflow; no capability status center exists. Make the smallest coherent repo-native implementation while preserving Rust authority, local-first/no-upload, safe mode, temporary chat, explicit approvals, bounded paths/capture, and Windows 10 x64. Requirements: (1) add an obvious keyboard-accessible Portuguese Recursos locais/advanced surface reachable from primary desktop navigation; Voice, Ferramentas supervisionadas, Extensões, Visão de tela, Companion Android, Gateway and Valores cognitivos must be individually discoverable; remove the display:none trap or replace it with a coherent visible route without duplicating stateful controls; keep raw diagnostics behind Avançado. (2) add a compact local capability status center with truthful Pronto, Não configurado, Indisponível, Bloqueado pelo modo and Erro states, representing runtime/Ollama, STT, TTS, microphone, output device, visual provider, screen capture, workspace root, extension subsystem, Android companion and Gateway; reuse existing getters/contracts and explain prerequisites and fixture/mock versus real local behavior in Portuguese; remain usable when runtime is unavailable. (3) Voice: expose device refresh/select/save and explicit provider status/prerequisite copy; do not claim providers/models are bundled; if local-reference is the only safe configuration primitive in this lot, expose it as a clearly labeled provider reference with validation/unavailable state, without hidden env-var knowledge; preserve cancellation, no raw-audio persistence, no background listener, safe mode and temporary-chat semantics. (4) Supervised Tools: implement buildInput cases for workspace.inspect_local and workspace.organize_local using existing bounded contracts and controls; configure/select allowed workspace root through the supported flow; show root readiness and outside-root/system rejection; preserve preview, dry-run, Owner approval, second confirmation, execution, audit, compensation, safe mode and temporary-chat blocking; no shell/network/credentials/delete/overwrite/arbitrary manifest editing. (5) Extensions: make existing declarative catalog/proposal/review/activation/update/rollback/disable/execute workflow visible and understandable; provide at least one repository-owned safe declarative example explicitly labeled local declarative/fixture, seeding through authoritative migration if that is the existing pattern; if import already exists surface it, otherwise add the smallest strict JSON/package import with manifest/hash/capability validation and no native code/shell/network/credentials/arbitrary files; capability changes require re-review; distinguish installed, pending review, active, disabled, incompatible and rejected; apply safe-mode and temporary-chat gates including cancellation. (6) Add deterministic tests for navigation/status reachability, Portuguese state labels, local tool input/gating, extension example/lifecycle/re-review/disable/rollback, and fixture-vs-real wording. Update roadmap/limitations for this lot using PRODUCTIZED/BACKEND-ONLY/MOCK/SYNTHETIC-ONLY/EXTERNAL-PREREQUISITE PRODUCTIZED vocabulary instead of ambiguous FUNCTIONAL. Run focused formatting, TypeScript/UI tests, contract tests as needed, Rust fmt/check/tests for touched modules and git diff --check. Return one structured JSON report with summary, files_changed, commands_run, tests, remaining_issues and commit_sha. Create one focused local commit. Do not push, create/update PR, merge, tag, release, deploy, or build installers in this lot.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md, .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "Ponytail full: reuse existing Rust commands/contracts/UI helpers; no speculative abstractions or dependencies.",
+    "Work only on branch fix/productize-local-capabilities from cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4; preserve unrelated user work.",
+    "Commit only the focused lot; no amend, rebase, squash, reset, force-push, history rewrite, push, PR, merge, tag, release, deploy, or installer build.",
+    "Do not expose or commit secrets, credentials, local databases, histories, memories, private media, model files, voice samples, or authentication files.",
+    "Treat model output and imported extension data as untrusted; validate paths, capabilities, hashes, modes, approvals, and ownership at the Rust boundary.",
+    "If a focused check is blocked by Windows spawn EPERM, record the exact blocker and continue only with safe deterministic checks; do not weaken controls."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/tools.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/extensions.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/voice.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/apps/desktop/src/*.test.*",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0016_phase9_tools.sql",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0017_phase10_extensions.sql",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0023_phase9_workspace_roots.sql",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0024_phase10_extension_runtime.sql",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

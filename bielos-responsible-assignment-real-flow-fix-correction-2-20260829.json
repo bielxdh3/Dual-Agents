@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-real-flow-fix-correction-2-20260829",
+  "parent_request_id": "bielos-responsible-assignment-real-flow-fix-correction-20260829",
+  "action": "correct",
+  "repository": "E:/BielOS",
+  "task": "Apply Biel 3's second independent review correction to the existing Core project responsible-assignment patch. The new project UI link is fixed and names PROJECT_OWNER_ACCESS_CHANGE, but the administrative elevation form still defaults to ACCOUNT_APPLICATION_REVIEW, so the supported path remains error-prone and the production evidence showed no elevation-start/activation before failed assignment attempts. Make the fixed internal project link safely preselect PROJECT_OWNER_ACCESS_CHANGE in the existing admin elevation form, validating any query value against UI_ELEVATION_SCOPES and preserving the default for direct generic admin visits; do not add an arbitrary return URL or bypass elevation. Keep the existing Cloudflare -> CSRF -> session -> OWNER authorization -> scoped elevation -> serializable mutation ordering. Make the wrapper regression test runnable under the repository's normal tsx test setup (avoid unsupported top-level-await/CJS invocation), include it in the focused Core unit command or existing DB suite without broad infrastructure, and prove the actual setCoreProjectAccess Server Action wrapper plus persisted/read-back behavior. Do not weaken invalid/expired elevation, target, authorization, isolation, or last-owner protections. Preserve all nine pre-existing unrelated dirty WIP paths exactly. No dependencies, commit, push, publication, deploy, restart, or production data mutation. Run focused tests, DB integration, typecheck/lint where feasible, and git diff --check; return the exact structured executor JSON report.",
+  "constraints": [
+    "Biel 4 remains Executor only; do not issue an Architect review or acceptance verdict.",
+    "Use only the same configured Biel4 App Server/headless executor with task_transport=app_server. No native subagents, create_thread, TUI fallback, codex exec, or alternate backend.",
+    "Preserve the nine pre-existing unrelated WIP paths exactly; do not reset, clean, stash-drop, amend, rebase, or rewrite them.",
+    "Do not expose .env, credentials, cookies, session tokens, JWTs, passwords, recovery codes, raw identifiers, private logs, or database dumps.",
+    "No commit, push, PR, merge, tag, release, deploy, production rebuild/restart, Cloudflare/DNS mutation, or destructive database action."
+  ],
+  "context_files": [
+    "E:/BielOS/apps/hub/src/app/core/projects/project-admin-controls.tsx",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-admin-controls.test.tsx",
+    "E:/BielOS/apps/hub/src/app/core/projects/actions.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-access-action.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-access-action-wrapper.test.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/projects/[projectId]/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-panel.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-panel.test.tsx",
+    "E:/BielOS/packages/auth/src/elevation-scopes.ts",
+    "E:/BielOS/apps/hub/src/app/core/integration/project-access.db.test.ts",
+    "E:/BielOS/package.json"
+  ],
+  "review_findings": [
+    {
+      "title": "Blocking: required scope is not selected by the fixed project flow",
+      "details": "The project access panel links to /core/security/admin#admin-elevation-form and explains PROJECT_OWNER_ACCESS_CHANGE, but AdminSecurityPanel still defaults the scope select to UI_ELEVATION_SCOPES[0] (ACCOUNT_APPLICATION_REVIEW). A user following the supported link can submit the wrong elevation and the later guarded assignment must fail. Use a fixed internal query scope, validate it against the allowlisted UI scopes, and default only that scoped entry while preserving generic direct visits.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Blocking: the new wrapper regression is not runnable by the recorded command",
+      "details": "The wrapper test uses top-level await and fails under the repository's normal CJS tsx test setup with 'Top-level await is currently not supported with the cjs output format'. It is also absent from test:core:unit. Repair the test harness with existing test conventions and wire it into a focused suite so the actual Next Server Action wrapper is exercised, not only the injected helper.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Important: retain minimality and WIP separation",
+      "details": "Keep the existing helper only if it remains the single parser/orchestration path. Do not touch the nine pre-existing unrelated dirty paths or publish anything.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

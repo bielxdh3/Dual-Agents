@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-wire-contract-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T16:01:47.720256+00:00",
+  "finished_at": "2026-08-22T16:05:59.143855+00:00",
+  "summary": "Unified the Phase 12 Android wire contract as bounded newline-delimited JSON and committed it as b60bd0b.",
+  "files_changed": [
+    ".gitignore",
+    "android/app/src/main/java/com/aip/companion/Protocol.kt",
+    "android/app/src/test/java/com/aip/companion/ProtocolTest.kt",
+    "docs/PHASE_12_ANDROID_IMPLEMENTATION.md",
+    "docs/PHASE_12_ANDROID_SPEC.md"
+  ],
+  "commands_run": [
+    "gradle.bat --no-daemon testDebugUnitTest lintDebug assembleDebug",
+    "Get-FileHash app/build/outputs/apk/debug/app-debug.apk -Algorithm SHA256",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m 'feat: define phase 12 companion wire contract'"
+  ],
+  "tests": [
+    {
+      "command": "Android unit tests, lint, assembleDebug",
+      "status": "passed",
+      "details": "Passed. APK SHA-256: A5B291158A1BED0028467A7C59CE97A985228D921B45439927E4F5D5E8166986."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "not_run",
+      "details": "The scanner failed because the environment denied its child-process git spawn with EPERM."
+    },
+    {
+      "command": "git status --short --branch",
+      "status": "passed",
+      "details": "Clean branch; generated toolchain/build paths are ignored."
+    }
+  ],
+  "remaining_issues": [
+    "Desktop listener remains intentionally unimplemented for the next scoped commit.",
+    "Physical-device, private-LAN, and release-signing validation remain outstanding.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T160148Z-aip-phase12-wire-contract-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T160148Z-aip-phase12-wire-contract-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T160148Z-aip-phase12-wire-contract-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T160148Z-aip-phase12-wire-contract-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a2d-a524-7c21-955c-f7cf0ed10fa3",
+  "app_server_turn_id": "01a02a34-f759-7d30-a06a-5b15371636ca",
+  "app_server_process_id": "3728",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T160148Z-aip-phase12-wire-contract-20260822.md",
+  "task_sha256": "a98cd14585cb493eacccb904fe30fcc662d3152bdd367e0cd5929ef5fc756477",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

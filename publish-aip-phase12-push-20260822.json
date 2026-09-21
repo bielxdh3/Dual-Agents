@@ -1,0 +1,11 @@
+{
+  "operation": "normal_push",
+  "mission_id": "aip-phase12-ci-modefix-push-20260822",
+  "authorization_reference": "aip-phase12-ci-modefix-push-20260822",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "repository_full_name": "bielxdh3/AIP",
+  "branch": "feat/phase-12-android-companion",
+  "expected_remote_old_sha": "82ebb6db2bea08f72c65fea03b2b6e7d02fac4f6",
+  "new_sha": "42bb33393978cb154aad05b9c08249ea88545921",
+  "authorization": {"allowed_actions": ["normal_push"]}
+}

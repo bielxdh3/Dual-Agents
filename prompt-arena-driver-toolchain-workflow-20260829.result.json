@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-driver-toolchain-workflow-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T13:04:42.926362+00:00",
+  "finished_at": "2026-08-29T13:05:46.959972+00:00",
+  "summary": "Blocked before implementation by required fail-closed provenance checks. Current HEAD and branch match the request, but turn ID, executor_account=biel4, windows.sandbox=elevated, and readiness=ready were not independently exposed. No workflow change or commit was made. Provenance metadata: {\"executor_account\":\"not independently verified\",\"executor_role\":\"task-asserted BL4 Executor\",\"task_transport\":\"task-asserted App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"turn_id\":null,\"sandbox\":\"managed workspace-write\",\"windows_sandbox\":\"not exposed\",\"readiness\":null,\"approval\":\"never\",\"head\":\"f3048a61f45cdb6b29f362444f3d32646edf4943\"}.",
+  "files_changed": [],
+  "commands_run": [
+    "Get-Content required skill files",
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "limited executor/provenance environment inspection"
+  ],
+  "tests": [
+    {
+      "command": "workflow syntax/format checks",
+      "status": "not_run",
+      "details": "Blocked before implementation because required provenance was not fully verifiable."
+    }
+  ],
+  "remaining_issues": [
+    "No commit SHA exists because no mutation was authorized under the fail-closed provenance requirement.",
+    "Required independently verifiable turn ID, biel4 executor identity, elevated Windows sandbox state, and ready status are unavailable in the current transport metadata.",
+    "No push, merge, release, tag, deploy, or other remote action was attempted."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T130443Z-prompt-arena-driver-toolchain-workflow-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T130443Z-prompt-arena-driver-toolchain-workflow-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T130443Z-prompt-arena-driver-toolchain-workflow-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T130443Z-prompt-arena-driver-toolchain-workflow-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04d9f-58ac-7202-9780-44d10a6a12ec",
+  "app_server_process_id": "21068",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T130443Z-prompt-arena-driver-toolchain-workflow-20260829.md",
+  "task_sha256": "157ecb29c1a9c77aa7cd26cb60c461e9968ceb8089e954063b9b95a98fcf1137",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

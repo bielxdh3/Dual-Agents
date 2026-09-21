@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-core-continuity-model-state-retry-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "On the isolated Prompt Arena branch, perform a narrow corrective implementation against the pasted Prompt Arena mission. Work only as the canonical BL4 Executor through the configured App Server/headless path. Inspect the current code before editing. First, audit the legacy ArenaResultsSurface blind score/reveal path (the surface used immediately after an Arena run) against the black-screen/evaluation-continuity requirement. In particular, inspect the text-based prepared-response matching, state transitions after score edits and lock, async invoke rejection handling, stable identity/indexing, and render safety. If the current path has a confirmed or plausible correctness hazard, implement the smallest repo-native fix that preserves blind identity suppression, immutable persistence, reveal sequencing, cancellation, and no-forced-reload behavior. Prefer stable attempt/run identity over response-text matching, bounded/memoized response rendering, and a pure state-transition helper where that enables focused tests. Add meaningful focused tests for the corrected score transition/continuity semantics; do not claim native UI evidence. Second, fix model availability/action precedence so an active install operation is represented as DOWNLOADING/CANCEL even when stale or concurrent catalog evidence says the model is available; preserve INSTALLED USE/REMOVE behavior when no active install exists, FAILED RETRY semantics, backend/path safety, and no invented downloads. Add a focused transition test. Do not make speculative architecture changes or broad rewrites. Run proportional validation (focused tests, full npm test, typecheck, build if practical) and report exact files, commands, results, remaining human/external gates, and canonical provenance metadata. Update delivery docs only if needed to reflect actual changes. Do not modify E:\\Prompt Arena or E:\\Prompt Arena-pr28. Do not commit, push, tag, release, deploy, merge, or create/update PRs; leave implementation changes uncommitted for BL3 review.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; backend app_server; task transport app_server; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Preserve existing no-secret, process-isolation, cancellation, blind-evaluation, and local-first boundaries.",
+    "No forced page reload as a black-screen workaround.",
+    "Do not revisit exhausted CDP/UIA/browser-coordinate automation paths.",
+    "Keep the diff minimal and do not commit."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\.codex\\attachments\\b16592b6-1f9f-44ec-b685-bd314cdb2e10\\pasted-text.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\model-library.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\*.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

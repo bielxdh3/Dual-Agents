@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase8-voice-migration-test-correction-20260820",
+  "parent_request_id": "aip-phase8-voice-core-correction-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Make the smallest Phase 8 migration-test correction in the existing branch state. The new migration 0022 makes the existing database::tests::version_twenty_tool_capabilities_are_repaired_by_forward_migration test delete only version 21 while schema_migrations already contains version 22, so the runner correctly does not reapply migration 21 and the test fails. Update only that test fixture to remove the relevant latest migration marker(s) so the forward-migration test exercises migration 0021 again under the current migration chain; do not weaken production migration ordering or alter unrelated tests. Then run cargo fmt --check, cargo check --locked, cargo clippy --locked --all-targets -- -D warnings, cargo test --locked --lib, and git diff --check. If all pass, commit all current Phase 8 core changes with exactly `feat: implement phase 8 functional local voice`. Do not push or perform GitHub operations.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents.",
+    "Preserve the current partial Phase 8 changes; no reset, discard, rebase, or force operation.",
+    "No raw audio persistence, upload, telemetry, public listener, cloud provider, arbitrary shell, or safety weakening.",
+    "Do not modify unrelated phase scope or perform remote operations.",
+    "Return the wrapper-required JSON report fields only."
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/database.rs",
+    "apps/desktop/src-tauri/migrations/0021_corrective_tools_capabilities.sql",
+    "apps/desktop/src-tauri/migrations/0022_phase8_voice_runtime.sql"
+  ],
+  "review_findings": [
+    {
+      "title": "Forward migration regression test must include the new latest migration",
+      "severity": "blocking",
+      "details": "The required library suite currently has 114 passed and one failure: version_twenty_tool_capabilities_are_repaired_by_forward_migration expected [\"inspect_scope\"] but received {\"operations\":[\"inspect_scope\"]}. The test deletes only version 21, but migration 22 is now the current MAX and prevents 21 from rerunning. Adjust only the test setup to delete version 21 and the later Phase 8 marker(s), preserving production migration behavior."
+    }
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

@@ -1,0 +1,58 @@
+{
+  "verdict": "approved_with_reservations",
+  "blocking_findings": [],
+  "important_findings": [
+    "The prior documentation contradiction is corrected: KNOWN_LIMITATIONS now accurately describes explicit Owner-confirmed GDI capture, transient pixels, and pending analysis/model/manual validation.",
+    "The prior contract-capacity defect is fixed: Rust and TypeScript share an 18-record bound, covering two synthetic fixtures plus up to 16 real displays, with acceptance/rejection tests.",
+    "Windows display enumeration, selected monitor bounds, GDI capture, dimension/byte limits, transient lifecycle, and in-memory cancellation wiring are implemented.",
+    "Rust/SQLite remains authoritative for Owner, agent, permission, safe-mode, temporary-chat, quota, idempotency, audit, lifecycle, cleanup, and reference-GPU serialization gates.",
+    "Real local-model behavior fails closed as unavailable/degraded; synthetic behavior is deterministic, uncertain, non-diagnostic, non-sensitive, bounded, and non-durable.",
+    "Contracts reject forbidden pixel, screenshot, and durable-visual fields while accepting bounded real display metadata.",
+    "Phase 12 Android and Phase 13 gateway files remain unchanged.",
+    "No obvious secrets, private paths, generated binaries, provider credentials, network/upload path, watcher, public listener, telemetry, or raw-content persistence were found.",
+    "Cancellation under real workload, packaged Windows behavior, model availability, privacy/UX, and visual quality remain appropriate human/release reservations."
+  ],
+  "evidence": [
+    "HEAD is f2b2f84, 'docs: reconcile phase 11 capture limitations'.",
+    "apps/desktop/src-tauri/src/screen_vision.rs:575-630 enumerates and bounds real displays.",
+    "apps/desktop/src-tauri/src/screen_vision.rs:151-260 captures selected display bounds with GDI and performs resource cleanup.",
+    "apps/desktop/src-tauri/src/screen_vision.rs:23-52 and 933-981 implement per-job cancellation registration, observation, and cleanup.",
+    "apps/desktop/src-tauri/src/screen_vision.rs:22-24 defines the 16-real-display and 18-total-fixture bounds.",
+    "packages/contracts/src/index.ts:3324 and 3626-3635 enforce the matching 18-record contract bound.",
+    "packages/contracts/tests/contracts.test.ts:932-935 tests acceptance of 18 records and rejection of 19.",
+    "docs/KNOWN_LIMITATIONS.md:68-91 now truthfully classifies the bounded Windows capture/provider checkpoint and its remaining reservations."
+  ],
+  "validation_run": [
+    "Read-only Git status, log, diff, source, contract, test, documentation, and secret-pattern inspections completed.",
+    "The contracts test command was attempted but the sandbox denied Vitest worker spawning with EPERM.",
+    "The repository secret scan was attempted but its child git process was denied with EPERM.",
+    "Focused cargo tests were not run because the read-only environment denied creation of target/debug/.cargo-build-lock.",
+    "Remote CI not confirmed.",
+    "The requested base commit ceccd4cbb897b935dbf9e956e2713fa0487ed6ae remains unavailable locally; comparison used the available Phase 10 parent f297503..f2b2f84."
+  ],
+  "remaining_human_checks": [
+    "Packaged Windows validation.",
+    "Manual Owner privacy and UX validation.",
+    "Local model installation and visual quality.",
+    "Real multi-monitor capture and cancellation under load.",
+    "Remote CI and Windows-specific compilation/test execution."
+  ],
+  "provenance": {
+    "reviewer": "Biel4 Reviewer",
+    "role": "configured App Server reviewer",
+    "mode": "fast",
+    "range_requested": "ceccd4cbb897b935dbf9e956e2713fa0487ed6ae..f2b2f84c53ae1ef43e0075dd67bb132fa0cbcdd6",
+    "range_reviewed": "f297503..f2b2f84c53ae1ef43e0075dd67bb132fa0cbcdd6",
+    "commits": [
+      "9827ee4",
+      "2beca1f",
+      "a2ee44b",
+      "7c120b7",
+      "f584259",
+      "4eed9f5",
+      "6cb6a2e",
+      "f2b2f84"
+    ],
+    "read_only": true
+  }
+}

@@ -1,0 +1,398 @@
+{
+  "summary": {
+    "verdict": "BLOCKED",
+    "commit": "6da72b033f68496296bf9f104405e6e28173fe45",
+    "parent": "cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4",
+    "text": "The productization surface is substantially present, but the gate cannot pass: Screen Vision privacy enforcement is incomplete, temporary-chat tool-root protection is bypassable, capability cards are not actionable, and current lint/Rust-format checks fail. No files were modified."
+  },
+  "blocking_findings": [
+    {
+      "id": "screen-vision-privacy",
+      "finding": "Screen Vision validates redaction policy metadata but does not redact captured pixels. Full GDI pixels are passed to the configured provider, while preview metadata hardcodes syntheticFixture=true and redactionApplied=true.",
+      "impact": "Sensitive screen content can reach a local provider despite the selected privacy policy.",
+      "evidence": "apps/desktop/src-tauri/src/screen_vision.rs:992-1005, 1117-1148, 1656-1666",
+      "introduced_in_commit": false
+    },
+    {
+      "id": "temporary-root-guard",
+      "finding": "add_workspace_root and remove_workspace_root check temporary-chat state for hardcoded agent agt_astra_provisional; the request has no caller agent identity.",
+      "impact": "A direct command can mutate durable workspace-root state while the active Luma chat is temporary.",
+      "evidence": "apps/desktop/src-tauri/src/lib.rs:1136-1178; apps/desktop/src/App.tsx:4260-4264",
+      "introduced_in_commit": false
+    },
+    {
+      "id": "non-actionable-discovery",
+      "finding": "Local capability cards are plain anchors pointing at closed details elements. They do not open the target panel; Runtime/Ollama also links to its own status card without a configuration destination.",
+      "impact": "An installed user can discover the status surface but cannot reliably reach the prerequisite workflow from the status card.",
+      "evidence": "apps/desktop/src/App.tsx:8214-8226, 8270-8328",
+      "introduced_in_commit": true
+    },
+    {
+      "id": "current-quality-failures",
+      "finding": "pnpm lint fails on the newly added provider-parser no-control-regex rule, and cargo fmt --check fails on current extensions.rs/lib.rs formatting.",
+      "impact": "The reviewed commit does not satisfy current package-quality checks.",
+      "evidence": "packages/contracts/src/index.ts:90; apps/desktop/src-tauri/src/extensions.rs:2511; apps/desktop/src-tauri/src/lib.rs:55-98",
+      "introduced_in_commit": true
+    }
+  ],
+  "important_findings": [
+    {
+      "id": "provider-configuration",
+      "finding": "Voice and real Screen Vision providers require executable paths in environment variables; no installed-user configuration control exists in the UI.",
+      "evidence": "AIP_VOICE_STT_PROVIDER_PATH, AIP_VOICE_TTS_PROVIDER_PATH, AIP_LOCAL_VISUAL_PROVIDER_PATH"
+    },
+    {
+      "id": "android-surface",
+      "finding": "The desktop Companion panel exercises only a Tauri fixture. The real debug APK and socket transport exist, but the installed desktop UI does not start or connect that transport.",
+      "evidence": "apps/desktop/src/App.tsx CompanionControls; docs/PHASE_12_ANDROID_SPEC.md"
+    },
+    {
+      "id": "gateway-surface",
+      "finding": "Gateway has a real authenticated loopback listener/backend, but the UI uses synthetic account/client data and provides no bundled external client or BielOS integration.",
+      "evidence": "apps/desktop/src-tauri/src/gateway_transport.rs; docs/PHASE_13_GATEWAY_SPEC.md"
+    },
+    {
+      "id": "extension-cancel",
+      "finding": "The extension Cancel control is enabled only after execution succeeds, while Rust cancellation accepts only running executions.",
+      "evidence": "apps/desktop/src/App.tsx:5278-5300, 5625-5633"
+    },
+    {
+      "id": "accessibility",
+      "finding": "App.css removes the global visible keyboard focus outline from local capability cards without providing a replacement.",
+      "evidence": "apps/desktop/src/App.css:57-60, 265-269"
+    },
+    {
+      "id": "format-baseline",
+      "finding": "pnpm format:check fails across 17 files, including current files and pre-existing files; this is broader than the current commit."
+    }
+  ],
+  "capability_matrix": [
+    {
+      "capability": "Voice",
+      "classification": "EXTERNAL-PREREQUISITE PRODUCTIZED",
+      "criteria": {
+        "discoverable": {
+          "pass": true,
+          "note": "Visible under Recursos locais; card deep-link does not open the closed panel."
+        },
+        "prerequisites_configurable_without_developer_knowledge": {
+          "pass": false,
+          "note": "Provider executable paths require environment variables; device selection is available."
+        },
+        "real_supported_workflow": {
+          "pass": true,
+          "note": "Windows waveIn/waveOut and bounded local STT/TTS/wake adapters are implemented."
+        },
+        "honest_degradation": {
+          "pass": true,
+          "note": "Missing providers/devices fall back to text or unavailable status."
+        },
+        "fixture_mock_labeling": {
+          "pass": true,
+          "note": "Fixture transcription/synthesis is explicitly labeled and produces metadata only."
+        },
+        "security_privacy": {
+          "pass": true,
+          "note": "Raw audio is transient and not persisted or uploaded."
+        },
+        "docs_claims": {
+          "pass": true,
+          "note": "Known limitations document provider, hardware, packaging, and quality prerequisites."
+        },
+        "human_validation_meaningful": {
+          "meaningful": true,
+          "completed": false,
+          "note": "Real device/provider, packaged-app, restart, and quality checks remain pending."
+        }
+      }
+    },
+    {
+      "capability": "Supervised Tools",
+      "classification": "BLOCKED",
+      "criteria": {
+        "discoverable": {
+          "pass": true,
+          "note": "Workspace root, preview, approval, execution, compensation, and audit controls are visible."
+        },
+        "prerequisites_configurable_without_developer_knowledge": {
+          "pass": true,
+          "note": "Owner can enter a local root and use bounded controls."
+        },
+        "real_supported_workflow": {
+          "pass": true,
+          "note": "Local inspection and approved file moves execute against configured roots; provider catalogs are fixtures."
+        },
+        "honest_degradation": {
+          "pass": true,
+          "note": "Unavailable roots/providers and safe or temporary mode stop operations."
+        },
+        "fixture_mock_labeling": {
+          "pass": true,
+          "note": "Calendar/messaging and deterministic workspace fixtures are clearly labeled."
+        },
+        "security_privacy": {
+          "pass": false,
+          "note": "Temporary-chat protection for root mutations is not bound to the requesting agent."
+        },
+        "docs_claims": {
+          "pass": true,
+          "note": "Docs accurately limit tools to bounded local workspace effects and explicit approval."
+        },
+        "human_validation_meaningful": {
+          "meaningful": true,
+          "completed": false,
+          "note": "Installed Windows root/move, approval, rollback, and restart validation remain pending."
+        }
+      }
+    },
+    {
+      "capability": "Extensions",
+      "classification": "PRODUCTIZED",
+      "criteria": {
+        "discoverable": {
+          "pass": true,
+          "note": "Closed declarative package lifecycle and execution controls are visible."
+        },
+        "prerequisites_configurable_without_developer_knowledge": {
+          "pass": true,
+          "note": "The safe repository fixture can be reviewed, activated, updated, rolled back, and disabled from the UI."
+        },
+        "real_supported_workflow": {
+          "pass": true,
+          "note": "Rust executes bounded declarative packages through a closed VM with persistent lifecycle state."
+        },
+        "honest_degradation": {
+          "pass": true,
+          "note": "Strict validation, integrity failures, mode restrictions, quotas, and disabled states fail closed."
+        },
+        "fixture_mock_labeling": {
+          "pass": true,
+          "note": "Local-fixture admission and untrusted metadata-only behavior are explicit."
+        },
+        "security_privacy": {
+          "pass": true,
+          "note": "No filesystem, network, shell, subprocess, credential, or arbitrary native execution."
+        },
+        "docs_claims": {
+          "pass": true,
+          "note": "Documentation describes a closed declarative runtime, not a general plugin ecosystem."
+        },
+        "human_validation_meaningful": {
+          "meaningful": true,
+          "completed": false,
+          "note": "Human extension usability and package review are still pending."
+        }
+      }
+    },
+    {
+      "capability": "Screen Vision",
+      "classification": "BLOCKED",
+      "criteria": {
+        "discoverable": {
+          "pass": true,
+          "note": "Screen controls and synthetic/real fixture distinctions are visible, though the summary says synthetic only."
+        },
+        "prerequisites_configurable_without_developer_knowledge": {
+          "pass": false,
+          "note": "Real provider executable path is environment-only."
+        },
+        "real_supported_workflow": {
+          "pass": false,
+          "note": "GDI capture and provider execution exist, but the selected privacy contract is not enforced."
+        },
+        "honest_degradation": {
+          "pass": false,
+          "note": "Missing providers degrade honestly, but preview metadata claims synthetic input and redaction for real captures."
+        },
+        "fixture_mock_labeling": {
+          "pass": true,
+          "note": "Synthetic fixtures are labeled in the control body; metadata truthfulness is incorrect for real captures."
+        },
+        "security_privacy": {
+          "pass": false,
+          "note": "Captured pixels reach the provider without actual sensitive-region redaction."
+        },
+        "docs_claims": {
+          "pass": false,
+          "note": "Docs/UI imply privacy redaction behavior that the pixel path does not implement."
+        },
+        "human_validation_meaningful": {
+          "meaningful": true,
+          "completed": false,
+          "note": "Manual Windows capture/provider/privacy/performance validation remains pending."
+        }
+      }
+    },
+    {
+      "capability": "Android Companion",
+      "classification": "PRODUCTIZED FOR DEBUG COMPANION",
+      "criteria": {
+        "discoverable": {
+          "pass": true,
+          "note": "The Companion panel is visible and explicitly marked as a local fixture."
+        },
+        "prerequisites_configurable_without_developer_knowledge": {
+          "pass": false,
+          "note": "The desktop UI has no APK/endpoint/transport connection workflow."
+        },
+        "real_supported_workflow": {
+          "pass": false,
+          "note": "The real debug APK and Rust transport exist, but the installed desktop surface exercises only Tauri fixtures."
+        },
+        "honest_degradation": {
+          "pass": true,
+          "note": "Offline queue/history limits and fixture-only behavior are explicit."
+        },
+        "fixture_mock_labeling": {
+          "pass": true,
+          "note": "Fixture pairing, no-network behavior, and no external account are repeatedly labeled."
+        },
+        "security_privacy": {
+          "pass": true,
+          "note": "Implemented protocol includes authentication/replay controls and avoids media persistence."
+        },
+        "docs_claims": {
+          "pass": true,
+          "note": "Docs state debug-only status and pending physical/private-LAN/lifecycle validation."
+        },
+        "human_validation_meaningful": {
+          "meaningful": true,
+          "completed": false,
+          "note": "Physical device, private LAN, permissions, lifecycle, recovery, and signing validation remain pending."
+        }
+      }
+    },
+    {
+      "capability": "Gateway",
+      "classification": "BACKEND-ONLY",
+      "criteria": {
+        "discoverable": {
+          "pass": true,
+          "note": "Gateway protocol, transfer, recovery, audit, and loopback transport controls are visible."
+        },
+        "prerequisites_configurable_without_developer_knowledge": {
+          "pass": false,
+          "note": "Only a fixed loopback listener path is exposed; no real external-client/private-LAN workflow is available."
+        },
+        "real_supported_workflow": {
+          "pass": false,
+          "note": "Authenticated Rust listener/backend is real, but the UI workflow and account/client data are synthetic."
+        },
+        "honest_degradation": {
+          "pass": true,
+          "note": "Loopback-only scope, metadata-only effects, and transport failures are explicit."
+        },
+        "fixture_mock_labeling": {
+          "pass": true,
+          "note": "Fixture account/client/transfer data and absence of BielOS/external effects are explicit."
+        },
+        "security_privacy": {
+          "pass": true,
+          "note": "Framed HMAC, replay/counter checks, bounded payloads, and loopback binding are implemented."
+        },
+        "docs_claims": {
+          "pass": true,
+          "note": "Docs accurately reserve private LAN, recovery, Cloudflare, BielOS, and live-client work."
+        },
+        "human_validation_meaningful": {
+          "meaningful": true,
+          "completed": false,
+          "note": "Private-LAN client, recovery, and packaged/manual validation remain pending."
+        }
+      }
+    },
+    {
+      "capability": "Phase 7B-7F discoverability",
+      "classification": "PRODUCTIZED",
+      "criteria": {
+        "discoverable": {
+          "pass": false,
+          "note": "7B-7E appear under the generic Valores cognitivos panel; 7F is documentation/validation only and has no explicit UI label."
+        },
+        "prerequisites_configurable_without_developer_knowledge": {
+          "pass": true,
+          "note": "Local persistence and Owner controls are available without external setup."
+        },
+        "real_supported_workflow": {
+          "pass": true,
+          "note": "Rust/SQLite-backed opinions, relationships, goals, reviews, and bounded fictional activity workflows are real."
+        },
+        "honest_degradation": {
+          "pass": true,
+          "note": "Temporary mode, safe mode, and unavailable runtime preserve history/settings and fail safely."
+        },
+        "fixture_mock_labeling": {
+          "pass": true,
+          "note": "Fictional activities and simulated conversations are identified as such."
+        },
+        "security_privacy": {
+          "pass": true,
+          "note": "Owner, temporary-chat, safe-mode, and bounded persistence controls are present."
+        },
+        "docs_claims": {
+          "pass": true,
+          "note": "Phase 7B-7F docs distinguish automated checks from pending installed-user validation."
+        },
+        "human_validation_meaningful": {
+          "meaningful": true,
+          "completed": false,
+          "note": "Installed Windows, restart, Portuguese Owner, and runtime-recovery checks remain pending."
+        }
+      }
+    }
+  ],
+  "tests_reviewed": [
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS",
+      "note": "Contracts and desktop TypeScript completed."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "result": "PASS",
+      "note": "170 repository files scanned."
+    },
+    {
+      "command": "git diff --check 6da72b0^ 6da72b0",
+      "result": "PASS"
+    },
+    {
+      "command": "pnpm lint",
+      "result": "FAIL",
+      "note": "New no-control-regex failure at packages/contracts/src/index.ts:90; another failure is pre-existing."
+    },
+    {
+      "command": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check",
+      "result": "FAIL",
+      "note": "Current extensions.rs and lib.rs formatting differences."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test; pnpm --filter @aip/desktop test",
+      "result": "NOT EXECUTED",
+      "note": "Read-only sandbox denied Vitest temp/.vite writes before tests ran."
+    },
+    {
+      "command": "cargo check/test --locked",
+      "result": "NOT EXECUTED",
+      "note": "Read-only sandbox denied apps/desktop/src-tauri/target/debug/.cargo-build-lock before compilation."
+    },
+    {
+      "command": "pnpm format:check",
+      "result": "FAIL",
+      "note": "17 files reported, including current and pre-existing files."
+    }
+  ],
+  "human_gate": {
+    "status": "BLOCKED",
+    "meaningful": true,
+    "completed": false,
+    "required": [
+      "Implement and test actual Screen Vision redaction before provider invocation.",
+      "Bind workspace-root mutation authorization to the requesting agent and temporary-chat state.",
+      "Make capability cards open or focus their target configuration panels and expose a usable Runtime/Ollama destination.",
+      "Fix current lint and Rust-format failures.",
+      "Run contract, desktop, and Rust tests in a writable validation environment.",
+      "Perform installed Windows, packaged/restart, real provider/device, Android debug, Gateway client, and Portuguese Owner validation."
+    ]
+  }
+}

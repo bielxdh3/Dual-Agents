@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-security-docs-20260829",
+  "parent_request_id": "prompt-arena-security-fix-blind-errors",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T01:48:26.037723+00:00",
+  "finished_at": "2026-08-30T01:51:33.365694+00:00",
+  "summary": "Updated only the two evidence documents for source HEAD 838d952b2c352404eabdf082ce37847f5f3a1cb4. Added blind telemetry remediation evidence, 17-file/100-test result, security/publication status, explicit pending QA markers, and corrected exact-HEAD NSIS wording. No source, generated, remote, or publication changes occurred. Docs commit was blocked by linked-worktree index-lock permissions; no commit SHA. Provenance: biel4 Executor, App Server/headless, workspace-write, Windows elevated readiness ready, approval never; thread/turn IDs were not exposed.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "git status --short; git branch --show-current; git rev-parse HEAD; git log -6 --oneline --decorate",
+    "Read required AGENTS.md and skill files",
+    "Read both evidence documents and relevant source/test references",
+    "rg stale HEAD, validation, QA, security, and publication markers",
+    "git diff --check; git diff --name-only; git diff --stat",
+    "git add -- docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only Git line-ending warnings were reported."
+    },
+    {
+      "command": "npm test",
+      "status": "not_run",
+      "details": "Documentation-only change; existing recorded evidence remains 17 files and 100 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "not_run",
+      "details": "Documentation-only change; not needed for proportional validation."
+    },
+    {
+      "command": "npm run build",
+      "status": "not_run",
+      "details": "Documentation-only change; not needed for proportional validation."
+    }
+  ],
+  "remaining_issues": [
+    "The requested commit `docs: record blind telemetry security remediation` could not be created because Git was denied creation of the linked-worktree index lock; the exact two-file diff remains unstaged for host-side commit.",
+    "Native visual/human QA, live Ollama/Docker runtime, remote CI, and fresh exact-HEAD NSIS packaging remain pending or blocked as documented. No visual, human, native, or runtime acceptance is claimed.",
+    "Publication verdict remains `Create a sanitized public copy` because reachable internal evidence/history contains local usernames, absolute paths, and operational provenance; public sharing must redact those details."
+  ],
+  "git_status": " M docs/DELIVERY_MATRIX.md\n M docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T014826Z-prompt-arena-security-docs-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T014826Z-prompt-arena-security-docs-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T014826Z-prompt-arena-security-docs-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T014826Z-prompt-arena-security-docs-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05043-1ad9-7c31-9710-b74066d02b96",
+  "app_server_turn_id": "01a0505a-8e3f-7782-99dc-e510403f1dff",
+  "app_server_process_id": "7828",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T014826Z-prompt-arena-security-docs-20260829.md",
+  "task_sha256": "5c134a2c739112d4c29390c5cebf43594d8e2dfff979c9258d6d171b2204c54e",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

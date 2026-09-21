@@ -1,0 +1,21 @@
+{
+  "status": "blocked",
+  "operation": "normal_push",
+  "repository": "E:\\AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "mission_id": "aip-corrective-push-20260820",
+  "branch": "",
+  "pr_number": null,
+  "expected_remote_old_sha": "ced75a8f71e1a46eeb3098a392e007c5e9852fc6",
+  "observed_remote_old_sha": "bf6d332b92f58fb59cd7ec7b909b271750798f5f",
+  "expected_remote_state": "",
+  "observed_pre_state": "",
+  "observed_remote_state": "",
+  "requested_new_sha": "bf6d332b92f58fb59cd7ec7b909b271750798f5f",
+  "observed_remote_new_sha": "",
+  "created": false,
+  "fast_forward": false,
+  "remote_state": "unchanged",
+  "error_classification": "REMOTE_HEAD_MOVED",
+  "detail": "Remote branch no longer matches the expected old SHA."
+}

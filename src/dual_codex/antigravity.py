@@ -19,6 +19,7 @@ import time
 from typing import Any, Callable
 
 from .config import AgentConfig
+from .bootstrap import CANONICAL_INSTRUCTIONS_ROOT, canonical_instructions_root
 from .process import CommandResult, _prepare_command
 
 
@@ -34,7 +35,7 @@ _TERMINAL_STATUSES = {
 _SUCCESS_STATUS = "SUCCESS"
 _HEARTBEAT_SECONDS = 15.0
 _SHUTDOWN_TIMEOUT_SECONDS = 5.0
-_CANONICAL_INSTRUCTIONS_ROOT = Path(r"C:\CodexGlobal")
+_CANONICAL_INSTRUCTIONS_ROOT = CANONICAL_INSTRUCTIONS_ROOT
 
 
 @dataclass(frozen=True)
@@ -82,12 +83,9 @@ def antigravity_status(command: str, *, cwd: Path | None = None) -> str:
 
 
 def _canonical_instructions_root() -> Path:
-    root = _CANONICAL_INSTRUCTIONS_ROOT
-    if not (root / "AGENTS.md").is_file():
-        raise FileNotFoundError(f"Canonical instruction file is unavailable: {root / 'AGENTS.md'}")
-    if not (root / "skills").is_dir():
-        raise FileNotFoundError(f"Canonical skill tree is unavailable: {root / 'skills'}")
-    return root
+    # Keep the patchable seam used by transport tests while sharing the same
+    # fail-closed validation contract as Codex profile transports.
+    return canonical_instructions_root(_CANONICAL_INSTRUCTIONS_ROOT)
 
 
 def _event_message(prompt: str) -> str:
@@ -251,6 +249,8 @@ def run_antigravity(
         "task_artifact": str(task_artifact_path.expanduser().resolve()) if task_artifact_path is not None else "",
         "task_sha256": task_sha256,
         "reuse_existing": False,
+        "canonical_bootstrap_required": True,
+        "canonical_bootstrap_source": "machine-wide",
     }
     if not repository.is_dir():
         metadata["antigravity_terminal_status"] = "WORKSPACE_UNAVAILABLE"
@@ -273,7 +273,8 @@ def run_antigravity(
                 metadata,
             )
     try:
-        _canonical_instructions_root()
+        canonical_root = _canonical_instructions_root()
+        metadata["canonical_instructions_root"] = str(canonical_root)
     except OSError as exc:
         metadata["antigravity_terminal_status"] = "INSTRUCTIONS_UNAVAILABLE"
         return CommandResult(

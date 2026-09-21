@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-ui-voices-correction-20260830",
+  "action": "correct",
+  "parent_request_id": "ia-voz-ui-voices-20260830",
+  "repository": "C:/IA DE VOZ",
+  "task": "Make the multi-voice UI unambiguous for a non-technical user based on the current live audit. There are multiple real profiles, including duplicate display names Existing Voice; do not delete, rename, migrate, or mutate any existing profile/audio data. Add a small presentation helper so profile selector labels are unique and friendly: preserve the configured display name, mark legacy profiles as migrada, and append a short voice_id suffix only when needed to disambiguate duplicate names. Make the active header/help and VOZES overview use these labels and clearly explain that Existing Voice (migrada) is the automatically copied legacy voice while other names are separate profiles. Keep per-profile counts and paths isolated. In ÁUDIOS, keep gr.File multiple/filepath as the visible drag-and-drop area, add an explicit button labelled ADICIONAR ÁUDIOS À VOZ ATIVA, and move the upload handler to that button so dropping/selecting does not silently write before confirmation. Keep the existing secure copy-only upload_audio behavior, status and refreshed inventory/overview; optionally clear the file picker after success if safe. Add clear section headings/instructions for: choose a voice above, upload only to the selected voice, switch selector before another voice, and inspect the per-voice counts. Keep all existing path/reparse/traversal/cross-profile/stale-callback guards. Add/update focused tests for duplicate-friendly labels, migrated marker, button/event wiring, and two-profile upload isolation. Run py_compile, all focused profile/upload tests, build_ui smoke and git diff --check. Do not execute preparation, training, generation or migration on real data, change dependencies, alter .git metadata, commit or push.",
+  "constraints": [
+    "Canonical biel4 App Server/headless Executor only; no native subagents, create_thread, alternate backend, TUI, or direct fallback.",
+    "Edit only app.py and focused tests; preserve all existing real profile/audio data exactly.",
+    "No destructive action, no dependency install, no commit/push/publication in this task.",
+    "Fail closed on unsafe upload paths and stale voice callbacks."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/tests/test_phase4_audio_upload.py",
+    "C:/IA DE VOZ/voices"
+  ],
+  "review_findings": [
+    {"title":"Duplicate profile names are ambiguous","details":"The live overview currently renders multiple profiles with the same Existing Voice name and no friendly distinction. Add stable presentation labels without changing stored display_name or voice_id."},
+    {"title":"Upload needs explicit confirmation","details":"The current gr.File upload event silently copies on drop. Add the requested ADICIONAR ÁUDIOS À VOZ ATIVA button and wire the secure handler to it, preserving the drag-and-drop picker."}
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

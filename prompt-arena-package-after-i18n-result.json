@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-after-i18n-20260830",
+  "parent_request_id": "prompt-arena-i18n-native-label-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T07:38:00.320504+00:00",
+  "finished_at": "2026-08-30T07:47:16.635845+00:00",
+  "summary": "Fresh corrected-head Windows NSIS package attested. Initial clean checkout was 4e471224d51bddef7f9d511f4dcce6df62f6a2ee, containing baseline reviewed implementation 8588a2d plus focused PT-BR correction 4e471224. Final clean HEAD is a4cc4ce600e7b0b56a0c0f12eed47c40e1b37af5. Provenance: biel4, Executor, authenticated App Server/headless transport with wrapper-retained IDs, canonical executor profile when available, workspace-write, Windows elevated readiness ready, approval never. A single locked generated executable was moved to prompt-arena.exe.previous-build; no source or protected worktree changed.",
+  "files_changed": [
+    "checksums-sha256.txt",
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "git status --porcelain=v1 --branch; git rev-parse HEAD; git diff --name-only",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}' (attempt 1)",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}' (attempt 2)",
+    "Move-Item exact generated src-tauri\\target\\release\\prompt-arena.exe to prompt-arena.exe.previous-build",
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}' (successful retry)",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows --smoke",
+    "node --input-type=module -e \"import { verifyChecksumManifest } from './scripts/package-artifacts.mjs'; verifyChecksumManifest('checksums-sha256.txt', 'package-artifacts')\"",
+    "Get-FileHash measurements for artifact, bundle, bundled worker, sidecar, checksum manifest, and package-verification",
+    "git diff --check",
+    "git commit -m \"docs: attest corrected exact-head package provenance\""
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}' (attempts 1-2)",
+      "status": "failed",
+      "details": "Both attempts compiled successfully but failed replacing target\\release\\prompt-arena.exe with Windows Access denied (os error 5). No running Prompt Arena process was found; process enumeration was sandbox-denied."
+    },
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}' (successful retry)",
+      "status": "passed",
+      "details": "Frontend, Rust release build, sidecar preparation, and NSIS bundling passed after moving only the exact locked generated executable."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "passed",
+      "details": "Prepared 1 required NSIS artifact; optional MSI unavailable."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum manifest passed; clean install, executable start, restart, and silent uninstall passed; MSI unavailable; overall result passed."
+    },
+    {
+      "command": "Checksum verifier",
+      "status": "passed",
+      "details": "Verified 1 manifest entry for prompt-arena-0.1.0-windows-nsis.exe."
+    },
+    {
+      "command": "Exact measurements",
+      "status": "passed",
+      "details": "Package artifact: 3,817,224 bytes, SHA-256 9c28a522592a2b7afc56d08a2ab1c232412e91660b516acf34e89eff6f854c9c. Bundle: 3,817,224 bytes, same SHA-256. Bundled worker: 2,651,136 bytes, SHA-256 5a379cbcdf1d6c537504ca4d08323f84aa9a8dcb1b113715cbcc3a38e5eb932a. Prepared sidecar: 2,629,120 bytes, SHA-256 352e09c15c9fd3acad1cf321f020597561faf5a485d02b5a265c12a5fbaa3033. checksums-sha256.txt: 102 bytes, SHA-256 5a4e1fe141f61e79bf522bbc8b98b3eb61f8f82c5836e10250b7f341f6d1209b. package-verification.txt: 282 bytes, SHA-256 9f410c6f8b1e8f1225c30fbd16f8a7be7f0ad1b6e0091f1203e7016fee7693c1."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only Windows line-ending conversion warnings."
+    },
+    {
+      "command": "Post-commit git status and commit inspection",
+      "status": "passed",
+      "details": "Branch is clean at a4cc4ce; commit contains only the three permitted evidence files."
+    }
+  ],
+  "remaining_issues": [
+    "PENDING_HUMAN_QA remains; package smoke is not visual or human QA. Screenshot/UIA evidence remains blocked by SetIsBorderRequired 0x80004002.",
+    "BLOCKED LOCALLY/MSI remains; BLOCKED_EXTERNAL_RUNTIME remains for Docker; Linux and remote CI remain pending/unconfirmed.",
+    "Live LM Studio/llama.cpp service validation remains pending. No telemetry, adapter, Rust, source implementation, package artifact source, or protected worktree changes were made; no push, tag, release, deploy, or merge occurred.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T073800Z-prompt-arena-package-after-i18n-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T073800Z-prompt-arena-package-after-i18n-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T073800Z-prompt-arena-package-after-i18n-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T073800Z-prompt-arena-package-after-i18n-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0517a-f89e-7ff1-be7e-d7314d0027bb",
+  "app_server_turn_id": "01a0519a-97e3-7be1-ace1-3f2dce7ddb74",
+  "app_server_process_id": "24092",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T073800Z-prompt-arena-package-after-i18n-20260830.md",
+  "task_sha256": "9906eea3d8232fe2dc62751093e701d080c2de907cdc39616a668d97707f8f21",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

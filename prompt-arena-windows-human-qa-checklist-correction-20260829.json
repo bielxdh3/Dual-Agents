@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-human-qa-checklist-correction-20260829",
+  "parent_request_id": "prompt-arena-windows-human-qa-checklist-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Required skills before acting: C:\\CodexGlobal\\AGENTS.md; C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full); C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md; C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md. Continue as canonical BL4/biel4 Executor through App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; return result metadata with real thread_id and turn_id. Apply only the two documentation corrections below to the existing uncommitted human QA handoff in E:\\Prompt Arena-pr28-bl4. Do not touch E:\\Prompt Arena original WIP, product source, tests, configuration, or packaging; do not commit, push, merge, tag, release, deploy, install tools, or use WebDriver/CDP/TUI/fallback/coordinate automation. Correction 1: in docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md replace the global rule that no native acceptance marker may be created until every required item passes with batch-scoped marker semantics: WINDOWS_NATIVE_UIA_NAVIGATION_PASS may be emitted once the specific minimum navigation batch (host/app startup plus Overview -> Arena -> Models -> Runs -> Settings with expected content and screenshots) passes; broader native acceptance markers still require their own complete acceptance criteria, and no marker is emitted for the current unavailable UIA discovery. Correction 2: in docs/DELIVERY_MATRIX.md amend the UIA evidence entry to reference docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md as the human QA handoff. Preserve the existing WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE, PENDING_HUMAN_QA, no-product-failure claim, individual P1-P7 statuses, and security wording. Run only focused Markdown/diff checks; leave changes uncommitted and unpushed for BL3 review.",
+  "constraints": [
+    "Documentation-only correction; minimal diff limited to docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md.",
+    "Canonical BL4/biel4 Executor only; App Server/headless; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No commit, push, merge, release, tag, deploy, global install, WebDriver/CDP, TUI/native_tui, fallback, or coordinate automation.",
+    "Do not emit or claim any acceptance marker for the current discovery; preserve all existing classifications and security controls."
+  ],
+  "review_findings": [
+    {"title": "Scope acceptance markers by batch", "details": "The checklist's global prohibition on markers until every P1-P7 item passes conflicts with the requested WINDOWS_NATIVE_UIA_NAVIGATION_PASS after the minimum navigation batch. Make marker eligibility batch-scoped while retaining full criteria for broader acceptance markers."},
+    {"title": "Cross-reference the human handoff", "details": "The DELIVERY_MATRIX UIA evidence entry must reference docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md so the formal PENDING_HUMAN_QA gate is reproducible from the matrix."}
+  ],
+  "context_files": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

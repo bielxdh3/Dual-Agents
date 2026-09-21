@@ -1,0 +1,12 @@
+{
+  "operation": "normal_push",
+  "mission_id": "prompt-arena-native-retest-docs-publish-20260829",
+  "authorization_reference": "prompt-arena-native-retest-docs-publish-20260829",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "repository_full_name": "bielxdh3/Prompt-Arena",
+  "authorization": {"allowed_actions": ["normal_push"]},
+  "remote": "origin",
+  "branch": "validation/native-tauri-acceptance",
+  "expected_remote_old_sha": "c8a6d5b5088f164633dd86ba79dd246285e452ed",
+  "new_sha": "3233896eaaf1cd734d728704a42c1ef2d0b7f3c5"
+}

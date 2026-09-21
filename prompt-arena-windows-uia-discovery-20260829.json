@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-windows-uia-discovery-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Perform the first Windows UI Automation discovery for Prompt Arena as a strictly read-only operation. Read C:\\CodexGlobal\\AGENTS.md and the required review/security skills before acting. Use only canonical BL4/biel4 Executor through App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; return control-plane/result metadata with real thread_id and turn_id. The original WIP E:\\Prompt Arena must remain untouched. Product release artifact is E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe and must be verified against product SHA f3048a61f45cdb6b29f362444f3d32646edf4943. Do not modify product source, tests, configuration, lockfiles, or repository files; do not commit, push, merge, tag, release, deploy, install global tools, or use another executor. Do not use WebDriver, CDP, remote debugging, --disable-gpu, --no-sandbox, --disable-gpu-sandbox, browser flags, TUI/native_tui, or coordinate hacks. Start the normal release app directly and verify process liveness, visible window, and WebView2 startup. First run where.exe winapp and winapp --help. If winapp is present, run winapp ui status -a prompt-arena, winapp ui inspect -a prompt-arena --depth 8, winapp ui inspect -a prompt-arena --interactive, and winapp ui screenshot -a prompt-arena. If unavailable, use only read-only Windows UI Automation through PowerShell/.NET in a temporary run directory; do not install anything. Locate by stable process/window identity when needed. Capture the UIA tree and screenshots as artifacts outside the repository. Determine whether the tree exposes real application controls and content (Overview, Arena, Advanced Arena, Benchmarks, Models, Runs, Settings, buttons, inputs, selects/lists, status/text), rather than only Window -> WebView -> Pane. If the app cannot start or UIA inner controls are unavailable, record the exact boundary and emit WINDOWS_WEBVIEW2_UIA_INNER_TREE_UNAVAILABLE; do not create fragile coordinate automation. If real inner controls are exposed, report the stable selectors/patterns and whether a separate UIA harness is justified, but stop after discovery without implementing it. Close the app and clean up only processes started by this task. Preserve all pre-existing files and state.",
+  "constraints": [
+    "Read-only discovery; no repository or remote mutation.",
+    "Canonical BL4/biel4 Executor only; App Server/headless; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No WebDriver/CDP/remote debugging/browser workarounds and no global installation.",
+    "Artifacts must be stored outside the repository and include command output, UIA tree, screenshots, process/window/WebView2 evidence, and exact failure boundary if blocked.",
+    "Do not claim a Windows acceptance marker unless the requested UIA navigation is actually executed; this phase is discovery only."
+  ],
+  "context_files": [
+    "docs/DELIVERY_MATRIX.md",
+    "ROADMAP.md",
+    "docs/SECURITY.md",
+    "scripts/native-ui-smoke.mjs"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

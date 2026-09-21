@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase8-voice-integration-20260820",
+  "action": "implement",
+  "repository": "E:\\AIP",
+  "task": "Integrate the already committed Phase 8 functional local voice core (HEAD 6893d72) into the bounded Tauri/TypeScript surface on branch feat/phase-8-functional-voice. Keep this pass limited to command/contracts/UI/docs wiring; do not rewrite the Rust capture/provider core and do not implement Phase 9+.\\n\\n1. In apps/desktop/src-tauri/src/lib.rs add AppState ownership for VoiceRuntime, initialize it once in setup, import the runtime request/result/status types, and expose guarded synchronous Tauri commands for on-demand local transcription, synthesis, wake-word detection, operation cancellation, and operation-status lookup. Use the existing database/owner checks and temporary-chat/safe/silent/suspended gates. Cancellation must verify agent ownership through the database before setting the runtime cancellation flag. Do not add background listeners or raw-audio paths. Register the commands in generate_handler and add focused command tests only if they fit existing patterns.\\n\\n2. In packages/contracts/src/index.ts add explicit camelCase request/result/status types for the runtime commands while preserving the existing metadata-only fixture types and parsers. Runtime results must represent completed/cancelled/degraded outcomes, providerRef/source, bounded duration, listenerActive, metadataOnly=false only for a real local provider result, rawAudioPersisted=false, and text fallback. Add parser helpers only where the existing contract boundary convention requires them; do not loosen fixture parsers.\\n\\n3. In apps/desktop/src/App.tsx extend VoiceControls with clearly labeled on-demand local actions (capture/transcribe, synthesize, wake-word check) using operation IDs/idempotency keys, visible start/completed/degraded/cancelled status, and a cancel button while an operation is active. Keep fixture buttons explicitly labeled as fixtures. Use local references such as local:wavein:0/local:waveout:0/local:stt:provider/local:tts:provider as examples, never claim hardware/model success when the provider/device is absent, and keep text chat available on degraded errors. Do not create a hidden listener or persist raw audio.\\n\\n4. Update docs/PHASE_8_VOICE_SPEC.md and docs/CORRECTIVE_GAP_MATRIX.md to state precisely that the bounded on-demand local Windows adapter and provider-neutral argv path now exist, while supported-device/provider availability, packaged/manual hardware checks, quality, and human Owner validation remain open. Preserve the no-cloud/no-upload/no-telemetry/no-background-listener/custom-consent boundaries.\\n\\nRun the relevant validations: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm --filter @aip/contracts typecheck; pnpm --filter @aip/desktop typecheck; pnpm secrets:scan; git diff --check. Commit only this integration scope on top of 6893d72 with exactly `feat: wire phase 8 local voice commands and controls`. Do not push, create PR, merge, tag, release, or perform remote operations. Return the wrapper-required JSON report fields only.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents.",
+    "Preserve commit 6893d72 and all existing changes; no reset, discard, rebase, or force operation.",
+    "No raw audio persistence, upload, telemetry, public listener, cloud provider, arbitrary shell, or safety weakening.",
+    "Keep fixture APIs and metadata-only claims separate from real runtime APIs.",
+    "Do not modify Phase 9 or later behavior and do not perform remote GitHub operations."
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/lib.rs",
+    "apps/desktop/src-tauri/src/voice.rs",
+    "packages/contracts/src/index.ts",
+    "apps/desktop/src/App.tsx",
+    "docs/PHASE_8_VOICE_SPEC.md",
+    "docs/CORRECTIVE_GAP_MATRIX.md"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-docs-update-20260829",
+  "parent_request_id": "prompt-arena-package-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Update only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md to record the completed exact-HEAD packaging attempt. Use canonical BL4/biel4 App Server/headless, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read required AGENTS.md and skills first. Verify actual checkout HEAD is 99485dec0f3f096b62fbe665c0085d8e7786579f before editing. Keep source target 838d952 distinct from the current documentation-only checkout commit 99485de, and do not claim either historical package or stale generated files as current. Record that npm test 17 files/100 tests, typecheck, build, and diff-check passed at this checkout; fresh NSIS was attempted twice with the local-tools override but failed before bundling during Rust compilation with Windows STATUS_IN_PAGE_ERROR (0xc0000006), so package:artifacts, verify:package, and install/launch/restart/uninstall smoke were not run and no current artifact/checksum/sidecar evidence exists. Keep historical 57f02b3 evidence separate. Update PENDING_AUTOMATED_NATIVE_QA wording to include the exact blocker and preserve PENDING_HUMAN_QA, BLOCKED_EXTERNAL_RUNTIME, MSI blocked, Linux CI pending, and remote CI unconfirmed. Preserve publication verdict Create a sanitized public copy and phase verdict Approved with reservations; record the residual unconfirmed blind-lock matching hypothesis only as a reservation if useful. Do not modify source/tests/generated artifacts/history/remotes/tags/releases/deploys or other worktrees; do not claim visual/native/human QA. Leave a precise two-file diff if commit is blocked.",
+  "constraints": [
+    "Only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md may change.",
+    "No source/generated/remote/tag/release/deploy/other-worktree changes.",
+    "Historical 57f02b3 package evidence must remain explicitly historical.",
+    "No current-head package or native smoke may be claimed after STATUS_IN_PAGE_ERROR."
+  ],
+  "review_findings": [
+    {
+      "title": "Fresh exact-HEAD NSIS package is blocked by STATUS_IN_PAGE_ERROR",
+      "details": "The canonical biel4 packaging run attempted the local-tools NSIS flow twice at HEAD 99485de; Rust compilation failed before bundling with Windows STATUS_IN_PAGE_ERROR (0xc0000006)."
+    },
+    {
+      "title": "Docs need current package blocker and phase reservation",
+      "details": "Both evidence docs still describe fresh packaging only as pending and do not record the exact blocker or the final recheck phase verdict Approved with reservations."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\prompt-arena-package-20260829.result.json",
+    "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\prompt-arena-final-recheck-20260829.result.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

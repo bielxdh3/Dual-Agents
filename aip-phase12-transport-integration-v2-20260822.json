@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-transport-integration-v2-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Integrate the Phase 12 transport core plus lifecycle (commits 4535b3d and 09b8ea3) with desktop Tauri/Rust authority and Android on branch feat/phase-12-android-companion. The shared JSON-line contract is b60bd0b and the ephemeral one-time key/connection shutdown API is 09b8ea3; use them instead of inventing new semantics.\n\nAdd an in-memory CompanionTransportManager/State around TransportHandle/EphemeralPairing. Add typed Rust request/status/result structures and Tauri commands for explicit Owner-confirmed start, stop, and status. Start must reject temporary chat/safe mode/invalid agent-owner, require ownerConfirmed=true, default bind 127.0.0.1, allow only explicitly confirmed RFC1918 host, reject wildcard/public, use bounded/ephemeral port, call the one-time pairing-key API, return raw pairing code only in the start result to the Owner/UI, and never log/persist it. Stop must use lifecycle shutdown; status must be redacted. Add AppState initialization, test_state field, command registration, and TypeScript contracts/invoke wrappers/Portuguese status UI.\n\nWire the callback to real Owner/agent Rust/SQLite companion authority. An authenticated `pair` frame with bounded JSON payload must call existing start_companion_pairing; after the Owner confirms pairing, `session`/`reconnect`, `history`, `queue_preview`, `queue_approve`, `queue_cancel`, and `queue_retry` frames must deserialize into existing request structs, carry the exact session proof/idempotency/temporaryChat fields, call existing Database methods, and return bounded typed JSON responses. Never fabricate effects or return raw private paths/media/secrets. Preserve all existing fixture commands/gates. Add a real Rust integration test with a temporary Database and actual localhost TCP client that performs auth/pair/session/history or queue request, rejects wrong MAC/replay/temporary chat/revocation, and proves stop closes the port.\n\nUpdate Android SocketTransport to use the shared JSON-line WireFrame and SecureStore key: explicit connect only, pairing/session handshake, HMAC/replay checks, bounded history/queue requests, timeout/reconnect, and offline/degraded result when no desktop response. Add JVM tests against a deterministic loopback fake and offline fallback. Do not auto-connect, scan, or listen on Android.\n\nUpdate docs/PHASE_12_ANDROID_IMPLEMENTATION.md, PHASE_12_ANDROID_SPEC.md, ROADMAP.md, KNOWN_LIMITATIONS.md, CORRECTIVE_GAP_MATRIX.md, README.md honestly: real APK + authenticated local/private transport + deterministic loopback functional; physical-device/private-LAN/manual/release signing reservations; Phase 13 BielOS/Cloudflare remains separate. Run cargo fmt/check/clippy/full/focused tests; contracts typecheck/build/tests; desktop typecheck/tests/build; Android absolute-toolchain gradle test/lint/assembleDebug; APK SHA-256; secrets scan; diff check; clean status. Commit this integration exactly `feat: integrate phase 12 companion transport`. No push/publish/PR/merge/tag/release/deploy/BielOS/native subagents/direct edits.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Use the committed shared wire/lifecycle APIs; Rust/SQLite authority and raw-secret prohibition remain mandatory.",
+    "Transport must be explicit, authenticated, bounded, local/private-only by default, fail-closed, and no relay/public listener/telemetry/Python exposure.",
+    "Use absolute checkout-local Android toolchain paths; ignored .tooling is never committed.",
+    "No remote mutation, BielOS import, Phase 13 external integration, or release claim."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "review_findings": [
+    {
+      "title": "Integration was previously blocked by missing lifecycle primitives",
+      "severity": "blocking",
+      "details": "The shared JSON contract and one-time pairing/shutdown lifecycle are now implemented and tested in b60bd0b/09b8ea3. Complete the Tauri/SQLite/Android integration against those APIs and verify real loopback effects."
+    }
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/companion_transport.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/companion.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/database.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src/App.tsx",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/android/app/src/main/java/com/aip/companion/Protocol.kt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_12_ANDROID_IMPLEMENTATION.md"
+  ],
+  "max_correction_cycles": 0
+}

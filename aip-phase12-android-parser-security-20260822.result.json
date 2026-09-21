@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-parser-security-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T17:06:30.427294+00:00",
+  "finished_at": "2026-08-22T17:08:35.743121+00:00",
+  "summary": "Hardened Android frame parsing and strict UTF-8 transport handling. Committed as 5ac7132.",
+  "files_changed": [
+    "android/app/src/main/java/com/aip/companion/Protocol.kt",
+    "android/app/src/test/java/com/aip/companion/ProtocolTest.kt"
+  ],
+  "commands_run": [
+    "./gradlew.bat testDebugUnitTest",
+    "./gradlew.bat lintDebug",
+    "./gradlew.bat assembleDebug",
+    "Get-FileHash -Algorithm SHA256 app/build/outputs/apk/debug/app-debug.apk",
+    "git diff --check",
+    "git commit -m \"fix: reject invalid android frames\"",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "testDebugUnitTest",
+      "status": "passed",
+      "details": "Passed using Kotlin fallback compilation."
+    },
+    {
+      "command": "lintDebug",
+      "status": "passed",
+      "details": "BUILD SUCCESSFUL."
+    },
+    {
+      "command": "assembleDebug",
+      "status": "passed",
+      "details": "BUILD SUCCESSFUL."
+    },
+    {
+      "command": "SHA-256 app-debug.apk",
+      "status": "passed",
+      "details": "00CDDB5B125FD49E20F1CD5E8900D671B5B0CAD0E56CACA205AC723EBD92D7C5"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff errors."
+    }
+  ],
+  "remaining_issues": [
+    "Kotlin daemon emitted access-denied warnings and used fallback compilation.",
+    "No physical-device, private-LAN, or release-signing validation performed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T170630Z-aip-phase12-android-parser-security-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T170630Z-aip-phase12-android-parser-security-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T170630Z-aip-phase12-android-parser-security-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T170630Z-aip-phase12-android-parser-security-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a63-9209-7be2-8af4-08b9c61c3fa5",
+  "app_server_turn_id": "01a02a70-3306-74c0-9810-a8ed7519a972",
+  "app_server_process_id": "3424",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T170630Z-aip-phase12-android-parser-security-20260822.md",
+  "task_sha256": "a27595a03d6c9b01484c3888c5d883c3de3f6fd725c0bf6aee57e527c882e52b",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

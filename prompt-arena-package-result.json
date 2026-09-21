@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-20260829",
+  "parent_request_id": "prompt-arena-i18n-tests-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T18:53:56.464833+00:00",
+  "finished_at": "2026-08-29T18:59:32.157598+00:00",
+  "summary": "Packaging attempted at exact HEAD be1007f99814f004e384abae6acd986e5bcaa521. Sidecar prepared at E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\binaries\\prompt-arena-worker-x86_64-pc-windows-msvc.exe (2,547,712 bytes, SHA-256 89b82dcdb78b0b99ff0b0dcd29c42c9836901b66cdd86cc1cea3077b77744f76). Release executable built at E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target\\release\\prompt-arena.exe (12,975,104 bytes, SHA-256 a727466954bb572e1603168b8737353c34360a09d623e7099989220782b5fdba). NSIS bundling failed with exact error “Acesso negado. (os error 5)”; no NSIS path, checksum manifest, package artifact, or smoke run was produced. BL4 provenance: canonical biel4 App Server/headless, workspace-write, Windows elevated readiness ready, approval never; no commits or remote operations.",
+  "files_changed": [
+    "src-tauri/binaries/prompt-arena-worker-x86_64-pc-windows-msvc.exe",
+    "src-tauri/target/release/prompt-arena.exe"
+  ],
+  "commands_run": [
+    "npm run tauri:build -- --bundles nsis",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows",
+    "git rev-parse HEAD",
+    "Get-FileHash on generated sidecar and release executable",
+    "git diff --name-only"
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis",
+      "status": "failed",
+      "details": "Frontend and Rust compilation passed; NSIS bundling failed while recreating the NSIS directory with Acesso negado. (os error 5)."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "failed",
+      "details": "required nsis bundle artifact was not produced."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows",
+      "status": "failed",
+      "details": "ENOENT: checksums-sha256.txt was not present."
+    },
+    {
+      "command": "NSIS clean-install/launch/restart/uninstall smoke",
+      "status": "not_run",
+      "details": "Blocked because the NSIS installer and checksum manifest were not produced."
+    }
+  ],
+  "remaining_issues": [
+    "Windows NSIS bundling is blocked by the exact permission error: Acesso negado. (os error 5).",
+    "No installer, package-artifacts output, checksum manifest, or automated install/launch/restart/uninstall result exists.",
+    "Git index refresh could not run because the linked worktree lacks permission to add an object under E:/Prompt Arena/.git/objects; Cargo.toml content hash matches HEAD and git diff --name-only is empty."
+  ],
+  "git_status": " M src-tauri/Cargo.toml\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T185356Z-prompt-arena-package-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T185356Z-prompt-arena-package-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T185356Z-prompt-arena-package-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T185356Z-prompt-arena-package-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ed8-00cd-7cf3-911d-b4bbaf1e09d0",
+  "app_server_turn_id": "01a04edf-1504-7070-b064-f67dde34dbb3",
+  "app_server_process_id": "18572",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T185356Z-prompt-arena-package-20260829.md",
+  "task_sha256": "0c33839e621567cfc1b2d28e2e315b6d6645bb913f04f5475e874640f9a2efdd",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

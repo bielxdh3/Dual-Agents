@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "request_id": "bielos-responsible-assignment-real-flow-fix-restore-20260829",
+  "parent_request_id": "bielos-responsible-assignment-real-flow-fix-correction-3-20260829",
+  "action": "correct",
+  "repository": "E:/BielOS",
+  "task": "The visible checkout unexpectedly lost the already accepted real-flow member-assignment fix and currently contains only the nine unrelated WIP paths. Restore exactly the accepted Biel 3-reviewed fix from the prior Dual Codex artifact at C:/Users/bielx/3D Objects/Dual-Codex-worktree/runs/20260829T154833Z-bielos-responsible-assignment-real-flow-fix-correction-3-20260829/git-diff.md. Apply only the accepted real-flow paths listed here: apps/hub/src/app/core/integration/project-access.db.test.ts; apps/hub/src/app/core/integration/project-access-action-wrapper.db.test.ts; apps/hub/src/app/core/projects/action-runtime.ts; apps/hub/src/app/core/projects/actions.ts; apps/hub/src/app/core/projects/project-access-action.ts; apps/hub/src/app/core/projects/project-admin-controls.tsx; apps/hub/src/app/core/projects/project-admin-controls.test.tsx; apps/hub/src/app/core/projects/page.tsx; apps/hub/src/app/core/projects/[projectId]/page.tsx; apps/hub/src/app/core/security/admin/elevation-scope.ts; apps/hub/src/app/core/security/admin/page.tsx; apps/hub/src/app/core/security/admin-panel.tsx; apps/hub/src/app/core/security/admin-panel.test.tsx. Do not apply any hunks for the nine existing unrelated WIP paths. Preserve the accepted behavior: fixed internal project link preselects allowlisted PROJECT_OWNER_ACCESS_CHANGE, generic admin visits retain ACCOUNT_APPLICATION_REVIEW, actual setCoreProjectAccess wrapper parses canonical form values, preserves Cloudflare -> CSRF -> session -> authorization -> scoped elevation -> serializable mutation order, revalidates and reads back persisted access. Do not redesign, add dependencies, run publication, commit, push, deploy, restart, or mutate production. Return the structured executor JSON report only.",
+  "constraints": [
+    "Biel 4 remains Executor only; do not issue an Architect review or acceptance verdict.",
+    "Use only the same configured Biel4 App Server/headless executor with task_transport=app_server. No native subagents, create_thread, TUI fallback, codex exec, or alternate backend.",
+    "Preserve the nine pre-existing unrelated dirty WIP paths exactly; do not reset, clean, stash-drop, amend, rebase, or rewrite them.",
+    "Do not expose .env, credentials, cookies, session tokens, JWTs, passwords, recovery codes, raw identifiers, private logs, or database dumps.",
+    "No commit, push, PR, merge, tag, release, deploy, production rebuild/restart, Cloudflare/DNS mutation, or destructive database action."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/runs/20260829T154833Z-bielos-responsible-assignment-real-flow-fix-correction-3-20260829/git-diff.md",
+    "E:/BielOS/apps/hub/src/app/core/projects/actions.ts",
+    "E:/BielOS/apps/hub/src/app/core/projects/project-admin-controls.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin/page.tsx",
+    "E:/BielOS/apps/hub/src/app/core/security/admin-panel.tsx"
+  ],
+  "review_findings": [
+    {
+      "title": "Blocking: accepted fix is absent from current checkout",
+      "details": "HEAD and origin/main remain f3bc2b565f42fd4fe48e818b1a59003085bb59b2, while the working tree contains only the nine unrelated WIP paths; the accepted real-flow files and behavior are missing. Restore only the accepted diff recorded by the prior Executor run before Node 22 validation and publication.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Blocking: do not publish unrelated WIP",
+      "details": "The artifact includes a mixed dirty diff. Apply only the 13 explicitly listed real-flow paths and leave trusted-browser, GymForge, docs, and auth WIP untouched.",
+      "severity": "blocking"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

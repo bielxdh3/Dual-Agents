@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-docs-provenance-cleanup-20260829",
+  "parent_request_id": "prompt-arena-package-docs-update-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Update only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md. Use canonical BL4/biel4 App Server/headless, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read required AGENTS.md and skills first. Remove the self-referential wording that says current checkout HEAD is 99485de, because the host has since added the documentation-only blocker commit 68c4262. Preserve the accurate distinction: reviewed source HEAD is 838d952; 99485de was the prior docs checkout at which packaging was attempted; subsequent docs-only commits may advance checkout HEAD and do not change source target. Keep all package blocker, security/publication, phase, human QA, and historical artifact claims unchanged. Do not modify source/tests/generated artifacts/history/remotes/tags/releases/deploys or other worktrees. Leave a precise two-file diff and do not commit.",
+  "constraints": [
+    "Only docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md may change.",
+    "No source/generated/remote/tag/release/deploy/other-worktree changes.",
+    "Do not claim a current checkout SHA that will become stale after this documentation commit."
+  ],
+  "review_findings": [
+    {
+      "title": "Documentation self-reference became stale after host commit",
+      "details": "The docs currently say current checkout HEAD is 99485de, but the host committed a later documentation-only blocker record as 68c4262. The source target 838d952 remains unchanged."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-provider-execution-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "On completion/advanced-arena at HEAD ff56656, extend the existing src-tauri/src/external_providers.rs secure core with bounded provider execution. Add a transport abstraction with a production HTTPS implementation using already available Rust dependencies where possible and a deterministic in-memory/mock transport for tests. Implement request/response normalization for OpenAI-compatible and OpenAI chat-completions, Anthropic messages, and Gemini generateContent; enforce endpoint/model/key bounds, connect/read timeouts, max request/response bytes, redacted errors, explicit network_consent=true, and no external calls in tests. Retrieve API keys only from OsCredentialBackend and never return/log/store them. Add a Tauri command and TypeScript bridge types/function for an explicit external generation request that returns sanitized response, provider-reported model identity, usage, network-used flag, and cost evidence. Require a dated PriceSnapshot and enforce estimate/confirmation/budget-ceiling gates; fail closed on missing/invalid price or usage. Do not change local Ollama execution or P4. Add focused Rust tests for all four serializers/parsers, consent, budget, malformed/oversized responses, and redaction. Run cargo fmt/check/test and npm typecheck/test/build, then commit only this provider-execution slice. No UI in this slice, no real provider calls, no reset/clean/discard, no merge/tag/release/deploy.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; preserve HEAD ff56656 and all prior commits",
+    "no direct Architect implementation, no TUI/native_tui/fallback/substitute",
+    "no secrets in source, logs, errors, tests, exports, reports, or Git; no plaintext credential fallback",
+    "no external network calls during tests or validation; network only behind explicit user command consent",
+    "no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/external_providers.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/Cargo.toml"],
+  "review_findings": [{"severity": "blocking", "title": "P5 provider execution is not yet wired", "details": "Extend the existing secure core with mockable, bounded four-provider execution and cost gates."}],
+  "max_correction_cycles": 0
+}

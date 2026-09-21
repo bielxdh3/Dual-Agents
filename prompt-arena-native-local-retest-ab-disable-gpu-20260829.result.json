@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-retest-ab-disable-gpu-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T14:34:19.582043+00:00",
+  "finished_at": "2026-08-29T14:40:12.000315+00:00",
+  "summary": "Authorized B-only A/B diagnostic completed and failed. The exact native harness was run with only child-process WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu; it still failed at WebDriver POST /session with `session not created from chrome not reachable`. This does not establish a normal-GPU pass and no acceptance marker was emitted. No source, policy, commit, push, or original-WIP changes occurred. Provenance: BL4/biel4 Executor, App Server/headless, readiness=ready, approval=never, effective workspace-write; elevated sandbox and real App Server thread/turn IDs were not exposed.",
+  "files_changed": [
+    ".native-tools/native-ui-smoke-ab-disable-gpu-20260829.stdout.log",
+    ".native-tools/native-ui-smoke-ab-disable-gpu-20260829.stderr.log"
+  ],
+  "commands_run": [
+    "Read required AGENTS.md and review skills",
+    "git branch --show-current; git rev-parse HEAD; git status --short; git diff --exit-code -- .",
+    "Read-only manifest, tool, and product SHA-256 verification",
+    "Prepend only .native-tools to PATH and run node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe with child-only WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu",
+    "Read-only WebView2, DevToolsActivePort, GPU log, UDF ACL, RemoteDebuggingAllowed, process, port, environment, and final integrity diagnostics"
+  ],
+  "tests": [
+    {
+      "command": "Product and tool verification",
+      "status": "passed",
+      "details": "Branch validation/native-tauri-acceptance; product SHA f3048a61f45cdb6b29f362444f3d32646edf4943. App E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe SHA-256 BC632933E2B5DAD72EF907522B10D1E16D5869EEAFDAE714DCB133D74C4C361E. Worker E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena-worker.exe SHA-256 4E34773C5B30504292CF867D76D9734640C948798223C5EAE8132DA162D654F5. Manifest SHA-256 7D39BD12861B5F1F7781876275D34FD54236BB42433E4DF5E3F0F7DBC50CAB48; workflowRunId 33254907801; sourceCommit 55d685fbdbd927a5ab195ab141fa76ea823acf96. tauri-driver.exe E:\\Prompt Arena-native-local-20260829-pr\\.native-tools\\tauri-driver.exe, package version 2.0.6, SHA-256 e37974bf5a76fc97b2282af19489f8f516d4d367318dc0c124fe292f88e33e01. msedgedriver.exe E:\\Prompt Arena-native-local-20260829-pr\\.native-tools\\msedgedriver.exe, version Microsoft Edge WebDriver 151.0.4129.101, SHA-256 3684b7096da7aced2ddb627cca12d9e59a8e69378bd8ec1e09cc8f2a7d47b87a. Hashes matched the manifest."
+    },
+    {
+      "command": "Runtime provenance",
+      "status": "passed",
+      "details": "Timestamp 2026-08-29T14:39:26.4046774Z. Node v24.14.1; rustc 1.97.1 (8bab26f4f 2026-07-14). Edge C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe ProductVersion 152.0.4191.53. WebView2 C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\151.0.4129.107\\msedgewebview2.exe ProductVersion 151.0.4129.107; registry version 151.0.4129.107. All checked RemoteDebuggingAllowed policy values were absent."
+    },
+    {
+      "command": "B native smoke with ephemeral --disable-gpu",
+      "status": "failed",
+      "details": "Command runner timed out after 180421 ms with exit 124. Captured stdout: `Native Tauri acceptance app: E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe` and `Host: win32 10.0.19045`. Captured stderr: `Error: WebDriver POST /session failed (500): session not created from chrome not reachable`, originating at scripts/native-ui-smoke.mjs:38, startSession line 59, firstSession line 210. No Local app ready, bridge, Rust, sidecar, persistence, close/reopen, run_id, NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED, or WINDOWS_NATIVE_TAURI_ACCEPTANCE_LOCAL_PASS marker was produced."
+    },
+    {
+      "command": "B read-only WebView2 diagnostics",
+      "status": "passed",
+      "details": "Newest B UDF C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-native-ui-smoke-628mkE had Modify ACLs. EBWebView\\DevToolsActivePort existed with port 52075 and browser endpoint `/devtools/browser/3d2a27a4-0ee1-41b9-92bb-6f7fbc94f1a4`. chrome_debug.log recorded GPU process exit_code=-1073741790 (0xC0000022, access denied) nine times, then `GPU process isn't usable. Goodbye.` No target processes or listeners on ports 4444, 9515, 9222, or 9223 remained."
+    },
+    {
+      "command": "Ephemeral flag clearing",
+      "status": "passed",
+      "details": "The flag was set only in the smoke child environment. A fresh post-run process reported flag_current_process=False; no persistent environment, registry, source, or configuration change was made."
+    },
+    {
+      "command": "Final source integrity",
+      "status": "passed",
+      "details": "Branch and SHA remained validation/native-tauri-acceptance and f3048a61f45cdb6b29f362444f3d32646edf4943. git diff --exit-code returned 0. Existing untracked temporary files were preserved."
+    }
+  ],
+  "remaining_issues": [
+    "The --disable-gpu A/B did not resolve the native WebView session failure; the same GPU STATUS_ACCESS_DENIED and chrome-not-reachable failure recurred.",
+    "The result is diagnostic only. The full Tauri bridge, Rust command, app-owned sidecar, persistence, close/reopen, and persisted-run assertions remain unvalidated.",
+    "Current Edge is 152.0.4191.53 while WebView2 and EdgeDriver are 151.0.4129.x; this version difference is recorded but not proven as the root cause.",
+    "Control-plane thread_id, turn_id, and windows.sandbox=elevated were not exposed by the available runtime metadata; effective sandbox was workspace-write.",
+    "Phase review verdict: Approved with reservations. Security and registry policies were unchanged. No publication or remote action occurred."
+  ],
+  "git_status": "?? .native-driver-cargo-retry-20260829/\n?? .native-tools/\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T143419Z-prompt-arena-native-local-retest-ab-disable-gpu-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T143419Z-prompt-arena-native-local-retest-ab-disable-gpu-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T143419Z-prompt-arena-native-local-retest-ab-disable-gpu-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T143419Z-prompt-arena-native-local-retest-ab-disable-gpu-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04d64-1a5e-7a22-8a03-7b99bf7069b5",
+  "app_server_turn_id": "01a04df1-631d-77d0-963f-15c7ce3ad70b",
+  "app_server_process_id": "1612",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T143419Z-prompt-arena-native-local-retest-ab-disable-gpu-20260829.md",
+  "task_sha256": "2f91b0972d19da7e969df4c878663d2794065202e04d8aa8f1ac3f4fbdacbe41",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

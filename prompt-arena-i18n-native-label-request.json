@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-native-label-20260830",
+  "parent_request_id": "prompt-arena-package-provenance-followup-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. Continue the single Prompt Arena completion task as the canonical BL4/biel4 Executor only through the authenticated Dual Codex App Server/headless path. Work in E:\\Prompt Arena-live-telemetry-i18n-commit2 on branch completion/windows-qa-live-telemetry-i18n, preserving the reviewed runtime implementation at 8588a2d and all protected original/linked/PR#28 worktrees. A fresh native accessibility pass against the current target release binary (explicit process launch from src-tauri\\target\\release\\prompt-arena.exe, PT-BR locale) found one concrete remaining UI localization gap: the overview MetricCard label=Local models is rendered as the English fallback LOCAL MODELS, while the MetricCard helper translates its label. Apply the minimal repo-native correction by adding the centralized PT_BR_MESSAGES entry \"Local models\": \"Modelos locais\" (place it in the existing message map), add a focused test proving translateText(\"pt-BR\", \"Local models\") returns \"Modelos locais\", and, only if a small focused static-contract assertion is needed, extend the existing UI-contract coverage so helper-prop literals passed to translating components cannot silently omit resource keys. Do not broaden the parser or rework unrelated translations. Do not touch telemetry, adapter/runtime, Rust, package artifacts, or protected WIP unless required by the focused correction. Run the focused tests first, then serially run npm test -- --run, npm run typecheck, npm run build, npm run check:boundaries, cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check, and git diff --check. Stage only the focused i18n map/test/UI-contract files that actually changed and create one normal local commit with a clear message such as fix: close native PT-BR label gap. No push, tag, release, deploy, merge, amend, rebase, reset, cargo clean, broad deletion, or alternate execution path. Report full wrapper provenance: executor biel4, role, authenticated App Server/headless transport and IDs, workspace-write, Windows elevated sandbox/readiness, approval policy, exact checkout/head, clean status, changed files, commit, and every validation result. Keep PENDING_HUMAN_QA, BLOCKED_EXTERNAL_RUNTIME, BLOCKED LOCALLY/MSI, Linux/remote CI, and live LM Studio/llama.cpp reservations honest; the accessibility finding is not screenshot evidence because screenshot capture remains blocked by SetIsBorderRequired 0x80004002. If the wrapper itself lacks a required provenance field, stop without a commit and report PROMPT_ARENA_BLOCKED_BY_PROVENANCE.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI/native_tui, fallback backend, alternate account, or danger-full-access.",
+    "Minimal PT-BR label correction only; preserve source implementation 8588a2d and all protected worktrees; no telemetry/adapters/package changes.",
+    "Run focused tests and the required validation commands serially; stage only actually changed focused files.",
+    "Retain honest human/native/external/CI reservations and distinguish accessibility text evidence from screenshot evidence.",
+    "Do not push, tag, release, deploy, merge, amend, rebase, reset, cargo clean, or broad-delete."
+  ],
+  "review_findings": [
+    {
+      "title": "Fresh native PT-BR accessibility gap",
+      "details": "The current target release binary, launched explicitly from the canonical checkout, localized the overview prose and saved status but exposed LOCAL MODELS in English. Source line App.tsx:527 passes label=Local models to MetricCard, which calls translate(label); PT_BR_MESSAGES has no exact Local models key.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Avoid duplicate implementation",
+      "details": "The runtime/i18n/telemetry/adapters implementation and package provenance are already complete in this same task. Make one focused correction commit only, then stop for review/package rebuild.",
+      "severity": "important"
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\i18n.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\scripts\\ui-contracts.test.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation"]
+  }
+}

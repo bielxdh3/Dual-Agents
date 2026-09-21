@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-audit-ui-20260828",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T14:04:36.072300+00:00",
+  "finished_at": "2026-08-28T14:12:21.971728+00:00",
+  "summary": "Status: hotfix required. Read-only Phase A audit; no implementation or completion claim. Provenance: HEAD and origin/main are cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4; worktree clean. Reviewed App.tsx, App.css, contracts, lib.rs, voice.rs, tools.rs, extensions.rs, database migrations, roadmap, limitations, and UI/spec documents.\n\nNavigation/status center: App.tsx exposes only Conversa, Memórias, Estado, Aparência, Perfil, Configurações and Temporária. Voice, Ferramentas supervisionadas and Extensões locais exist only inside the agent-tools container at App.tsx:7827-7865. App.css:143-149 sets .agent-tools to display:none, with no later override. Therefore an installed user cannot discover or operate any of the three capabilities. There is no status-center JSX for capability health, pending approvals, sessions, executions, devices, models or extension availability; the footer/banner reports runtime state only. Documentation describes these controls as available, creating source/docs drift.\n\nVoice: Backend/runtime is real bounded Windows code in voice.rs: native waveIn/waveOut device enumeration, bounded capture/playback, cancellation, local provider execution, no raw-audio persistence. Provider executables must be supplied through AIP_VOICE_STT_PROVIDER_PATH or AIP_VOICE_TTS_PROVIDER_PATH and referenced with local identifiers; they are not bundled by tauri.conf.json. Tauri commands include get/update settings, consent, fixture transcription/synthesis/wake-word, local transcription/synthesis/wake-word, cancellation and status. React entry point is VoiceControls at App.tsx:1624-2000. It exposes device/model/reference fields and fixture plus on-demand local actions, but only through the hidden agent-tools container. Fixture paths are deterministic metadata-only simulations; local paths are real Windows/provider operations when prerequisites exist. Temporary chat prevents persistent settings and real local operations; silent/suspended modes prevent mutations; global safe mode blocks local runtime operations. Exact blockers: hidden navigation; no packaged voice provider/model configuration; no installed-facing prerequisite/status explanation; hardware/provider/packaged-startup human validation remains pending. Smallest safe plan: surface the existing panel, add clear availability/prerequisite status, preserve local-reference configuration and all existing gates, then perform manual Windows validation with an installed package.\n\nSupervised Tools: Rust/SQLite owns catalog, roots, sessions, preview, approval, second confirmation, execution, cancellation, compensation and audit. Tauri commands are registered in lib.rs:1109-1301 and 3129-3142. Fixture catalog entries are seeded by 0016_phase9_tools.sql; local workspace capabilities are added by 0023_phase9_workspace_roots.sql. React entry point is ToolControls at App.tsx:4259-4902. Fixture calendar/messaging/workspace paths execute deterministic mock behavior. Local inspection and organization use real bounded filesystem metadata/moves only for explicit workspace roots, with canonical-path checks, captured identity, no overwrite/delete, rollback attempts and fail-closed revalidation. Safe mode and temporary chat block mutations; approval and second confirmation are required. Exact blockers: hidden panel; buildInput() at App.tsx:4365-4397 has no cases for workspace.inspect_local or workspace.organize_local even though the UI renders those choices at App.tsx:4649-4658, so selecting either local tool produces no executable preview; no visible status/permission/root readiness surface. Smallest safe plan: make the existing panel reachable, add the two local input cases by reusing existing contract builders, show root/prerequisite state, and retain the current Rust authority and approval flow.\n\nExtensions: Rust/SQLite provides a closed declarative package interpreter, catalog, proposals, review, activation, update, rollback, disable, execution, cancellation and audit. Tauri commands are registered in lib.rs:1303-1497 and 3143-3155. The package supports only emit_text, read_agent_context, list_tool_catalog and yield; no native code, network, shell, subprocess, credentials or arbitrary file access. Execution requires an active revision, exact package/hash, approved capabilities, bounded input and local-fixture admission. Safe mode and temporary chat gates apply to durable lifecycle operations and execution. React entry point is ExtensionControls at App.tsx:4991-5673, currently hidden. The Rust runtime/DDL are bundled, but migrations 0017_phase10_extensions.sql and 0024_phase10_extension_runtime.sql do not seed a discoverable extension; fixture.notes is only a form default. There is no installer, loader, marketplace or user-installed external extension path. Execution is real Rust interpreter code but the available package is declarative fixture behavior, not a real third-party extension. Exact blockers: hidden panel; no bundled/discoverable extension entry; management form is not an installed-facing discovery flow; human usability and release/package review remain pending. Smallest safe plan: surface the panel, label it as local declarative extensions, provide an explicit empty-catalog/prerequisite state, and validate proposal/review/activation/execution in a packaged Windows build without expanding scope.\n\nPortuguese copy gaps: most visible strings are Portuguese, but the unreachable panels still expose technical terms such as fixture, mock, dry-run, wake-word, metadata-only, provider, SDK, hash and local: identifiers without plain-language prerequisite/status help. The tools UI labels local scopes with fixture terminology, and there is no unified copy for bundled, manually configured, unavailable, blocked by safe mode, pending approval or simulation versus real local effect. The status center should use concise Portuguese labels, distinguish simulation from real effects, state why an action is unavailable, and never imply success before Rust confirmation.\n\nAcceptance criteria for the smallest follow-up: (1) an installed user can reach Voice, Supervised Tools and Extensions through visible keyboard-accessible navigation; (2) each surface reports bundled, configurable, unavailable, blocked and prerequisite states in Portuguese; (3) fixture/mock execution is visibly distinguished from real local execution; (4) temporary chat, safe mode, suspension, explicit approval, bounded paths and Rust fail-closed checks remain authoritative; (5) both local workspace tools can be previewed and executed through the UI; (6) extension empty-catalog behavior is explicit and no installer/marketplace scope is added; (7) packaged Windows manual validation covers voice devices/providers, local tool paths and extension lifecycle; (8) UI tests or equivalent coverage are added for discovery, gating and the local-tool input regression. Backend existence and FUNCTIONAL documentation alone are insufficient evidence of product completion.",
+  "files_changed": [],
+  "commands_run": [
+    "Get-Content -Raw for AGENTS.md and all required implementation, phase-review, security-review, publication-check and Ponytail skill instructions",
+    "git status --short; git branch --show-current; git rev-parse HEAD; git rev-parse origin/main",
+    "git diff --name-status; git diff --stat; git diff --check",
+    "rg targeted searches across App.tsx, App.css, contracts, Rust commands/modules and documentation",
+    "Get-Content bounded sections of App.tsx, App.css, contracts, lib.rs, voice.rs, tools.rs and extensions.rs",
+    "Get-Content relevant SQLite migrations and phase/UI documentation",
+    "rg --files and rg searches for desktop tests and VoiceControls, ToolControls and ExtensionControls coverage",
+    "pnpm secrets:scan",
+    "git ls-files and path-only scans for tracked sensitive files or secret-like values",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No diff or whitespace errors; repository remained unchanged."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "passed",
+      "details": "Exited 0; output was not reproduced."
+    },
+    {
+      "command": "rg source tests for #[test] in voice.rs, tools.rs and extensions.rs",
+      "status": "passed",
+      "details": "Read-only inventory found 8 voice tests, 8 tools tests and 6 extension tests; they were not executed."
+    },
+    {
+      "command": "rg UI tests for VoiceControls, ToolControls and ExtensionControls",
+      "status": "passed",
+      "details": "No matching React test coverage was found."
+    },
+    {
+      "command": "pnpm test, cargo test, typecheck or build",
+      "status": "not_run",
+      "details": "Not run because the task explicitly prohibited builds and requested a read-only audit."
+    }
+  ],
+  "remaining_issues": [
+    "Critical: .agent-tools is display:none, hiding Voice, Supervised Tools and Extensions from installed users.",
+    "Critical: ToolControls renders local workspace choices but buildInput does not construct inputs for workspace.inspect_local or workspace.organize_local.",
+    "No visible capability status center for prerequisites, availability, safe-mode blocks, approvals, sessions, executions or audits.",
+    "Voice providers/models are manually referenced and environment-configured; no bundled provider/model or installer-facing setup exists.",
+    "Extensions have no seeded discoverable entry, installer, loader or marketplace; current execution is a closed declarative fixture runtime.",
+    "Documentation and phase specs describe controls as available while the current CSS hides them.",
+    "No React tests cover discovery, gating or the local-tool input regression; Rust tests were not executed.",
+    "Verify the cancellation boundary for extension executions: the cancellation request has no temporaryChat field and the Tauri wrapper passes false to the temporary-chat mutation gate. Either document intentional recovery semantics or add an explicit fail-closed contract."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T140436Z-aip-productization-audit-ui-20260828\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T140436Z-aip-productization-audit-ui-20260828",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T140436Z-aip-productization-audit-ui-20260828\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T140436Z-aip-productization-audit-ui-20260828\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a048af-d041-7831-9c43-9e801668041f",
+  "app_server_turn_id": "01a048af-d0f4-7b03-b27d-290ac8baac7b",
+  "app_server_process_id": "17576",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T140436Z-aip-productization-audit-ui-20260828.md",
+  "task_sha256": "f188b3b384556f79d6f011a2a81d4328cd3f6553d4b7a935f618188fba78548a",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-fresh-thread-20260830",
+  "parent_request_id": "prompt-arena-i18n-fallback-coverage-20260830",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. This is a fresh, isolated BL4/biel4 Executor turn; execute ONLY the package/evidence task below. Do not rely on or repeat any prior thread task. Use only the authenticated Dual Codex App Server/headless path; do not use Computer Use, Windows UI automation, or visual/native interaction. In E:\\Prompt Arena-live-telemetry-i18n-commit2 on branch completion/windows-qa-live-telemetry-i18n, verify the clean exact checkout HEAD fe5c28644b7aea01f7077bbb0e73ef73605255f2. This HEAD already contains all source changes; do not edit any source, tests, Rust, telemetry, adapters, or protected worktrees. Build one fresh incremental Windows NSIS package from this exact HEAD: npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'; npm run package:artifacts -- --platform windows; npm run verify:package -- --platform windows --smoke; and the checksum verifier. Do not run cargo clean or broad deletion. If only the exact generated src-tauri\\target\\release\\prompt-arena.exe is locked, move that one file to src-tauri\\target\\release\\prompt-arena.exe.previous-build-fresh-thread-20260830 and retry; do not terminate, launch, or automate the app. Capture exact artifact, bundle, bundled-worker, prepared sidecar, checksums-sha256.txt, and package-verification.txt sizes and SHA-256 values, plus checksum/clean-install/start/restart/silent-uninstall results. Update only checksums-sha256.txt, package-verification.txt, docs/DELIVERY_MATRIX.md, and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md when exact-head wording or measurements require it. State clearly that the package is built from checkout HEAD fe5c286, containing baseline reviewed implementation 8588a2d plus focused corrections 4e471224 and fe5c286. Retain honest PENDING_HUMAN_QA, BLOCKED_EXTERNAL_RUNTIME, BLOCKED LOCALLY/MSI, Linux/remote CI, screenshot/UIA, and live LM Studio/llama.cpp reservations; package smoke is not human QA. Stage only evidence files that actually changed and create one normal local commit such as docs: attest fresh fallback-head package provenance. No push, tag, release, deploy, merge, amend, rebase, reset, cargo clean, broad-delete, source edit, or protected-worktree change. Report full provenance from control-plane metadata: biel4, Executor, authenticated App Server/headless, canonical Executor profile, workspace-write, Windows elevated/readiness ready, approval never, repository, exact HEAD, clean status, changed files, commit, and every result. If the wrapper or new thread cannot provide required provenance, stop without a commit and report PROMPT_ARENA_BLOCKED_BY_PROVENANCE. Return a structured report even if the outer wrapper later marks a clean post-commit tree as failed.",
+  "constraints": [
+    "Fresh App Server thread only; package task only; do not repeat prior source correction and do not use Computer Use.",
+    "Exact source checkout HEAD must be fe5c28644b7aea01f7077bbb0e73ef73605255f2 before build and source files must remain unchanged.",
+    "Incremental NSIS build/package smoke only; move at most one exact locked generated executable; no cargo clean or broad deletion.",
+    "Stage only evidence files and preserve honest human/external/CI reservations.",
+    "No push, tag, release, deploy, merge, amend, rebase, reset, source/protected-worktree changes, or UI automation."
+  ],
+  "review_findings": [
+    {
+      "title": "Package artifact is stale relative to the latest source correction",
+      "details": "The prior NSIS artifact was built before fe5c286. This one package turn must use the exact current corrected checkout so all PT-BR fallback coverage is shipped.",
+      "severity": "blocking"
+    },
+    {
+      "title": "Previous App Server thread replayed a prior task",
+      "details": "A stale per-repository thread mapping was isolated before this request. Refuse any source-edit task or prior-task replay; execute only package generation and evidence attestation from this artifact.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package.json",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\scripts\\verify-package.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\checksums-sha256.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package-verification.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\tauri.conf.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {
+    "allowed_actions": ["local_mutation"]
+  }
+}

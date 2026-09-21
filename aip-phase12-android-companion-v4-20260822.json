@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-companion-v4-20260822",
+  "parent_request_id": "aip-phase12-android-companion-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "The authorized Android toolchain is now already installed inside the writable checkout at .tooling/android: JDK 17.0.12+7 under .tooling/android/jdk, Android SDK command-line tools/platform-tools/platforms;android-35/build-tools;35.0.0 under .tooling/android/sdk, and Gradle 8.9 under .tooling/android/gradle/gradle-8.9. Do not redownload or write outside this path. Set JAVA_HOME, ANDROID_SDK_ROOT, ANDROID_HOME, and PATH only for this run and verify java, sdkmanager, adb, and gradle. Continue on the existing clean local branch feat/phase-12-android-companion at d002180; no code files were changed by prior attempts.\n\nNow complete the full Phase 12 roadmap deliverable, not a metadata checkpoint: create the pinned native Kotlin Android project under android/ and a real debug APK/package ID with unit tests/lint and SHA-256; Portuguese text conversation, floating icon, explicitly permission-gated optional overlay, privacy-safe bounded notifications, offline read-only history and outgoing text queue, reconnect/compatibility/approval, and Android Keystore credential custody with no plaintext secret. Implement the actual explicit Owner-enabled bounded local/private authenticated aip-companion-v1 desktop transport with strict frames, version negotiation, HMAC-SHA-256 challenge-response, nonce/replay/idempotency/ownership/safe-mode/temporary-chat gates, clean stop/revoke/rotation, and deterministic loopback/emulator integration for handshake/history/queue/reconnect/replay rejection/revocation/fallback. Add minimum migration/contracts/Tauri/UI/docs/CI changes and focused Rust/TypeScript/Android tests, preserve fixture paths/standalone fallback, and keep Phase 13 BielOS integration metadata-only. Run all Rust/contracts/desktop/Android/lint/build/integration/secrets/diff checks, hash the APK, and commit only this scope with exact message `feat: implement phase 12 android companion`. Do not push, publish, PR, merge, tag, release, deploy, modify BielOS, use native subagents, or edit directly outside the Executor. If any secure/buildable requirement is blocked, report it precisely instead of claiming completion.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Use the existing .tooling/android only; never commit it or change system-wide state.",
+    "Produce a real buildable APK and authenticated transport; metadata-only or mock-only output is not acceptable.",
+    "No remote mutation, relay, public listener, telemetry, raw secret/media, Python runtime exposure, BielOS import, or safety weakening.",
+    "Preserve existing fixture and Rust/SQLite Owner/agent/safe-mode/temporary-chat/idempotency/audit gates."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "review_findings": [
+    {
+      "title": "Previous attempts were blocked only by unavailable toolchain",
+      "severity": "blocking",
+      "details": "JDK/SDK/Gradle are now present inside the writable checkout. Use them and complete the real Phase 12 APK and authenticated transport scope; do not substitute metadata-only output."
+    }
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase12-android-companion-20260822.json",
+    "C:/Users/bielx/Downloads/AIP_DUAL_CODEX_FULL_ROADMAP_AUTONOMOUS_COMPLETION.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/companion.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/gateway.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/.github/workflows/ci.yml"
+  ],
+  "max_correction_cycles": 0
+}

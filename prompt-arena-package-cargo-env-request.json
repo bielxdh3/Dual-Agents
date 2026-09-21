@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-cargo-env-20260829",
+  "parent_request_id": "prompt-arena-package-localtarget-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Make one packaging-only attempt for the current exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a in the isolated Prompt Arena worktree. Do not modify source files, docs, repository history, remotes, or settings. Confirm the exact HEAD before and after. Create a fresh target directory E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target-cargo-env if allowed, set the process environment variable CARGO_TARGET_DIR to that directory, and run the existing flow: npm run tauri:build -- --bundles nsis, then npm run package:artifacts -- --platform windows and npm run verify:package -- --platform windows. This intentionally uses CARGO_TARGET_DIR rather than the unsupported Tauri --target-dir argument. Capture exact NSIS installer path, size, SHA-256/checksum manifest, bundled worker sidecar evidence, and clean install/launch/restart/uninstall smoke only if produced. If any permission or toolchain error occurs, report it verbatim and stop. Do not claim native human UI QA from automation. Use canonical biel4 Executor through App Server/headless with workspace-write, Windows elevated readiness ready, approval never, and complete provenance metadata.",
+  "constraints": [
+    "No source, docs, history, remote, tag, release, deploy, or settings changes.",
+    "Generated target/package output may be created locally and remain ignored.",
+    "Preserve exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a."
+  ],
+  "review_findings": [
+    {
+      "title": "NSIS directory recreation remains permission-blocked",
+      "details": "Three prior canonical attempts reached either Acesso negado (os error 5) during NSIS directory recreation or an environment/CLI target-directory limitation. A fresh CARGO_TARGET_DIR inside the already writable isolated worktree is the only untried packaging path."
+    },
+    {
+      "title": "Packaging-only exact-commit gate",
+      "details": "The source and docs are frozen. Preserve exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a and stop on any permission/toolchain error without source or history changes."
+    }
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

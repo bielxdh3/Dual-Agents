@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-acceptance-retry-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T12:00:00.554501+00:00",
+  "finished_at": "2026-08-29T12:06:30.100986+00:00",
+  "summary": "Validation failed locally because required WebDriver tools could not be installed or found. Clone and artifacts are correct; source tree is clean and unchanged. Executor context: BL4/biel4, Executor, App Server/headless, readiness=ready, approval=never, workspace-write. Elevated Windows sandbox could not be proven. No source edits, commit, push, or publication occurred.",
+  "files_changed": [],
+  "commands_run": [
+    "git branch --show-current; git rev-parse HEAD; git status --short",
+    "git diff --ignore-space-at-eol -- src-tauri scripts .github",
+    "git update-index --refresh -- src-tauri/Cargo.toml",
+    "cargo install tauri-driver --locked",
+    "cargo install --git https://github.com/chippers/msedgedriver-tool",
+    "node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe",
+    "where.exe tauri-driver; tauri-driver --version; where.exe msedgedriver; msedgedriver --version; node --version; rustc --version",
+    "git status --short; git diff --exit-code -- ."
+  ],
+  "tests": [
+    {
+      "command": "Repository and artifact verification",
+      "status": "passed",
+      "details": "Branch validation/native-tauri-acceptance; SHA f3048a61f45cdb6b29f362444f3d32646edf4943. App: E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe, SHA-256 BC632933E2B5DAD72EF907522B10D1E16D5869EEAFDAE714DCB133D74C4C361E. Worker: E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena-worker.exe, SHA-256 4E34773C5B30504292CF867D76D9734640C948798223C5EAE8132DA162D654F5."
+    },
+    {
+      "command": "Source integrity and final git status",
+      "status": "passed",
+      "details": "Working tree clean; semantic git diff exit code 0. The Cargo.toml status anomaly cleared after index refresh and no source content changed."
+    },
+    {
+      "command": "Runtime provenance probes",
+      "status": "passed",
+      "details": "Node v24.14.1 at C:\\Program Files\\nodejs\\node.exe; rustc 1.97.1 (8bab26f4f 2026-07-14) at C:\\Users\\bielx\\.cargo\\bin\\rustc.exe; WebView2 executable C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\151.0.4129.107\\msedgewebview2.exe, ProductVersion 151.0.4129.107; registry version 151.0.4129.107. Edge msedge.exe was not found. RemoteDebuggingAllowed policy values were absent for all checked Edge and EdgeWebView policy paths."
+    },
+    {
+      "command": "cargo install tauri-driver --locked",
+      "status": "failed",
+      "details": "crates.io download failed with Schannel SEC_E_NO_CREDENTIALS (0x8009030e); tauri-driver was not installed."
+    },
+    {
+      "command": "cargo install --git https://github.com/chippers/msedgedriver-tool",
+      "status": "failed",
+      "details": "Default Cargo cache creation failed with access denied. Temporary Cargo-home retry also failed creating the Git database; msedgedriver-tool was not installed. No msedgedriver executable was found."
+    },
+    {
+      "command": "node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe",
+      "status": "failed",
+      "details": "Exit code 1. stdout: Native Tauri acceptance app: E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe; Host: win32 10.0.19045. stderr: tauri-driver was not recognized; Error: tauri-driver did not become ready: fetch failed at scripts/native-ui-smoke.mjs:55. Failure occurred before WebDriver session creation, so no bridge invoke, Rust command, worker sidecar, persistence, reopen, marker, or persisted run_id was produced."
+    }
+  ],
+  "remaining_issues": [
+    "Install tauri-driver and msedgedriver-tool in a host with working Cargo network credentials and writable Cargo directories, then rerun the exact smoke command.",
+    "Required driver probes all returned not found; tauri-driver --version, msedgedriver --version, and msedgedriver-tool --version were unavailable.",
+    "NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED marker and persisted run_id are unavailable because the smoke stopped before session startup.",
+    "No RemoteDebuggingAllowed policy was explicitly disabled; policies were unchanged. Hosted Windows DevToolsActivePort classification is not applicable because the local smoke never reached WebDriver startup.",
+    "Phase review verdict: Approved with reservations. Security review found no changed controls or policy modifications. No publication occurred; full-history publication verification was not performed."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T120000Z-prompt-arena-native-local-acceptance-retry-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T120000Z-prompt-arena-native-local-acceptance-retry-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T120000Z-prompt-arena-native-local-acceptance-retry-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T120000Z-prompt-arena-native-local-acceptance-retry-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04d64-1a5e-7a22-8a03-7b99bf7069b5",
+  "app_server_turn_id": "01a04d64-1aed-7683-9ddd-4778e087224a",
+  "app_server_process_id": "19988",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T120000Z-prompt-arena-native-local-acceptance-retry-20260829.md",
+  "task_sha256": "8eb5de6df7fd9f4072f0b042a03c7dbe12bcc2bb817aefbb7b57895155c4669c",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

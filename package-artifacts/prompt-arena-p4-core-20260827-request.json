@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-core-20260827",
+  "parent_request_id": "prompt-arena-p3-review-fix-20260827",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Implement the P4 Advanced Arena core on completion/advanced-arena, preserving P3 HEAD 1e2e40ac560973e102f44a6b7cb9ed70d5a68800. Add a bounded, deterministic advanced-arena domain/module and SQLite persistence/migration for real Arena evidence: rankings by category and metric (objective pass rate, duration/tokens where present, human score), regression comparison between saved Arena summaries/benchmark versions with deltas and uncertainty, Tournament Mode scheduling for 1v1 and bounded round-robin or single-elimination, blind ranking inputs/outputs, optional judge score ingestion, calibration metrics, and explicit human-vs-judge disagreement handling. Keep identities/profiles and raw evidence immutable; validate all IDs, sizes, sample counts, ties, and score ranges; never claim unsupported statistical significance. Add Tauri commands and typed bridge APIs for listing/saving/getting ranking/regression/tournament records if needed by the UI. Add focused Rust/TypeScript tests using saved Arena evidence fixtures. No external AI/network calls in this turn; optional AI judge must be represented as an explicit provider-unavailable/score-input boundary, never fabricated. Run cargo fmt/check/test, npm typecheck/test/build, git diff --check, then create one focused local commit. No P5 BYOK, no P6 redesign, no P7 packaging, no merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/advanced-arena; preserve P1/P2/P3 commits and PRs",
+    "local immutable evidence only; no secrets, cloud calls, or invented judge outputs",
+    "bounded competitors (max 8), tournament matches (max 64), scores and payload sizes; no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/arena-runner.test.ts", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/App.tsx"],
+  "review_findings": [{"severity": "blocking", "title": "P4 advanced workflows absent", "details": "Current Arena exposes only a basic per-run ranking and blind evaluation; rankings by category/metric, regression, tournament scheduling, calibration, and disagreement records need a bounded persisted core."}],
+  "max_correction_cycles": 0
+}

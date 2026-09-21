@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Implement the roadmap's Phase 11 as a real, capability-bounded Windows on-demand screen-vision path, replacing the current metadata-only checkpoint while retaining deterministic fake coverage. Start by verifying the clean HEAD f2975033ae602c7ef14e1dbcc7d68694f8093ac0 and create/switch to branch feat/phase-11-real-screen-vision. Read the attached roadmap section for Phase 11 and the existing screen_vision module, Tauri commands, contracts, tests, docs, and AGENTS instructions before editing. Add actual Windows display enumeration and explicit Owner-requested screenshot capture using a bounded in-memory lifecycle; no continuous capture, no upload, no default persistence, and cleanup even on failure/cancellation. Keep a deterministic fake capture provider for tests. Add a replaceable local visual adapter interface with availability/missing-model degradation, one-heavy-generation resource guard, bounded dimensions, cancellation/termination checkpoints, untrusted bounded output, and no durable sensitive-attribute promotion. The real adapter may be a local Windows-safe provider that reports unavailable when prerequisites/model are absent; it must not fake successful real capture. Wire the existing Tauri/TypeScript/UI surface so users can select an actual display, preview/confirm, capture/analyze, cancel, and see truthful real-vs-fixture status in Portuguese. Preserve safe-mode, temporary-chat, Owner review, privacy/redaction hooks, quotas, idempotency, audit and bounded error behavior. Add focused Rust and contracts/desktop tests covering real provider gating, capture byte bounds/cleanup, cancellation, missing-model degradation, resource serialization, and fixture compatibility. Update Phase 11 spec, roadmap/status, known limitations, README, and corrective gap matrix truthfully: functional automated checkpoint, packaged/manual Windows prerequisites and visual quality remain human validation. Do not touch Android/gateway implementation beyond necessary shared contracts. Run cargo fmt/check/clippy/test, focused tests, contracts typecheck/build/tests, desktop typecheck/tests/build, secrets scan, and git diff --check; if any sandbox spawn blocks, report it precisely and rerun safe host checks where possible. Commit coherent changes with a descriptive message. Do not push or create PR.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents, no alternate agent, no direct manual code edits outside the Executor.",
+    "Keep changes minimal and repository-native; do not weaken sandbox, privacy, authentication, safe-mode, loopback, or Owner-approval boundaries.",
+    "Do not add a public listener, network upload, telemetry, Python runtime exposure, continuous screen watcher, or persistent raw screenshot store.",
+    "Do not claim a real model is available when it is not; expose explicit unavailable/degraded status and preserve deterministic fake tests.",
+    "Do not modify Phase 12 Android or Phase 13 gateway behavior in this request.",
+    "Do not push, publish, merge, tag, release, or deploy."
+  ],
+  "context_files": [
+    "C:/Users/bielx/.codex/attachments/6318d895-613a-41cb-8e95-cb0e08ad03dc/pasted-text-1.txt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/screen_vision.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/tests/contracts.test.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/AGENTS.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

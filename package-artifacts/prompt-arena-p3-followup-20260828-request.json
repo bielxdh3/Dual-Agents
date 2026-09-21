@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p3-followup-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Continue Prompt Arena P3 from clean completion/model-library-followup at 455df511996259213ce917f1138dfcd091f7003e. Audit the existing full model-library implementation against the mission requirements: Ollama, LM Studio, llama.cpp/GGUF, unified discovery/search, metadata, backend-native downloads where supported, progress/cancellation, safe official removal, and quantizations as distinct competitors. Fix the remaining genuine user-facing gaps with the smallest coherent change: make immutable profile registration runtime/source-aware for discovered Ollama, LM Studio, and llama.cpp/GGUF models (preserve stable profile IDs and backend identity in effective config); make action availability explicit in the UI for unsupported backend-native downloads/removal rather than silently omitting capability; preserve Ollama pull progress/cancel, managed GGUF import/removal audit and no-delete-active guarantees; and ensure quantization variants remain distinct. Add focused TypeScript/Rust tests for runtime-aware profile construction, capability labeling, and fail-closed path/endpoint validation. Do not invent a remote download mechanism for runtimes that do not expose one; state unsupported features clearly. Keep loopback-only discovery and no external network calls. Update ROADMAP P3 honestly. Run npm typecheck/test/build, cargo fmt/check/test, and git diff --check. Commit focused implementation. No push, merge, tag, release, deploy, paid-provider calls, or page-transition motion.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "start clean on completion/model-library-followup at 455df511996259213ce917f1138dfcd091f7003e",
+    "preserve unrelated work; no generated evidence files committed"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "C:/Users/bielx/Downloads/PROMPT_ARENA_PRODUCT_COMPLETION_AND_REAL_DESKTOP_DELIVERY.md",
+    "E:/Prompt Arena/ROADMAP.md",
+    "E:/Prompt Arena/src/model-library.ts",
+    "E:/Prompt Arena/src/model-library.test.ts",
+    "E:/Prompt Arena/src/App.tsx",
+    "E:/Prompt Arena/src/bridge.ts",
+    "E:/Prompt Arena/src-tauri/src/domain.rs",
+    "E:/Prompt Arena/src-tauri/src/model_library.rs",
+    "E:/Prompt Arena/src-tauri/src/commands.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs"
+  ],
+  "max_correction_cycles": 0
+}

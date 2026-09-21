@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-ui-summary-tests-20260827",
+  "parent_request_id": "prompt-arena-p2-backend-commit-20260827",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Complete the remaining P2 user-facing integration on completion/verification-packs using the same canonical BL4. Preserve commits b9ac2b4d124835f16a5c1f6c80bc99382dc3aca2 and existing backend behavior. Add bridge types/functions and registered Rust commands for save/list/get ArenaSummaryPayload records, then have the real Arena flow persist its repetition summary, competitors, uncertainty/tie margins, and per-sample evidence immutably after execution and reload it from Runs/history where appropriate. Add a usable Official Packs UI action to choose a bounded seed, call materializeOfficialPack, show progress/result/content hash/saved outcome, and make Docker-required programming packs visibly blocked with no host fallback. Ensure no dead invoke paths. Add focused TypeScript tests for objective verifier policies, deterministic seed metadata/parsing, Arena summary payload construction/statistics, and Docker-unavailable UI state; add any needed Rust command/storage tests. Run npm test, npm run typecheck, npm run build, boundary checks, cargo fmt/check/test, and git diff --check; fix concrete failures only. Create one focused local commit with exact report/provenance. Keep P2 IN PROGRESS pending native Tauri QA; no P3-P7 scope, motion, merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/verification-packs; all code/tests/commit in BL4",
+    "preserve P2 backend commits and PR #17; no history rewrite",
+    "Docker-required programming tasks never fall back to host",
+    "no paid APIs or secrets; no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/App.tsx", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src-tauri/src/storage.rs", "E:/Prompt Arena/src-tauri/src/official_packs.rs", "E:/Prompt Arena/src/arena-ui.ts", "E:/Prompt Arena/src/objective-verifiers.ts"],
+  "review_findings": [
+    {"severity": "blocking", "title": "P2 backend has no UI materialization path", "details": "materialize_official_pack is registered and callable from bridge.ts but App.tsx never exposes it; users cannot materialize or inspect seeded pack evidence."},
+    {"severity": "blocking", "title": "Arena summaries are storage-only", "details": "StorageService has save/list/get ArenaSummary methods, but no Tauri command or Arena flow uses them; repetition statistics are still frontend-only and disappear on reopen."},
+    {"severity": "important", "title": "No TypeScript tests for P2 additions", "details": "The P2 commits add no focused TS tests for policy normalization, seed parsing, summary payloads, or Docker-blocked UI state."}
+  ],
+  "max_correction_cycles": 0
+}

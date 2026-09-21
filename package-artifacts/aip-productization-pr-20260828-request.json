@@ -1,0 +1,14 @@
+{
+  "operation": "draft_pr_create",
+  "mission_id": "aip-productization-closure-20260828",
+  "authorization_reference": "aip-productization-closure-20260828",
+  "repository": "E:/AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "remote": "origin",
+  "branch": "fix/productize-local-capabilities",
+  "base_branch": "main",
+  "title": "feat: productize local capability workflows",
+  "body": "## AIP productization closure\n\n- adds a persistent, Owner-scoped local provider registry with visible setup for STT, TTS, and screen vision\n- routes registered providers into bounded voice/status and screen-vision execution paths\n- adds explicit Companion Android loopback debug transport start/stop controls and the Android INTERNET permission\n- preserves safe-mode, temporary-chat, confirmation, redaction, replay, and no-network boundaries\n- aligns Phase 7B–7F, Voice, Tools, Extensions, Screen Vision, Android, and Gateway docs with honest product classifications\n- adds the installed-Windows human smoke checklist\n\nValidation: contracts 23 tests; desktop 59 tests; Rust 152 tests; cargo fmt/check/clippy; desktop typecheck; lint; secrets scan; web build; Python checks. Android Gradle validation remains pending because this host has no Java/JAVA_HOME.\n\nClassifications remain explicit: EXTERNAL-PREREQUISITE PRODUCTIZED for Voice/Tools/Screen Vision, PRODUCTIZED for Extensions, PRODUCTIZED FOR DEBUG COMPANION for Android, and BACKEND-ONLY for Gateway. Final release approval still requires installed-Windows human smoke.",
+  "draft": true,
+  "authorization": {"allowed_actions": ["create_branch", "normal_push", "draft_pr_create"]}
+}

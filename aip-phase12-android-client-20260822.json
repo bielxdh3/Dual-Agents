@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-client-20260822",
+  "action": "implement",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Implement the first functional slice of authorized Phase 12 on the existing local branch feat/phase-12-android-companion at exact SHA d0021802288136ffe4da1f3b91356722b015270f. The checkout-local Android toolchain is ready and must be used without redownload: JAVA_HOME=C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/.tooling/android/jdk/jdk-17.0.12+7, ANDROID_SDK_ROOT and ANDROID_HOME=C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/.tooling/android/sdk, Gradle 8.9 at .tooling/android/gradle/gradle-8.9. The only untracked non-source path is .tooling; leave it untracked and never commit it. Read AGENTS.md and the roadmap Phase 12, existing Phase 12 spec/contracts/tests, and product/privacy docs first.\n\nCreate a real maintained native Kotlin Android project under android/ (Gradle wrapper with pinned Gradle 8.9, AGP/Kotlin versions, compile/target SDK 35, min SDK, package ID, resources, manifest, debug build). Use dependency-light native Views so it can build offline after dependency download. Add Portuguese UI and runnable code for: text conversation screen; bounded read-only offline history; bounded outgoing text queue with preview/explicit approval/cancel/retry; reconnect/compatibility status; privacy-safe notifications with a channel and no sensitive message text by default; an in-app floating action icon; and an optional overlay service/permission flow that is never enabled or requested without an explicit user action and policy check. Add deterministic Android unit tests for queue/history bounds, approval/cancel/retry, reconnect states, notification redaction, and overlay permission gating.\n\nAdd Android Keystore-backed credential storage (AES-GCM or equivalent) for a generated pairing secret; plaintext secrets must never be written to SharedPreferences/files/logs. Implement a versioned `aip-companion-v1` protocol/client library in Kotlin with bounded newline JSON frames, version negotiation, strict field/size validation, nonce and monotonically increasing replay counter, HMAC-SHA-256 challenge-response, typed auth/replay/version failures, timeout/reconnect, and key rotation/revocation handling. The client must support standalone/offline operation and expose a small transport interface so the next scoped commit can connect it to the desktop listener. Add protocol unit tests with deterministic vectors for HMAC, handshake, replay rejection, bounds, and revocation. Do not fake network success or claim desktop delivery in this slice.\n\nAdd setup/build documentation and a truthful Phase 12 implementation note saying the Android client/protocol is functional while desktop transport integration is the next scoped commit. Add the Android Gradle CI job/test/lint/assembleDebug artifact to .github/workflows/ci.yml if it can be done without weakening desktop gates. Run the Android wrapper unit tests, lint, assembleDebug, APK SHA-256, and relevant repository secrets/diff checks. Commit only this slice with exact message `feat: add phase 12 android companion client`. Do not push, publish, PR, merge, tag, release, deploy, modify BielOS, use native subagents, or make direct edits outside the configured Biel4 Executor. Preserve all existing Rust/SQLite authority and fixture paths.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor in fast mode; no native subagents or alternate backend.",
+    "Use the existing .tooling/android toolchain only; do not commit or alter it.",
+    "This slice must contain a real building Android project and APK, not metadata or mock-only files.",
+    "No remote mutation, public listener, relay, telemetry, raw credential/media persistence, Python runtime exposure, BielOS import, or safety weakening.",
+    "Leave desktop transport integration for the next scoped commit; do not claim it exists."
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "C:/Users/bielx/Downloads/AIP_DUAL_CODEX_FULL_ROADMAP_AUTONOMOUS_COMPLETION.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_12_ANDROID_SPEC.md",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/.github/workflows/ci.yml"
+  ],
+  "max_correction_cycles": 0
+}

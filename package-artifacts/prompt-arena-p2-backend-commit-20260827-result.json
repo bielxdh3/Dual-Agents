@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-backend-commit-20260827",
+  "parent_request_id": "prompt-arena-p2-review-correction-20260827",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T21:46:49.069266+00:00",
+  "finished_at": "2026-08-27T21:50:42.169124+00:00",
+  "summary": "Committed P2 backend changes locally as b9ac2b4d124835f16a5c1f6c80bc99382dc3aca2 on completion/verification-packs. Wrapper provenance: request prompt-arena-p2-backend-commit-20260827, canonical BL4, account=biel4, Executor/Reviewer, app_server transport, local-only; worktree clean.",
+  "files_changed": [
+    "packs/official/programming/software-engineering.json",
+    "packs/official/reasoning/math/knowledge.json",
+    "packs/official/writing/analysis/instruction-following.json",
+    "src-tauri/src/commands.rs",
+    "src-tauri/src/domain.rs",
+    "src-tauri/src/lib.rs",
+    "src-tauri/src/official_packs.rs",
+    "src-tauri/src/orchestration.rs",
+    "src-tauri/src/storage.rs",
+    "src-tauri/src/storage/migrations/0005_p2_evidence.sql"
+  ],
+  "commands_run": [
+    "cargo fmt --all -- --check",
+    "cargo check --all-targets",
+    "cargo test --all-targets",
+    "git diff --check",
+    "git commit -m \"feat: materialize P2 backend evidence\""
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "status": "passed",
+      "details": "Passed from E:\\Prompt Arena\\src-tauri."
+    },
+    {
+      "command": "cargo check --all-targets",
+      "status": "passed",
+      "details": "Compilation passed for all targets."
+    },
+    {
+      "command": "cargo test --all-targets",
+      "status": "passed",
+      "details": "78 passed, 0 failed, 0 ignored; auxiliary targets had 0 tests."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; Git emitted only LF/CRLF conversion warnings."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T214649Z-prompt-arena-p2-backend-commit-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T214649Z-prompt-arena-p2-backend-commit-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T214649Z-prompt-arena-p2-backend-commit-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T214649Z-prompt-arena-p2-backend-commit-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04530-a12e-7050-b83e-bde82199c9eb",
+  "app_server_turn_id": "01a04530-a1d8-7d92-9bc3-d53bdca4ba68",
+  "app_server_process_id": "6500",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T214649Z-prompt-arena-p2-backend-commit-20260827.md",
+  "task_sha256": "b189b2debb221e822ce8660bf4fe2b79b7fc094e289b29b6d867efd6bf7ef04f",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

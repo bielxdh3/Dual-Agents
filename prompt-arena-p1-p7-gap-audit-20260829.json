@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p1-p7-gap-audit-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-pr28-bl4",
+  "task": "Perform a read-only phase-gap audit of Prompt Arena P1-P7 after the completed Windows normal/A-B native retests. Read C:\\CodexGlobal\\AGENTS.md and required review skills first. Use only canonical BL4/biel4 Executor via App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Do not edit any file, commit, push, merge, release, tag, deploy, or touch E:\\Prompt Arena original WIP. Inspect docs/ROADMAP.md, docs/DELIVERY_MATRIX.md, docs/SECURITY.md, current PR #28 diff/state, and existing automated/native evidence. Produce a compact evidence-backed table for each P1-P7: implemented evidence, still-open acceptance gate, whether the gap is safely implementable in code now, or blocked by external runtime/human QA (Docker unavailable, real Ollama/LM Studio/llama.cpp, official judge integration, secure provider/native accessibility, MSI/Wix, installed Windows visual QA). Do not propose redoing delivered work. Identify the single next phase that can be unambiguously delegated without guessing product requirements; if none, state that no safe automatic implementation remains until an external prerequisite or explicit phase scope is supplied. Return exact files/lines/run IDs and full control-plane provenance, including real thread_id and turn_id; no self-report-only conclusion.",
+  "constraints": [
+    "Read-only audit; no repository or remote mutation.",
+    "BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "Preserve all P1-P7 statuses and security controls; do not invent requirements."
+  ],
+  "context_files": ["docs/ROADMAP.md", "docs/DELIVERY_MATRIX.md", "docs/SECURITY.md"],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": []}
+}

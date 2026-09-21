@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "ia-voz-multi-voice-phase2-20260830",
+  "action": "implement",
+  "repository": "C:/IA DE VOZ",
+  "task": "Required skills at top: C:/CodexGlobal/skills/ponytail/SKILL.md; C:/CodexGlobal/skills/project-phase-review/SKILL.md; C:/CodexGlobal/skills/project-security-review/SKILL.md. Read each fully and report resolved paths. Implement Phase 2 (core implementation and GUI integration) of C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md, using the accepted Phase 1 design in this request. Start from workspace C:/IA DE VOZ at baseline e4d958554779bdbfe400f1a21934e03816679795; the local Git metadata is orchestration-only and must not be removed or rewritten. Keep the diff minimal and repository-native: prefer app.py plus one focused deterministic test helper if needed; do not rewrite qwen3-tts or add dependencies. Implement first-class persistent voice profiles with stable validated voice_id (not display name), active-profile state and VOICES UI; non-destructive, manifest-checked, idempotent migration of the existing global single-voice layout into a neutral Existing Voice profile while leaving legacy files untouched; profile-scoped input_audio, dataset/review/references/tokenizer artifacts, training runs/checkpoints/evaluation, and generated outputs; shared models/cache remain global. Refactor all current speaker-sensitive flows in app.py and scripts/train_runner.py to resolve a captured ProfileContext/voice_id rather than global paths. Enforce profile-relative paths and canonical containment, reject absolute/UNC/drive/.. traversal and reparse-point escapes, validate every JSONL audio/ref_audio/checkpoint path before tokenization/training/evaluation/generation, reject cross-profile paths without substitution, and prevent arbitrary checkpoint/review audio access. Bind long-running jobs and callbacks to the voice_id/manifest captured at start; never redirect stale callbacks to the current profile. Preserve all existing supported audio formats, FFmpeg/ASR/VAD/cleaning/reports/tokenizer/model loading, CPU/GPU restrictions, stop-training, local-only loopback privacy, and the legacy global data as recoverable source. GUI must show active voice, allow create/select/rename/delete with explicit confirmation/open-folder, refresh profile-sensitive tabs on switch, show resolved profile audio folder/count/duration/size, and list only active-profile checkpoints; generated output must include voice_id/model/checkpoint/timestamp metadata. Do not run PREPARE DATASET, training, or generation on the real data as part of implementation; migration may copy existing artifacts only after source-manifest validation and must never modify the four input_audio originals. Add focused deterministic tests (no synthetic mutation of real data) for profile lifecycle, path containment, migration idempotency/manifest checks, JSONL cross-profile rejection, and active-profile routing. Run focused compile/tests and a bounded app import/UI smoke; preserve the currently running app until code is ready, then report whether restart is needed. Return exactly one JSON object containing summary, files_changed, commands_run, tests, and remaining_issues, including phase_id/phase_title/objective/scope/non_goals/security_constraints/implementation_contract/required_skills/expected_evidence/validation/acceptance_boundary, provenance fields, project-phase verdict and project-security verdict. No commit, push, PR, merge, release, tag, deployment, publication, dependency install, dataset preparation, training, generation, or deletion. No raw audio/transcript/log contents in output.",
+  "constraints": [
+    "Use only the same configured biel4 App Server/headless Executor with isolated CODEX_HOME; no native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Local code mutation only. Never move, rename, rewrite, delete, or overwrite C:/IA DE VOZ/input_audio or any legacy user artifact; migration is copy-only and idempotent.",
+    "Do not change .git metadata, do not commit, push, publish, deploy, or alter dependencies. Preserve unrelated work and the baseline source of truth.",
+    "Fail closed on invalid voice_id, profile path, cross-profile reference/checkpoint, changed migration manifest, deleted profile, reparse point, stale job ownership, or unavailable required artifact.",
+    "No cloud or external audio upload. Do not claim full end-to-end inference/training success without running it; mark manual or unavailable checks explicitly."
+  ],
+  "context_files": [
+    "C:/Users/bielx/Downloads/PONYTAIL_Dual_Codex_IA_DE_VOZ_Multi_Voice_Profiles.md",
+    "C:/IA DE VOZ/app.py",
+    "C:/IA DE VOZ/scripts/train_runner.py",
+    "C:/IA DE VOZ/README_PTBR.md",
+    "C:/IA DE VOZ/INICIAR.bat",
+    "C:/IA DE VOZ/input_audio",
+    "C:/IA DE VOZ/dataset",
+    "C:/IA DE VOZ/training",
+    "C:/IA DE VOZ/generated",
+    "C:/IA DE VOZ/config",
+    "C:/IA DE VOZ/logs"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": []}
+}

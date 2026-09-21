@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-retry-20260829",
+  "parent_request_id": "prompt-arena-package-20260829",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:00:59.418480+00:00",
+  "finished_at": "2026-08-29T19:02:44.190744+00:00",
+  "summary": "Retry used exact HEAD be1007f99814f004e384abae6acd986e5bcaa521. Frontend/Rust build and worker-sidecar preparation succeeded, but NSIS bundling again failed with `Acesso negado. (os error 5)` while recreating the NSIS directory. Per instruction, downstream packaging and verification were not run. BL4 provenance: canonical biel4 App Server/headless, workspace-write, Windows elevated readiness ready, approval never; no source, docs, history, or remote operations changed.",
+  "files_changed": [
+    "src-tauri/binaries/prompt-arena-worker-x86_64-pc-windows-msvc.exe",
+    "src-tauri/target/release/prompt-arena.exe"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "npm run tauri:build -- --bundles nsis",
+    "Read-only sidecar, executable, NSIS directory, HEAD, and diff metadata inspection"
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis",
+      "status": "failed",
+      "details": "Frontend and Rust compilation passed; sidecar prepared at E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\binaries\\prompt-arena-worker-x86_64-pc-windows-msvc.exe. Tauri failed with `failed to bundle project: Acesso negado. (os error 5)`."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "not_run",
+      "details": "Stopped as instructed after the NSIS retry failed."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows",
+      "status": "not_run",
+      "details": "Stopped as instructed after the NSIS retry failed."
+    },
+    {
+      "command": "NSIS clean-install/launch/restart/uninstall smoke",
+      "status": "not_run",
+      "details": "No NSIS installer was produced."
+    }
+  ],
+  "remaining_issues": [
+    "NSIS packaging remains blocked by `Acesso negado. (os error 5)` during NSIS directory recreation.",
+    "No installer path, checksum manifest, package artifact, or automated smoke result was produced.",
+    "Sidecar: E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\binaries\\prompt-arena-worker-x86_64-pc-windows-msvc.exe, 2,547,712 bytes, SHA-256 89b82dcdb78b0b99ff0b0dcd29c42c9836901b66cdd86cc1cea3077b77744f76. Release executable: E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target\\release\\prompt-arena.exe, 12,975,104 bytes, SHA-256 10a4fddd17f899048d1e8f094b9ea2f34ce096d1a252d1f5a45e7806d77d7b8b."
+  ],
+  "git_status": " M src-tauri/Cargo.toml\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190059Z-prompt-arena-package-retry-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190059Z-prompt-arena-package-retry-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190059Z-prompt-arena-package-retry-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T190059Z-prompt-arena-package-retry-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ed8-00cd-7cf3-911d-b4bbaf1e09d0",
+  "app_server_turn_id": "01a04ee5-8766-7900-9611-4f444dca467c",
+  "app_server_process_id": "17888",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T190059Z-prompt-arena-package-retry-20260829.md",
+  "task_sha256": "4330c794963fcf71bae363ef5d92f52fc94d68eeef57f94335f7bbed5966818a",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-followup-finalize-20260828",
+  "parent_request_id": "prompt-arena-p6-followup-close-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize the existing P6 follow-up diff only. Do not inspect or add new features. Preserve the current seven-file diff for storage retention and appearance JSON import/export. Run exactly: npm run typecheck; npm test; npm run build; cargo fmt --manifest-path src-tauri/Cargo.toml -- --check; cargo check --manifest-path src-tauri/Cargo.toml --all-targets; cargo test --manifest-path src-tauri/Cargo.toml --all-targets; git diff --check. Fix only compile/test defects in this diff. If all checks pass, commit all current P6 follow-up files in one focused commit on completion/product-polish-followup. Keep P6 IN PROGRESS in ROADMAP.md if touched; do not change other phases. If checks cannot pass, do not commit and report failure. No reset, clean, discard, push, merge, tag, release, deploy, page-transition motion, telemetry, cloud calls, paid-provider calls, or P7 work.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "preserve current diff exactly except minimal test/compile corrections; no unrelated files"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": [
+    "E:/Prompt Arena/src-tauri/src/commands.rs",
+    "E:/Prompt Arena/src-tauri/src/lib.rs",
+    "E:/Prompt Arena/src-tauri/src/storage.rs",
+    "E:/Prompt Arena/src/App.tsx",
+    "E:/Prompt Arena/src/appearance.ts",
+    "E:/Prompt Arena/src/appearance.test.ts",
+    "E:/Prompt Arena/src/bridge.ts"
+  ],
+  "review_findings": [{"severity": "important", "title": "Validate and commit the preserved P6 follow-up diff", "details": "The prior BL4 turns timed out after editing. Only the fixed validation list and one commit are required now."}],
+  "max_correction_cycles": 0
+}

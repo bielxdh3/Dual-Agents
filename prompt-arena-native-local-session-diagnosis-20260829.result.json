@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-session-diagnosis-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T13:39:01.726516+00:00",
+  "finished_at": "2026-08-29T13:43:41.512895+00:00",
+  "summary": "Read-only diagnosis complete. The supplied native tools and product artifacts are valid. A bounded direct WebDriver probe reached healthy EdgeDriver status, launched WebView2, created DevToolsActivePort, then failed during session creation because the WebView GPU process repeatedly exited with STATUS_ACCESS_DENIED. This is classified as a host WebView2/GPU access limitation, not an app/Rust/sidecar defect. No acceptance or marker was claimed.",
+  "files_changed": [
+    ".native-driver-cargo-retry-20260829/",
+    ".native-tools/"
+  ],
+  "commands_run": [
+    "git branch --show-current; git rev-parse HEAD; git status --short; git diff --exit-code -- .",
+    "Read-only manifest, artifact, and tool SHA-256 verification",
+    "Prepend only .native-tools to PATH; tauri-driver --help; msedgedriver --version",
+    "Bounded direct WebDriver probe using the existing wry and tauri:options capabilities",
+    "Read-only UDF, DevToolsActivePort, chrome_debug.log, policy, process, port, and final integrity diagnostics"
+  ],
+  "tests": [
+    {
+      "command": "Repository and product artifact verification",
+      "status": "passed",
+      "details": "Timestamp 2026-08-29T13:39:58.7741316Z. Branch validation/native-tauri-acceptance; product SHA f3048a61f45cdb6b29f362444f3d32646edf4943. App E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe SHA-256 BC632933E2B5DAD72EF907522B10D1E16D5869EEAFDAE714DCB133D74C4C361E. Worker E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena-worker.exe SHA-256 4E34773C5B30504292CF867D76D9734640C948798223C5EAE8132DA162D654F5. Source diff exit code 0."
+    },
+    {
+      "command": "Prebuilt tool manifest verification",
+      "status": "passed",
+      "details": "Manifest E:\\Prompt Arena-native-local-20260829-pr\\.native-tools\\manifest.json SHA-256 7D39BD12861B5F1F7781876275D34FD54236BB42433E4DF5E3F0F7DBC50CAB48; workflowRunId 33254907801; sourceCommit 55d685fbdbd927a5ab195ab141fa76ea823acf96. tauri-driver.exe absolute path E:\\Prompt Arena-native-local-20260829-pr\\.native-tools\\tauri-driver.exe, package version 2.0.6, SHA-256 e37974bf5a76fc97b2282af19489f8f516d4d367318dc0c124fe292f88e33e01. msedgedriver.exe absolute path E:\\Prompt Arena-native-local-20260829-pr\\.native-tools\\msedgedriver.exe, version Microsoft Edge WebDriver 151.0.4129.101 (cc1d9f4080fd9140611a9600b8d1615db310105d), SHA-256 3684b7096da7aced2ddb627cca12d9e59a8e69378bd8ec1e09cc8f2a7d47b87a. Hashes matched the manifest."
+    },
+    {
+      "command": "Runtime and policy provenance",
+      "status": "passed",
+      "details": "Node v24.14.1; rustc 1.97.1 (8bab26f4f 2026-07-14). Edge C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe ProductVersion 151.0.4129.107. WebView2 C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\151.0.4129.107\\msedgewebview2.exe ProductVersion 151.0.4129.107; registry version 151.0.4129.107. All checked RemoteDebuggingAllowed policy values were absent."
+    },
+    {
+      "command": "Bounded direct WebDriver session",
+      "status": "failed",
+      "details": "Started 2026-08-29T13:41:05.275Z; application E:\\Prompt Arena-native-local-20260829-pr\\src-tauri\\target\\release\\prompt-arena.exe; UDF C:\\Users\\bielx\\AppData\\Local\\Temp\\prompt-arena-native-session-diagnosis-yyHbER; tauri-driver PID 24360. STATUS_RESPONSE was HTTP 200 with msedgedriver ready, build 151.0.4129.101. Exact SESSION_RESPONSE: {\"error\":\"TimeoutError: The operation was aborted due to timeout\"}. tauri-driver exited with {\"code\":null,\"signal\":\"SIGTERM\"}; stdout `Error serving connection: hyper::Error(IncompleteMessage)\\n`; stderr empty. Finished 2026-08-29T13:41:21.584Z. No session ID or product assertions were reached."
+    },
+    {
+      "command": "WebView2/UDF diagnostics",
+      "status": "passed",
+      "details": "UDF had Modify ACLs and contained EBWebView\\DevToolsActivePort with contents `57703` and `/devtools/browser/fcaa30a5-a8ef-4e46-bc85-4e5075f1f3cc`. chrome_debug.log recorded repeated GPU process exits with exit_code=-1073741790 (0xC0000022, access denied), followed by `GPU process isn't usable. Goodbye.` No relevant listeners remained on ports 4444, 9515, 9222, or 9223; no target app/driver processes remained."
+    },
+    {
+      "command": "Child process command-line capture",
+      "status": "not_run",
+      "details": "Get-CimInstance Win32_Process was denied with HRESULT 0x80041003 during the live probe. The tauri-driver PID and exit status were captured; command lines for spawned Edge/WebView2 children were unavailable."
+    },
+    {
+      "command": "Final source integrity",
+      "status": "passed",
+      "details": "Final branch and SHA remained validation/native-tauri-acceptance and f3048a61f45cdb6b29f362444f3d32646edf4943. No source diff, policy change, commit, push, or original-WIP access occurred."
+    }
+  ],
+  "remaining_issues": [
+    "The host WebView2 GPU process is denied access and crashes repeatedly, preventing WebDriver session creation. The specific enforcing policy is not identified; RemoteDebuggingAllowed is not explicitly disabled.",
+    "The full Tauri bridge, Rust commands, sidecar, persistence, close/reopen, and acceptance marker were intentionally not exercised after session creation failed.",
+    "The manifest sourceCommit 55d685fbdbd927a5ab195ab141fa76ea823acf96 differs from product SHA f3048a61f45cdb6b29f362444f3d32646edf4943; both are preserved as provenance.",
+    "The diagnostic UDF remains in the system temporary directory because cleanup outside the authorized clone/tool scope was not performed.",
+    "Control-plane metadata reported BL4/biel4, Executor, App Server/headless, readiness=ready, approval=never, effective workspace-write; windows.sandbox=elevated and app_server_thread_id/turn_id were not exposed. Phase verdict: Approved with reservations; no security controls were changed and no publication occurred."
+  ],
+  "git_status": "?? .native-driver-cargo-retry-20260829/\n?? .native-tools/\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T133901Z-prompt-arena-native-local-session-diagnosis-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T133901Z-prompt-arena-native-local-session-diagnosis-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T133901Z-prompt-arena-native-local-session-diagnosis-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T133901Z-prompt-arena-native-local-session-diagnosis-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04d64-1a5e-7a22-8a03-7b99bf7069b5",
+  "app_server_turn_id": "01a04dbe-c2d5-7532-92f0-b5acb04b4e74",
+  "app_server_process_id": "24568",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T133901Z-prompt-arena-native-local-session-diagnosis-20260829.md",
+  "task_sha256": "c20f9d68dfe7c3082234375b55efa2ddc12223442d198041c027fad137792cc1",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'failed'."
+}

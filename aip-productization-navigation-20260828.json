@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-productization-navigation-20260828",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "On branch fix/productize-local-capabilities, finish only the root-shell navigation/status-center gap in the current dirty worktree. Existing partial App.tsx/Rust/contract changes must be preserved. Edit the bottom App.tsx shell around SettingsSurface/App (roughly lines 7680-8090) and App.css selectors around .agent-tools/.workspace-tabs; do not inspect or refactor the large capability components. Add a visible keyboard-accessible Portuguese primary tab Recursos locais (workspace union) and render a compact LocalCapabilitiesSurface in the main panel. It must individually link/render the existing VoiceControls, ToolControls, ExtensionControls, ScreenVisionControls, CompanionControls, GatewayControls and CognitivePanelGate for the active agent, with safeMode/temporaryChat props. Add a compact capability status center above them using existing invoke getters/parsers: runtime/Ollama, STT/TTS, microphone/output device availability, visual provider, screen capture, workspace root, extensions, Android companion and Gateway. Use only truthful states Pronto, Não configurado, Indisponível, Bloqueado pelo modo and Erro; no raw executable paths or fake readiness. State fixture/mock versus real local behavior and prerequisites in Portuguese. Ensure resources remain usable when runtime is unavailable, and safe mode/temporary chat still block mutations. Remove the display:none trap for .agent-tools only if the new main route no longer duplicates it; otherwise keep hidden developer details behind an Avançado disclosure. Add focused UI tests that assert Recursos locais is reachable and capability labels/status copy are rendered with mocked invoke; reuse existing test setup, no new dependencies or screenshot goldens. Run only targeted formatting, TypeScript/UI tests, and git diff --check. Commit all coherent current-lot changes (including existing partial Rust/contract work) in one local commit with message fix: expose local capability product surface. Do not push, create/update PR, merge, tag, release, deploy or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, remaining_issues and commit_sha.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md, .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md.",
+    "Ponytail full: smallest shell diff; reuse existing components/parsers/commands; no speculative abstractions/dependencies.",
+    "Work only on fix/productize-local-capabilities from cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4; preserve unrelated user work and current partial changes.",
+    "Local mutation/commit are authorized; no amend, rebase, squash, reset, force-push, history rewrite, push, PR, merge, tag, release, deploy or installer build.",
+    "Do not expose or commit secrets, credentials, local databases, histories, memories, private media, model files, voice samples or auth files.",
+    "Treat status/provider data as untrusted and preserve Rust authority, ownership, mode and temporary-chat gates.",
+    "If focused validation is blocked by Windows spawn EPERM, record the exact blocker and retain safe deterministic checks."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/screen-vision.test.tsx",
+    "E:/AIP/apps/desktop/src/gateway.test.tsx",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/packages/contracts/tests/contracts.test.ts"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

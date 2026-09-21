@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p4-algorithms-finalize2-20260828",
+  "parent_request_id": "prompt-arena-p4-algorithms-finalize-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize only the already staged P4 algorithm diff on completion/advanced-arena. Do not redesign or broaden scope. Inspect staged src/advanced-arena.ts, src/arena-runner.ts, src/bridge.ts, and storage.rs changes. Run npm run typecheck, npm test, npm run build, cargo fmt --all -- --check, cargo check, cargo test, and git diff --cached --check. If all pass, create one focused local commit for this staged P4 algorithm slice. If a minimal compile/test defect is found, fix it in the same files and commit. No UI beyond existing seams, no P5/P6/P7, no external calls, no merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target completion/advanced-arena; preserve current staged diff and all P1/P2/P3 commits",
+    "no reset/clean/discard; no secrets/cloud calls",
+    "no merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/advanced-arena.ts", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/src/storage.rs"],
+  "review_findings": [{"severity": "blocking", "title": "P4 staged algorithm diff lacks final validation/commit", "details": "Run the required checks and commit only the existing staged slice."}],
+  "max_correction_cycles": 0
+}

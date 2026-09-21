@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-contract-count-test-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-contract-ui-tests-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Fix the remaining stale Phase 11 contract test on the current branch. Host pnpm --filter @aip/contracts test now has 18 passed and one failure at tests/contracts.test.ts:935 because parseScreenVisionFixtures intentionally accepts up to three bounded records (two deterministic fixtures plus one real Windows display), while the test still expects an array of three fixtures to be null. Update the test/name to assert the supported bounded count and reject a fourth fixture (or equivalent unsafe/oversized collection). Do not change production parser bounds or real-display acceptance. Then run contracts typecheck/build/tests, desktop typecheck/tests/build, cargo fmt/check/clippy/full/focused, secrets scan and diff check; commit the test-only correction. Do not push or publish.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits outside the Executor.",
+    "Keep real display records accepted and preserve the maximum bounded collection of three fixtures.",
+    "Do not change Phase 11 security/privacy/capture/adapter semantics or Phase 12/13 behavior; do not push, merge, tag, release or deploy."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/tests/contracts.test.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Remaining stale fixture-count assertion",
+      "severity": "blocking",
+      "details": "The contracts suite fails only because it still expects parseScreenVisionFixtures([fixture, fixture, fixture]) to be null. The shipped bounded parser accepts three records so a real display can coexist with the two deterministic fixtures; update the test to reject four instead."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-control-contracts-20260830-correction",
+  "parent_request_id": "prompt-arena-p2-control-contracts-20260830",
+  "action": "correct",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "Finish the same Prompt Arena P2 control/test gap from the parent request. Keep the primary Arena Task/Case custom listboxes, keyboard helper, static contracts, no backend/blind/security changes, and leave all changes uncommitted for BL3 review. Address only the actionable findings below, then rerun focused tests plus npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check.",
+  "constraints": [
+    "Use the same canonical BL4/biel4 App Server/headless provenance: workspace-write, Windows sandbox elevated, readiness ready, approval never.",
+    "Do not reset, stash, overwrite unrelated work, or modify E:/Prompt Arena or E:/Prompt Arena-pr28.",
+    "No backend redesign, forced reload, unsafe HTML/eval, global overflow masking, or blind identity disclosure.",
+    "Leave product changes uncommitted for BL3 review; no push, tag, release, deploy, merge, or PR."
+  ],
+  "review_findings": [
+    {
+      "title": "Custom listbox trigger omits the selected value from its accessible name",
+      "details": "In src/App.tsx ArenaListbox, aria-labelledby={labelId} on the trigger overrides the button's descendant text, so assistive technology may announce only the Task/Case label and not the selected option or placeholder. Add a stable value element id and include the label plus value in the accessible name (or an equivalent standards-compliant approach) while retaining visible text and user-content escaping.",
+      "severity": "important",
+      "files": ["E:/Prompt Arena-live-telemetry-i18n/src/App.tsx"]
+    },
+    {
+      "title": "Static UI contracts omit the Models responsive fallback",
+      "details": "The new scripts/ui-contracts.test.mjs checks Arena comparison/live overflow and reduced motion, but the prompt's layout testing expectation also requires the Models desktop-to-narrow behavior. Add a focused static contract assertion for .models-layout and .model-row switching to one column in the max-width:900px media block, without inventing a browser harness.",
+      "severity": "important",
+      "files": ["E:/Prompt Arena-live-telemetry-i18n/scripts/ui-contracts.test.mjs", "E:/Prompt Arena-live-telemetry-i18n/src/styles.css"]
+    }
+  ],
+  "context_files": [
+    "C:/Users/bielx/.codex/attachments/b16592b6-1f9f-44ec-b685-bd314cdb2e10/pasted-text.txt",
+    "E:/Prompt Arena-live-telemetry-i18n/src/App.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/styles.css",
+    "E:/Prompt Arena-live-telemetry-i18n/scripts/ui-contracts.test.mjs",
+    "E:/Prompt Arena-live-telemetry-i18n/src/listbox-navigation.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/listbox-navigation.test.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

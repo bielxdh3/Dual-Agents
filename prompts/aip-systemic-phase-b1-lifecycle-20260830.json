@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-systemic-phase-b1-lifecycle-20260830",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Required skills at top: E:/AIP/.agents/skills/aip-implementation/SKILL.md; E:/AIP/.agents/skills/aip-phase-review/SKILL.md; E:/AIP/.agents/skills/aip-security-review/SKILL.md; E:/AIP/.agents/skills/aip-publication-check/SKILL.md; C:/CodexGlobal/skills/ponytail/SKILL.md (read each fully before acting). Execute only bounded Phase B1 conversation lifecycle/synchronization work from C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md. Start from branch fix/systemic-desktop-ux-and-generation at current HEAD f0db5428b163c3cef7095a737404c38334c9d7c8; preserve all existing work and do not reset/discard. Scope: inspect the existing conversations schema/migrations, Database conversation methods, phase-one message creation, Tauri conversation commands, App.tsx ConversationList and root conversation revision wiring. Implement the smallest coherent fix for these acceptance points: (1) persistent named empty conversations have a deterministic seven-day expiry and expired empty rows are removed safely during normal listing/initialization; (2) an abandoned unnamed draft does not create a database row, while the explicit named Create action remains the save boundary; (3) the first persisted user message clears the empty expiry; (4) create, rename, archive/restore, pin and delete refresh the sidebar and active conversation title/state without stale UI; (5) deleting the active conversation leaves a valid active conversation or clear empty state; (6) preserve temporary-chat isolation and existing ownership checks. Use an additive migration only if required, preserve old data/IDs, and avoid changing model picker, modal, profile, state, memories, calendar, overlay, or unrelated generation code. Add focused deterministic Rust tests for expiry/first-message/active-selection behavior and narrow frontend tests only if existing test infrastructure makes them straightforward; do not invent broad test setup. Keep source/docs UI PT-BR as existing conventions. Run cargo fmt --check and focused cargo tests for database/chat; run focused TypeScript checks only if dependencies are available. Commit locally with an explanatory message. Do not push, create PR, merge, tag, release, deploy, or build installers. Return exactly one JSON object with summary, files_changed, commands_run, tests, and remaining_issues; report any unavailable test/dependency explicitly and do not claim full end-to-end completion.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Executor with elevated/ready Windows sandbox. No native subagents, create_thread, alternate backend, TUI, or manual/direct implementation fallback.",
+    "Keep the diff Phase B1-only and minimal; preserve Rust authority, local-first privacy, temporary chat, and ownership/authorization checks.",
+    "Do not amend, rebase, squash, force-push, or touch unrelated owner work. Do not publish remotely."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "C:/Users/bielx/Downloads/AIP_GOAL_SYSTEMIC_DESKTOP_UX_AND_GENERATION_CLOSURE_DUAL_CODEX.md",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0002_phase1_conversations.sql",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0005_phase3_conversations_memory.sql",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0026_conversation_organization.sql",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/use-phase-one.ts",
+    "E:/AIP/apps/desktop/src/conversation-state.ts",
+    "E:/AIP/packages/contracts/src/index.ts"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

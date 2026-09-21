@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-big-smoke-review-short-20260827",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-27T15:07:16.536648+00:00",
+  "finished_at": "2026-08-27T15:12:15.510912+00:00",
+  "summary": "verdict=approved_with_reservations; findings=[1 pass: SVG fill and RGBA preservation; 2 pass statically: transparent overlay scope, no opaque square; 3 pass: immutable Pencil layer and undo/redo; 4 pass: anchored, reversed, clamped, reset selection; 5 pass: scoped ConversationList hooks and accessibility]; net diff is limited to the eight requested files; tests_reviewed=[AgentSprite.test.ts, pixel-document.test.ts, pixel-editor.test.tsx, conversation-list.test.tsx]; files_reviewed=[App.tsx, App.css, AgentSprite.tsx, AgentSprite.test.ts, pixel-document.ts, pixel-document.test.ts, conversation-list.test.tsx, pixel-editor.test.tsx].",
+  "files_changed": [],
+  "commands_run": [
+    "Read-only git status, branch, HEAD, commit metadata, and log inspection",
+    "Read-only diff/name-status/numstat inspection for 9a77344..9bd6076 restricted to the eight files",
+    "Read-only Get-Content and rg inspection of AGENTS.md, aip-phase-review/SKILL.md, and the eight files"
+  ],
+  "tests": [
+    {
+      "command": "Reviewed regression tests",
+      "status": "not_run",
+      "details": "Execution prohibited by the request; no tests or builds were run."
+    }
+  ],
+  "remaining_issues": [
+    "Remote CI not confirmed.",
+    "CSS/Tauri transparency was verified statically only; no allowed test directly exercises the Tauri window configuration."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T150716Z-aip-big-smoke-review-short-20260827\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T150716Z-aip-big-smoke-review-short-20260827",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T150716Z-aip-big-smoke-review-short-20260827\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260827T150716Z-aip-big-smoke-review-short-20260827\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a043c2-d50a-70b1-9689-9f60b831c649",
+  "app_server_turn_id": "01a043c2-d5be-71e0-a957-f65c47c22cb7",
+  "app_server_process_id": "16572",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260827T150716Z-aip-big-smoke-review-short-20260827.md",
+  "task_sha256": "7e8ac6f090b6746a089810ec82921ad00520e774d9322ba1403e426c3b04efd9",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

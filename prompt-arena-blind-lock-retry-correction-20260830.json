@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-blind-lock-retry-correction-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Continue the same Prompt Arena blind-evaluation correction as the canonical BL4 Executor through App Server/headless. The current intentionally dirty worktree contains the stable identity/memoization/model-operation changes from the prior BL4 turns. Review the legacy ArenaResultsSurface lockEvaluation retry path against the mission's evaluation-continuity acceptance. A partial multi-response lock can leave an earlier run immutable/locked; the current retry calls the helper with a locked preparation and fails, blocking recovery. Implement the smallest safe idempotent retry behavior: recognize an already locked run, read/reconcile its persisted score against the currently selected local score, skip it only when it matches, and surface a bounded error on mismatch or missing record. Never rewrite immutable records, reveal early, match by response text, or force reload. Add focused pure/helper tests where feasible. Preserve current source/test changes and docs; do not commit or touch protected worktrees. Run focused results tests and typecheck, report exact changes and provenance.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Preserve all current uncommitted changes; no reset, stash, or commit.",
+    "No source-wide rewrite, no forced page reload, no remote actions, no UI automation."
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\bridge.ts"
+  ],
+  "review_findings": [
+    {
+      "title": "Partial blind lock retry",
+      "details": "After a partial success, prepareBlindEvaluation returns locked with no response token; the current legacy lock loop passes that to the prepared-only helper and blocks recovery. Retry must reconcile existing immutable score before skipping.",
+      "severity": "important"
+    }
+  ],
+  "max_correction_cycles": 1,
+  "parent_request_id": "prompt-arena-docs-test-count-correction-20260830",
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

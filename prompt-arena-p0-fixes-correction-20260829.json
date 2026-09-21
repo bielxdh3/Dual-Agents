@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p0-fixes-correction-20260829",
+  "parent_request_id": "prompt-arena-p0-fixes-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Complete the P0 correction in the existing dirty checkout using the same canonical BL4/biel4 App Server/headless provenance, workspace-write, windows.sandbox=elevated, readiness=ready, approval=never. Before acting read C:\\CodexGlobal\\AGENTS.md and the required ponytail, project-phase-review, project-security-review, project-publication-check, product-design/index, and product-design/audit SKILL.md files. The previous Executor cycle timed out after applying a six-file diff, so inspect and preserve the existing changes; do not reset or discard them. Review the current diff for the two findings WINDOWS_QA_FINDING_ARENA_UI_FREEZES_DURING_BENCHMARK and WINDOWS_QA_FINDING_EVALUATION_SCORE_CAUSES_BLACK_SCREEN. The current diff makes execute_run_once an async Tauri command backed by tauri::async_runtime::spawn_blocking, adds focused command tests, makes blind score edits functional/local via updateBlindEvaluationScore, memoizes BlindResponsePane, bounds response panes to a scrollable 320px region without truncating text, and adds focused tests. Validate whether this is semantically safe and sufficient; correct any compile, lifecycle, accessibility, React-state, security, or failure-path issues you find, but keep the scope to P0. Run npm test -- --run src/results-ui.test.ts src/arena-runner.test.ts, npm run typecheck, cargo test --manifest-path src-tauri/Cargo.toml --lib commands::tests, git diff --check, and any additional focused tests needed. Do not claim runtime/human QA: Ollama endpoint/browser/native UI are unavailable in this environment. If tests pass and the diff is sound, create one normal local commit with message `fix: keep Arena execution and blind scoring responsive`. Do not push, merge, tag, release, deploy, modify docs/generated files, or touch other worktrees. Return exact files, tests, commit SHA, remaining external gates, and full control-plane provenance including real thread_id and turn_id if exposed.",
+  "constraints": [
+    "Preserve and review the existing six-file P0 diff; no reset or destructive cleanup.",
+    "Only source/tests needed for P0 may change; no broad UI redesign or docs/generated changes.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; windows.sandbox=elevated; readiness=ready; approval=never.",
+    "No forced reload, arbitrary sleeps/timeouts, event suppression, unsafe HTML, weakened isolation, cloud/provider calls, or native TUI.",
+    "No push, merge, tag, release, deploy, or public publication."
+  ],
+  "review_findings": [
+    {
+      "title": "Previous implementation cycle timed out before validation and commit",
+      "details": "The six-file diff is present and root-side focused tests already pass, but the BL4 result has no executor report or provenance. Review the actual diff, rerun tests under the canonical Executor, and commit only after validation."
+    },
+    {
+      "title": "P0 fixes must not be overstated",
+      "details": "The local Ollama port 127.0.0.1:11434 and a browser/component harness were unavailable, so runtime benchmark responsiveness and installed Windows visual/evaluation acceptance remain external human gates."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\commands.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\styles.css",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\results-ui.test.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

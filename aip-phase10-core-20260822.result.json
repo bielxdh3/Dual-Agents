@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase10-core-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T13:44:52.975658+00:00",
+  "finished_at": "2026-08-22T13:48:06.527054+00:00",
+  "summary": "Partial implementation blocked: package model, SHA-256 validation, bounded interpreter, migration 0024, and execution/cancellation APIs were added, but required validation cannot complete because the repository build references a missing runtime binary. Full requested runtime safeguards and focused tests remain incomplete; no commit was created.",
+  "files_changed": [
+    "apps/desktop/src-tauri/Cargo.toml",
+    "apps/desktop/src-tauri/Cargo.lock",
+    "apps/desktop/src-tauri/src/database.rs",
+    "apps/desktop/src-tauri/src/extensions.rs",
+    "apps/desktop/src-tauri/migrations/0024_phase10_extension_runtime.sql"
+  ],
+  "commands_run": [
+    "cargo fmt",
+    "cargo fmt --check",
+    "cargo check --locked",
+    "git diff --check",
+    "git status --short"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Formatting passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "failed",
+      "details": "Build script failed because binaries/aip-runtime-x86_64-pc-windows-msvc.exe is missing."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "not_run",
+      "details": "Blocked by the missing runtime binary."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "not_run",
+      "details": "Blocked by the missing runtime binary."
+    },
+    {
+      "command": "focused extension tests",
+      "status": "not_run",
+      "details": "Blocked by the missing runtime binary."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors found."
+    }
+  ],
+  "remaining_issues": [
+    "The requested implementation is not complete, including comprehensive persisted execution/idempotency behavior, cancellation checkpoints, all specified gates and limits, and focused tests.",
+    "Validation is blocked by missing binaries/aip-runtime-x86_64-pc-windows-msvc.exe.",
+    "No local commit was created because the safe core could not be completed and validated."
+  ],
+  "git_status": " M apps/desktop/src-tauri/Cargo.lock\n M apps/desktop/src-tauri/Cargo.toml\n M apps/desktop/src-tauri/src/database.rs\n M apps/desktop/src-tauri/src/extensions.rs\n?? apps/desktop/src-tauri/migrations/0024_phase10_extension_runtime.sql\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T134453Z-aip-phase10-core-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T134453Z-aip-phase10-core-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T134453Z-aip-phase10-core-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T134453Z-aip-phase10-core-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a029b7-9b4c-7273-a607-61a42ea52c5c",
+  "app_server_process_id": "4584",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T134453Z-aip-phase10-core-20260822.md",
+  "task_sha256": "2f2f2ce98c6a172f18ac92608f702f03bf12662ddf2e972ac3d11b7b80ceb9b5",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied."
+}

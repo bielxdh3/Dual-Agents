@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-ui-reset-phase-c-20260831",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-31T21:01:46.931800+00:00",
+  "finished_at": "2026-08-31T21:11:33.595015+00:00",
+  "summary": "Implemented Phase C sidebar/conversation UX and committed as a163be5.",
+  "files_changed": [
+    "apps/desktop/src/App.tsx",
+    "apps/desktop/src/App.css",
+    "apps/desktop/src/conversation-list.test.tsx",
+    "apps/desktop/src/phase-d-sidebar-state.test.tsx"
+  ],
+  "commands_run": [
+    "pnpm --filter @aip/desktop test",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm exec eslint ...",
+    "pnpm exec prettier --check ...",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"fix: prioritize AIP conversations\""
+  ],
+  "tests": [
+    {
+      "command": "Focused conversation/sidebar Vitest",
+      "status": "passed",
+      "details": "13 tests passed."
+    },
+    {
+      "command": "Full desktop Vitest",
+      "status": "passed",
+      "details": "30 files and 118 tests passed."
+    },
+    {
+      "command": "Desktop TypeScript typecheck",
+      "status": "passed",
+      "details": "tsc --noEmit passed."
+    },
+    {
+      "command": "ESLint and Prettier checks",
+      "status": "passed",
+      "details": "No lint errors; formatting passed."
+    },
+    {
+      "command": "Secret/privacy scan",
+      "status": "passed",
+      "details": "200 repository files checked."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    }
+  ],
+  "remaining_issues": [
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T210147Z-aip-ui-reset-phase-c-20260831\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T210147Z-aip-ui-reset-phase-c-20260831",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T210147Z-aip-ui-reset-phase-c-20260831\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260831T210147Z-aip-ui-reset-phase-c-20260831\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05910-09d5-7723-9116-e11fbee1ea5e",
+  "app_server_turn_id": "01a059a0-d533-74a3-9ffa-85ddba18ff39",
+  "app_server_process_id": "15132",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260831T210147Z-aip-ui-reset-phase-c-20260831.md",
+  "task_sha256": "525744f52891fa97a0f18870a8b56ed3d498489e933e3f44a29313ab7ef63379",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

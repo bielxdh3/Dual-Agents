@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-overlay-fix",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-28T21:41:03.293207+00:00",
+  "finished_at": "2026-08-28T21:46:15.460550+00:00",
+  "summary": "Applied and committed custom overlay hit-region fix in commit 78d38a19d1357a068b00b1d98995fb6448de1eaa.",
+  "files_changed": [
+    "apps/desktop/src/Overlay.tsx",
+    "apps/desktop/src/components/AgentSprite.tsx",
+    "apps/desktop/src/overlay-input.ts",
+    "apps/desktop/src/overlay-input.test.ts"
+  ],
+  "commands_run": [
+    "pnpm --filter @aip/desktop exec vitest run src/overlay-input.test.ts src/components/AgentSprite.test.ts",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop exec vitest run src/overlay-input.test.ts src/components/AgentSprite.test.ts src/conversation-list.test.tsx src/conversation-state.test.ts src/conversation-surface.test.tsx src/agent-navigation.test.ts",
+    "cargo fmt --check",
+    "cargo check",
+    "cargo test overlays::tests:: && cargo test native_overlay_region::tests::",
+    "cargo test",
+    "git diff --check",
+    "git commit -m \"fix: include custom overlay hit regions\""
+  ],
+  "tests": [
+    {
+      "command": "Focused overlay/sprite Vitest",
+      "status": "passed",
+      "details": "8/8 tests passed."
+    },
+    {
+      "command": "Focused desktop Vitest",
+      "status": "passed",
+      "details": "25/25 tests passed."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "TypeScript completed successfully."
+    },
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Formatting clean."
+    },
+    {
+      "command": "cargo check",
+      "status": "passed",
+      "details": "Rust check completed successfully."
+    },
+    {
+      "command": "Overlay Rust tests",
+      "status": "passed",
+      "details": "8/8 native overlay tests passed."
+    },
+    {
+      "command": "cargo test",
+      "status": "passed",
+      "details": "154 passed, 0 failed, 1 ignored; ignored test requires a local Ollama model."
+    }
+  ],
+  "remaining_issues": [
+    "Installed-Windows transparency and click-through behavior remains a manual runtime validation gate; no installer was built.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T214103Z-aip-desktop-conversation-ux-architecture-20260828-overlay-fix\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T214103Z-aip-desktop-conversation-ux-architecture-20260828-overlay-fix",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T214103Z-aip-desktop-conversation-ux-architecture-20260828-overlay-fix\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260828T214103Z-aip-desktop-conversation-ux-architecture-20260828-overlay-fix\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04a44-41dc-7291-b61f-65b62802dc47",
+  "app_server_turn_id": "01a04a51-b5c1-7880-84d3-227f9a37d909",
+  "app_server_process_id": "17068",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260828T214103Z-aip-desktop-conversation-ux-architecture-20260828-overlay-fix.md",
+  "task_sha256": "47dc7dd9f3dd13df41b56138feec161ac25ddbe11b37ec792ffdb33b055dbdb8",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

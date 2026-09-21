@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-source-identity-correction-20260820",
+  "parent_request_id": "aip-phase9-final-review-collections-20260820",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-20T19:00:21.521078+00:00",
+  "finished_at": "2026-08-20T19:07:15.644167+00:00",
+  "summary": "Implemented source-identity revalidation, Rust collection limits, contract validation, UI labels, focused tests, and committed locally.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/tools.rs",
+    "apps/desktop/src-tauri/src/database.rs",
+    "packages/contracts/src/index.ts",
+    "packages/contracts/tests/contracts.test.ts",
+    "apps/desktop/src/App.tsx"
+  ],
+  "commands_run": [
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib",
+    "pnpm --filter @aip/contracts typecheck",
+    "pnpm --filter @aip/contracts build",
+    "pnpm --filter @aip/contracts test",
+    "pnpm --filter @aip/desktop typecheck",
+    "pnpm --filter @aip/desktop test",
+    "pnpm --filter @aip/desktop build",
+    "pnpm secrets:scan",
+    "git diff --check",
+    "git commit -m \"fix: revalidate phase 9 source identity\""
+  ],
+  "tests": [
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "119 passed, 1 optional Ollama test ignored."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts build",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/contracts test",
+      "status": "not_run",
+      "details": "Blocked by executor spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop typecheck",
+      "status": "passed",
+      "details": "Passed."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop test",
+      "status": "not_run",
+      "details": "Blocked by executor spawn EPERM."
+    },
+    {
+      "command": "pnpm --filter @aip/desktop build",
+      "status": "not_run",
+      "details": "Blocked by executor spawn EPERM."
+    },
+    {
+      "command": "pnpm secrets:scan",
+      "status": "not_run",
+      "details": "Blocked by executor spawnSync git EPERM."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "Passed."
+    }
+  ],
+  "remaining_issues": [
+    "Node-dependent tests/builds and secrets scan require rerun in an executor without spawn EPERM.",
+    "Final commit: 77b65d292b5589f61c6590eda1761d2f26e6dcb3",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T190021Z-aip-phase9-source-identity-correction-20260820\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T190021Z-aip-phase9-source-identity-correction-20260820",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T190021Z-aip-phase9-source-identity-correction-20260820\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260820T190021Z-aip-phase9-source-identity-correction-20260820\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0205e-aff2-7cb0-a414-12bebdfa9e5a",
+  "app_server_turn_id": "01a0208b-b6eb-72c1-ac3d-01f9746b892f",
+  "app_server_process_id": "18436",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260820T190021Z-aip-phase9-source-identity-correction-20260820.md",
+  "task_sha256": "b0eb009a089e1f9408a9c1bd5ae144c714104e804b023f4f5c71111451fbfc21",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'. Executor changed Git HEAD; no rollback was attempted."
+}

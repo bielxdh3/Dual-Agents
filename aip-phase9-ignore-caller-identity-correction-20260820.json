@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase9-ignore-caller-identity-correction-20260820",
+  "parent_request_id": "aip-phase9-source-identity-correction-20260820",
+  "action": "correct",
+  "repository": "E:\\AIP",
+  "task": "Apply the one remaining local-review correction on the current clean Phase 9 branch at HEAD 77b65d292b5589f61c6590eda1761d2f26e6dcb3. Read AGENTS.md and required AIP implementation, phase, security, and publication skills before editing. Keep the change limited to Phase 9 Rust tools and its focused tests; do not publish remotely or implement later phases.\n\nCorrection: validate_local_action_input currently uses movement.source_identity supplied in the incoming ToolActionInput when present, and only captures a file identity when it is absent. This is untrusted caller data and must never determine the approved source identity. Always call capture_file_identity on the safely validated source during local preview and persist that freshly captured value; ignore any caller-supplied sourceIdentity for authority purposes. Keep sourceIdentity optional/defaulted only for serialized output/backward compatibility and fixture moves. Add or adjust a deterministic Rust test that supplies a forged source_identity in the preview input, substitutes the source path before execution, and proves execution fails with workspace_source_identity_mismatch and the substitute remains unmoved. Preserve all existing source preflight, compensation, collection, owner, and fixture behavior.\n\nValidation before commit: cargo fmt --check; cargo check --locked; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib; pnpm --filter @aip/contracts typecheck; pnpm --filter @aip/contracts build; pnpm --filter @aip/contracts test; pnpm --filter @aip/desktop typecheck; pnpm --filter @aip/desktop test; pnpm --filter @aip/desktop build; pnpm secrets:scan; git diff --check. The executor may report Node spawn EPERM, but the parent will rerun those gates. Create one corrective commit with exact message `fix: ignore caller source identity`. Do not push, create PR, merge, tag, release, or deploy. Report all evidence and final SHA.",
+  "constraints": [
+    "Use only the configured Biel4 App Server Executor; no native subagents or alternate backend.",
+    "Local mutation and one scoped commit only; no remote GitHub mutation or publication.",
+    "Preserve the existing Phase 9 source-identity, compensation, collection, audit, owner, safe-mode, temporary-chat, and fixture boundaries."
+  ],
+  "review_findings": [
+    {
+      "title": "Never trust caller-supplied source identity",
+      "details": "validate_local_action_input uses movement.source_identity when present instead of always capturing the safely validated source identity in Rust. Ignore the input value for authority and add a forged-identity regression test.",
+      "severity": "blocking"
+    }
+  ],
+  "context_files": [
+    "apps/desktop/src-tauri/src/tools.rs",
+    "apps/desktop/src-tauri/src/database.rs"
+  ],
+  "authorization": {
+    "allowed_actions": ["local_mutation", "local_commit"]
+  },
+  "max_correction_cycles": 0
+}

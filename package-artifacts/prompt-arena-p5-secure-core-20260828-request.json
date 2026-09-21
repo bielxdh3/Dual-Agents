@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p5-secure-core-20260828",
+  "parent_request_id": "prompt-arena-p5-byok-core-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "The preserved src-tauri/src/external_providers.rs is currently the only P5 change and is untracked. Finish a small secure-core slice only: inspect/fix compile issues in that module, register it in lib.rs, add Tauri commands for list/configure/update-cost-policy/remove provider using OsCredentialBackend, add bridge types/functions for those metadata-only operations, and add focused Rust tests (including a memory/mock CredentialBackend) for validation, redaction, cost policy, and fail-closed unsupported platform. Do not implement external HTTP execution or UI in this slice; leave those for a follow-up. Run cargo fmt/check/test and npm typecheck/test/build. Commit only the secure-core slice with a descriptive message, preserving P4 and prior commits. No secrets in logs/reports, no plaintext fallback, no network calls, no reset/clean/discard, no merge/tag/release/deploy.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session with --allow-dirty; preserve HEAD ff4ace5 and the untracked external_providers.rs",
+    "no direct Architect implementation, no TUI/native_tui/fallback/substitute, no external provider calls",
+    "no secret values in tests, logs, errors, exports, snapshots, or Git; no plaintext credential storage",
+    "no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src-tauri/src/external_providers.rs", "E:/Prompt Arena/src-tauri/src/lib.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src/bridge.ts", "E:/Prompt Arena/src-tauri/Cargo.toml"],
+  "review_findings": [{"severity": "blocking", "title": "P5 secure provider core is untracked and not integrated", "details": "Integrate only the existing core and validate it before adding HTTP/UI follow-ups."}],
+  "max_correction_cycles": 0
+}

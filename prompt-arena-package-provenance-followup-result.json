@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-provenance-followup-20260830",
+  "parent_request_id": "prompt-arena-package-exact-head-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T07:03:28.013578+00:00",
+  "finished_at": "2026-08-30T07:11:35.778184+00:00",
+  "summary": "Fresh incremental NSIS package verified from checkout 21a9b5c7798a219fe6c6f318fb036f57ef7567eb with production source implementation at 8588a2dd66e386082e153c933b1b55891ac42657. Commit 08a49eb created locally. Provenance: biel4, Executor, authenticated App Server/headless transport, workspace-write, Windows elevated readiness ready, approval never. No source changes, push, tag, release, deploy, merge, amend, rebase, reset, or cargo clean.",
+  "files_changed": [
+    "checksums-sha256.txt",
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows --smoke",
+    "node --input-type=module -e \"import { verifyChecksumManifest } from './scripts/package-artifacts.mjs'; verifyChecksumManifest('checksums-sha256.txt', 'package-artifacts')\"",
+    "git diff --check HEAD^ HEAD",
+    "git commit -m \"docs: attest exact-head package provenance\""
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'",
+      "status": "passed",
+      "details": "Frontend, Rust release build, worker sidecar preparation, and NSIS bundling passed."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "passed",
+      "details": "Prepared 1 Windows NSIS artifact; optional MSI unavailable."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows --smoke",
+      "status": "passed",
+      "details": "Checksum manifest, clean install, executable start, restart, and silent uninstall passed."
+    },
+    {
+      "command": "SHA-256 measurement capture",
+      "status": "passed",
+      "details": "Artifact 3812679 bytes / 197f5a13d8c6200b0e29df244cb577359e3bd5240726319f3e871f066285c714; bundle same; bundled worker 2651136 bytes / 9461564d241f5de47cfe1c3f0dbb288951d6988e41643abce16df165ae8e4eb9; sidecar 2629120 bytes / 352e09c15c9fd3acad1cf321f020597561faf5a485d02b5a265c12a5fbaa3033; checksum manifest 102 bytes / 0452e2a111c79292e3ed60bc5bb04178aa989517957049aa264408271adaab0c; package-verification 282 bytes / 9f410c6f8b1e8f1225c30fbd16f8a7be7f0ad1b6e0091f1203e7016fee7693c1."
+    },
+    {
+      "command": "git diff --check HEAD^ HEAD",
+      "status": "passed",
+      "details": "No whitespace errors."
+    }
+  ],
+  "remaining_issues": [
+    "PENDING_HUMAN_QA remains for visual/native/full Tauri Arena review; package smoke is not human QA.",
+    "Windows MSI remains BLOCKED LOCALLY; Docker remains BLOCKED_EXTERNAL_RUNTIME; Linux/remote CI remains CI PENDING/unconfirmed.",
+    "Live LM Studio/llama.cpp service smoke remains pending.",
+    "Security verdict remains Approved with reservations; publication verdict remains Create a sanitized public copy. No publication occurred.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T070328Z-prompt-arena-package-provenance-followup-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T070328Z-prompt-arena-package-provenance-followup-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T070328Z-prompt-arena-package-provenance-followup-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T070328Z-prompt-arena-package-provenance-followup-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a0517a-f89e-7ff1-be7e-d7314d0027bb",
+  "app_server_turn_id": "01a0517a-f93c-7193-918e-fcc5cf948b99",
+  "app_server_process_id": "19820",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T070328Z-prompt-arena-package-provenance-followup-20260830.md",
+  "task_sha256": "014f495ebe600763378fb5a3b2d76e316b1c33594b5d96c3592b83f67ecb8927",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-android-companion-v4-20260822",
+  "parent_request_id": "aip-phase12-android-companion-20260822",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T15:34:45.422667+00:00",
+  "finished_at": "2026-08-22T15:36:03.658725+00:00",
+  "summary": "The supplied toolchain is present and usable only with its actual nested JDK path and a checkout-local Gradle user home: JDK 17.0.12, SDK tools/platform-tools, and Gradle 8.9 verified. However, the full Phase 12 implementation was not completed in this turn: no Android project, APK, authenticated desktop transport, or repository code was created. No partial implementation or false APK claim was made.",
+  "files_changed": [
+    ".tooling/"
+  ],
+  "commands_run": [
+    "java -version",
+    "sdkmanager --version",
+    "adb version",
+    "gradle --version",
+    "Get-ChildItem .tooling\\android -Recurse -Filter java.exe",
+    "gradle.bat --version --stacktrace"
+  ],
+  "tests": [
+    {
+      "command": "JDK/Android SDK/Gradle verification",
+      "status": "passed",
+      "details": "JDK 17.0.12, sdkmanager 12.0, adb 37.0.1, and Gradle 8.9 verified. Gradle required JAVA_HOME at .tooling/android/jdk/jdk-17.0.12+7 and checkout-local GRADLE_USER_HOME."
+    },
+    {
+      "command": "Phase 12 Android project/APK/transport validation",
+      "status": "not_run",
+      "details": "No Phase 12 implementation was created, so build, APK hash, Android tests/lint, transport integration, and full repository gates were not run."
+    }
+  ],
+  "remaining_issues": [
+    "The requested real Kotlin Android companion, Android Keystore custody, authenticated aip-companion-v1 desktop transport, migrations/contracts/Tauri/UI/docs/CI, tests, APK, and SHA-256 artifact remain unimplemented.",
+    "The user-provided .tooling directory remains untracked and was not modified or committed.",
+    "No commit was created."
+  ],
+  "git_status": "?? .tooling/\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T153446Z-aip-phase12-android-companion-v4-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T153446Z-aip-phase12-android-companion-v4-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T153446Z-aip-phase12-android-companion-v4-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T153446Z-aip-phase12-android-companion-v4-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a029b7-9a83-7630-ad67-400f9e7d4de7",
+  "app_server_turn_id": "01a02a1c-3906-7dd0-b322-d04a0970b839",
+  "app_server_process_id": "9944",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T153446Z-aip-phase12-android-companion-v4-20260822.md",
+  "task_sha256": "0681ca885ae8702f5dad306963e908bc815481ed5b84cbabc9dc9bd39d2bcd42",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor reported a test with status 'not_run'."
+}

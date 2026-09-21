@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-bl4-health-after-reset-20260828",
+  "action": "implement",
+  "repository": "E:/Prompt Arena",
+  "task": "Read-only BL4 health probe from E:/Prompt Arena. Do not alter files, commit, push, merge, tag, release, deploy, or use TUI/native_tui/fallback. Run node child_process cmd gate, node child gate, npm run typecheck, and git status --short --branch. Return the required JSON contract only.",
+  "constraints": [
+    "account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never",
+    "no file changes and no implementation",
+    "no TUI/native_tui/fallback/substitute"
+  ],
+  "authorization": {"allowed_actions": []},
+  "context_files": [],
+  "max_correction_cycles": 0
+}

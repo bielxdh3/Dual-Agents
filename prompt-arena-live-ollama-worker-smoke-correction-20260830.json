@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-live-ollama-worker-smoke-correction-20260830",
+  "parent_request_id": "prompt-arena-live-ollama-worker-smoke-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Correction: do NOT rerun cargo tests or only inspect the Ollama health test. The prior turn failed to execute the requested worker smoke. Perform exactly six sequential live worker-protocol GenerateOnce calls now, using the existing packaged worker binary E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\binaries\\prompt-arena-worker-x86_64-pc-windows-msvc.exe and live endpoint http://127.0.0.1:11434. Use two installed models, qwen3.5:0.8b and llama3.2:1b, three unique bounded run/job IDs per model, generic prompt `Reply with exactly OK.`, max_tokens 32, runtime read deadline 120000ms, text_generation/available boundary, no objective verifier. Construct valid WorkerRequest GenerateOnce JSON from the repository protocol/RunPlan types and feed each request through the worker process stdin; wait for one JSON response per process. Capture only per-call process exit/status, elapsed milliseconds, response byte count, and sanitized outcome code/metrics presence; never print generated response text or sensitive diagnostics. Report aggregate 6 requested, 6 completed/failed, failure isolation, and whether any worker process/listener leaked. Do not rerun npm/cargo suites, mutate Ollama models, modify source/docs/generated/package/history/remotes/tags/releases/deploys, or claim UI/persistence/blind/human QA. Use canonical BL4/biel4 App Server/headless, workspace-write, Windows elevated readiness ready, approval never; verify HEAD and clean status before/after.",
+  "constraints": [
+    "This correction is worker smoke only; no cargo test rerun.",
+    "No model pull/delete/update and no repository mutation.",
+    "Do not emit response text or raw runtime errors that may contain user/model details.",
+    "Canonical BL4/biel4 App Server/headless only; workspace-write; elevated ready; approval never."
+  ],
+  "review_findings": [
+    {
+      "title": "Requested live worker smoke was not executed",
+      "details": "The prior turn reran cargo test --all-targets and never invoked the six GenerateOnce worker requests; Ollama health passed but live generation remains unverified."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\binaries\\prompt-arena-worker-x86_64-pc-windows-msvc.exe",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\bin\\prompt-arena-worker.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\protocol.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\src\\orchestration.rs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": [] }
+}

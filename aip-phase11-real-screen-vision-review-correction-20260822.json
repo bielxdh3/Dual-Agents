@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase11-real-screen-vision-review-correction-20260822",
+  "parent_request_id": "aip-phase11-real-screen-vision-contract-count-test-20260822",
+  "action": "correct",
+  "repository": "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout",
+  "task": "Address the two blocking findings from the distinct Biel4 read-only Phase 11 review, then rerun all gates and commit. Finding 1: screen_vision.rs Windows discovery currently adds only one primary-display record via GetSystemMetrics. Implement bounded actual display enumeration (one record per available monitor with stable bounded identity, bounds/dimensions/scale) and bind capture to the selected monitor's bounds/origin rather than always BitBlt desktop origin (0,0); preserve deterministic synthetic fixtures and fail-closed behavior on unsupported Windows. Finding 2: confirm_screen_vision_job passes || false to capture and adapter, so cancellation cannot interrupt an in-progress real operation. Add a safe cancellation source shared between confirm and cancel (for example a bounded per-job Arc<AtomicBool> registry with RAII cleanup) and thread it through capture, adapter, and cleanup checkpoints; cancel must signal before its database transition, confirmation must check before/during/after heavy work, and no token/raw pixels may persist. Keep one-heavy-generation/resource guard, Owner/privacy/safe-mode/temporary/idempotency/audit gates and typed unavailable degradation intact. Add focused tests for multi-display fixture enumeration/capture origin mapping where Windows APIs permit, cancellation signal observed by providers/adapters, and registry cleanup. Update Phase 11 docs to describe multi-display enumeration and cancellation truthfully. Run cargo fmt/check/clippy/full/focused, contracts typecheck/build/tests, desktop typecheck/tests/build, secrets scan and diff check; use host reruns if App Server spawn restrictions block Node. Commit coherent correction; do not push or publish.",
+  "constraints": [
+    "Use the configured Biel4 App Server Executor in fast mode; no native subagents and no direct manual code edits outside the Executor.",
+    "Do not fake multi-display or cancellation success: unsupported environments must return explicit bounded unavailable/degraded errors.",
+    "No continuous capture, network/upload, raw screenshot persistence, public listener, provider credentials, or weakened Owner/privacy/safe-mode controls.",
+    "Do not modify Phase 12 Android or Phase 13 gateway behavior; do not push, merge, tag, release or deploy."
+  ],
+  "context_files": [
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase11-review-20260822.result.json",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/screen_vision.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src-tauri/src/lib.rs",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/apps/desktop/src/screen-vision.test.tsx",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/packages/contracts/src/index.ts",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/docs/PHASE_11_SCREEN_VISION_SPEC.md",
+    "C:/Users/bielx/.codex/attachments/6318d895-613a-41cb-8e95-cb0e08ad03dc/pasted-text-1.txt",
+    "C:/Users/bielx/3D Objects/Dual-Codex-worktree/aip-phase10-checkout/AGENTS.md"
+  ],
+  "review_findings": [
+    {
+      "title": "Windows discovery is primary-display-only",
+      "severity": "blocking",
+      "details": "apps/desktop/src-tauri/src/screen_vision.rs around the Windows fixture helper uses GetSystemMetrics and exposes only display:primary. The roadmap requires display enumeration and scope selection; enumerate actual monitors and capture selected bounds/origin rather than desktop origin (0,0)."
+    },
+    {
+      "title": "Real capture/adapter cancellation is not wired",
+      "severity": "blocking",
+      "details": "confirm_screen_vision_job at the real path passes || false to WindowsScreenVisionCaptureProvider.capture and LocalScreenVisionVisualAdapter.analyze. The separate cancel command cannot interrupt an in-progress operation; thread a shared per-job cancellation source with checkpoints and cleanup."
+    }
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]}
+}

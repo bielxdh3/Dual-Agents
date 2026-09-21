@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-desktop-conversation-ux-architecture-20260828-review-final",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Act as the distinct Biel4 Reviewer through the configured App Server. Review the exact clean branch fix/desktop-conversation-ux-architecture at HEAD 78d38a19d1357a068b00b1d98995fb6448de1eaa (parent 75fa3941d9262003bf4b6f94534cb886d28d50b0; baseline 7bbd5e7b92f580614fd99207640b3faf49d83066) after the follow-up custom overlay hit-region fix. Evidence only: do not edit files, commit, push, open/update PRs, merge, tag, release, deploy, or build installers. Read the original pasted /goal specification and required skills first. Independently inspect the complete net diff and relevant source/tests/docs. Explicitly answer all acceptance questions: old horizontal tabs removed; left sidebar agent-first; multiple conversations with no privileged permanent main UX; safe discoverable create/open/rename/pin/unpin/archive/unarchive/delete and archived chats absent from ordinary list; contextual Temporary Chat and advanced relocation; composer model selector immediate/default/override/unavailable behavior; aligned responsive PT-BR-first profile and canonical mappings; concise Local Resources/Voice with diagnostics hidden; actual overlay alpha/transparency and custom/imported pixel hit regions/click-through path plus deterministic scaling tests; legacy migration/restart/data preservation and agent isolation; unchanged or stronger security/privacy/Rust authority/runtime-degraded UI/temporary-chat boundaries/accessibility; truthful future bundled/managed offline STT+TTS roadmap. Check all overlay/Bubble callers/listeners and migration idempotence. Verify reported local tests where possible without modifying the tree. Return exactly one JSON object with summary, verdict (approved, approved_with_reservations, or changes_requested), findings [{severity,title,details}], files_reviewed, tests_reviewed, validations_reviewed, remaining_issues, and provenance. Distinguish static evidence from the still-required installed-Windows human gate, packaging and remote CI.",
+  "constraints": [
+    "Use only the configured Biel4 App Server/headless Reviewer identity; no native subagents, alternate backend, account or fallback.",
+    "Keep the worktree clean and unchanged. Do not run commands that modify files, generated outputs, Git state, databases or user data.",
+    "Do not expose or print secrets, credentials, authentication files, local databases, histories, memories, private media or unnecessary private paths.",
+    "Do not infer installed-Windows overlay success, packaging or CI from static code or executor claims without evidence."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/apps/desktop/src/App.tsx",
+    "E:/AIP/apps/desktop/src/App.css",
+    "E:/AIP/apps/desktop/src/Overlay.tsx",
+    "E:/AIP/apps/desktop/src/Bubble.tsx",
+    "E:/AIP/apps/desktop/src/agent-navigation.ts",
+    "E:/AIP/apps/desktop/src/conversation-list.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-surface.test.tsx",
+    "E:/AIP/apps/desktop/src/conversation-state.test.ts",
+    "E:/AIP/apps/desktop/src/overlay-input.ts",
+    "E:/AIP/apps/desktop/src/overlay-input.test.ts",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.tsx",
+    "E:/AIP/apps/desktop/src/components/AgentSprite.test.ts",
+    "E:/AIP/apps/desktop/src-tauri/src/database.rs",
+    "E:/AIP/apps/desktop/src-tauri/migrations/0026_conversation_organization.sql",
+    "E:/AIP/apps/desktop/src-tauri/src/lib.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/overlays.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/native_overlay_region.rs",
+    "E:/AIP/apps/desktop/src-tauri/src/domain.rs",
+    "E:/AIP/packages/contracts/src/index.ts",
+    "E:/AIP/docs/ARCHITECTURE.md",
+    "E:/AIP/docs/DATA_MODEL.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md",
+    "E:/AIP/docs/UI_BEHAVIOR.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": []
+  }
+}

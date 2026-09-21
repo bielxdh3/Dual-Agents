@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-verification-packs-20260827-finalize",
+  "parent_request_id": "prompt-arena-p2-verification-packs-20260827-correction",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Finalize the existing P2 implementation on completion/verification-packs. Do not add new feature scope or rewrite the current diff. Inspect only the current changes, run the focused TypeScript tests and typecheck/build plus Rust fmt/check/test as feasible, fix concrete compile/test failures in the touched files, run git diff --check, and create one focused local commit. Ensure the resulting code has no host fallback for Docker-required tasks, keeps verifier bounds and persistence coherent, and does not call P2 complete before native Tauri QA. Return a valid report with commit SHA, exact tests and outcomes, remaining native QA, and wrapper provenance. No merge/tag/release/deploy/public release and no page-transition motion.",
+  "constraints": [
+    "canonical BL4 only; trusted wrapper attestation remains account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; repository=E:/Prompt Arena; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target branch completion/verification-packs; preserve and finalize current intentional dirty diff",
+    "all code edits, tests, and commit occur in this BL4 session",
+    "fix only concrete failures; do not broaden scope beyond P2",
+    "no paid APIs or secrets; no merge, tag, release, deploy, or public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/ROADMAP.md", "E:/Prompt Arena/docs/DELIVERY_MATRIX.md", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src-tauri/src/orchestration.rs", "E:/Prompt Arena/src-tauri/src/commands.rs", "E:/Prompt Arena/src-tauri/src/worker.rs", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/objective-verifiers.ts", "E:/Prompt Arena/src/App.tsx"],
+  "review_findings": [{"severity": "blocking", "title": "Previous turn timed out before validation and commit", "details": "The current branch contains the preserved P2 implementation diff. Close it with focused validation and one local commit; do not restart or expand implementation."}],
+  "max_correction_cycles": 0
+}

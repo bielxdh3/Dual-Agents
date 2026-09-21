@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-evidence-docs-20260829",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T13:45:59.590094+00:00",
+  "finished_at": "2026-08-29T13:48:22.432372+00:00",
+  "summary": "Updated only docs/DELIVERY_MATRIX.md and committed as c8a6d5b5088f164633dd86ba79dd246285e452ed. Recorded PR head 55d685fbdbd927a5ab195ab141fa76ea823acf96, toolchain run 33254907801 and artifact details, hosted Windows limitation CI_HOSTED_WINDOWS_WEBDRIVER_POLICY_LIMITATION, and separate local limitation LOCAL_WINDOWS_WEBVIEW2_GPU_HOST_LIMITATION. Existing Linux evidence and all P1-P7 incomplete statuses were preserved; docs/SECURITY.md was unchanged. Provenance: {\"executor_account\":\"biel4\",\"executor_role\":\"BL4 App Server/headless Executor\",\"task_transport\":\"App Server/headless\",\"thread_id\":\"01a04ba4-78bf-7611-b606-15af8ec75b44\",\"workspace\":\"E:\\\\Prompt Arena-pr28-bl4\",\"workspace_write\":\"verified\",\"windows_sandbox\":\"elevated (control-plane asserted)\",\"readiness\":\"ready (control-plane asserted)\",\"approval\":\"never\",\"commit\":\"c8a6d5b5088f164633dd86ba79dd246285e452ed\"}. No push attempted.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "Get-Content docs/DELIVERY_MATRIX.md",
+    "rg evidence audit in docs/SECURITY.md",
+    "git diff --check",
+    "git diff --unified=0 -- docs/DELIVERY_MATRIX.md",
+    "git log --oneline -3 -- docs/DELIVERY_MATRIX.md",
+    "bounded delivery evidence/status consistency check",
+    "git diff inspection",
+    "git add -- docs/DELIVERY_MATRIX.md",
+    "git diff --cached --check",
+    "git commit -m \"docs: record native driver artifact and Windows host limitation\"",
+    "post-commit delivery evidence/status consistency check",
+    "git diff HEAD^ HEAD --check",
+    "git show --stat --oneline --decorate HEAD"
+  ],
+  "tests": [
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "bounded delivery evidence/status consistency check",
+      "status": "passed",
+      "details": "Required artifact, run IDs, failure classifications, host diagnostics, and no-acceptance wording are present; all 25 matrix statuses remain unchanged and no COMPLETE status was introduced."
+    },
+    {
+      "command": "git diff HEAD^ HEAD --check",
+      "status": "passed",
+      "details": "Committed documentation diff is clean."
+    }
+  ],
+  "remaining_issues": [
+    "Windows native acceptance remains unproven: bridge, Rust, sidecar, persistence, and close/reopen assertions were not exercised on Windows.",
+    "Linux native evidence remains limited to the existing recorded hosted pass; native QA, security, and publication gates remain incomplete.",
+    "No merge, push, release, tag, deploy, or other remote action was performed.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T134559Z-prompt-arena-native-evidence-docs-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T134559Z-prompt-arena-native-evidence-docs-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T134559Z-prompt-arena-native-evidence-docs-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T134559Z-prompt-arena-native-evidence-docs-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ba4-78bf-7611-b606-15af8ec75b44",
+  "app_server_turn_id": "01a04dc5-2317-7cb3-ad81-068a0215ac92",
+  "app_server_process_id": "6216",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T134559Z-prompt-arena-native-evidence-docs-20260829.md",
+  "task_sha256": "673dfcfafa22177edc57f0752abc350ca6b925603ae2341b9e86f4aaf03540e0",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

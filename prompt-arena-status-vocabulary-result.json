@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-status-vocabulary-20260830",
+  "parent_request_id": "prompt-arena-local-adapters-evidence-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T06:48:53.615812+00:00",
+  "finished_at": "2026-08-30T06:50:35.252217+00:00",
+  "summary": "Completed the vocabulary correction and committed it locally. Provenance: executor biel4, role executor, task transport app_server, wrapper-captured App Server IDs, workspace-write, Windows sandbox elevated, readiness ready, approval never; session 01a04e66-6ed5-7c33-987a-c2be8f1c8f79, thread 01a05159-fe11-78c0-a32b-84c9962414ec. Previous commits preserved; new commit da36292cb8e19336d401f9a05f18c788985d647f.",
+  "files_changed": [
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "rg -n -C 2 \"PENDING_EXACT_HEAD_REBUILD|PENDING_HUMAN_QA|5c5de64|8588a2d\" docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "git diff --check",
+    "git diff --cached --check",
+    "git commit -m \"docs: use allowed completion statuses\"",
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git rev-parse HEAD^",
+    "git diff HEAD^ HEAD --check"
+  ],
+  "tests": [
+    {
+      "command": "focused stale-marker scan",
+      "status": "passed",
+      "details": "No PENDING_EXACT_HEAD_REBUILD markers remain."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only normal CRLF notices."
+    },
+    {
+      "command": "git diff --cached --check",
+      "status": "passed",
+      "details": "Staged documentation diff is clean."
+    },
+    {
+      "command": "git diff HEAD^ HEAD --check",
+      "status": "passed",
+      "details": "Committed documentation diff is clean."
+    }
+  ],
+  "remaining_issues": [
+    "Fresh exact-head NSIS/package rebuild at source HEAD 8588a2d remains required.",
+    "Existing native/human QA, Docker, MSI, Linux, and remote CI reservations remain unchanged.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T064853Z-prompt-arena-status-vocabulary-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T064853Z-prompt-arena-status-vocabulary-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T064853Z-prompt-arena-status-vocabulary-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T064853Z-prompt-arena-status-vocabulary-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05159-fe11-78c0-a32b-84c9962414ec",
+  "app_server_turn_id": "01a0516d-a231-7823-afcc-d89bff835773",
+  "app_server_process_id": "3880",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T064853Z-prompt-arena-status-vocabulary-20260830.md",
+  "task_sha256": "006d2c37ac28aacabc9b5382061dc5ff71babb30cab372422348eb1c6009b80b",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

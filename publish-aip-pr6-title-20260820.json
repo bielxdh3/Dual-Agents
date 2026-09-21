@@ -1,0 +1,16 @@
+{
+  "operation": "draft_pr_update",
+  "mission_id": "aip-pr6-corrective-title-20260820",
+  "authorization_reference": "aip-pr6-corrective-title-20260820",
+  "repository": "E:\\AIP",
+  "repository_full_name": "bielxdh3/AIP",
+  "pr_number": 6,
+  "expected_pr_head_sha": "bf6d332b92f58fb59cd7ec7b909b271750798f5f",
+  "expected_pr_state": "open",
+  "expected_pr_draft": true,
+  "expected_pr_base": "main",
+  "title": "feat: bounded cognitive core foundation and corrective stabilization",
+  "authorization": {
+    "allowed_actions": ["draft_pr_update"]
+  }
+}

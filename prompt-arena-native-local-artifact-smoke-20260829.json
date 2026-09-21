@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-native-local-artifact-smoke-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-native-local-20260829-pr",
+  "task": "Read and apply C:\\CodexGlobal\\AGENTS.md and the required skills C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full), C:\\CodexGlobal\\skills\\project-phase-review\\SKILL.md, C:\\CodexGlobal\\skills\\project-security-review\\SKILL.md, and C:\\CodexGlobal\\skills\\project-publication-check\\SKILL.md. You are BL4/biel4 Executor via the current configured App Server/headless transport. This is the final local Windows native acceptance run in the isolated clone E:\\Prompt Arena-native-local-20260829-pr. Do not touch E:\\Prompt Arena and do not edit, commit, push, or alter any source. The app/worker were built at product SHA f3048a61f45cdb6b29f362444f3d32646edf4943. A CI artifact from run 33254907801 has already been downloaded to E:\\Prompt Arena-native-local-20260829-pr\\.native-tools and its manifest verified by BL3: sourceCommit 55d685fbdbd927a5ab195ab141fa76ea823acf96, tauri-driver package 2.0.6 SHA-256 e37974bf5a76fc97b2282af19489f8f516d4d367318dc0c124fe292f88e33e01, EdgeDriver 151.0.4129.101 SHA-256 3684b7096da7aced2ddb627cca12d9e59a8e69378bd8ec1e09cc8f2a7d47b87a. Re-verify manifest hashes, versions, and exact app/worker artifact hashes. Prepend only .native-tools to PATH for this process and run the existing real harness: node scripts/native-ui-smoke.mjs src-tauri/target/release/prompt-arena.exe. Do not use cargo installs, browser-only tests, mocks, fallback drivers, TUI/native_tui, or policy changes. Capture full stdout/stderr and exact result. The harness must prove real Tauri WebView2 session, Local app ready, bridge/invoke, Rust commands, official packs/profiles/runs/summaries, navigation, execute_run_once, app-owned worker sidecar, persisted run, close, reopen, and persisted run after reopen. On success capture NATIVE_TAURI_UI_BRIDGE_SIDECAR_REOPEN_ACCEPTED with run_id and emit WINDOWS_NATIVE_TAURI_ACCEPTANCE_LOCAL_PASS with product SHA, toolchain run/manifest SHA, versions, absolute app/worker/tool paths and hashes. On failure capture the exact stage/error; if DevToolsActivePort recurs, run only read-only diagnostics for policy values, writable UDF, orphan processes and ports, without weakening anything. Return all provenance fields from the control-plane envelope and report no source changes.",
+  "constraints": [
+    "BL4/biel4 App Server/headless only; workspace-write, windows.sandbox=elevated, readiness=ready, approval=never are required in the control-plane envelope.",
+    "Validation-only: no source edits, commits, push, merge, release, tag, deploy, registry-policy changes, or cleanup outside the clone's authorized temporary tool directory.",
+    "Use only the prebuilt artifact binaries; no alternate or fallback driver."
+  ],
+  "context_files": [
+    "scripts/native-ui-smoke.mjs",
+    ".native-tools/manifest.json",
+    "src-tauri/target/release/prompt-arena.exe",
+    "src-tauri/target/release/prompt-arena-worker.exe"
+  ],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": [
+      "local_mutation"
+    ]
+  }
+}

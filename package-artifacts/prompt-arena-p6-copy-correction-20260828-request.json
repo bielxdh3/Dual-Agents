@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p6-copy-correction-20260828",
+  "parent_request_id": "prompt-arena-p6-commit-current-20260828",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Apply one minimal P6 UX correction on the clean completion/product-polish branch. In src/App.tsx, update only the user-facing ProviderStatusCard empty/unconfigured copy: it must no longer say External not wired, Not wired, or Catalog only because P5 now has HTTPS provider execution and cost controls. Use truthful bounded wording such as external HTTPS available when explicitly consented, OS secure storage not configured, execution requires configuration and consent, and dated price snapshot required. Do not change behavior, provider logic, security controls, or any other files. Run npm run typecheck, npm test, npm run build, cargo fmt --manifest-path src-tauri/Cargo.toml -- --check, cargo check --manifest-path src-tauri/Cargo.toml --all-targets, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, and git diff --check. Commit the focused correction on completion/product-polish and return the required JSON report with exact native provenance. No merge/tag/release/deploy/public release.",
+  "constraints": [
+    "canonical BL4 only; account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "clean target branch completion/product-polish; preserve commits; only minimal copy correction",
+    "no secrets, telemetry, cloud calls, paid-provider calls, page-transition motion, merge/tag/release/deploy/public release"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/src/App.tsx"],
+  "review_findings": [{"severity": "important", "title": "Stale foundation copy in provider cards", "details": "User-facing copy contradicts implemented P5 transport, execution, and cost controls."}],
+  "max_correction_cycles": 0
+}

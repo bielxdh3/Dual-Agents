@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-local-adapters-evidence-20260830",
+  "parent_request_id": "prompt-arena-local-adapters-correction2-20260830",
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-30T06:42:54.511318+00:00",
+  "finished_at": "2026-08-30T06:48:00.512939+00:00",
+  "summary": "Completed and committed evidence correction. Provenance: executor biel4, role executor, task transport app_server, wrapper-captured App Server IDs, workspace-write, Windows sandbox elevated, readiness ready, approval never; session 01a04e66-6ed5-7c33-987a-c2be8f1c8f79, thread 01a05159-fe11-78c0-a32b-84c9962414ec. Source implementation HEAD preserved at 8588a2dd66e386082e153c933b1b55891ac42657; new commit 494697f425df292c01c7483d25518235b01cc8f9.",
+  "files_changed": [
+    "src-tauri/src/openai_compatible.rs",
+    "docs/DELIVERY_MATRIX.md",
+    "docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "commands_run": [
+    "cargo fmt --manifest-path src-tauri/Cargo.toml --all",
+    "cargo test --manifest-path src-tauri/Cargo.toml openai_compatible -- --nocapture",
+    "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "npm run check:boundaries",
+    "git diff --check",
+    "git add -- src-tauri/src/openai_compatible.rs docs/DELIVERY_MATRIX.md docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "git diff --cached --check",
+    "git commit -m \"docs: align adapter evidence and QA head\"",
+    "git status --short --branch",
+    "git rev-parse HEAD",
+    "git diff HEAD^ HEAD --check"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --manifest-path src-tauri/Cargo.toml --all",
+      "status": "passed",
+      "details": "Formatting completed."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml openai_compatible -- --nocapture",
+      "status": "passed",
+      "details": "4 focused tests passed, including real LmStudio and LlamaCpp model-listing/provider-identity coverage."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "failed",
+      "details": "First run had one unrelated download-operation test failure: 112 passed, 1 failed."
+    },
+    {
+      "command": "cargo test --manifest-path src-tauri/Cargo.toml --all-targets",
+      "status": "passed",
+      "details": "Immediate rerun passed: 113 tests passed, 0 failed."
+    },
+    {
+      "command": "npm test",
+      "status": "passed",
+      "details": "19 files and 113 tests passed."
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "details": "TypeScript checks passed."
+    },
+    {
+      "command": "npm run build",
+      "status": "passed",
+      "details": "Production build passed with the existing large-chunk warning."
+    },
+    {
+      "command": "npm run check:boundaries",
+      "status": "passed",
+      "details": "Repository boundary check passed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors; only normal CRLF notices."
+    }
+  ],
+  "remaining_issues": [
+    "Existing NSIS/package hashes remain attributed to prior source HEAD 5c5de64; fresh exact-head rebuild is required before current package COMPLETE can be claimed.",
+    "Native/human QA remains PENDING_HUMAN_QA.",
+    "Docker remains BLOCKED_EXTERNAL_RUNTIME; MSI remains BLOCKED LOCALLY; Linux and remote CI remain pending or unconfirmed.",
+    "No package artifacts were edited.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T064254Z-prompt-arena-local-adapters-evidence-20260830\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T064254Z-prompt-arena-local-adapters-evidence-20260830",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T064254Z-prompt-arena-local-adapters-evidence-20260830\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260830T064254Z-prompt-arena-local-adapters-evidence-20260830\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a05159-fe11-78c0-a32b-84c9962414ec",
+  "app_server_turn_id": "01a05168-2795-7d92-b49c-0ed74a882914",
+  "app_server_process_id": "24700",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260830T064254Z-prompt-arena-local-adapters-evidence-20260830.md",
+  "task_sha256": "ae2bfc945db96309e98eba6aedb2e7de62a644ce0f095b575ea11982597de620",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor report indicates that the requested change was not applied. Executor changed Git HEAD; no rollback was attempted."
+}

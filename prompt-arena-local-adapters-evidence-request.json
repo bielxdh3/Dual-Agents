@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-local-adapters-evidence-20260830",
+  "parent_request_id": "prompt-arena-local-adapters-correction2-20260830",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n-commit2",
+  "task": "Required skills first: read C:\\CodexGlobal\\AGENTS.md, C:\\CodexGlobal\\skills\\ponytail\\SKILL.md (full mode), and the applicable project-phase, project-security, and project-publication instructions before editing. You are the canonical BL4/biel4 Executor only through the authenticated Dual Codex App Server/headless path. Continue the same Prompt Arena local-adapter task in E:\\Prompt Arena-live-telemetry-i18n-commit2 on branch completion/windows-qa-live-telemetry-i18n. Preserve commit 8588a2dd66e386082e153c933b1b55891ac42657 and all protected worktrees; do not duplicate or reimplement the adapter. Apply only these evidence corrections: (1) extend the focused Rust OpenAI-compatible mock-loopback coverage so a real OpenAiCompatibleRuntime::LlamaCpp provider is exercised as well as LmStudio (model listing and provider identity/stream path may share existing helpers; do not weaken assertions); (2) refresh docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md so the reviewed source implementation HEAD is exactly 8588a2dd66e386082e153c933b1b55891ac42657 and the source validation counts are 113 npm/Rust tests, while preserving truthful PENDING_HUMAN_QA, Docker/MSI/Linux/remote reservations; explicitly state that the currently recorded NSIS/package hashes were built at prior source HEAD 5c5de64 and require a fresh exact-head rebuild before claiming current package COMPLETE. Do not edit package artifacts in this turn. Run cargo fmt, focused openai_compatible tests, cargo test --manifest-path src-tauri/Cargo.toml --all-targets, npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check serially. If a directly-caused test failure appears, fix only that. Stage only the new focused test and the two evidence docs, then create one normal local commit with message docs: align adapter evidence and QA head. Do not push, tag, release, deploy, merge, amend, rebase, reset, or use an alternate backend/path. Provenance handling: the authenticated wrapper records executor account biel4, executor role, App Server transport and IDs, workspace-write, Windows sandbox elevated/readiness ready, and approval never in its result metadata; treat that wrapper metadata as authoritative and do not self-block on unsupported PowerShell snapshots or read-only protected-worktree dubious-ownership warnings. Report the captured wrapper fields. Only if the wrapper itself genuinely lacks a required field should you stop without a commit and report PROMPT_ARENA_BLOCKED_BY_PROVENANCE.",
+  "constraints": [
+    "Canonical BL4/biel4 authenticated App Server/headless Executor only; no native subagent, TUI/native_tui, fallback backend, alternate account, or danger-full-access.",
+    "Preserve existing adapter implementation commit 8588a2d and protected worktrees; no duplicate implementation or unrelated source changes.",
+    "Add genuine LlamaCpp test coverage and correct only stale evidence; do not rebuild package artifacts in this turn.",
+    "Keep current package hashes attributed to source HEAD 5c5de64 until a later exact-head package rebuild; retain all human/external gates.",
+    "Run checks serially; no push, tag, release, deploy, merge, amend, rebase, or reset."
+  ],
+  "review_findings": [
+    {"title":"Focused tests do not exercise LlamaCpp runtime","details":"src-tauri/src/openai_compatible.rs has four mock-loopback tests, but MockServer::provider always constructs OpenAiCompatibleRuntime::LmStudio. Add a parallel assertion/path for OpenAiCompatibleRuntime::LlamaCpp without weakening existing LM Studio coverage.","severity":"important"},
+    {"title":"Evidence docs identify stale source HEAD","details":"docs/DELIVERY_MATRIX.md and docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md still call 5c5de64 the reviewed source implementation HEAD and say exact-head NSIS is COMPLETE, although adapter code is committed at 8588a2d and the existing package was built before it. Align source/test counts and mark current package exact-head rebuild as pending until rebuilt.","severity":"blocking"}
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\src-tauri\\src\\openai_compatible.rs",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\DELIVERY_MATRIX.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\docs\\WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package-artifacts\\prompt-arena-0.1.0-windows-nsis.exe",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\checksums-sha256.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package-verification.txt",
+    "E:\\Prompt Arena-live-telemetry-i18n-commit2\\package.json"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

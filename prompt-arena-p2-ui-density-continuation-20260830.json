@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-ui-density-continuation-20260830",
+  "action": "implement",
+  "repository": "E:/Prompt Arena-live-telemetry-i18n",
+  "task": "Continue the Prompt Arena mission on the isolated checkout at current HEAD 6c82a5a17e4635545374423a2aa94b89d6223412. Work only as the canonical BL4 Executor through the configured App Server/headless path. Inspect the current UI before editing and implement a narrow P2 density/interaction correction that makes the requested desktop-first product state more true without changing backend semantics or blind/security boundaries. (1) Arena comparison: make the legacy blind-card comparison and the Runs blind-response grid use horizontal comparison columns on wide desktop with a meaningful minimum width, local overflow ownership, equal/bounded response panes, and narrow-window row fallback; keep shell overflow-x bounded. (2) Arena live monitor: add an aligned semantic column header/row for model/competitor, state, sample progress, time, and metrics, with neutral blind labels and no identity-sensitive values; keep current cancel/status behavior. (3) Models: reduce vertical density by using the existing horizontal model layout/grid on desktop, keep friendly name, quantization, size, availability/action, recommendation and hardware fit visible, move long download/removal capability explanations and raw metadata into the existing Details disclosure, remove duplicated visible size if redundant, and give Refresh/Start Ollama compact explicit button treatment with stable dimensions during loading. Preserve active-install precedence, path validation, and action semantics. (4) Settings/external-generation history: keep security meaning but move verbose storage/no-secret/history policy text into native details disclosure where appropriate; ensure Refresh history and Remove stored configuration read as explicit controls with stable hover/focus/active/disabled states and no layout shift. Add only the minimal PT-BR translation keys needed for new labels. Preserve accessibility (semantic buttons/details, labels, focus, reduced motion), local-only/no-secret behavior, and existing responsive breakpoints. Add focused tests only where a pure helper or state contract is introduced; do not invent a browser harness or claim native visual QA. Run npm test, npm run typecheck, npm run build, npm run check:boundaries, and git diff --check if practical. Do not modify E:/Prompt Arena or E:/Prompt Arena-pr28. Do not commit, push, tag, release, deploy, merge, or create/update PRs; leave product changes uncommitted for BL3 review.",
+  "constraints": [
+    "Canonical BL4/biel4 App Server/headless only; backend app_server; task transport app_server; sandbox workspace-write; Windows sandbox elevated; readiness ready; approval never.",
+    "Preserve the clean current source/docs state and do not reset, stash, or overwrite unrelated work.",
+    "No backend redesign, no forced reload, no global horizontal-overflow masking that hides comparison content, and no unsafe HTML/eval.",
+    "Do not revisit exhausted CDP/UIA/browser-coordinate automation paths.",
+    "No changes to E:/Prompt Arena or E:/Prompt Arena-pr28; leave the target uncommitted."
+  ],
+  "context_files": [
+    "C:/Users/bielx/.codex/attachments/b16592b6-1f9f-44ec-b685-bd314cdb2e10/pasted-text.txt",
+    "E:/Prompt Arena-live-telemetry-i18n/src/App.tsx",
+    "E:/Prompt Arena-live-telemetry-i18n/src/styles.css",
+    "E:/Prompt Arena-live-telemetry-i18n/src/i18n.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/arena-runner.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/model-library.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/src/*.test.ts",
+    "E:/Prompt Arena-live-telemetry-i18n/docs/DELIVERY_MATRIX.md",
+    "E:/Prompt Arena-live-telemetry-i18n/docs/WINDOWS_NATIVE_HUMAN_QA_CHECKLIST.md"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}

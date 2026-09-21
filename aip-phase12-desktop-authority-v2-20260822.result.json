@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-phase12-desktop-authority-v2-20260822",
+  "parent_request_id": null,
+  "status": "failed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-22T16:29:07.400639+00:00",
+  "finished_at": "2026-08-22T16:33:07.052466+00:00",
+  "summary": "Implemented and committed desktop Phase 12 transport authority integration as 2abb6f8.",
+  "files_changed": [
+    "apps/desktop/src-tauri/src/lib.rs"
+  ],
+  "commands_run": [
+    "cargo fmt",
+    "cargo fmt --check",
+    "cargo check --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo test --locked --lib companion_transport",
+    "cargo test --locked --lib",
+    "git diff --check",
+    "git commit -m 'feat: integrate phase 12 companion transport desktop'"
+  ],
+  "tests": [
+    {
+      "command": "cargo fmt --check",
+      "status": "passed",
+      "details": "Formatting passed."
+    },
+    {
+      "command": "cargo check --locked",
+      "status": "passed",
+      "details": "Rust crate check passed."
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "status": "passed",
+      "details": "Clippy passed without warnings."
+    },
+    {
+      "command": "cargo test --locked --lib companion_transport",
+      "status": "passed",
+      "details": "9 focused transport tests passed."
+    },
+    {
+      "command": "cargo test --locked --lib",
+      "status": "passed",
+      "details": "134 passed, 1 ignored, 0 failed."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "details": "No whitespace errors."
+    },
+    {
+      "command": "git status --short --branch",
+      "status": "passed",
+      "details": "Clean branch after commit."
+    }
+  ],
+  "remaining_issues": [
+    "A dedicated temporary-Database TCP integration test covering pair/session/history or queue, replay/temporary/revocation rejection, and port closure was not added in this commit.",
+    "Desktop TypeScript/UI validation was not run; no UI/contracts changes were made.",
+    "Git HEAD changed during delegation; inspect the commit manually."
+  ],
+  "git_status": "",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T162907Z-aip-phase12-desktop-authority-v2-20260822\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T162907Z-aip-phase12-desktop-authority-v2-20260822",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T162907Z-aip-phase12-desktop-authority-v2-20260822\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260822T162907Z-aip-phase12-desktop-authority-v2-20260822\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a02a2d-a524-7c21-955c-f7cf0ed10fa3",
+  "app_server_turn_id": "01a02a4d-f8cf-7f22-8486-b36f616f9622",
+  "app_server_process_id": "11772",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260822T162907Z-aip-phase12-desktop-authority-v2-20260822.md",
+  "task_sha256": "351e949f99ebd39b47e9a3a45042e3f431744c3320f1c0281c7915fe0a90d219",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": "Executor produced a valid report but did not apply any repository changes. Executor changed Git HEAD; no rollback was attempted."
+}

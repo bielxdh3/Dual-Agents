@@ -1,0 +1,41 @@
+[orchestrator]
+repository = "E:/BielOS"
+runs_dir = "runs"
+max_correction_cycles = 1
+require_clean_git = false
+codex_command = "codex"
+node_command = "node"
+terminal_readiness_timeout = 60
+terminal_turn_start_timeout = 15
+app_server_initialize_timeout = 30
+app_server_thread_timeout = 30
+app_server_turn_start_timeout = 30
+app_server_turn_timeout = 600
+dashboard_telemetry_timeout = 5
+live_event_journal_max_records = 2000
+live_event_journal_max_record_bytes = 65536
+live_event_journal_max_detail_bytes = 16384
+
+[accounts."biel3"]
+label = "bielxdh3@gmail.com"
+codex_home = "C:/Users/bielx/3D Objects/CodexProfiles/architect"
+model = ""
+reasoning_effort = "high"
+service_tier = ""
+backend = "windows"
+network_access = false
+
+[accounts."biel4"]
+label = "bielxdh4@gmail.com"
+codex_home = "C:/Users/bielx/3D Objects/CodexProfiles/executor"
+model = "gpt-5.6-luna"
+reasoning_effort = "max"
+service_tier = "priority"
+backend = "app_server"
+network_access = true
+
+[roles]
+orchestrator = "biel3"
+architect = "biel3"
+reviewer = "biel4"
+executor = "biel4"

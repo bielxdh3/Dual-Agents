@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-i18n-finalize-20260829",
+  "parent_request_id": "prompt-arena-i18n-correction-20260829",
+  "action": "implement",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Finish the existing i18n phase in this isolated worktree, with a narrow mechanical pass only. Preserve all existing Windows/UI remediation, live Arena telemetry, blind-evaluation anonymity, immutable evidence, cancellation/error behavior, and no-secret/BYOK boundaries. Do not modify E:\\Prompt Arena or E:\\Prompt Arena-pr28. Local mutation only; no commits, pushes, PRs, merges, tags, releases, deploys, or settings changes. The existing src/i18n.ts already contains a large typed PT_BR_MESSAGES catalog, exact en/pt-BR locale support, persistence, formatting helpers, and safe English fallback. Use it rather than redesigning it. Complete translation wiring for residual user-facing JSX text in src/App.tsx and src/advanced-arena-view.tsx. A scan still shows raw English headings, paragraphs, labels, buttons, options, table captions/headers, aria labels, statuses, validation/errors, empty states, blind-review text, Runs/Models/Settings/BYOK text, and Advanced Arena text. Replace each user-facing literal with translate(\"English source\") or an equivalent provider-backed lookup and add any missing PT-BR catalog entries. Keep brand/product names and technical/user content/IDs/paths/protocol names unchanged. Ensure locale switching rerenders every surface including AdvancedArenaView. Keep React text interpolation escaped and do not translate identifiers or response/benchmark/model content. Add focused tests in the existing test style for i18n persistence/normalization, fallback/switching, locale formatting, and representative telemetry labels; do not add dependencies.",
+  "constraints": [
+    "Do not spend time on unrelated refactors or documentation.",
+    "Do not leave raw translation keys in shipped UI when a missing key is encountered; English is the deliberate fallback.",
+    "Run npm run typecheck; npm test; npm run build; npm run check:boundaries; git diff --check. Report exact outcomes and any remaining raw-literal limitation honestly.",
+    "Use canonical biel4 App Server/headless executor with workspace-write, Windows elevated readiness ready, approval never; include complete authoritative provenance metadata."
+  ],
+  "context_files": [
+    "C:\\Users\\bielx\\Downloads\\PROMPT_ARENA_WINDOWS_QA_LIVE_TELEMETRY_I18N_COMPLETION.md",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\i18n.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\App.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\advanced-arena-view.tsx",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.ts",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src\\arena-runner.test.ts"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": {"allowed_actions": ["local_mutation"]}
+}

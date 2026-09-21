@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-p2-verification-packs-20260827-correction",
+  "parent_request_id": "prompt-arena-p2-verification-packs-20260827-retry2",
+  "action": "correct",
+  "repository": "E:/Prompt Arena",
+  "task": "Continue the same P2 implementation on the existing completion/verification-packs branch. The previous canonical BL4 turn timed out after preserving intended changes in src-tauri/src/domain.rs, src-tauri/src/orchestration.rs, src/arena-runner.ts, src/arena-ui.ts, src/bridge.ts, src/objective-verifiers.ts, src/results-ui.ts, and src/run-plan.ts. Inspect the real diff; do not discard it or touch completion/core-arena. Finish the P2 requirements from the parent request, prioritizing correctness and user-facing completeness: objective verifier policies and safe bounded matching, procedural official pack materialization and persisted evidence, Docker-required programming boundary with no host fallback, repetition statistics/uncertainty/tie margins, and usable React/Tauri state. Add or update focused tests. Run formatting, TypeScript tests/typecheck/build and Rust fmt/check/test as feasible, fix all failures, then stage and create one focused local commit on completion/verification-packs. Return a valid executor report with exact files, tests, commit SHA, remaining native QA, and wrapper provenance. No merge/tag/release/deploy/public release and no page-transition motion.",
+  "constraints": [
+    "canonical BL4 only; trusted wrapper attestation: account=biel4; role=Executor/Reviewer; CODEX_HOME=C:/Users/bielx/3D Objects/CodexProfiles/executor; backend=app_server; task_transport=app_server; repository=E:/Prompt Arena; sandbox_mode=workspace-write; windows.sandbox=elevated; readiness=ready; approval_policy=never; danger-full-access prohibited",
+    "same app_server Executor session; no TUI/native_tui/fallback/substitute",
+    "target branch completion/verification-packs; preserve current intentional dirty diff",
+    "all implementation, tests, and commit occur in this BL4 session",
+    "Docker-required tasks never fall back to host execution",
+    "no paid APIs or secrets",
+    "no merge, tag, release, deploy, or public release",
+    "do not mark P2 complete before native Tauri acceptance"
+  ],
+  "authorization": {"allowed_actions": ["local_mutation", "local_commit"]},
+  "context_files": ["E:/Prompt Arena/ROADMAP.md", "E:/Prompt Arena/docs/DELIVERY_MATRIX.md", "E:/Prompt Arena/src-tauri/src/domain.rs", "E:/Prompt Arena/src-tauri/src/orchestration.rs", "E:/Prompt Arena/src/arena-runner.ts", "E:/Prompt Arena/src/objective-verifiers.ts", "E:/Prompt Arena/src/App.tsx"],
+  "review_findings": [{"severity": "blocking", "title": "Previous turn timed out before validation and commit", "details": "The previous canonical BL4 turn preserved the listed P2 changes but exited at the launcher timeout with no executor report, no tests, and no commit. Continue from the existing branch and complete validation and commit safely."}],
+  "max_correction_cycles": 0
+}

@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "request_id": "aip-final-human-gate-preparation-20260827",
+  "action": "implement",
+  "repository": "E:/AIP",
+  "task": "Execute Stage A through Stage C of the AIP Final Human Gate mission on the live repository. Start by fetching and verifying origin/main is cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4, the merge commit of PR #15, and that the target worktree is clean before mutation. Create a focused branch docs/final-human-gate-preparation from origin/main. Record the Owner-attested installed-Windows Big Smoke Round 2 result exactly as PASS for only these five defects: agent transparency/alpha; unintended giant square/bounding box; Pencil corruption; pointer-down selection anchor; Conversation List/creation styling. Record date 2026-08-27, tested main SHA cfdb564139a9fb3e2fb1ec7d88eb8c3a908850c4, CI run 33089533701, artifact filenames A.I.P._0.1.0_x64_en-US.msi and A.I.P._0.1.0_x64-setup.exe, and hashes 47DB703F45F91BACD9928A863ADCCD44C68C2DA3FCD3259FFA8F8D522C2EE512 and C7748D42361F3C97E2A3190172B7EC3DF1BB177B8F5E7B84A1E20B896987F085. Do not invent additional human observations and do not repeat these five checks as pending. Audit docs/ROADMAP.md, docs/KNOWN_LIMITATIONS.md, all phase validation/spec files, docs/CORRECTIVE_GAP_MATRIX.md, docs/SECURITY_AND_PERMISSIONS.md, docs/RELEASE_CHECKLIST.md, merged PR evidence, current workflows, and release metadata. Build a truthful Phase 0-13 status matrix and identify only genuinely remaining human/device/subjective gates. Distinguish external/non-blocking BielOS, live Cloudflare/provider credentials, public relay, and production Android signing when outside standalone AIP scope. Exhaust all currently possible objective validation using repository-authoritative equivalents: pnpm secrets:scan; touched-file formatting; TypeScript typecheck; contracts tests; full desktop/frontend tests; desktop production build; Python format/lint/typecheck/tests; cargo fmt --check; cargo check; repository-policy Clippy; full Rust/Tauri tests; migration/restart automation; Android tests/lint/build; Windows MSI/NSIS packaging or exact existing artifact inspection; artifact-content/private-path inspection; current security review; current phase review; publication check; tracked-file/private-path scan. Use existing CI run 33089533701 as authoritative for code SHA cfdb only where the preparatory change is documentation-only, and explain that distinction precisely; do not claim CI for a new code/configuration SHA without evidence. If an objective defect is found, fix it minimally with regression coverage and rerun affected validation; never defer an automatable defect to the human checklist. Update the appropriate validation/release-candidate/roadmap/known-limitations/release-note records according to repository convention, preserving historical failures and reservations as superseded rather than deleting them. Add one concise Portuguese consolidated human checklist containing only remaining human checks, each with number, exact action, expected result, and PASS/FAIL criterion; include the exact response forms PASSOU TUDO, FALHOU <número>: <descrição>, and NÃO EXECUTADO <número>: <motivo>. The checklist must not mark any human item passed and must end at the waiting gate. Commit only truthful focused documentation/objective fixes with exact message test: record approved Big Smoke validation. Push the branch and open a draft PR only if repository convention requires it for this record; do not merge, tag, create a stable release, upload release assets, or publish release notes. Return a structured report with summary, files_changed, commands_run, tests, phase_status_matrix, remaining_human_gates, optional_external_dependencies, release_candidate_sha, artifact_hashes, ci, remaining_issues, commit, branch, pr, git_status, diff_file, and provenance.",
+  "constraints": [
+    "Read and honor E:/AIP/AGENTS.md, .agents/skills/aip-implementation/SKILL.md, aip-phase-review/SKILL.md, aip-security-review/SKILL.md, aip-publication-check/SKILL.md, and C:/CodexGlobal/skills/ponytail/SKILL.md before inspection or edits.",
+    "Use only the configured Biel4 App Server Executor through the Dual Codex launcher; no native subagents, no alternate backend, and no fallback executor.",
+    "Preserve standalone local-first AIP boundaries; do not import BielOS code or add telemetry, relay, public listener, hidden reasoning, or private data.",
+    "No force-push, reset, rebase, amend, squash, history rewrite, or branch deletion. Preserve unrelated user work and inspect status before/after.",
+    "Do not fabricate human evidence. The Owner PASS applies only to the five listed Big Smoke regressions.",
+    "Do not create a stable tag/release, overwrite v0.1.0, merge, or publish release assets in this stage.",
+    "Do not commit .env files, credentials, databases, histories, memories, backups, models, media, private paths, or generated local artifacts.",
+    "If an environment gate is unavailable, record it precisely as not run/blocker; do not weaken controls or substitute a narrow check for a broad claim."
+  ],
+  "context_files": [
+    "E:/AIP/AGENTS.md",
+    "E:/AIP/docs/ROADMAP.md",
+    "E:/AIP/docs/KNOWN_LIMITATIONS.md",
+    "E:/AIP/docs/CORRECTIVE_GAP_MATRIX.md",
+    "E:/AIP/docs/SECURITY_AND_PERMISSIONS.md",
+    "E:/AIP/docs/RELEASE_CHECKLIST.md",
+    "E:/AIP/docs/PHASE_0_VALIDATION.md",
+    "E:/AIP/docs/PHASE_1_VALIDATION.md",
+    "E:/AIP/docs/PHASE_6_VALIDATION.md",
+    "E:/AIP/docs/PHASE_7A_VALIDATION.md",
+    "E:/AIP/docs/PHASE_7E_VALIDATION.md",
+    "E:/AIP/docs/PHASE_7F_VALIDATION.md",
+    "E:/AIP/docs/PHASE_8_VOICE_SPEC.md",
+    "E:/AIP/docs/PHASE_9_TOOLS_SPEC.md",
+    "E:/AIP/docs/PHASE_10_EXTENSIONS_SPEC.md",
+    "E:/AIP/docs/PHASE_11_SCREEN_VISION_SPEC.md",
+    "E:/AIP/docs/PHASE_12_ANDROID_SPEC.md",
+    "E:/AIP/docs/PHASE_13_GATEWAY_SPEC.md",
+    "E:/AIP/package.json",
+    "E:/AIP/apps/desktop/src-tauri/tauri.conf.json",
+    "E:/AIP/apps/desktop/src-tauri/Cargo.toml",
+    "E:/AIP/.github/workflows"
+  ],
+  "review_findings": [],
+  "max_correction_cycles": 0,
+  "authorization": {
+    "allowed_actions": ["local_mutation", "create_branch", "local_commit", "normal_push", "branch_publication", "draft_pr_create"]
+  }
+}

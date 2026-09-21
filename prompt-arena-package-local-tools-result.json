@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-local-tools-20260829",
+  "parent_request_id": "prompt-arena-package-cargo-env-20260829",
+  "status": "completed",
+  "executor_account": "biel4",
+  "executor_label": "bielxdh4@gmail.com",
+  "executor_sandbox": "workspace-write",
+  "exit_code": 0,
+  "started_at": "2026-08-29T19:44:51.530410+00:00",
+  "finished_at": "2026-08-29T19:48:27.066678+00:00",
+  "summary": "Packaging succeeded at exact HEAD 57f02b35abacce6a0a1ed64a5f952d29a710614a before and after. The local-tools override succeeded; NSIS produced an installer. No source, docs, history, remotes, or settings changed. BL4 provenance: biel4 Executor, App Server/headless, workspace-write, Windows elevated, readiness ready, approval never.",
+  "files_changed": [
+    "src-tauri/target/release/bundle/nsis/Prompt Arena_0.1.0_x64-setup.exe",
+    "package-artifacts/prompt-arena-0.1.0-windows-nsis.exe",
+    "checksums-sha256.txt",
+    "package-verification.txt"
+  ],
+  "commands_run": [
+    "git rev-parse HEAD",
+    "npm run tauri:build -- --bundles nsis --config {\"bundle\":{\"useLocalToolsDir\":true}}",
+    "npm run package:artifacts -- --platform windows",
+    "npm run verify:package -- --platform windows",
+    "git rev-parse HEAD",
+    "git status --short --untracked-files=all"
+  ],
+  "tests": [
+    {
+      "command": "npm run tauri:build -- --bundles nsis --config {\"bundle\":{\"useLocalToolsDir\":true}}",
+      "status": "passed",
+      "details": "NSIS built successfully. Installer: E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target\\release\\bundle\\nsis\\Prompt Arena_0.1.0_x64-setup.exe; size 3744774 bytes; SHA-256 755BC8C48FD8912A4C8E07BB4C8ED11938D5022F63DBE800800BE69CCD05991C."
+    },
+    {
+      "command": "npm run package:artifacts -- --platform windows",
+      "status": "passed",
+      "details": "Prepared 1 Windows artifact; optional MSI unavailable. Wrote E:\\Prompt Arena-live-telemetry-i18n\\checksums-sha256.txt containing the matching installer checksum."
+    },
+    {
+      "command": "npm run verify:package -- --platform windows",
+      "status": "passed",
+      "details": "Checksum manifest passed for 1 artifact; optional MSI unavailable. Clean-install/app smoke was not requested by the executed command."
+    }
+  ],
+  "remaining_issues": [
+    "No native human UI QA is claimed. Clean install/launch/restart/uninstall smoke was not run because the requested verification command did not include --smoke. Worker evidence: prepared sidecar E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\binaries\\prompt-arena-worker-x86_64-pc-windows-msvc.exe, 2547712 bytes, SHA-256 89B82DCDB78B0B99FF0B0DCD29C42C9836901B66CDD86CC1CEA3077B77744F76; release sidecar E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\target\\release\\prompt-arena-worker.exe, 2570752 bytes, SHA-256 31FDC12F505EF00A15D56AF2C9CF3DFB5C3BA33428C8B3D4D29B784454A7D437. MSI was not produced. checksums-sha256.txt and package-verification.txt remain untracked local generated outputs."
+  ],
+  "git_status": "?? checksums-sha256.txt\n?? package-verification.txt\n",
+  "diff_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T194451Z-prompt-arena-package-local-tools-20260829\\git-diff.md",
+  "run_directory": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T194451Z-prompt-arena-package-local-tools-20260829",
+  "executor_report_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T194451Z-prompt-arena-package-local-tools-20260829\\executor-report.json",
+  "stderr_file": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\20260829T194451Z-prompt-arena-package-local-tools-20260829\\executor.stderr.log",
+  "terminal_session_id": "",
+  "terminal_turn_start": "",
+  "app_server_thread_id": "01a04ef8-9d5b-7451-8733-b9d0ad9288e4",
+  "app_server_turn_id": "01a04f0d-b267-7f30-a64b-72d43e194bec",
+  "app_server_process_id": "7756",
+  "executor_windows_sandbox": "elevated",
+  "executor_windows_sandbox_readiness": "ready",
+  "executor_approval_policy": "never",
+  "executor_role": "executor",
+  "task_transport": "app_server",
+  "task_artifact": "C:\\Users\\bielx\\3D Objects\\Dual-Codex-worktree\\runs\\executor-task-artifacts\\20260829T194451Z-prompt-arena-package-local-tools-20260829.md",
+  "task_sha256": "a82084b5e9d1b11f4f8c149a64e490e63aeb59bbbceb87466995dc4452222997",
+  "reuse_existing": false,
+  "reuse_provenance": {
+    "mode": "reuse_or_start"
+  },
+  "error": ""
+}

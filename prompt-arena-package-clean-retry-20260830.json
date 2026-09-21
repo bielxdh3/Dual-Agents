@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "request_id": "prompt-arena-package-clean-retry-20260830",
+  "parent_request_id": "prompt-arena-package-20260829",
+  "action": "correct",
+  "repository": "E:\\Prompt Arena-live-telemetry-i18n",
+  "task": "Make one final packaging-only recovery attempt at exact current checkout HEAD f393e9023b2f1d28de27ce34b73eff83f9a2af45. Use canonical BL4/biel4 App Server/headless with workspace-write, windows.sandbox=elevated, readiness=ready, approval=never; read required AGENTS.md and skills first. The prior exact-source packaging attempts failed twice before NSIS bundling with Rust Windows STATUS_IN_PAGE_ERROR (0xc0000006) while compiling the app library. Verify the exact HEAD and clean status, then run only generated-output cleanup (`cargo clean --manifest-path src-tauri/Cargo.toml` or an equivalent cargo-generated target cleanup) and retry `npm run tauri:build -- --bundles nsis --config '{\"bundle\":{\"useLocalToolsDir\":true}}'`. If bundling succeeds, run `npm run package:artifacts -- --platform windows` and `npm run verify:package -- --platform windows --smoke`, capture exact installer/sidecar paths, sizes, SHA-256, checksum and lifecycle smoke. If any error recurs, stop and report it verbatim. Do not modify source, docs, tests, repository history, remotes, tags, releases, deploys, or other worktrees; do not claim visual/human QA. Generated target/package outputs may remain ignored. Preserve exact HEAD and full provenance.",
+  "constraints": [
+    "Packaging-only; generated target/package outputs are the only permitted mutations.",
+    "Do not use native/TUI/danger-full-access/fallback backend or weaken isolation.",
+    "Historical 57f02b3 installer evidence must not be relabeled current-head output.",
+    "Stop on repeated STATUS_IN_PAGE_ERROR or any source/history mutation."
+  ],
+  "review_findings": [
+    {
+      "title": "Rust STATUS_IN_PAGE_ERROR may be stale generated target state",
+      "details": "Two canonical exact-head attempts failed before bundling while compiling prompt-arena lib with Windows STATUS_IN_PAGE_ERROR (0xc0000006); disk space is available and the generated target has not been cleaned since the failures."
+    },
+    {
+      "title": "Fresh package gate remains open",
+      "details": "No current-head installer, checksum, sidecar, or install/launch/restart/uninstall smoke exists; only historical 57f02b3 evidence is available."
+    }
+  ],
+  "context_files": [
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\Cargo.toml",
+    "E:\\Prompt Arena-live-telemetry-i18n\\src-tauri\\tauri.conf.json",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\prepare-worker-sidecar.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\package-artifacts.mjs",
+    "E:\\Prompt Arena-live-telemetry-i18n\\scripts\\verify-package.mjs"
+  ],
+  "max_correction_cycles": 1,
+  "authorization": { "allowed_actions": ["local_mutation"] }
+}
