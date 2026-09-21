@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Registrada e corrigida a flake intermitente de CI em Windows/Python 3.13
+  (`test_cross_process_writers_share_the_journal_lock`): um replace atomico
+  podia atravessar a drenagem de handles do processo filho, deixando
+  `shared.jsonl.lock` aberto durante a limpeza do temporario. O caso foi
+  classificado como corrida de ciclo de vida/concorrencia de recursos; o
+  writer agora usa um unico handle para inicializar o lock e uma janela
+  limitada para o compartilhamento transitorio, e o teste fecha processos
+  somente apos join. Observado em 2026-09-21: primeira execucao falhou e o
+  rerun passou.
+
 - Adicionada a visao `EXECUTOR LIVE` no dashboard, com estado, modelo,
   reasoning protocolar, service tier, thread/turn, tokens, plano quando
   anunciado e atividade real do Executor.

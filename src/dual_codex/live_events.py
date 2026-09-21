@@ -429,8 +429,9 @@ def _open_journal_lock(lock_path: Path) -> Any:
     deadline = time.monotonic() + 5.0
     while True:
         try:
-            lock_path.touch(exist_ok=True)
-            handle = lock_path.open("r+b")
+            # One open owns the lock-file handle for its entire lifecycle. A
+            # separate touch can race with a peer's Windows sharing state.
+            handle = lock_path.open("a+b")
             try:
                 if handle.seek(0, os.SEEK_END) == 0:
                     handle.write(b"\0")
@@ -474,6 +475,23 @@ def _journal_lock(path: Path) -> Iterator[None]:
                     msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
                 else:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _replace_journal_file(temporary: Path, path: Path) -> None:
+    """Replace a journal snapshot, allowing a short Windows handle-drain window."""
+
+    deadline = time.monotonic() + 0.5
+    while True:
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError:
+            # MoveFileExW rejects replacement while a peer's just-closed file
+            # handle is still draining. Retry only on Windows and only for a
+            # bounded interval; permanent ACL failures still propagate.
+            if os.name != "nt" or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
 
 
 def _read_dicts(path: Path, *, max_record_bytes: int, max_records: int) -> list[dict[str, Any]]:
@@ -521,7 +539,7 @@ def _write_dicts(path: Path, records: list[dict[str, Any]]) -> None:
                 os.fsync(handle.fileno())
             except OSError:
                 pass
-        os.replace(temporary, path)
+        _replace_journal_file(temporary, path)
     finally:
         try:
             temporary.unlink()
