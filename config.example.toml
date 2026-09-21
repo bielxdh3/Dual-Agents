@@ -9,6 +9,7 @@ require_clean_git = true
 fallback_enabled = false
 codex_command = "codex"
 antigravity_command = "C:/Users/USER/AppData/Local/agy/bin/agy.exe"
+claude_command = "claude"
 node_command = "node"
 terminal_readiness_timeout = 60
 terminal_turn_start_timeout = 15
@@ -66,6 +67,19 @@ fallback_roles = ["executor"]
 # supported_reasoning_efforts = []
 # model = "model-id"
 # reasoning_effort = ""
+
+# Claude Code keeps its own login and session state. Dual Agents stores only
+# this metadata and points Claude Code at the isolated state root.
+# [accounts.claude]
+# label = "Anthropic Claude"
+# backend = "claude_code"
+# provider_type = "anthropic"
+# adapter_type = "claude_code"
+# auth_mode = "provider_native"
+# codex_home = "C:/Users/USER/ClaudeProfiles/default"
+# model = "sonnet"
+# reasoning_effort = "high"
+# fallback_roles = ["architect", "reviewer"]
 
 [roles]
 orchestrator = "primary"

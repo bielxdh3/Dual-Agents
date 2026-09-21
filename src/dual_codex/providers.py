@@ -48,6 +48,7 @@ class ProviderCapabilities:
     credential_status: str = "unknown"
     runtime_status: str = "Unknown"
     error: str | None = None
+    supported_roles: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -66,10 +67,16 @@ class ProviderCapabilities:
             "credential_status": self.credential_status,
             "runtime_status": self.runtime_status,
             "error": self.error,
+            "supported_roles": list(self.supported_roles),
             # Keep the dashboard's existing model-row contract.
             "effort_levels": list(self.effort_levels),
             "service_tiers": list(self.service_tiers),
         }
+
+    def supports_role(self, role: str) -> bool:
+        if self.runtime_status in {"Unavailable", "Unknown"}:
+            return False
+        return not self.supported_roles or role in self.supported_roles
 
 
 class ProviderAdapter(Protocol):
@@ -107,6 +114,7 @@ def provider_for_backend(backend: str) -> str:
         "windows": "codex",
         "antigravity": "gemini",
         "api": "api",
+        "claude_code": "anthropic",
     }.get(backend, backend or "unknown")
 
 
@@ -117,6 +125,8 @@ def provider_label(provider: str, backend: str = "") -> str:
         return "Antigravity / Gemini"
     if provider == "api" or backend == "api":
         return "API / OpenAI-compatible"
+    if provider == "anthropic" or backend == "claude_code":
+        return "Anthropic Claude"
     return provider.replace("_", " ").title() or "Provider"
 
 
@@ -125,6 +135,8 @@ def provider_default_label(provider: str, backend: str = "") -> str:
         return "Inherit Codex default"
     if provider == "gemini" or backend == "antigravity":
         return "Inherit Antigravity default"
+    if provider == "anthropic" or backend == "claude_code":
+        return "Inherit Claude default"
     return "Provider default"
 
 
@@ -224,6 +236,7 @@ class CodexAdapter:
             isolation_note="Codex profile state is isolated by the account CODEX_HOME.",
             credential_status="provider-managed",
             runtime_status="Connected",
+            supported_roles=("orchestrator", "architect", "reviewer", "executor"),
         )
 
 
@@ -353,6 +366,7 @@ class AntigravityAdapter:
                 isolation_note="The installed agy 1.2.7 exposes no profile/state-root isolation flag.",
                 credential_status="provider-managed",
                 runtime_status="Unavailable",
+                supported_roles=("executor",),
                 error=_safe_error(exc),
             )
         models = _parse_antigravity_models(result.stdout)
@@ -376,6 +390,7 @@ class AntigravityAdapter:
             credential_status="provider-managed",
             runtime_status="Connected" if status == "OK" and result.returncode == 0 else "Unavailable",
             error=error,
+            supported_roles=("executor",),
         )
 
 
@@ -414,6 +429,7 @@ class OpenAICompatibleAdapter:
             credential_status=credential_status,
             runtime_status="Configured" if error is None and credential_status == "configured" else "Unavailable",
             error=error,
+            supported_roles=("orchestrator", "architect", "reviewer"),
         )
 
     def run(
@@ -497,6 +513,10 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def provider_capabilities(config: OrchestratorConfig, account: AccountConfig) -> ProviderCapabilities:
+    if account.backend == "claude_code":
+        from .claude_code import ClaudeCodeAdapter
+
+        return ClaudeCodeAdapter().capabilities(config, account)
     if account.backend == "antigravity":
         return AntigravityAdapter().capabilities(config, account)
     if account.backend == "api":
@@ -506,3 +526,16 @@ def provider_capabilities(config: OrchestratorConfig, account: AccountConfig) ->
 
 def api_adapter() -> OpenAICompatibleAdapter:
     return OpenAICompatibleAdapter()
+
+
+def provider_supports_role(config: OrchestratorConfig, account: AccountConfig, role: str) -> bool:
+    """Return role support from the provider capability boundary."""
+
+    if role == "executor" and account.backend == "api":
+        return False
+    if role in {"architect", "reviewer", "orchestrator"} and account.backend == "antigravity":
+        return False
+    try:
+        return provider_capabilities(config, account).supports_role(role)
+    except Exception:
+        return False
