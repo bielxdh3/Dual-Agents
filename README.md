@@ -1,449 +1,383 @@
-# Dual Agents Orchestrator — Codex Architect + Antigravity/Gemini Executor
+<div align="center">
 
-Orquestrador local para coordenar o Codex Architect com o unico Executor ativo:
-Google Antigravity/Gemini. O Architect interpreta, delega e revisa; o Executor
-implementa em modo headless e devolve um relatorio estruturado.
+# Dual Agents
 
-```text
-Task → Codex Architect → Antigravity/Gemini Executor → Architect review
-                                  ↑                 |
-                                  └── correction ───┘
-```
+### Role-based orchestration for independent AI coding agents.
 
-Por padrao, o projeto nao faz commit, push, PR ou merge. Uma delegacao pode
-autorizar acoes especificas por missao em `authorization.allowed_actions`; os
-artefatos ficam em `runs/` e o repositorio pode exigir estado limpo por
-configuracao.
+**Local-first · Multi-provider · Role-based · Auditable**
 
-## Account profile != Role
+[![CI](https://github.com/bielxdh3/Dual-Agents/actions/workflows/tests.yml/badge.svg)](https://github.com/bielxdh3/Dual-Agents/actions/workflows/tests.yml)
+[![Status](https://img.shields.io/badge/status-active%20development-orange)](#project-status)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB)](#requirements)
+[![Providers](https://img.shields.io/badge/providers-Codex%20%C2%B7%20Gemini%20%C2%B7%20Claude%20%C2%B7%20API-6f42c1)](#providers-and-roles)
 
-Uma conta autenticada e uma coisa; o papel de orquestracao e outra:
+Dual Agents is a local control plane for assigning independently configured AI providers to specialized coding roles, with explicit routing, bounded fallback, structured provenance, and provider-owned authentication.
 
-```text
-Account profile:
-executor-account / <codex-home>/executor / sessao autenticada
+</div>
 
-Role:
-executor → executor-account
-```
+> [!IMPORTANT]
+> Dual Agents is under active development. The configured-actor architecture, Codex execution, Antigravity/Gemini execution, Claude read-only review, Claude native-Windows file editing, role-scoped fallback, and the local dashboard are implemented and tested. Provider limitations remain explicit and fail closed rather than silently changing actors or privileges.
 
-Uma conta pode ter varios roles, e uma conta sem role continua registrada. O
-role `reviewer` pode ficar sem atribuicao; nesse caso, a revisao usa a conta de
-`architect`. Os roles `architect` e `executor` precisam estar atribuídos para
-executar o fluxo.
+## Why Dual Agents
 
-## Requisitos e instalacao no Windows
+<table>
+<tr>
+<td width="50%" valign="top">
 
-- Windows 10 ou 11
-- Python 3.11 ou superior
-- Git
-- Codex CLI instalado e disponivel no PowerShell, inclusive `codex.CMD`
+### 🧠 Separate responsibilities
+Architect, Executor, Reviewer, and Orchestrator are roles, not hard-coded providers. The same provider profile can fill multiple compatible roles, or each role can use a different actor.
 
-```powershell
+</td>
+<td width="50%" valign="top">
+
+### 🔌 Use the provider that fits
+Codex, Antigravity/Gemini, Claude Code, and OpenAI-compatible profiles live behind provider-aware capability checks instead of one universal execution path.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🛡️ Fail closed
+Unavailable runtimes, unsupported roles, unsafe permission boundaries, malformed results, and invalid session state stop the run instead of silently falling back to a different agent.
+
+</td>
+<td width="50%" valign="top">
+
+### 🔎 Keep the evidence
+Runs preserve configured and actual actors, provider/backend details, session identity, result artifacts, Git state, and sanitized diagnostics so delegation remains inspectable.
+
+</td>
+</tr>
+</table>
+
+## The idea at a glance
+
+\`\`\`text
+                         ┌──────────────────────┐
+                         │      User / task     │
+                         └──────────┬───────────┘
+                                    │
+                         ┌──────────▼───────────┐
+                         │  Dual Agents control │
+                         │  profiles · roles    │
+                         │  policy · provenance │
+                         └──────────┬───────────┘
+                                    │
+               ┌────────────────────┼────────────────────┐
+               │                    │                    │
+        ┌──────▼──────┐      ┌──────▼──────┐      ┌──────▼──────┐
+        │  Architect  │      │   Executor  │      │   Reviewer  │
+        │ configured  │      │ configured  │      │ configured  │
+        │ actor       │      │ actor       │      │ actor       │
+        └──────┬──────┘      └──────┬──────┘      └──────┬──────┘
+               │                    │                    │
+               └────────────────────┼────────────────────┘
+                                    │
+                         ┌──────────▼───────────┐
+                         │ result · diff ·      │
+                         │ report · provenance  │
+                         └──────────────────────┘
+
+Optional fallback is role-scoped, explicit, and limited to eligible profiles.
+\`\`\`
+
+A **profile is not a role**. A profile owns provider metadata and authentication state; role assignment decides what that profile is allowed to do in the orchestration flow.
+
+## Providers and roles
+
+| Provider | Orchestrator | Architect | Executor | Reviewer | Notes |
+|---|:---:|:---:|:---:|:---:|---|
+| **Codex** | ✅ | ✅ | ✅ | ✅ | Isolated by \`CODEX_HOME\`; native Windows and App Server transports are supported where configured. |
+| **Antigravity / Gemini** | — | — | ✅ | — | Headless executor through the installed \`agy\` runtime. Current runtime does not advertise isolated multi-account state roots. |
+| **Anthropic Claude** | — | ✅ | ⚠️ | ✅ | Isolated with \`CLAUDE_CONFIG_DIR\`. Native-Windows Executor is file-edit-only; command-running Executor is blocked. |
+| **OpenAI-compatible API** | ✅ | ✅ | — | ✅ | BYOK through \`env:VARIABLE\`; no local tool/workspace execution is claimed. |
+
+Provider support is capability-driven. A configured profile is rejected before dispatch when its runtime cannot safely satisfy the selected role.
+
+## What it can do
+
+- assign independent provider profiles to **Orchestrator, Architect, Executor, and Reviewer** roles;
+- reassign roles without re-authenticating an existing profile;
+- use **Codex** as an Architect, Reviewer, Orchestrator, or Executor;
+- use **Antigravity/Gemini** as a structured headless Executor;
+- use **Claude Code** for bounded Architect/Reviewer work and file-edit-only execution on native Windows;
+- use declared **OpenAI-compatible API** profiles for non-tool roles;
+- configure provider-aware models, reasoning/effort, and supported service tiers;
+- keep Codex state isolated by \`CODEX_HOME\` and Claude state by \`CLAUDE_CONFIG_DIR\`;
+- preserve exact provider sessions where the adapter supports safe continuation;
+- enable optional, deterministic **role-scoped fallback** without arbitrary actor substitution;
+- manage profiles and roles from a loopback-only dashboard;
+- expose live Executor activity from real run journals instead of simulated UI state;
+- persist structured run evidence and sanitized provenance.
+
+## Project status
+
+**Current state: active development on \`main\`.**
+
+<details>
+<summary><strong>Implementation matrix</strong></summary>
+
+| Area | Current state |
+|---|---|
+| Configured actor routing | Implemented |
+| Role/profile separation | Implemented |
+| Codex provider | Implemented |
+| Antigravity/Gemini provider | Implemented for Executor |
+| Claude Code provider | Implemented; read-only roles and native-Windows file-only Executor bounded |
+| OpenAI-compatible API profiles | Implemented for declared non-tool roles |
+| Role-scoped fallback | Implemented; disabled by default |
+| Dashboard profile management | Implemented |
+| Provider-aware model/effort controls | Implemented |
+| Live Executor telemetry | Implemented |
+| Native Windows persistent Codex TUI | Implemented |
+| WSL Claude command-running Executor | Deferred |
+| Claude two-account live isolation | Not yet live-proven |
+| Cross-platform runtime parity | Not a current guarantee |
+
+</details>
+
+The project intentionally distinguishes **implemented**, **live-proven**, and **unsupported** behavior instead of treating provider capabilities as interchangeable.
+
+## Technology
+
+| Layer | Technology |
+|---|---|
+| Core | Python 3.11+ |
+| Configuration | TOML |
+| Dashboard | Python loopback HTTP server + embedded HTML/JS |
+| Native Codex terminal | Node.js + \`node-pty\` / Windows ConPTY |
+| Codex transport | native TUI and App Server |
+| Gemini transport | \`agy\` stream-json |
+| Claude transport | Claude Code headless JSON |
+| API transport | OpenAI-compatible \`/chat/completions\` |
+| Validation | Python \`unittest\` + Node syntax/audit checks |
+| Primary platform | Windows |
+
+## Requirements
+
+Core:
+
+- **Windows 10/11**
+- **Python 3.11+**
+- **Git**
+
+Optional provider/runtime requirements depend on what you use:
+
+- **Codex CLI** for Codex profiles;
+- **Node.js 22+** for the persistent ConPTY host;
+- **Antigravity \`agy\`** for Gemini Executor profiles;
+- **Claude Code** for Anthropic Claude profiles;
+- an HTTPS endpoint plus environment-variable secret reference for OpenAI-compatible API profiles.
+
+You do not need every provider installed to use Dual Agents.
+
+## Quick start
+
+### 1. Clone and install
+
+\`\`\`powershell
+git clone https://github.com/bielxdh3/Dual-Agents.git
+cd Dual-Agents
+
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e .
+\`\`\`
+
+Install the Node dependency only when using the persistent native Codex terminal host:
+
+\`\`\`powershell
+npm ci
+\`\`\`
+
+### 2. Create local configuration
+
+\`\`\`powershell
 Copy-Item config.example.toml config.toml
 notepad config.toml
-```
+\`\`\`
 
-Em `config.toml`, ajuste `repository`, os caminhos `codex_home` e o comando do
-Codex. O arquivo local e ignorado pelo Git. Nunca compartilhe `auth.json`.
+\`config.toml\` is local configuration. Provider secrets should not be written into it.
 
-## Registro de contas
+### 3. Check the environment
 
-As chaves em `[accounts.<name>]` sao identificadores locais estaveis. `label`
-serve somente para exibicao; nao e usado para descobrir ou autenticar uma conta.
-
-```toml
-[accounts.primary]
-label = "Primary account"
-codex_home = "<codex-home>/architect"
-model = ""
-reasoning_effort = "high"
-
-[accounts.secondary]
-label = "Secondary account"
-codex_home = "<codex-home>/executor"
-model = ""
-reasoning_effort = "high"
-
-[roles]
-orchestrator = "primary"
-architect = "primary"
-reviewer = "primary"
-executor = "secondary"
-```
-
-O sandbox e definido pelo role: `architect`/`reviewer` usam `read-only` e
-`executor` usa `workspace-write`. Trocar contas nao troca essas permissoes.
-
-Para adicionar uma terceira conta, sem atribuir role automaticamente:
-
-```powershell
-dual-codex account add tertiary --label "Terceira conta"
-```
-
-O comando cria um `CODEX_HOME` separado, grava seu `config.toml` sem BOM,
-executa o login somente nesse perfil e verifica o status depois. Tambem e
-possivel informar `--codex-home`, `--model`, `--reasoning-effort` e repetir
-`--role` para uma atribuicao explicita.
-
-Perfis API nao executam login local nem copiam chaves. Registre uma referencia
-de ambiente e as capacidades declaradas pelo adapter:
-
-```powershell
-dual-codex account add api-openai --backend api `
-  --base-url "https://api.example.invalid/v1" `
-  --auth-reference "env:DUAL_CODEX_API_KEY" `
-  --available-model "model-id"
-```
-
-## Comandos CLI
-
-```text
-dual-codex account add [name] [--label LABEL] [--codex-home PATH] [--backend BACKEND]
-dual-codex account login NAME [--yes]
-dual-codex account list
-dual-codex account rename OLD-NAME NEW-NAME
-dual-codex account label NAME LABEL
-dual-codex account enable NAME
-dual-codex account disable NAME
-dual-codex account remove NAME [--delete-profile] [--confirm-delete]
-
-dual-codex role list
-dual-codex role assign ROLE ACCOUNT
-dual-codex role unassign ROLE
-dual-codex role swap ROLE-A ROLE-B
-
-dual-codex status [--json]
-dual-codex dashboard [--port PORT] [--no-open]
+\`\`\`powershell
 dual-codex doctor
-dual-codex run task.md
-dual-codex delegate --request-file request.json --result-file result.json
-```
-
-Exemplos:
-
-```powershell
-# Ver todas as atribuicoes sem exibir credenciais
 dual-codex status
-dual-codex role list
+\`\`\`
 
-# Mover o trabalho executor para outra conta
-dual-codex role assign executor tertiary
+The package still exposes the historical \`dual-codex\` CLI name; the product and repository are now **Dual Agents**.
 
-# Trocar Architect e Executor
-dual-codex role swap architect executor
+### 4. Open the dashboard
 
-# Alterar somente o nome amigavel, sem novo login
-dual-codex account label tertiary "Conta de testes"
-```
+\`\`\`powershell
+dual-codex dashboard
+\`\`\`
 
-`account rename` atualiza as referencias de role sem mover o `CODEX_HOME`.
-`account remove` exige que nenhum role use a conta e nao remove o diretorio por
-padrao. Para apagar um perfil, use explicitamente `--delete-profile` e confirme
-quando solicitado.
+The dashboard binds to \`127.0.0.1\` only and opens the local profile/role control plane.
 
-## Migracao do formato antigo
+### 5. Create profiles and assign roles
 
-O formato antigo com `[architect]` e `[executor]` continua sendo lido para
-manter o fluxo funcionando, mas deve ser migrado antes de alterar contas ou
-roles. A migracao nao abre login e nao move, le ou regrava `auth.json`.
+Profiles can be created from the dashboard or CLI. Authentication stays provider-owned: Codex uses its profile \`CODEX_HOME\`, Claude Code uses its isolated state root, Gemini uses the installed \`agy\` runtime, and API profiles reference an environment variable.
 
-Primeiro use um dry run:
+Example role layout:
 
-```powershell
-dual-codex migrate-config `
-  --architect-name architect-account `
-  --executor-name executor-account `
-  --architect-label "Conta Architect" `
-  --executor-label "Conta Executor" `
-  --dry-run
-```
+\`\`\`text
+Orchestrator → Codex primary
+Architect    → Codex primary
+Executor     → Codex secondary
+Reviewer     → Claude
+\`\`\`
 
-Se a pre-visualizacao estiver correta, repita sem `--dry-run`:
+This is only an example. Roles are independent from profile names and providers.
 
-```powershell
-dual-codex migrate-config --architect-name architect-account --executor-name executor-account `
-  --architect-label "Conta Architect" --executor-label "Conta Executor"
-```
+### 6. Run or delegate
 
-A migracao cria um backup timestampado de `config.toml`, preserva exatamente os
-caminhos existentes, cria:
+\`\`\`powershell
+dual-codex run task.md
+\`\`\`
 
-```text
-legacy Architect → orchestrator, architect, reviewer
-legacy Executor  → executor
-```
+For explicit delegation:
 
-Ela aceita TOML com BOM, grava a nova configuracao sem BOM e e segura para
-repetir: uma configuracao ja migrada nao e duplicada nem sobrescrita.
+\`\`\`powershell
+dual-codex delegate --request-file request.json --result-file result.json
+\`\`\`
 
-Para o layout local ja existente, informe os nomes desejados e mantenha os
-diretorios:
+The Windows launcher can also be used directly:
 
-```text
-<codex-home>/architect
-<codex-home>/executor
-```
+\`\`\`powershell
+.\scripts\dual-codex.ps1 --config .\config.toml delegate --request-file .\request.json --result-file .\result.json
+\`\`\`
 
-Esses caminhos sao apenas exemplos; nao sao hardcoded no aplicativo e devem ser
-substituidos pelos perfis locais de cada maquina.
+See [CLI reference](docs/CLI.md) for schemas and advanced options.
 
-## Dashboard local de contas
+## Dashboard
 
-`dual-codex dashboard` inicia o painel Dual Agents em `127.0.0.1` e abre o
-navegador; use `--no-open` para apenas imprimir a URL ou `--port` para fixar
-uma porta. O painel consulta o App Server por processo/`CODEX_HOME` isolado e
-mostra perfis, roles, provider/backend, status do `agy`, modelos, reasoning,
-Fast ou outro service tier, rate limits, uso e thread persistente quando
-disponíveis.
+The local dashboard is the normal control surface for:
 
-O campo `model = ""` usa o default do provider selecionado: **Inherit Codex
-default** para Codex, **Inherit Antigravity default** para Gemini e **Provider
-default** para adapters API. O modelo efetivo só é exibido quando descoberto
-pelo catálogo/eventos instalados; nunca é inferido como Sol ou outro valor.
-Alterações do painel são validadas e salvas atomicamente para turnos futuros;
-a thread persistente atual não é alterada silenciosamente. Métricas ou métodos
-não suportados aparecem como `Unknown` ou `Not available`.
+- creating, renaming, enabling, disabling, and removing profile metadata;
+- checking provider authentication/runtime status;
+- selecting provider-supported models and reasoning/effort levels;
+- assigning primary roles;
+- configuring fallback eligibility separately from primary roles;
+- viewing rate-limit or usage data when the provider exposes it;
+- watching real Executor activity through the **EXECUTOR LIVE** view.
 
-Os controles de reasoning e service tier/Fast acompanham imediatamente o
-modelo selecionado. Com `model = ""`, o provider controla modelo e esforço; o
-dashboard não inventa opções específicas de um modelo desconhecido. Opções
-incompatíveis são ajustadas no formulário com aviso, sem alterar a configuração
-até `Save`. Cada conta também pode manter vários roles; o editor
-por checkboxes aplica o conjunto completo em uma operação atômica e transfere
-roles globais para a conta escolhida quando necessário.
+Provider controls are capability-aware. For example, Claude exposes documented model aliases such as Sonnet, Opus, Haiku, and Fable; effort controls are enabled only when that model family supports them.
 
-A seção **Profiles / Accounts** permite criar, renomear, habilitar/desabilitar e
-remover somente o registro de perfis, com validação de `CODEX_HOME` e sem copiar
-credenciais. Para Codex, os botões **Authenticate**, **Re-authenticate** e
-**Logout** executam apenas o CLI nativo dentro do `CODEX_HOME` selecionado; a
-conclusão de navegador, conta ou MFA deve ser feita manualmente pelo usuário.
+Settings apply to future turns and do not silently rewrite an already-running provider session.
 
-### Perfis API
+## Fallback
 
-Perfis com `backend = "api"` usam o adapter OpenAI-compatible. Configure apenas
-`auth_reference = "env:NOME_DA_VARIAVEL"`; a chave nunca é escrita no TOML,
-no dashboard ou nos logs. `base_url` aceita HTTPS remoto e HTTP somente para
-servidores loopback de teste. `available_models` e
-`supported_reasoning_efforts` são a declaração explícita de capacidades; uma
-lista de esforços vazia não exibe um controle de reasoning.
+Automatic fallback is **off by default**.
 
-O runtime `agy` 1.2.7 não anuncia uma flag de perfil/state-root. Assim, vários
-registros Gemini podem coexistir, mas a autenticação Gemini continua
-provider-managed e não é declarada como isolada até que o runtime ofereça esse
-mecanismo. Codex continua isolado por `CODEX_HOME`.
+When enabled, fallback remains constrained by:
 
-Remover uma conta remove apenas o registro Dual Agents por padrão. A opção
-explícita `--delete-profile` remove somente o diretório local de perfil que o
-registro controla e pode remover o `auth.json` mantido naquele `CODEX_HOME`;
-isso exige confirmação explícita. A operação não toca keyrings nem credenciais
-provider-native fora do diretório controlado.
+\`\`\`text
+global fallback switch
++ profile enabled
++ role listed in fallback_roles
++ provider supports that role
++ runtime preflight passes
++ failure is fallback-eligible
+\`\`\`
 
-### Live Executor
+Only one fallback actor is attempted. Semantic task failures and security denials do not become excuses to route work to another provider.
 
-O painel tambem possui a visao `EXECUTOR LIVE`, baseada nos eventos reais do
-Executor Antigravity/Gemini. Ela le um journal JSONL por conta, role e identidade do
-repositorio; nenhum processo Executor falso e criado pelo dashboard. O caminho
-do journal e derivado pelo servidor dentro de `runs_dir`, e o navegador nunca
-envia um caminho de arquivo.
+## Local-first and security boundary
 
-O historico e limitado pelos valores `live_event_journal_max_records`,
-`live_event_journal_max_record_bytes` e `live_event_journal_max_detail_bytes`.
-A visao usa o endpoint SSE somente para leitura, retoma por cursor ou
-`Last-Event-ID`, mantem uma quantidade limitada de linhas no navegador e envia
-heartbeats sem busy loop. `Clear View` remove apenas as linhas renderizadas no
-navegador; nao apaga journal nem historico do servidor.
+Dual Agents is designed around explicit local trust boundaries:
 
-Antes da persistencia, eventos removem ou redigem segredos, caminhos sensiveis,
-arquivos de autenticacao e campos de reasoning interno. A interface insere
-texto como texto, nao como HTML, e nunca exibe chain-of-thought; reasoning
-visivel significa somente o nivel protocolar anunciado. Commands, output,
-diffs, files e mensagens aparecem apenas quando ha evidencia do protocolo;
-leituras de arquivos nao sao inferidas. O painel continua somente em
-`127.0.0.1`, valida Host/Origin, nao oferece shell interativo nem endpoint de
-filesystem e operacoes GET/SSE nao alteram configuracao ou journal.
+- provider credentials remain owned by their native runtime or environment-variable secret reference;
+- Codex profiles are isolated by \`CODEX_HOME\`;
+- Claude profiles are isolated with \`CLAUDE_CONFIG_DIR\`;
+- the dashboard listens on loopback and validates Host/Origin;
+- repository/workspace identity is bound before provider dispatch;
+- role-specific tool permissions are enforced before the model turn;
+- unavailable or unsafe provider states fail closed;
+- automatic configured-actor fallback is opt-in and role-scoped;
+- structured provenance records the configured and actual actor used;
+- diagnostics are sanitized before persistence;
+- internal chain-of-thought is not exposed as dashboard telemetry.
 
-## Status e seguranca
+> [!NOTE]
+> Claude Code on native Windows does not provide the OS command sandbox required for a command-running Executor. Dual Agents therefore keeps native-Windows Claude execution file-edit-only. WSL2 command execution is separate future scope.
 
-`dual-codex status` mostra contas, labels, caminhos abreviados, login, roles,
-repositorio ativo, estado do Git, caminho/versao do Codex e configuracao atual.
-Ele nao le `auth.json` para descobrir identidade e nao imprime tokens, conteudo
-de autenticacao ou caminhos completos de credenciais.
+## Persistent Codex terminals
 
-O `doctor` verifica executavel, perfis, existencia de login, roles necessarios e
-repositorio. O login de cada conta usa somente seu proprio `CODEX_HOME`.
+Dual Agents can host persistent Codex sessions through Windows ConPTY:
 
-## Testes
+\`\`\`powershell
+dual-codex terminal start primary --role architect --attach
+dual-codex terminal start secondary --role executor --attach
+dual-codex terminal list
+\`\`\`
 
-```powershell
+Interactive attach connects to the managed session instead of spawning another Codex process. Strict reuse verifies account, role, repository, process identity, and session readiness before adoption.
+
+Advanced terminal behavior is documented in [CLI.md](docs/CLI.md) and [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
+## Validation
+
+Run the Python suite:
+
+\`\`\`powershell
 python -m unittest discover -s tests -v
-python -m compileall -q src
-python -m pip install --no-deps -e .
-```
+python -m compileall -q src tests
+\`\`\`
 
-Os testes usam diretorios temporarios e placeholders nao secretos. Nenhum teste
-precisa de uma conta Codex real.
+Validate the Node host:
 
-## Delegacao visivel pelo Codex App
+\`\`\`powershell
+npm ci
+node --check scripts/pty-host.js
+npm audit --omit=dev
+\`\`\`
 
-O fluxo recomendado para uso diario deixa o Codex App como interface visivel:
+GitHub Actions runs the test matrix on Python 3.11, 3.12, and 3.13 plus the Node validation job.
 
-```mermaid
-flowchart LR
-    U[Usuario] --> A[Codex App\norquestrador + architect + reviewer]
-    A --> D[dual-agents delegate]
-    D --> E[agy stream-json\nAntigravity/Gemini]
-    E --> R[resultado JSON + report + Git diff]
-    R --> A
-    A -->|findings concretos| C[correct]
-    C --> E
-```
+## Repository map
 
-Conta visivel: `Codex App -> Architect + reviewer`
-Executor headless: `agy -> Antigravity/Gemini`
+\`\`\`text
+Dual-Agents/
+├── src/                     Python orchestration and provider adapters
+├── tests/                   unit and regression tests
+├── docs/                    CLI, app integration and troubleshooting
+├── scripts/                 launcher and native terminal host
+├── schemas/                 typed request/result contracts
+├── prompts/                 prompt assets used by the orchestration flow
+├── .github/                 CI configuration
+├── config.example.toml      example local configuration
+├── task.example.md          example task
+├── CHANGELOG.md             user-visible change history
+├── AGENTS.md                repository agent instructions
+└── README.md
+\`\`\`
 
-Use a frase natural `Use Dual Agents to implement this task.` no App. O App
-inspeciona o repositorio alvo, prepara o pedido JSON, chama o launcher local,
-aguarda `DUAL_CODEX_RESULT`, le o resultado, o report, o estado do Git e o
-diff, e somente entao apresenta a conclusao. O usuario normalmente nao precisa
-abrir o CLI nem criar `task.md`.
+## Documentation
 
-O comando principal e:
+- [CLI reference](docs/CLI.md)
+- [Codex App integration](docs/APP-INTEGRATION.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Changelog](CHANGELOG.md)
+- [Repository agent instructions](AGENTS.md)
 
-```powershell
-.\scripts\dual-codex.ps1 --config .\config.toml delegate `
-  --request-file .\request.json --result-file .\result.json
-```
+Deep runtime details, schemas, migration behavior, terminal internals, and failure recovery belong in the focused documentation above rather than turning this README into an implementation log.
 
-Tambem e possivel usar `--stdin` em vez de `--request-file`. O alvo deve ser
-explicito em `repository` no pedido ou por `--repository`; a opcao de linha de
-comando tem precedencia. Um repositorio sujo e recusado quando
-`require_clean_git = true`; `--allow-dirty` e a excecao explicita.
+## Current limitations
 
-O App pode consultar o estado sem expor autenticacao:
+- Windows is the primary supported runtime target.
+- Antigravity/Gemini is currently an Executor-only provider.
+- The installed \`agy\` runtime does not currently provide verified isolated multi-account state roots.
+- Native-Windows Claude command execution remains intentionally unavailable; Claude Executor is file-edit-only.
+- Claude multi-account isolation uses separate state roots, but two independently authenticated accounts have not been live-validated together.
+- OpenAI-compatible API profiles do not provide local workspace/tool execution.
+- Some legacy \`dual-codex\` naming remains in the CLI and package metadata.
 
-```powershell
-.\scripts\dual-codex.ps1 --config .\config.toml status --json
-```
+## Project philosophy
 
-## Transporte Antigravity/Gemini
+Dual Agents does not assume that one model should plan, implement, review, authenticate, and publish everything by itself.
 
-O backend ativo do Executor e o `agy` instalado localmente. A delegacao usa
-`--input-format stream-json --output-format stream-json`, envia um evento NDJSON
-por turno e aguarda o evento terminal `result`, preservando `conversation_id` e
-diagnosticos stderr. O processo falha fechado em erro, timeout, JSON invalido,
-autenticacao indisponivel ou encerramento prematuro; nao ha fallback silencioso
-para um Executor Codex.
-
-Configure por conta:
-
-```toml
-[orchestrator]
-antigravity_command = "C:/Users/USER/AppData/Local/agy/bin/agy.exe"
-
-[accounts.secondary]
-backend = "antigravity"
-model = "gemini-3.8-flash"
-reasoning_effort = "high"
-```
-
-O catálogo `agy models` é normalizado no adapter: variantes como
-`gemini-3.8-flash-high`, `-medium` e `-low` aparecem como um único modelo com
-esforços reais. Modelos fixos como `Claude Sonnet 4.6 (Thinking)` exibem apenas
-`Thinking (fixed)`. O mapeamento salvo mantém o slug exato do runtime; uma
-variante ausente falha de forma explícita e nunca faz downgrade silencioso.
-
-Os backends Codex existentes permanecem apenas para compatibilidade do Architect
-e dos comandos legados. O fluxo `delegate` exige `backend = "antigravity"` no
-role `executor` e recusa qualquer substituicao.
-
-## Terminais Windows persistentes
-
-Para visibilidade e fallback TUI, Dual Codex usa ConPTY por meio de um host
-Node pequeno (`node-pty`). O Python continua sendo o orquestrador. Cada conta
-possui uma sessao independente, `CODEX_HOME`, repositorio, PID e log; o
-controle entre Python e o host usa uma named pipe local, sem servidor de rede.
-O host desativa a integracao opcional `apps` do CLI para nao depender do MCP
-`codex_apps` do Desktop durante uma sessao local.
-
-Instale a dependencia do host uma vez:
-
-```powershell
-npm install
-```
-
-Abra as duas sessoes visiveis em terminais nativos separados:
-
-```powershell
-dual-codex terminal start architect-account --role architect --attach
-dual-codex terminal start executor-account --role executor --attach
-```
-
-Ao iniciar o `executor` sem `--headless`, Dual Codex abre automaticamente uma
-janela de console para `terminal attach --interactive`; esse processo e apenas
-um viewer do ConPTY ja gerenciado e nunca inicia outro Codex. Use `--headless`
-somente para fluxos que nao exigem uma TUI humana visivel.
-
-Use `dual-codex terminal list`, `send`, `attach` e `terminate` para consultar,
-enviar follow-ups, rever a saida e encerrar sessoes. O fluxo `delegate` reutiliza
-a sessao persistente do executor para manter o contexto entre mensagens. O
-fluxo legado `run` e o fallback para executaveis mockados ainda usam o caminho
-one-shot por compatibilidade; o backend persistente nao usa `codex exec`.
-
-No fluxo persistente, o ConPTY e apenas um canal interativo de controle. O corpo
-de requests `implement`/`correct` fica em um artefato auditavel em
-`runs/executor-task-artifacts`, com SHA-256, e o TUI recebe somente uma mensagem
-curta para ler esse arquivo. Isso evita a representacao `[Pasted Content ...]`
-do composer para tarefas longas; follow-ups curtos continuam inline e follow-ups
-longos usam o mesmo transporte por arquivo. A mensagem de controle e sempre uma
-linha; o texto e o Enter (`\r`) sao enviados separadamente.
-A entrega tambem aguarda um marcador unico `[DC:...]` aparecer no composer
-antes de enviar o Enter; esse acknowledgement tem timeout proprio e nao reenvia
-o controle em caso de falha.
-
-A deteccao de atividade tambem e escopada ao processo ConPTY atual: rollouts
-historicos e inalterados sao registrados como stale e nao bloqueiam uma nova
-readiness, enquanto rollouts criados/atualizados no epoch atual ou associados ao
-mesmo `Codex session_id` continuam bloqueando corretamente.
-
-Arquiteturalmente, a implementacao segue o padrao de runtime-process nativo do
-Agent Orchestrator (processo por sessao e `node-pty`/ConPTY), o conceito de
-Codex como terminal persistente do AWS CLI Agent Orchestrator e o monitoramento
-de sessoes/follow-ups demonstrado pelo codex-orchestrator. Esses projetos sao
-referencias, nao dependencias nem codigo incorporado.
-
-WSL continua sendo o fallback secundario planejado; o runtime Windows nao usa `danger-full-access`,
-`--dangerously-bypass-approvals-and-sandbox`, servidor de rede ou credenciais
-compartilhadas.
-
-### Attach interativo e reuse estrito
-
-`dual-codex terminal attach <session-id> --interactive` conecta ao ConPTY
-gerenciado, reproduz saida live limitada por cursor/sequence e encaminha teclas
-raw para o mesmo processo Codex. `Ctrl-]` faz detach viewer-only e preserva o
-ConPTY e o registro; durante uma delegacao o lease de entrada da automacao torna
-anexos humanos watch-only. O attach sem `--interactive` continua sendo o
-snapshot legado.
-
-O lease humano distingue composicao real, comandos submetidos e configuracao.
-Composicao e turnos humanos continuam exclusivos; apos inatividade comprovada o
-lease pode expirar e ser readquirido atomicamente. Comandos `/model` e
-`/reasoning` liberam o lease quando o prompt ocioso retorna, com TTL curto apenas
-como fallback de crash. O snapshot expõe geracao, atividade, expiracao e motivo
-sanitizados para diagnostico.
-
-`delegate --reuse-existing` reutiliza somente uma sessao Windows Dual Codex
-registrada, viva, pronta e livre do role `executor`, com a mesma conta,
-`CODEX_HOME` e identidade do repositorio. Ausencia, stale, busy, PID/epoch
-incompativel, viewer ausente ou pipe inalcançavel falham fechado, sem iniciar
-outro Codex ou alterar model/reasoning escolhidos manualmente. O registro inclui
-host PID, processo Executor, viewer PID, epoch, named pipe e identidades de
-conta/repositorio. TUIs abertas arbitrariamente fora do Dual Codex nao podem ser
-adotadas.
-
-Consulte [docs/CLI.md](docs/CLI.md), [docs/APP-INTEGRATION.md](docs/APP-INTEGRATION.md)
-e [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) para os schemas, o fluxo
-de correcoes e a recuperacao de falhas.
+The control plane owns **who is assigned**, **what that actor is allowed to do**, **how the runtime is bound**, and **what evidence is preserved**. Providers remain replaceable; the routing and trust boundary stay explicit.
