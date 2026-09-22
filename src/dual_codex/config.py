@@ -283,7 +283,7 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
     )
     model = validate_setting_value(raw.get("model", ""), "model")
     has_reasoning_setting = "reasoning_effort" in raw
-    reasoning_effort = validate_setting_value(raw.get("reasoning_effort", "" if backend == "api" else "high"), "reasoning_effort")
+    reasoning_effort = validate_setting_value(raw.get("reasoning_effort", "" if backend in {"api", "claude_code"} else "high"), "reasoning_effort")
     runtime_model = validate_setting_value(raw.get("runtime_model", ""), "runtime_model")
     fixed_mode = validate_setting_value(raw.get("fixed_mode", ""), "fixed_mode")
     if backend == "antigravity":
@@ -295,7 +295,7 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
         label=str(raw.get("label", "")).strip(),
         codex_home=_path(raw.get("codex_home", raw.get("state_root", f".dual-codex-profiles/{name}")), base),
         model=model,
-        reasoning_effort=reasoning_effort or ("" if backend == "api" or (backend == "antigravity" and (fixed_mode or has_reasoning_setting)) else "high"),
+        reasoning_effort=reasoning_effort or ("" if backend in {"api", "claude_code"} or (backend == "antigravity" and (fixed_mode or has_reasoning_setting)) else "high"),
         runtime_model=runtime_model,
         fixed_mode=fixed_mode,
         backend=backend,

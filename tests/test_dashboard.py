@@ -280,10 +280,44 @@ console.log(JSON.stringify({
         self.assertEqual(provider_default_label("codex", "app_server"), "Inherit Codex default")
         self.assertEqual(provider_default_label("gemini", "antigravity"), "Inherit Antigravity default")
         self.assertIn("Provider default", SCRIPT)
+        self.assertIn("This model does not expose configurable effort", SCRIPT)
+        self.assertIn("No active turn", SCRIPT)
+        self.assertIn("applyClaudeUx", SCRIPT)
+        self.assertIn("isExecutor||a.provider==='anthropic'", SCRIPT)
         self.assertIn("PROFILES / ACCOUNTS", HTML)
         self.assertIn("Add profile", HTML)
         self.assertIn("data-profile-auth", SCRIPT)
         self.assertIn("Remove metadata", SCRIPT)
+
+    def test_claude_model_effort_persistence_reconciles_no_effort_models(self) -> None:
+        account = replace(
+            self.config.accounts["primary"],
+            backend="claude_code",
+            provider_type="anthropic",
+            adapter_type="claude_code",
+            model="sonnet",
+            reasoning_effort="high",
+            service_tier="",
+        )
+        self.config.accounts["primary"] = account
+        catalog = [
+            {"id": "sonnet", "reasoning_efforts": ["low", "medium", "high", "xhigh", "max"], "default_reasoning": "high", "service_tiers": []},
+            {"id": "opus", "reasoning_efforts": ["low", "medium", "high", "xhigh", "max"], "default_reasoning": "high", "service_tiers": []},
+            {"id": "haiku", "reasoning_efforts": [], "default_reasoning": None, "service_tiers": []},
+            {"id": "fable", "reasoning_efforts": ["low", "medium", "high", "xhigh", "max"], "default_reasoning": "high", "service_tiers": []},
+        ]
+        service = DashboardService(self.config)
+        current = {"models": catalog, "capabilities": {"effort_levels": ["low", "medium", "high", "xhigh", "max"]}}
+        with patch.object(service, "collect_account", return_value=current):
+            service.save_settings("primary", {"model": "haiku", "scope": "future_turns"})
+        saved = load_config(self.config_path).accounts["primary"]
+        self.assertEqual(saved.model, "haiku")
+        self.assertEqual(saved.reasoning_effort, "")
+        with patch.object(service, "collect_account", return_value={"models": catalog, "capabilities": current["capabilities"]}):
+            with self.assertRaises(DashboardError):
+                service.save_settings("primary", {"model": "haiku", "reasoning_effort": "high", "scope": "future_turns"})
+            service.save_settings("primary", {"model": "sonnet", "reasoning_effort": "high", "scope": "future_turns"})
+        self.assertEqual(load_config(self.config_path).accounts["primary"].reasoning_effort, "high")
 
     def test_antigravity_dashboard_exposes_one_logical_row_per_catalog_family(self) -> None:
         account = replace(
