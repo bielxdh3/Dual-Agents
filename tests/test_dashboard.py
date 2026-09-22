@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 from unittest.mock import patch
 
 from dual_codex.config import load_config
+from dual_codex.claude_code import _save_session
 from dual_codex.dashboard import (
     CAPABILITY_SCRIPT,
     HTML,
@@ -25,7 +26,7 @@ from dual_codex.dashboard import (
 )
 from dual_codex.live_events import LiveEventJournal
 from dual_codex.paths import same_path
-from dual_codex.providers import provider_default_label
+from dual_codex.providers import ProviderCapabilities, provider_default_label
 
 
 class DashboardTests(unittest.TestCase):
@@ -497,6 +498,55 @@ console.log(JSON.stringify({
         self.assertTrue(account["capabilities"]["service_tier"])
         self.assertEqual(account["runtime_state"], "Idle")
         self.assertNotIn("email", json.dumps(account).lower())
+
+    def test_claude_dispatchable_requires_auth_runtime_and_scoped_session(self) -> None:
+        primary = replace(
+            self.config.accounts["primary"],
+            backend="claude_code",
+            provider_type="anthropic",
+            adapter_type="claude_code",
+            model="sonnet",
+        )
+        config = replace(
+            self.config,
+            accounts={**self.config.accounts, "primary": primary},
+            roles={**self.config.roles, "reviewer": "primary"},
+        )
+        capabilities = ProviderCapabilities(
+            provider="anthropic",
+            provider_label="Anthropic Claude",
+            adapter="claude_code",
+            runtime_status="Authenticated",
+            authenticated=True,
+        )
+        service = DashboardService(config)
+        with patch("dual_codex.dashboard.provider_capabilities", return_value=capabilities), patch(
+            "dual_codex.dashboard.login_status", return_value="OK"
+        ):
+            unbound = service.collect_account("primary", force=True)
+            self.assertEqual(
+                unbound["availability"],
+                {
+                    "configured": True,
+                    "authenticated": True,
+                    "runtime_initialized": True,
+                    "thread_bound": False,
+                    "dispatchable": False,
+                    "active": False,
+                },
+            )
+            _save_session(
+                config,
+                config.agent_for_role("architect"),
+                config.repository,
+                "architect",
+                "scoped-claude-session",
+            )
+            bound = service.collect_account("primary", force=True)
+
+        self.assertTrue(bound["availability"]["runtime_initialized"])
+        self.assertTrue(bound["availability"]["thread_bound"])
+        self.assertTrue(bound["availability"]["dispatchable"])
 
     def test_live_executor_snapshot_is_path_derived_and_bounded(self) -> None:
         service = DashboardService(self.config)
