@@ -212,7 +212,9 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     )
                 return CommandResult(["fake"], 0, "", "")
 
-            with patch("dual_codex.codex.run_codex_for_role", side_effect=fake_runner):
+            with patch("dual_codex.providers.provider_supports_role", return_value=True), patch(
+                "dual_codex.codex.run_codex_for_role", side_effect=fake_runner
+            ):
                 result = delegate_to_configured_actor(
                     config=config,
                     role="executor",
@@ -223,6 +225,46 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 )
             self.assertEqual(observed, ["executor-d", "executor-b"])
             self.assertEqual(result.metadata["actual_actor"], "executor-b")
+
+    def test_fallback_candidate_capability_filter_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root, executor="executor-d")
+            accounts = dict(base.accounts)
+            accounts["executor-b"] = replace(accounts["executor-b"], fallback_roles=("executor",))
+            accounts["secondary"] = replace(accounts["secondary"], fallback_roles=("executor",))
+            config = replace(base, accounts=accounts, fallback_enabled=True)
+            repository = root / "repository"
+            repository.mkdir()
+            observed: list[str] = []
+
+            def fake_runner(**kwargs):
+                observed.append(kwargs["agent"].account_name)
+                if kwargs["agent"].account_name == "executor-d":
+                    raise ActorAvailabilityError(
+                        "provider unavailable",
+                        failure_class="provider_unavailable",
+                        actor="executor-d",
+                    )
+                return CommandResult(["fake"], 0, "", "")
+
+            def capability(config, account, role):
+                del config, role
+                return account.name != "executor-b"
+
+            with patch("dual_codex.providers.provider_supports_role", side_effect=capability), patch(
+                "dual_codex.codex.run_codex_for_role", side_effect=fake_runner
+            ):
+                result = delegate_to_configured_actor(
+                    config=config,
+                    role="executor",
+                    task="write",
+                    repository=repository,
+                    output_path=root / "result.json",
+                    schema_path=root / "schema.json",
+                )
+            self.assertEqual(observed, ["executor-d", "secondary"])
+            self.assertEqual(result.metadata["actual_actor"], "secondary")
 
     def test_security_denial_never_falls_back(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
