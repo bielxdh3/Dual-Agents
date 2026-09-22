@@ -348,12 +348,14 @@ class _AppServerProcess:
         agent: AgentConfig,
         repository: Path,
         progress: Callable[[str], None] | None,
+        role: str = "",
         require_workspace_ready: bool = False,
     ) -> None:
         self.config = config
         self.agent = agent
         self.repository = repository.resolve()
         self.progress = progress
+        self.role = str(role or "")
         self.require_workspace_ready = require_workspace_ready
         self._lock = threading.RLock()
         self._next_id = 0
@@ -721,6 +723,7 @@ class _AppServerProcess:
             self.config,
             self.agent,
             repository,
+            role=self.role,
             windows_sandbox=self.windows_sandbox,
         )
         if stored:
@@ -856,6 +859,7 @@ class _AppServerProcess:
             self.agent,
             repository,
             thread_id,
+            role=self.role,
             windows_sandbox=self.windows_sandbox,
         )
         return {
@@ -943,14 +947,15 @@ class _AppServerProcess:
 
 
 _PROCESS_LOCK = threading.RLock()
-_PROCESSES: dict[tuple[str, str, str, str, str, str, str], _AppServerProcess] = {}
+_PROCESSES: dict[tuple[str, str, str, str, str, str, str, str], _AppServerProcess] = {}
 
 
 def _process_key(
     agent: AgentConfig,
     config: OrchestratorConfig,
     repository: Path | None = None,
-) -> tuple[str, str, str, str, str, str, str]:
+    role: str = "",
+) -> tuple[str, str, str, str, str, str, str, str]:
     return (
         agent.account_name,
         str(agent.codex_home.expanduser().resolve()),
@@ -959,6 +964,7 @@ def _process_key(
         str(repository.expanduser().resolve()) if repository is not None else "",
         _profile_config_identity(agent),
         agent.sandbox,
+        str(role or ""),
     )
 
 
@@ -967,9 +973,10 @@ def _get_process(
     agent: AgentConfig,
     repository: Path,
     progress: Callable[[str], None] | None,
+    role: str = "",
     require_workspace_ready: bool = False,
 ) -> _AppServerProcess:
-    key = _process_key(agent, config, repository)
+    key = _process_key(agent, config, repository, role)
     with _PROCESS_LOCK:
         process = _PROCESSES.get(key)
         if process is not None and process.process.poll() is None:
@@ -982,6 +989,7 @@ def _get_process(
             agent=agent,
             repository=repository,
             progress=progress,
+            role=role,
             require_workspace_ready=require_workspace_ready,
         )
         _PROCESSES[key] = process
@@ -998,22 +1006,22 @@ def _close_processes() -> None:
 
 def _discard_process(process: _AppServerProcess) -> None:
     repository = getattr(process, "repository", None)
-    key = _process_key(process.agent, process.config, repository)
+    key = _process_key(process.agent, process.config, repository, getattr(process, "role", ""))
     with _PROCESS_LOCK:
         if _PROCESSES.get(key) is process:
             _PROCESSES.pop(key, None)
     if repository is not None:
-        _delete_thread_mapping(process.config, process.agent, Path(repository))
+        _delete_thread_mapping(process.config, process.agent, Path(repository), role=getattr(process, "role", ""))
     process.close()
 
 
 atexit.register(_close_processes)
 
 
-def _mapping_path(config: OrchestratorConfig, agent: AgentConfig, repository: Path) -> Path:
+def _mapping_path(config: OrchestratorConfig, agent: AgentConfig, repository: Path, role: str = "") -> Path:
     import hashlib
 
-    key = f"{agent.account_name}|{agent.codex_home.resolve()}|{repository.resolve()}".encode("utf-8")
+    key = f"{agent.account_name}|{agent.codex_home.resolve()}|{repository.resolve()}|{role or ''}".encode("utf-8")
     return config.runs_dir / "app-server-sessions" / (hashlib.sha256(key).hexdigest() + ".json")
 
 
@@ -1022,9 +1030,10 @@ def _load_thread_mapping(
     agent: AgentConfig,
     repository: Path,
     *,
+    role: str = "",
     windows_sandbox: str = "",
 ) -> str | None:
-    path = _mapping_path(config, agent, repository)
+    path = _mapping_path(config, agent, repository, role)
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError):
@@ -1034,10 +1043,11 @@ def _load_thread_mapping(
         value.get("repository") != str(repository.resolve())
         or value.get("account") != agent.account_name
         or value.get("codex_home") != str(agent.codex_home.resolve())
+        or value.get("role", "") != str(role or "")
         or value.get("windows_sandbox") != expected_windows_sandbox
         or value.get("headless_raw_events") != (_HEADLESS_RAW_EVENTS_VERSION if os.name == "nt" else "")
     ):
-        _delete_thread_mapping(config, agent, repository)
+        _delete_thread_mapping(config, agent, repository, role=role)
         return None
     thread_id = value.get("thread_id")
     return thread_id if isinstance(thread_id, str) and thread_id else None
@@ -1049,9 +1059,10 @@ def _save_thread_mapping(
     repository: Path,
     thread_id: str,
     *,
+    role: str = "",
     windows_sandbox: str = "",
 ) -> None:
-    path = _mapping_path(config, agent, repository)
+    path = _mapping_path(config, agent, repository, role)
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(
         path,
@@ -1059,6 +1070,7 @@ def _save_thread_mapping(
             "account": agent.account_name,
             "codex_home": str(agent.codex_home.resolve()),
             "repository": str(repository.resolve()),
+            "role": str(role or ""),
             "thread_id": thread_id,
             "windows_sandbox": windows_sandbox if os.name == "nt" else "",
             "headless_raw_events": _HEADLESS_RAW_EVENTS_VERSION if os.name == "nt" else "",
@@ -1066,10 +1078,10 @@ def _save_thread_mapping(
     )
 
 
-def _delete_thread_mapping(config: OrchestratorConfig, agent: AgentConfig, repository: Path) -> None:
+def _delete_thread_mapping(config: OrchestratorConfig, agent: AgentConfig, repository: Path, *, role: str = "") -> None:
     """Forget a thread that may contain an unresolved client tool call."""
 
-    path = _mapping_path(config, agent, repository)
+    path = _mapping_path(config, agent, repository, role)
     try:
         path.unlink()
     except FileNotFoundError:
@@ -1167,6 +1179,7 @@ def run_codex_app_server(
             agent,
             repository,
             progress,
+            role=role,
             require_workspace_ready=require_workspace_ready,
         )
         run_with_context = getattr(process, "run_turn_with_context", None)
@@ -1249,6 +1262,7 @@ def app_server_call(
     method: str,
     params: dict[str, Any] | None = None,
     timeout: float | None = None,
+    role: str = "",
 ) -> dict[str, Any]:
     """Make one bounded, structured read against the account-isolated server.
 
@@ -1257,7 +1271,7 @@ def app_server_call(
     """
     process: _AppServerProcess | None = None
     try:
-        process = _get_process(config, agent, repository, None)
+        process = _get_process(config, agent, repository, None, role=role)
         telemetry_call = getattr(type(process), "request_without_event_journal", None)
         if callable(telemetry_call):
             response = process.request_without_event_journal(
@@ -1289,9 +1303,10 @@ def app_server_events(
     config: OrchestratorConfig,
     agent: AgentConfig,
     repository: Path,
+    role: str = "",
 ) -> list[dict[str, Any]]:
     """Return the in-memory notification tail for a healthy account process."""
-    key = _process_key(agent, config, repository)
+    key = _process_key(agent, config, repository, role)
     with _PROCESS_LOCK:
         process = _PROCESSES.get(key)
         if process is None or process.process.poll() is not None:

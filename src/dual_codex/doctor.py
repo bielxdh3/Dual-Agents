@@ -17,7 +17,18 @@ class Check:
     details: str
 
 
-def _auth_check(name: str, home: Path) -> Check:
+def _auth_check(name: str, home: Path, *, backend: str = "windows", config: OrchestratorConfig | None = None, account=None) -> Check:
+    """Check provider readiness without applying Codex rules to other providers."""
+
+    if backend == "claude_code":
+        if config is None or account is None:
+            return Check(name, False, "Claude Code readiness requires its provider account.")
+        status = login_status(config, account)
+        if status == "OK":
+            return Check(name, True, f"{abbreviate_path(home)} (Claude Code authenticated)")
+        return Check(name, False, f"Claude Code authentication: {status}")
+    if backend in {"antigravity", "api"}:
+        return Check(name, True, f"{abbreviate_path(home)} (provider-managed)")
     profile_config = home / "config.toml"
     if not home.exists():
         return Check(name, False, "CODEX_HOME does not exist")
@@ -44,7 +55,15 @@ def run_doctor(config: OrchestratorConfig) -> list[Check]:
             checks.append(Check("codex version", False, str(exc)))
 
     for name, account in config.accounts.items():
-        checks.append(_auth_check(f"account {name}", account.codex_home))
+        checks.append(
+            _auth_check(
+                f"account {name}",
+                account.codex_home,
+                backend=account.backend,
+                config=config,
+                account=account,
+            )
+        )
 
     for role in ("architect", "executor", "reviewer"):
         try:
@@ -61,7 +80,7 @@ def run_doctor(config: OrchestratorConfig) -> list[Check]:
 
     if executable:
         for account in config.accounts.values():
-            if (account.codex_home / "auth.json").exists():
+            if account.backend not in {"claude_code", "antigravity", "api"} and (account.codex_home / "auth.json").exists():
                 status = login_status(config, account)
                 checks.append(Check(f"login {account.name}", status == "OK", status))
 

@@ -390,15 +390,15 @@ def _delegate_to_configured_actor(
             result = invoke(fallback_config, fallback_agent)
             actual_agent = fallback_agent
             fallback_used = True
-        result.metadata.update(
-            configured_actor_provenance(
-                agent=actual_agent,
-                role=role,
-                repository=repository,
-                canonical_root=canonical_root,
-                bootstrap=bootstrap,
-            )
+        provenance = configured_actor_provenance(
+            agent=actual_agent,
+            role=role,
+            repository=repository,
+            canonical_root=canonical_root,
+            bootstrap=bootstrap,
         )
+        for key, value in provenance.items():
+            result.metadata.setdefault(key, value)
         result.metadata.update({
             "primary_actor": primary_agent.account_name,
             "actual_actor": actual_agent.account_name,

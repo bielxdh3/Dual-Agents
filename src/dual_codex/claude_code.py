@@ -516,6 +516,27 @@ def _result_payload(stdout: str) -> dict[str, Any] | None:
     return None
 
 
+def _claude_schema(schema_path: Path) -> str:
+    """Return the schema contract in the dialect accepted by Claude Code.
+
+    Claude Code validates the contract itself and does not accept the
+    repository's Draft 2020-12 ``$schema`` identifier.  Removing only that
+    dialect marker preserves every validation keyword and keeps structured
+    output enforcement intact.
+    """
+
+    text = schema_path.read_text(encoding="utf-8")
+    try:
+        value = json.loads(text)
+    except (TypeError, ValueError):
+        return text
+    if isinstance(value, dict):
+        value = dict(value)
+        value.pop("$schema", None)
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return text
+
+
 def run_claude_code(
     *,
     command: str,
@@ -614,7 +635,7 @@ def run_claude_code(
     try:
         env = claude_environment(agent, repository)
         session_id = _load_session(config, agent, repository, role)
-        schema = schema_path.read_text(encoding="utf-8")
+        schema = _claude_schema(schema_path)
         command_argv = build_command(
             command=command,
             agent=agent,
@@ -714,7 +735,7 @@ class ClaudeCodeAdapter:
         efforts = tuple(snapshot.get("efforts", ()))
         auth_status = claude_status(config.claude_command, cwd=config.project_root, account=account)
         credential_status = "configured" if auth_status == "OK" else "missing" if auth_status in {"NOT CONFIGURED", "NOT LOGGED IN"} else "unknown"
-        runtime_status = "Connected" if not snapshot.get("error") and auth_status == "OK" else "Unavailable"
+        runtime_status = "Authenticated" if not snapshot.get("error") and auth_status == "OK" else "Unavailable"
         return ProviderCapabilities(
             provider=self.provider,
             provider_label="Anthropic Claude",
@@ -736,6 +757,7 @@ class ClaudeCodeAdapter:
             ),
             credential_status=credential_status,
             runtime_status=runtime_status,
+            authenticated=auth_status == "OK",
             error=_safe_error(snapshot.get("error")) if snapshot.get("error") else None,
             supported_roles=roles,
         )

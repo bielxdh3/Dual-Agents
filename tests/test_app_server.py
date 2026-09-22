@@ -474,7 +474,7 @@ class AppServerTests(unittest.TestCase):
                 account_name="executor",
                 backend="app_server",
             )
-            _save_thread_mapping(config, agent, repository, "unmaterialized-thread", windows_sandbox="unspecified")
+            _save_thread_mapping(config, agent, repository, "unmaterialized-thread", role="executor", windows_sandbox="unspecified")
             fake = _FakeProcess()
             fake.resume_error = True
             with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
@@ -490,7 +490,7 @@ class AppServerTests(unittest.TestCase):
             self.assertIn("no rollout found", result.stderr)
             self.assertEqual(fake.turn_params, [])
             self.assertNotIn("thread/start", fake.request_order)
-            self.assertFalse(_mapping_path(config, agent, repository).exists())
+            self.assertFalse(_mapping_path(config, agent, repository, "executor").exists())
 
     def test_network_access_is_explicit_and_fail_closed(self) -> None:
         repository = Path("C:/repo")
@@ -659,6 +659,31 @@ class AppServerTests(unittest.TestCase):
             _process_key(agent, config, Path("C:/repo-a")),
             _process_key(agent, config, Path("C:/repo-b")),
         )
+
+    def test_thread_mapping_is_scoped_to_profile_repository_and_role(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="secondary",
+                backend="app_server",
+            )
+            _save_thread_mapping(config, agent, repository, "executor-thread", role="executor")
+            self.assertEqual(
+                _load_thread_mapping(config, agent, repository, role="executor"),
+                "executor-thread",
+            )
+            self.assertIsNone(_load_thread_mapping(config, agent, repository, role="architect"))
+            self.assertNotEqual(
+                _mapping_path(config, agent, repository, "executor"),
+                _mapping_path(config, agent, repository, "architect"),
+            )
 
     def test_network_enabled_executor_turn_receives_scoped_policy(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

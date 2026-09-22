@@ -303,7 +303,7 @@ class DashboardService:
     def _reload(self) -> None:
         self.config = load_config(self.config.config_path)
 
-    def _call(self, agent: AgentConfig, method: str, params: dict[str, Any] | None) -> tuple[dict[str, Any], str | None]:
+    def _call(self, agent: AgentConfig, method: str, params: dict[str, Any] | None, *, role: str = "") -> tuple[dict[str, Any], str | None]:
         result = app_server_call(
             config=self.config,
             agent=agent,
@@ -311,35 +311,35 @@ class DashboardService:
             method=method,
             params=params,
             timeout=self.config.dashboard_telemetry_timeout,
+            role=role or self._role_for_account(agent.account_name),
         )
         error = result.get("error") if isinstance(result, dict) else None
         return (result if isinstance(result, dict) else {}, _error_text(error) if error else None)
 
-    def _thread(self, agent: AgentConfig) -> tuple[dict[str, Any] | None, str | None]:
-        mapped = _load_thread_mapping(self.config, agent, self.repository)
+    def _role_for_account(self, account_name: str) -> str:
+        for role in ("executor", "architect", "reviewer", "orchestrator"):
+            if self.config.roles.get(role) == account_name:
+                return role
+        return ""
+
+    def _thread(self, agent: AgentConfig, *, role: str = "") -> tuple[dict[str, Any] | None, str | None]:
+        role = role or self._role_for_account(agent.account_name)
+        mapped = _load_thread_mapping(self.config, agent, self.repository, role=role)
         if mapped:
-            result, error = self._call(agent, "thread/read", {"threadId": mapped, "includeTurns": False})
+            result, error = self._call(agent, "thread/read", {"threadId": mapped, "includeTurns": False}, role=role)
             thread = result.get("thread") if isinstance(result.get("thread"), dict) else None
             if thread is not None and error is None:
                 return thread, None
-        result, error = self._call(agent, "thread/list", {
-            "cwd": str(self.repository),
-            "limit": 10,
-            "archived": False,
-            "sortKey": "updated_at",
-            "sortDirection": "desc",
-        })
-        rows = result.get("data") if isinstance(result.get("data"), list) else []
-        for row in rows:
-            if isinstance(row, dict):
-                return row, error
-        return None, error
+        # A profile must never adopt an arbitrary historical thread.  A thread
+        # becomes visible here only after this role-scoped adapter materializes
+        # and records it.
+        return None, None
 
-    def _token_usage(self, agent: AgentConfig, thread_id: str | None) -> dict[str, Any] | None:
+    def _token_usage(self, agent: AgentConfig, thread_id: str | None, *, role: str = "") -> dict[str, Any] | None:
         if not thread_id:
             return None
         latest = None
-        for event in reversed(app_server_events(config=self.config, agent=agent, repository=self.repository)):
+        for event in reversed(app_server_events(config=self.config, agent=agent, repository=self.repository, role=role or self._role_for_account(agent.account_name))):
             if event.get("method") != "thread/tokenUsage/updated":
                 continue
             params = event.get("params") if isinstance(event.get("params"), dict) else {}
@@ -393,6 +393,14 @@ class DashboardService:
             "thread": None,
             "token_usage": None,
             "capabilities": {},
+            "availability": {
+                "configured": True,
+                "authenticated": auth_raw == "OK",
+                "runtime_initialized": False,
+                "thread_bound": False,
+                "dispatchable": False,
+                "active": False,
+            },
             "last_error": None,
             "refreshed_at": _now(),
         }
@@ -426,6 +434,30 @@ class DashboardService:
                 "thread_settings_update": True,
                 **discovered.as_dict(),
             }
+            base["availability"] = dict(discovered.as_dict().get("availability", {}))
+            base["availability"]["authenticated"] = auth_raw == "OK"
+            base["availability"]["dispatchable"] = bool(base["availability"].get("dispatchable")) and auth_raw == "OK"
+            if account.backend == "claude_code":
+                role = self._role_for_account(account.name)
+                session_id = ""
+                if role:
+                    from .claude_code import _load_session
+
+                    session_id = _load_session(
+                        self.config,
+                        self.config.agent_for_role(role),
+                        self.repository,
+                        role,
+                    )
+                runtime_initialized = discovered.runtime_status == "Authenticated"
+                thread_bound = bool(session_id)
+                base["availability"].update(
+                    {
+                        "runtime_initialized": runtime_initialized,
+                        "thread_bound": thread_bound,
+                        "dispatchable": auth_raw == "OK" and runtime_initialized and thread_bound,
+                    }
+                )
             base["profile"] = {
                 **base["profile"],
                 "credential_status": discovered.credential_status,
@@ -440,6 +472,7 @@ class DashboardService:
             return base
 
         agent = _agent_for_account(account)
+        role = self._role_for_account(account.name)
         errors: list[str] = []
         model_result, error = self._call(agent, "model/list", {"includeHidden": False, "limit": 100})
         if error:
@@ -454,16 +487,16 @@ class DashboardService:
         usage_result, error = self._call(agent, "account/usage/read", None)
         if error:
             errors.append(f"account/usage/read: {error}")
-        thread, thread_error = self._thread(agent)
+        thread, thread_error = self._thread(agent, role=role)
         if thread_error:
             errors.append(f"thread: {thread_error}")
         thread_id = thread.get("id") if isinstance(thread, dict) and isinstance(thread.get("id"), str) else None
-        token_usage = self._token_usage(agent, thread_id)
+        token_usage = self._token_usage(agent, thread_id, role=role)
         default_model = next((model["id"] for model in models if model["is_default"]), None)
         default_model_row = next((model for model in models if model["is_default"]), None)
         default_service_tier = default_model_row.get("default_service_tier") if isinstance(default_model_row, dict) else None
         event_model = event_reasoning = event_tier = None
-        for event in reversed(app_server_events(config=self.config, agent=agent, repository=self.repository)):
+        for event in reversed(app_server_events(config=self.config, agent=agent, repository=self.repository, role=role)):
             if event.get("method") != "turn/started":
                 continue
             turn = (event.get("params") or {}).get("turn") if isinstance(event.get("params"), dict) else None
@@ -530,6 +563,16 @@ class DashboardService:
         else:
             state = "Idle"
         base["runtime_state"] = state
+        runtime_initialized = not errors
+        thread_bound = thread_id is not None
+        base["availability"] = {
+            "configured": True,
+            "authenticated": base["login"] == "OK",
+            "runtime_initialized": runtime_initialized,
+            "thread_bound": thread_bound,
+            "dispatchable": runtime_initialized and base["login"] == "OK" and thread_bound,
+            "active": state == "Working",
+        }
         base["last_error"] = "; ".join(errors)[:800] if errors else None
         with self._lock:
             self._cache[name] = (time.monotonic(), base)
@@ -1117,6 +1160,10 @@ SCRIPT += """const dashboardFetch=window.fetch.bind(window);window.fetch=(input,
 SCRIPT += """const executorTokenAmount=value=>{const direct=executorNumber(value);if(direct!=null)return direct;const object=executorObject(value);for(const key of ['totalTokens','total_tokens','tokens','value']){const amount=executorNumber(object[key]);if(amount!=null)return amount}return null};executorTokenText=value=>{const usage=executorObject(value);const total=executorTokenAmount(usage.totalTokens??usage.total??usage.tokens);const last=executorTokenAmount(usage.lastTokens??usage.last??usage.recent);if(total==null&&last==null)return 'Unknown';const parts=[];if(total!=null)parts.push(`total ${total.toLocaleString()}`);if(last!=null)parts.push(`last ${last.toLocaleString()}`);return parts.join(' · ')};const executorRenderMetaFromSnapshot=executorRenderMeta;executorRenderMeta=()=>{const snapshot=executorLive.snapshot||{};const started=executorDate(snapshot.started_at);const completed=executorDate(snapshot.completed_at);if(started!=null)executorLive.startedAt=started;if(completed!=null)executorLive.endedAt=completed;else if(executorText(snapshot.state,'IDLE').toUpperCase()==='WORKING')executorLive.endedAt=null;executorRenderMetaFromSnapshot()};const executorAddEventWithTimes=executorAddEvent;executorAddEvent=(value,eventName)=>{const event=executorObject(value);if(event.kind==='turn'&&event.state==='started'){executorLive.startedAt=executorDate(event.timestamp);executorLive.endedAt=null;if(executorLive.snapshot)executorLive.snapshot=Object.assign({},executorLive.snapshot,{started_at:event.timestamp,completed_at:null})}executorAddEventWithTimes(value,eventName)};"""
 SCRIPT += """function executorSyncServerTimes(){const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();const started=executorDate(snapshot.started_at);const ended=executorDate(snapshot.ended_at||snapshot.completed_at);if(started!=null)executorLive.startedAt=started;if(state==='WORKING')executorLive.endedAt=null;else if(ended!=null)executorLive.endedAt=ended;else if(executorLive.startedAt!=null&&Number.isFinite(Number(snapshot.elapsed_seconds)))executorLive.endedAt=executorLive.startedAt+Math.max(0,Number(snapshot.elapsed_seconds))*1000}const executorRenderMetaServerTruthBase=executorRenderMeta;executorRenderMeta=()=>{executorSyncServerTimes();executorRenderMetaServerTruthBase();const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();const reason=['STALE','DISCONNECTED'].includes(state)?executorText(snapshot.stale_reason,'Executor activity is no longer live.'):'';const status=document.getElementById('executor-status');if(status)status.textContent=`${state} · ${reason||executorLive.connection}`};const executorSetSnapshotServerTruthBase=executorSetSnapshot;executorSetSnapshot=value=>{executorSetSnapshotServerTruthBase(value);executorSyncServerTimes();executorRenderMeta()};function executorRecordLateEvent(event){const sequence=executorNumber(event.sequence);if(sequence==null||sequence<=executorLive.cursor)return;executorLive.cursor=sequence;executorUpdateMetaFromEvent(event);if(executorLive.clearedAt==null||sequence>executorLive.clearedAt){executorLive.rows.push(event);executorLive.rows=executorLive.rows.slice(-EXECUTOR_MAX_ROWS)}executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{cursor:sequence});executorRender()}const executorAddEventServerTruthBase=executorAddEvent;executorAddEvent=(value,eventName)=>{const event=executorObject(value);const snapshot=executorLive.snapshot||{};const currentState=executorText(snapshot.state,'IDLE').toUpperCase();const sameRun=!event.run_id||!snapshot.run_id||event.run_id===snapshot.run_id;if(['COMPLETE','FAILED','STALE','DISCONNECTED'].includes(currentState)&&sameRun&&event.kind==='turn'&&event.state==='started'){executorRecordLateEvent(event);return}if(event.run_id&&snapshot.run_id&&event.run_id!==snapshot.run_id){executorLive.snapshot=Object.assign({},snapshot,{run_id:event.run_id,request_id:event.request_id||null,state:'IDLE',started_at:null,ended_at:null,completed_at:null,elapsed_seconds:null});executorLive.startedAt=null;executorLive.endedAt=null}executorAddEventServerTruthBase(value,eventName);if(event.kind==='run'&&['completed','complete','failed','failure','cancelled','canceled'].includes(event.state)){const terminalState=['completed','complete'].includes(event.state)?'COMPLETE':'FAILED';const detail=executorObject(event.detail);const ended=executorDate(detail.ended_at)||executorDate(event.timestamp);const started=executorDate(detail.started_at);executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{state:terminalState,started_at:started==null?executorLive.snapshot?.started_at:detail.started_at,ended_at:detail.ended_at||executorLive.snapshot?.ended_at||event.timestamp,completed_at:ended==null?executorLive.snapshot?.completed_at:event.timestamp});if(started!=null)executorLive.startedAt=started;if(ended!=null)executorLive.endedAt=ended}executorSyncServerTimes();executorRenderMeta()};setInterval(()=>{const state=executorText(executorLive.snapshot?.state,'IDLE').toUpperCase();if(state!=='WORKING')executorRenderMeta()},1000);"""
 
+# Keep the availability ladder visible without treating Connected/Idle as proof.
+SCRIPT += """function availabilityLabel(a){const s=a.availability||{};const labels=['Configured'];if(s.authenticated)labels.push('Authenticated');if(s.runtime_initialized)labels.push('Runtime initialized');if(s.thread_bound)labels.push('Thread bound');if(s.dispatchable)labels.push('Dispatchable');if(s.active)labels.push('Active');return labels.join(' · ')}"""
+SCRIPT = SCRIPT.replace('Roles: ${esc((a.roles||[]).join(\', \')||\'none\')} · Runtime: ${esc(a.runtime_state)}', 'Roles: ${esc((a.roles||[]).join(\', \')||\'none\')} · Runtime: ${esc(a.runtime_state)} · ${esc(availabilityLabel(a))}')
+
 # Keep provider-specific presentation close to the generated dashboard
 # contract without duplicating the large card template.
 SCRIPT = SCRIPT.replace("node._providerModels=account?.models||[];});$('#updated')", "node._providerModels=account?.models||[];});applyClaudeUx();$('#updated')")
@@ -1125,6 +1172,7 @@ SCRIPT = SCRIPT.replace("if(selected&&selected.fixed_mode)body.reasoning_effort=
 SCRIPT = SCRIPT.replace("if(!tier.disabled)body.service_tier=tier.value", "if(tier&&!tier.disabled)body.service_tier=tier.value")
 SCRIPT = SCRIPT.replace("const tier=card.querySelector('[data-tier]');const state=reconcileCapabilitySelection(models,model,effort.value,tier.value", "const tier=card.querySelector('[data-tier]');const state=reconcileCapabilitySelection(models,model,effort.value,tier?.value||''")
 SCRIPT = SCRIPT.replace("tier.innerHTML=options.tiers;tier.value=state.service_tier_value;tier.disabled=state.service_tier_disabled", "if(tier){tier.innerHTML=options.tiers;tier.value=state.service_tier_value;tier.disabled=state.service_tier_disabled}")
+SCRIPT = SCRIPT.replace("a.capabilities&&((a.capabilities.app_server&&!a.last_error)||a.runtime_state==='Connected'||a.runtime_state==='Configured')", "a.availability&&a.availability.dispatchable")
 SCRIPT = SCRIPT.replace("const backendOptions=isExecutor?", "const backendOptions=isExecutor||a.provider==='anthropic'?")
 
 HTML = HTML.replace('<div class="save-row"><button id="add-profile"', '<div class="save-row"><label class="check"><input id="fallback-enabled" type="checkbox"> Enable automatic configured-actor fallback</label><button id="add-profile"')

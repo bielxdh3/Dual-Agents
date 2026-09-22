@@ -164,6 +164,37 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertFalse(result.metadata["fallback_used"])
             self.assertEqual(app_server.call_args.kwargs["agent"].backend, "app_server")
 
+    def test_configured_dispatch_preserves_provider_session_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = self._config(root)
+            repository = root / "repository"
+            repository.mkdir()
+
+            def fake_runner(**kwargs):
+                return CommandResult(
+                    ["fake"],
+                    0,
+                    "",
+                    "",
+                    {"session_id": "provider-session", "runtime_version": "provider-runtime"},
+                )
+
+            with patch("dual_codex.codex.run_codex_for_role", side_effect=fake_runner):
+                result = delegate_to_configured_actor(
+                    config=config,
+                    role="architect",
+                    task="return a handshake",
+                    repository=repository,
+                    output_path=root / "result.json",
+                    schema_path=root / "schema.json",
+                )
+
+            self.assertEqual(result.metadata["session_id"], "provider-session")
+            self.assertEqual(result.metadata["runtime_version"], "provider-runtime")
+            self.assertEqual(result.metadata["actual_actor"], "secondary")
+            self.assertFalse(result.metadata["fallback_used"])
+
     def test_one_role_scoped_fallback_is_selected_and_provenanced(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

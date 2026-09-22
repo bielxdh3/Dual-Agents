@@ -47,6 +47,12 @@ class ProviderCapabilities:
     isolation_note: str = ""
     credential_status: str = "unknown"
     runtime_status: str = "Unknown"
+    configured: bool = True
+    authenticated: bool = False
+    runtime_initialized: bool = False
+    thread_bound: bool = False
+    dispatchable: bool = False
+    active: bool = False
     error: str | None = None
     supported_roles: tuple[str, ...] = ()
 
@@ -66,6 +72,14 @@ class ProviderCapabilities:
             "isolation_note": self.isolation_note,
             "credential_status": self.credential_status,
             "runtime_status": self.runtime_status,
+            "availability": {
+                "configured": self.configured,
+                "authenticated": self.authenticated,
+                "runtime_initialized": self.runtime_initialized,
+                "thread_bound": self.thread_bound,
+                "dispatchable": self.dispatchable,
+                "active": self.active,
+            },
             "error": self.error,
             "supported_roles": list(self.supported_roles),
             # Keep the dashboard's existing model-row contract.
@@ -235,7 +249,7 @@ class CodexAdapter:
             profile_isolation=True,
             isolation_note="Codex profile state is isolated by the account CODEX_HOME.",
             credential_status="provider-managed",
-            runtime_status="Connected",
+            runtime_status="Configured",
             supported_roles=("orchestrator", "architect", "reviewer", "executor"),
         )
 
@@ -388,7 +402,8 @@ class AntigravityAdapter:
             profile_isolation=False,
             isolation_note="The installed agy runtime does not advertise isolated account state; saved Gemini profiles are metadata-only until such support exists.",
             credential_status="provider-managed",
-            runtime_status="Connected" if status == "OK" and result.returncode == 0 else "Unavailable",
+            runtime_status="Authenticated" if status == "OK" and result.returncode == 0 else "Unavailable",
+            authenticated=status == "OK" and result.returncode == 0,
             error=error,
             supported_roles=("executor",),
         )
@@ -428,6 +443,7 @@ class OpenAICompatibleAdapter:
             isolation_note="API credentials are referenced by environment variable; no key is persisted.",
             credential_status=credential_status,
             runtime_status="Configured" if error is None and credential_status == "configured" else "Unavailable",
+            authenticated=credential_status == "configured",
             error=error,
             supported_roles=("orchestrator", "architect", "reviewer"),
         )

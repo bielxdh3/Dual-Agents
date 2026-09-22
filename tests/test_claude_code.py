@@ -10,6 +10,7 @@ from unittest.mock import patch
 from dual_codex.claude_code import (
     ClaudeCodeAdapter,
     _verified_models,
+    _claude_schema,
     build_command,
     capability_snapshot,
     claude_environment,
@@ -131,6 +132,18 @@ class ClaudeCodeTests(unittest.TestCase):
             self.assertEqual(command[command.index("--tools") + 1], "Read,Glob,Grep")
             self.assertEqual(command[command.index("--permission-mode") + 1], "plan")
             self.assertEqual(command[command.index("--permission-prompts") + 1], "none")
+
+    def test_claude_schema_drops_only_unsupported_dialect_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "schema.json"
+            path.write_text(
+                '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["handshake"]}',
+                encoding="utf-8",
+            )
+            value = json.loads(_claude_schema(path))
+            self.assertNotIn("$schema", value)
+            self.assertEqual(value["type"], "object")
+            self.assertEqual(value["required"], ["handshake"])
 
     def test_capability_detection_requires_safe_mode_and_restricted(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
