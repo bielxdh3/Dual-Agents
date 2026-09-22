@@ -44,6 +44,7 @@ _AVAILABILITY_MARKERS = {
     "not_configured": "profile_readiness_unavailable",
     "not_ready": "profile_readiness_unavailable",
     "process unavailable": "process_unavailable",
+    "unusable_runtime": "unusable_runtime",
 }
 
 
@@ -181,6 +182,8 @@ def _same_configured_actor(left: AgentConfig, right: AgentConfig) -> bool:
         or left.backend != right.backend
         or left.provider_type != right.provider_type
         or left.adapter_type != right.adapter_type
+        or left.auth_mode != right.auth_mode
+        or left.auth_reference != right.auth_reference
     ):
         return False
     if not same_path(left.codex_home, right.codex_home):
@@ -212,6 +215,7 @@ def configured_actor_provenance(
         "app_server": "app_server",
         "windows": "codex_terminal",
         "api": "api",
+        "claude_code": "claude_code",
     }.get(agent.backend, agent.backend or "unknown")
     metadata: dict[str, Any] = {
         "phase": role,
@@ -237,6 +241,9 @@ def configured_actor_provenance(
         "fallback_actor": "",
         "fallback_reason": "",
         "fallback_failure_class": "",
+        "auth_mode": agent.auth_mode,
+        "session_id": "",
+        "runtime_version": "",
     }
     if canonical_root is not None:
         metadata.update(
@@ -271,6 +278,10 @@ def _annotate_provider_result(
             configured_actor=configured_actor,
         )
     )
+    if result.metadata.get("claude_session_id"):
+        result.metadata["session_id"] = result.metadata["claude_session_id"]
+    if result.metadata.get("claude_runtime_version"):
+        result.metadata["runtime_version"] = result.metadata["claude_runtime_version"]
     return result
 
 
@@ -358,6 +369,8 @@ def _delegate_to_configured_actor(
             fallback_failure_class = exc.failure_class
             # Account ids provide a stable deterministic ordering independent of
             # filesystem or mapping iteration order.
+            from .providers import provider_supports_role
+
             candidates = []
             accounts = getattr(config, "accounts", {})
             for account_name in sorted(accounts):
@@ -366,9 +379,7 @@ def _delegate_to_configured_actor(
                     continue
                 if role not in getattr(account, "fallback_roles", ()):
                     continue
-                if role == "executor" and account.backend not in {"app_server", "windows", "antigravity"}:
-                    continue
-                if role in {"architect", "reviewer", "orchestrator"} and account.backend == "antigravity":
+                if not provider_supports_role(config, account, role):
                     continue
                 candidates.append(account_name)
             if not candidates:
@@ -494,6 +505,38 @@ def run_codex_for_role(
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
                 bootstrap=bootstrap, configured_actor=configured)
+        finally:
+            cleanup_canonical_bootstrap(bootstrap)
+    if agent.backend == "claude_code":
+        from .claude_code import run_claude_code
+
+        try:
+            result = run_claude_code(
+                command=getattr(config, "claude_command", "claude"),
+                agent=agent,
+                role=role,
+                repository=repository,
+                prompt=prompt,
+                output_path=output_path,
+                schema_path=schema_path,
+                config=config,
+                progress=progress,
+            )
+            _raise_dispatch_failure(
+                result,
+                role=role,
+                agent=agent,
+                message=f"Claude {role} dispatch failed: {result.stderr}",
+            )
+            return _annotate_provider_result(
+                result,
+                agent,
+                role,
+                repository=repository,
+                canonical_root=canonical_root,
+                bootstrap=bootstrap,
+                configured_actor=configured,
+            )
         finally:
             cleanup_canonical_bootstrap(bootstrap)
     if agent.backend == "antigravity":

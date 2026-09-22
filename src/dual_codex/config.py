@@ -8,9 +8,9 @@ import tomllib
 
 
 SUPPORTED_ROLES = ("orchestrator", "architect", "reviewer", "executor")
-SUPPORTED_BACKENDS = ("app_server", "windows", "antigravity", "api")
-SUPPORTED_PROVIDER_TYPES = ("codex", "gemini", "api")
-SUPPORTED_ADAPTER_TYPES = ("codex_cli", "antigravity_cli", "openai_compatible")
+SUPPORTED_BACKENDS = ("app_server", "windows", "antigravity", "api", "claude_code")
+SUPPORTED_PROVIDER_TYPES = ("codex", "gemini", "api", "anthropic")
+SUPPORTED_ADAPTER_TYPES = ("codex_cli", "antigravity_cli", "openai_compatible", "claude_code")
 SUPPORTED_AUTH_MODES = ("provider_native", "environment", "none")
 _ACCOUNT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 _ROLE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
@@ -84,6 +84,7 @@ class OrchestratorConfig:
     config_path: Path
     legacy: bool = False
     antigravity_command: str = "agy"
+    claude_command: str = "claude"
     node_command: str = "node"
     terminal_readiness_timeout: float = 60.0
     terminal_turn_start_timeout: float = 15.0
@@ -91,6 +92,7 @@ class OrchestratorConfig:
     app_server_thread_timeout: float = 30.0
     app_server_turn_start_timeout: float = 30.0
     app_server_turn_timeout: float = 600.0
+    claude_turn_timeout: float = 600.0
     dashboard_telemetry_timeout: float = 5.0
     live_event_journal_max_records: int = 2000
     live_event_journal_max_record_bytes: int = 65536
@@ -239,8 +241,18 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
         role = validate_role_name(item)
         if role not in fallback_roles:
             fallback_roles.append(role)
-    default_provider = "gemini" if backend == "antigravity" else "api" if backend == "api" else "codex"
-    default_adapter = "antigravity_cli" if backend == "antigravity" else "openai_compatible" if backend == "api" else "codex_cli"
+    default_provider = (
+        "gemini" if backend == "antigravity"
+        else "api" if backend == "api"
+        else "anthropic" if backend == "claude_code"
+        else "codex"
+    )
+    default_adapter = (
+        "antigravity_cli" if backend == "antigravity"
+        else "openai_compatible" if backend == "api"
+        else "claude_code" if backend == "claude_code"
+        else "codex_cli"
+    )
     provider_type = str(raw.get("provider_type", default_provider)).strip() or default_provider
     adapter_type = str(raw.get("adapter_type", default_adapter)).strip() or default_adapter
     auth_mode = str(raw.get("auth_mode", "environment" if backend == "api" else "provider_native")).strip() or "provider_native"
@@ -264,7 +276,11 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
     supported_reasoning_efforts = tuple(validate_setting_value(item, "supported_reasoning_efforts") for item in raw_efforts if item.strip())
     state_root = raw.get("state_root")
     state_path = _path(state_root, base) if state_root else None
-    auth_reference = validate_auth_reference(raw.get("auth_reference", "")) if backend == "api" else validate_setting_value(raw.get("auth_reference", ""), "auth_reference")
+    auth_reference = (
+        validate_auth_reference(raw.get("auth_reference", ""))
+        if backend == "api" or (backend == "claude_code" and str(raw.get("auth_mode", "provider_native")).strip() == "environment")
+        else validate_setting_value(raw.get("auth_reference", ""), "auth_reference")
+    )
     model = validate_setting_value(raw.get("model", ""), "model")
     has_reasoning_setting = "reasoning_effort" in raw
     reasoning_effort = validate_setting_value(raw.get("reasoning_effort", "" if backend == "api" else "high"), "reasoning_effort")
@@ -289,7 +305,7 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
         adapter_type=adapter_type,
         auth_mode=auth_mode,
         auth_reference=auth_reference,
-        state_root=state_path,
+        state_root=state_path or (_path(raw.get("codex_home"), base) if backend == "claude_code" and raw.get("codex_home") else None),
         base_url=validate_setting_value(raw.get("base_url", ""), "base_url"),
         available_models=available_models,
         supported_reasoning_efforts=supported_reasoning_efforts,
@@ -375,6 +391,7 @@ def load_config(path: Path) -> OrchestratorConfig:
     app_server_thread_timeout = float(orch.get("app_server_thread_timeout", 30.0))
     app_server_turn_start_timeout = float(orch.get("app_server_turn_start_timeout", 30.0))
     app_server_turn_timeout = float(orch.get("app_server_turn_timeout", 600.0))
+    claude_turn_timeout = float(orch.get("claude_turn_timeout", app_server_turn_timeout))
     dashboard_telemetry_timeout = float(orch.get("dashboard_telemetry_timeout", 5.0))
     live_event_journal_max_records = int(orch.get("live_event_journal_max_records", 2000))
     live_event_journal_max_record_bytes = int(orch.get("live_event_journal_max_record_bytes", 65536))
@@ -395,6 +412,7 @@ def load_config(path: Path) -> OrchestratorConfig:
             app_server_thread_timeout,
             app_server_turn_start_timeout,
             app_server_turn_timeout,
+            claude_turn_timeout,
             dashboard_telemetry_timeout,
         )
     ):
@@ -415,6 +433,10 @@ def load_config(path: Path) -> OrchestratorConfig:
             validate_setting_value(orch.get("antigravity_command", "agy"), "antigravity_command")
             or "agy"
         ),
+        claude_command=(
+            validate_setting_value(orch.get("claude_command", "claude"), "claude_command")
+            or "claude"
+        ),
         node_command=str(orch.get("node_command", "node")).strip() or "node",
         terminal_readiness_timeout=terminal_readiness_timeout,
         terminal_turn_start_timeout=terminal_turn_start_timeout,
@@ -422,6 +444,7 @@ def load_config(path: Path) -> OrchestratorConfig:
         app_server_thread_timeout=app_server_thread_timeout,
         app_server_turn_start_timeout=app_server_turn_start_timeout,
         app_server_turn_timeout=app_server_turn_timeout,
+        claude_turn_timeout=claude_turn_timeout,
         dashboard_telemetry_timeout=dashboard_telemetry_timeout,
         live_event_journal_max_records=live_event_journal_max_records,
         live_event_journal_max_record_bytes=live_event_journal_max_record_bytes,

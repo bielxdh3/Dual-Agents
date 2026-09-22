@@ -24,6 +24,7 @@ from .config import (
     validate_role_name,
 )
 from .antigravity import antigravity_status
+from .claude_code import claude_status
 from .process import codex_environment, run_command
 
 
@@ -229,6 +230,8 @@ def login_status(config: OrchestratorConfig, account: AccountConfig) -> str:
         return "DISABLED"
     if account.backend == "antigravity":
         return antigravity_status(config.antigravity_command, cwd=config.project_root)
+    if account.backend == "claude_code":
+        return claude_status(getattr(config, "claude_command", "claude"), cwd=config.project_root, account=account)
     if account.backend == "api":
         reference = account.auth_reference.strip()
         if reference.startswith("env:"):
@@ -330,14 +333,24 @@ def add_account(
     requested_roles = [validate_role_name(role) for role in (roles or [])]
     if backend not in SUPPORTED_BACKENDS:
         raise ConfigError("backend must be one of: " + ", ".join(SUPPORTED_BACKENDS) + ".")
-    default_provider = "gemini" if backend == "antigravity" else "api" if backend == "api" else "codex"
-    default_adapter = "antigravity_cli" if backend == "antigravity" else "openai_compatible" if backend == "api" else "codex_cli"
+    default_provider = (
+        "gemini" if backend == "antigravity"
+        else "api" if backend == "api"
+        else "anthropic" if backend == "claude_code"
+        else "codex"
+    )
+    default_adapter = (
+        "antigravity_cli" if backend == "antigravity"
+        else "openai_compatible" if backend == "api"
+        else "claude_code" if backend == "claude_code"
+        else "codex_cli"
+    )
     provider_type = (provider_type or default_provider).strip()
     adapter_type = (adapter_type or default_adapter).strip()
     auth_mode = (auth_mode or ("environment" if backend == "api" else "provider_native")).strip()
-    if provider_type not in {"codex", "gemini", "api"} or adapter_type not in {"codex_cli", "antigravity_cli", "openai_compatible"}:
+    if provider_type not in {"codex", "gemini", "api", "anthropic"} or adapter_type not in {"codex_cli", "antigravity_cli", "openai_compatible", "claude_code"}:
         raise ConfigError("Unsupported provider or adapter type.")
-    if backend == "api":
+    if backend == "api" or (backend == "claude_code" and auth_mode == "environment"):
         auth_reference = validate_auth_reference(auth_reference)
     if not isinstance(enabled, bool):
         raise ConfigError("enabled must be a boolean.")
@@ -365,7 +378,7 @@ def add_account(
         provider_type=provider_type,
         adapter_type=adapter_type,
         auth_mode=auth_mode,
-        auth_reference=auth_reference if backend == "api" else validate_setting_value(auth_reference, "auth_reference"),
+        auth_reference=auth_reference if backend == "api" or (backend == "claude_code" and auth_mode == "environment") else validate_setting_value(auth_reference, "auth_reference"),
         base_url=validate_setting_value(base_url, "base_url"),
         available_models=tuple(validate_setting_value(value, "available_models") for value in available_models),
         supported_reasoning_efforts=tuple(validate_setting_value(value, "supported_reasoning_efforts") for value in supported_reasoning_efforts),
@@ -539,7 +552,10 @@ def update_account_settings(
             "backend must be one of: " + ", ".join(SUPPORTED_BACKENDS) + "."
         )
     new_auth_reference = account.auth_reference if auth_reference is None else validate_setting_value(auth_reference, "auth_reference")
-    if new_backend == "api":
+    new_auth_mode = account.auth_mode if auth_mode is None else str(auth_mode).strip()
+    if new_auth_mode not in {"provider_native", "environment", "none"}:
+        raise ConfigError("auth_mode must be one of: provider_native, environment, none.")
+    if new_backend == "api" or (new_backend == "claude_code" and new_auth_mode == "environment"):
         new_auth_reference = validate_auth_reference(new_auth_reference)
     new_model = account.model if model is None else validate_setting_value(model, "model")
     new_fixed_mode = account.fixed_mode if fixed_mode is None else validate_setting_value(fixed_mode, "fixed_mode")
@@ -567,7 +583,7 @@ def update_account_settings(
         service_tier=(account.service_tier if service_tier is None else validate_setting_value(service_tier, "service_tier")),
         provider_type=account.provider_type if provider_type is None else str(provider_type).strip(),
         adapter_type=account.adapter_type if adapter_type is None else str(adapter_type).strip(),
-        auth_mode=account.auth_mode if auth_mode is None else str(auth_mode).strip(),
+        auth_mode=new_auth_mode,
         auth_reference=new_auth_reference,
         state_root=account.state_root if state_root is None else Path(state_root).expanduser().resolve(),
         base_url=account.base_url if base_url is None else validate_setting_value(base_url, "base_url"),
