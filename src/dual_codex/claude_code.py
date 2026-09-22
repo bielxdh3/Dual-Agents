@@ -19,8 +19,81 @@ from .config import AgentConfig
 from .process import CommandResult, _prepare_command
 
 
-_MODEL_ALIAS_HINTS = ("sonnet", "opus", "haiku", "fable")
-_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max", "ultracode")
+# This is the provider contract, not a scrape of the installed CLI help.  The
+# Claude docs explicitly warn that `claude --help` is incomplete, so aliases
+# such as `haiku` must remain available when the help window omits them.
+_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+_CLAUDE_MODEL_CATALOG = (
+    {
+        "id": "sonnet",
+        "family": "sonnet",
+        "display_name": "Sonnet",
+        "description": "Latest Sonnet model for daily coding tasks.",
+        "reasoning_efforts": _EFFORT_LEVELS,
+        "default_reasoning": "high",
+    },
+    {
+        "id": "opus",
+        "family": "opus",
+        "display_name": "Opus",
+        "description": "Latest Opus model for complex reasoning tasks.",
+        "reasoning_efforts": _EFFORT_LEVELS,
+        "default_reasoning": "high",
+    },
+    {
+        "id": "haiku",
+        "family": "haiku",
+        "display_name": "Haiku",
+        "description": "Fast and efficient Haiku model for simple tasks.",
+        "reasoning_efforts": (),
+        "default_reasoning": None,
+        "access_caveat": "This model does not expose configurable effort.",
+    },
+    {
+        "id": "fable",
+        "family": "fable",
+        "display_name": "Fable",
+        "description": "Fable model for the hardest and longest-running tasks.",
+        "reasoning_efforts": _EFFORT_LEVELS,
+        "default_reasoning": "high",
+        "access_caveat": "Requires Fable access; provider/account entitlement is checked at runtime.",
+    },
+    {
+        "id": "best",
+        "family": "best",
+        "display_name": "Best",
+        "description": "Fable when available, otherwise Opus.",
+        "reasoning_efforts": _EFFORT_LEVELS,
+        "default_reasoning": "high",
+        "access_caveat": "Resolves to Fable when available, otherwise Opus; entitlement is checked at runtime.",
+    },
+    {
+        "id": "sonnet[1m]",
+        "family": "sonnet",
+        "display_name": "Sonnet (1M context)",
+        "description": "Sonnet with a one-million-token context window.",
+        "reasoning_efforts": _EFFORT_LEVELS,
+        "default_reasoning": "high",
+    },
+    {
+        "id": "opus[1m]",
+        "family": "opus",
+        "display_name": "Opus (1M context)",
+        "description": "Opus with a one-million-token context window.",
+        "reasoning_efforts": _EFFORT_LEVELS,
+        "default_reasoning": "high",
+    },
+    {
+        "id": "opusplan",
+        "family": "opusplan",
+        "display_name": "Opus plan",
+        "description": "Opus in plan mode, then Sonnet for execution.",
+        "reasoning_efforts": _EFFORT_LEVELS,
+        "default_reasoning": "high",
+    },
+)
+_CLAUDE_MODEL_BY_ID = {row["id"]: row for row in _CLAUDE_MODEL_CATALOG}
+_MODEL_ALIAS_HINTS = tuple(row["id"] for row in _CLAUDE_MODEL_CATALOG)
 _SESSION_ID = re.compile(r"^[A-Za-z0-9._:-]{1,200}$")
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SECRET_MARKERS = re.compile(
@@ -104,40 +177,58 @@ def _parse_choices(help_text: str, flag: str, values: tuple[str, ...]) -> tuple[
     return tuple(value for value in values if value.casefold() in haystack)
 
 
-def _verified_models(account: Any, help_text: str) -> list[dict[str, Any]]:
-    # These are parser hints, not a provider catalog.  The installed CLI help
-    # must mention an alias before it is exposed as selectable capability.
-    model_section = help_text
-    marker = re.search(r"--model\b", help_text, re.IGNORECASE)
-    if marker:
-        model_section = help_text[marker.start() : marker.start() + 800]
-    discovered = tuple(
-        value
-        for value in _MODEL_ALIAS_HINTS
-        if re.search(rf"(?<![A-Za-z0-9_-]){re.escape(value)}(?![A-Za-z0-9_-])", model_section, re.IGNORECASE)
-    )
-    configured = tuple(str(value).strip() for value in getattr(account, "available_models", ()) if str(value).strip())
-    configured_verified = tuple(value for value in configured if re.search(re.escape(value), model_section, re.IGNORECASE))
-    values = tuple(dict.fromkeys((*configured_verified, *discovered)))
+def _model_capability(model: str) -> dict[str, Any] | None:
+    """Return the verified capability family for an alias or known full ID."""
+
+    value = str(model or "").strip()
+    if not value:
+        return None
+    row = _CLAUDE_MODEL_BY_ID.get(value)
+    if row is not None:
+        return row
+    # Full Anthropic model IDs are valid Claude Code model values.  Only map
+    # IDs whose family is unambiguous; arbitrary aliases stay unsupported.
+    lowered = value.casefold()
+    family = next((name for name in ("fable", "opus", "sonnet", "haiku") if f"claude-{name}-" in lowered), None)
+    if family is None:
+        return None
+    return next(row for row in _CLAUDE_MODEL_CATALOG if row["family"] == family)
+
+
+def _verified_models(account: Any, help_text: str, *, effort_levels: tuple[str, ...] | None = None) -> list[dict[str, Any]]:
+    del help_text  # `--help` is intentionally not the model catalog source.
+    supported_efforts = tuple(effort_levels or _EFFORT_LEVELS)
+    configured = [str(value).strip() for value in getattr(account, "available_models", ()) if str(value).strip()]
+    configured_model = str(getattr(account, "model", "") or "").strip()
+    configured_runtime_model = str(getattr(account, "runtime_model", "") or "").strip()
+    values = list(_MODEL_ALIAS_HINTS)
+    for value in (*configured, configured_model, configured_runtime_model):
+        if value and value not in values and _model_capability(value) is not None:
+            values.append(value)
     rows = []
-    for index, value in enumerate(dict.fromkeys(values)):
-        rows.append(
-            {
-                "id": value,
-                "model": value,
-                "display_name": value.title() if value in _MODEL_ALIAS_HINTS else value,
-                "description": "Claude Code model alias verified by the installed CLI contract.",
-                "is_default": index == 0,
-                "hidden": False,
-                "default_reasoning": None,
-                "reasoning_efforts": list(getattr(account, "supported_reasoning_efforts", ())),
-                "fixed_mode": "",
-                "runtime_model": value,
-                "runtime_variants": {},
-                "default_service_tier": None,
-                "service_tiers": [],
-            }
-        )
+    for index, value in enumerate(values):
+        contract = _model_capability(value)
+        if contract is None:
+            continue
+        efforts = tuple(item for item in contract["reasoning_efforts"] if item in supported_efforts)
+        row = {
+            "id": value,
+            "model": value,
+            "display_name": contract["display_name"] if value == contract["id"] else value,
+            "description": contract["description"],
+            "access_caveat": contract.get("access_caveat", ""),
+            "selectable": True,
+            "is_default": index == 0,
+            "hidden": False,
+            "default_reasoning": contract["default_reasoning"] if efforts else None,
+            "reasoning_efforts": list(efforts),
+            "fixed_mode": "",
+            "runtime_model": value,
+            "runtime_variants": {},
+            "default_service_tier": None,
+            "service_tiers": [],
+        }
+        rows.append(row)
     return rows
 
 
@@ -277,17 +368,17 @@ def capability_snapshot(command: str, *, cwd: Path, account: Any, role: str | No
             "help": help_text,
             "roles": roles,
         }
-    efforts = _parse_choices(help_text, "--effort", _EFFORT_LEVELS)
-    configured_efforts = tuple(getattr(account, "supported_reasoning_efforts", ()))
-    if configured_efforts:
-        efforts = tuple(value for value in configured_efforts if value in efforts)
+    # Keep the installed flag as a capability sanity check, but use the
+    # documented Claude effort contract for model rows.  Account-level effort
+    # metadata is not a Claude model catalog and may be empty or stale.
+    efforts = _parse_choices(help_text, "--effort", _EFFORT_LEVELS) or _EFFORT_LEVELS
     return {
         "available": True,
         "error": None if not missing else f"Claude Code is missing required headless flags: {', '.join(missing)}.",
         "help": help_text,
         "roles": roles,
         "efforts": efforts,
-        "models": _verified_models(account, help_text),
+        "models": _verified_models(account, help_text, effort_levels=efforts),
         "runtime_version": _runtime_version(command, cwd=cwd),
     }
 
@@ -303,6 +394,17 @@ def build_command(
     session_id: str = "",
 ) -> list[str]:
     """Construct a bounded, non-interactive Claude Code invocation."""
+
+    runtime_model = getattr(agent, "runtime_model", "") or agent.model
+    contract = _model_capability(runtime_model)
+    if runtime_model and contract is None:
+        raise ValueError(f"Selected Claude model '{runtime_model}' is not in the verified Claude Code catalog.")
+    if agent.reasoning_effort:
+        allowed = tuple(contract["reasoning_efforts"]) if contract is not None else _parse_choices(help_text, "--effort", _EFFORT_LEVELS)
+        if agent.reasoning_effort not in allowed:
+            raise ValueError(
+                f"Claude effort '{agent.reasoning_effort}' is not supported by model '{runtime_model or 'provider default'}'."
+            )
 
     permission_mode = "acceptEdits" if role == "executor" else "plan"
     # On native Windows Executor is deliberately file-edit-only.  Restricted
@@ -329,7 +431,6 @@ def build_command(
         "20",
     ]
     result.insert(2, "--restricted")
-    runtime_model = getattr(agent, "runtime_model", "") or agent.model
     if runtime_model:
         result.extend(["--model", runtime_model])
     if agent.reasoning_effort:
@@ -489,14 +590,27 @@ def run_claude_code(
     if auth_status != "OK":
         metadata["capability_failure"] = True
         return CommandResult([command, "auth", "status"], 2, "", "Claude Code authentication status could not be verified safely.", metadata)
-    models = {row["id"] for row in snapshot.get("models", ())}
+    model_rows = tuple(row for row in snapshot.get("models", ()) if isinstance(row, dict))
+    models = {row.get("id") for row in model_rows}
     selected_model = getattr(agent, "runtime_model", "") or agent.model
     if selected_model and selected_model not in models:
         metadata["availability_failure_class"] = "model_unavailable"
         return CommandResult([command, "--model", selected_model], 1, "", "Selected Claude model is not verified by this adapter.", metadata)
-    if agent.reasoning_effort and agent.reasoning_effort not in tuple(snapshot.get("efforts", ())):
+    selected_row = next((row for row in model_rows if row.get("id") == selected_model), None)
+    allowed_efforts = (
+        tuple(selected_row.get("reasoning_efforts", ()))
+        if selected_row is not None and "reasoning_efforts" in selected_row
+        else tuple(snapshot.get("efforts", ()))
+    )
+    if agent.reasoning_effort and agent.reasoning_effort not in allowed_efforts:
         metadata["capability_failure"] = True
-        return CommandResult([command, "--effort", agent.reasoning_effort], 2, "", "Selected Claude effort is not verified for the configured model.", metadata)
+        return CommandResult(
+            [command, "--effort", agent.reasoning_effort],
+            2,
+            "",
+            "Selected Claude effort is not supported by the configured model.",
+            metadata,
+        )
     try:
         env = claude_environment(agent, repository)
         session_id = _load_session(config, agent, repository, role)

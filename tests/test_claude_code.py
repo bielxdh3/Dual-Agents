@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from dual_codex.claude_code import (
     ClaudeCodeAdapter,
+    _verified_models,
     build_command,
     capability_snapshot,
     claude_environment,
@@ -161,10 +162,10 @@ class ClaudeCodeTests(unittest.TestCase):
             ):
                 snapshot = capability_snapshot("claude", cwd=root, account=agent)
             self.assertEqual(snapshot["roles"], ("architect", "reviewer", "executor"))
-            self.assertEqual(snapshot["efforts"], ("low", "medium", "high", "max"))
+            self.assertEqual(snapshot["efforts"], ("low", "medium", "high", "xhigh", "max"))
             self.assertNotIn("dangerously-skip-permissions", snapshot["help"])
 
-    def test_model_capabilities_are_discovered_from_installed_help(self) -> None:
+    def test_model_catalog_ignores_incomplete_help_and_exposes_documented_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             agent = self._agent(root)
@@ -173,8 +174,14 @@ class ClaudeCodeTests(unittest.TestCase):
                 "dual_codex.claude_code._runtime_version", return_value="2.1.268"
             ):
                 snapshot = capability_snapshot("claude", cwd=root, account=agent)
-            self.assertEqual([row["id"] for row in snapshot["models"]], ["sonnet", "opus", "fable"])
-            self.assertNotIn("haiku", {row["id"] for row in snapshot["models"]})
+            self.assertEqual(
+                [row["id"] for row in snapshot["models"]],
+                ["sonnet", "opus", "haiku", "fable", "best", "sonnet[1m]", "opus[1m]", "opusplan"],
+            )
+            haiku = next(row for row in snapshot["models"] if row["id"] == "haiku")
+            self.assertEqual(haiku["reasoning_efforts"], [])
+            fable = next(row for row in snapshot["models"] if row["id"] == "fable")
+            self.assertIn("entitlement", fable["access_caveat"])
 
     def test_effort_choices_are_parsed_from_multiline_cli_help(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -188,7 +195,28 @@ class ClaudeCodeTests(unittest.TestCase):
                 "dual_codex.claude_code._runtime_version", return_value="2.1.268"
             ):
                 snapshot = capability_snapshot("claude", cwd=root, account=agent)
-            self.assertEqual(snapshot["efforts"], ("low", "medium", "high", "max"))
+            self.assertEqual(snapshot["efforts"], ("low", "medium", "high", "xhigh", "max"))
+
+    def test_model_catalog_rejects_unknown_aliases_and_maps_effort_by_family(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            agent = self._agent(root)
+            agent = agent.__class__(**{**agent.__dict__, "available_models": ("made-up", "claude-opus-5")})
+            rows = _verified_models(agent, HELP)
+            ids = {row["id"] for row in rows}
+            self.assertNotIn("made-up", ids)
+            self.assertIn("claude-opus-5", ids)
+            self.assertEqual(next(row for row in rows if row["id"] == "claude-opus-5")["reasoning_efforts"], ["low", "medium", "high", "xhigh", "max"])
+
+    def test_no_effort_model_clears_stale_effort_before_command_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            haiku = self._agent(root, model="haiku")
+            haiku = haiku.__class__(**{**haiku.__dict__, "reasoning_effort": ""})
+            command = build_command(command="claude", agent=haiku, role="reviewer", prompt="inspect", schema="{}", help_text=HELP)
+            self.assertNotIn("--effort", command)
+            with self.assertRaises(ValueError):
+                build_command(command="claude", agent=self._agent(root, model="haiku"), role="reviewer", prompt="inspect", schema="{}", help_text=HELP)
 
     def test_native_windows_executor_is_file_edit_only_without_os_sandbox(self) -> None:
         if os.name != "nt":

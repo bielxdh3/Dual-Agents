@@ -565,7 +565,7 @@ def update_account_settings(
         requested_effort = validate_setting_value(reasoning_effort, "reasoning_effort")
         if requested_effort:
             new_reasoning_effort = requested_effort
-        elif new_backend == "api" or (new_backend == "antigravity" and (new_fixed_mode or not new_model)):
+        elif new_backend in {"api", "claude_code"} or (new_backend == "antigravity" and (new_fixed_mode or not new_model)):
             new_reasoning_effort = ""
         else:
             new_reasoning_effort = "high"
