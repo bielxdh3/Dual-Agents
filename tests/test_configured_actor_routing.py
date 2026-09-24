@@ -234,6 +234,11 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     (Path(self._instructions.name) / "skills" / "ponytail" / "SKILL.md").read_bytes()
                 ).hexdigest(),
             )
+            self.assertEqual(
+                architect_provenance["canonical_bootstrap_skill_catalog"]["ponytail"],
+                architect_provenance["canonical_bootstrap_skill_digests"]["ponytail"],
+            )
+            self.assertTrue(architect_provenance["canonical_bootstrap_skill_catalog_sha256"])
             self.assertIn("skills/ponytail/SKILL.md", architect_provenance["canonical_bootstrap_source_files"])
 
     def test_mission_dispatches_claude_roles_and_codex_executor_without_native_start(self) -> None:

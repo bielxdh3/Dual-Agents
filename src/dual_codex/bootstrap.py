@@ -37,6 +37,8 @@ class CanonicalBootstrap:
     mechanism: str = "canonical-source"
     selected_skills: tuple[str, ...] = ()
     source_files: tuple[tuple[str, str], ...] = ()
+    skill_catalog: tuple[tuple[str, str], ...] = ()
+    skill_catalog_sha256: str = ""
 
     def metadata(self) -> dict[str, object]:
         skill_digests = {
@@ -56,6 +58,8 @@ class CanonicalBootstrap:
             "canonical_bootstrap_delivery": "trusted_inline" if self.artifact_path is not None else "source-reference",
             "canonical_bootstrap_selected_skills": list(self.selected_skills),
             "canonical_bootstrap_skill_digests": skill_digests,
+            "canonical_bootstrap_skill_catalog": dict(self.skill_catalog),
+            "canonical_bootstrap_skill_catalog_sha256": self.skill_catalog_sha256,
             "canonical_bootstrap_source_files": {
                 relative: digest for relative, digest in self.source_files
             },
@@ -117,6 +121,28 @@ def _canonical_files(
     return files
 
 
+def _canonical_skill_catalog(root: Path) -> tuple[tuple[str, str], ...]:
+    """Snapshot direct skill names and hashes without selecting or delivering them."""
+
+    entries: list[tuple[str, str]] = []
+    for path in sorted((root / "skills").glob("*/SKILL.md")):
+        name = path.parent.name
+        normalized = _normalise_skill_names((name,))
+        if normalized != (name,):
+            raise ValueError(f"Invalid canonical skill directory name: {name!r}")
+        entries.append((name, hashlib.sha256(path.read_bytes()).hexdigest()))
+    return tuple(entries)
+
+
+def _skill_catalog_sha256(catalog: Iterable[tuple[str, str]]) -> str:
+    digest = hashlib.sha256()
+    for name, file_digest in catalog:
+        digest.update(f"skills/{name}/SKILL.md".encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(bytes.fromhex(file_digest))
+    return digest.hexdigest()
+
+
 def _source_sha256(files: list[tuple[str, bytes]]) -> str:
     digest = hashlib.sha256()
     for relative, content in files:
@@ -162,6 +188,8 @@ def create_canonical_bootstrap(
     selected = _normalise_skill_names(
         () if selected_skills is None and role == "architect" else selected_skills
     )
+    skill_catalog = _canonical_skill_catalog(source_root) if role == "architect" else ()
+    skill_catalog_sha256 = _skill_catalog_sha256(skill_catalog)
     files = _canonical_files(source_root, selected_skills=selected)
     source_sha256 = _source_sha256(files)
     source_files = tuple(
@@ -173,6 +201,8 @@ def create_canonical_bootstrap(
             source_sha256,
             selected_skills=selected,
             source_files=source_files,
+            skill_catalog=skill_catalog,
+            skill_catalog_sha256=skill_catalog_sha256,
         )
     destination = artifact_dir.expanduser().resolve()
     destination.mkdir(parents=True, exist_ok=True)
@@ -190,6 +220,8 @@ def create_canonical_bootstrap(
             "ephemeral-run-artifact",
             selected,
             source_files,
+            skill_catalog,
+            skill_catalog_sha256,
         )
     except BaseException:
         try:
@@ -214,6 +246,14 @@ def finalize_architect_bootstrap(
     if len(names) != len(selected_skills):
         raise ValueError("Architect plan 'skills_loaded' must not contain duplicate skill names.")
 
+    catalog = dict(bootstrap.skill_catalog)
+    missing_from_catalog = [name for name in names if name not in catalog]
+    if missing_from_catalog:
+        raise FileNotFoundError(
+            "Required canonical skills were not present in the pre-dispatch catalog snapshot: "
+            + ", ".join(missing_from_catalog)
+        )
+
     files = _canonical_files(bootstrap.source_root, selected_skills=names)
     digests = tuple(
         (relative, hashlib.sha256(content).hexdigest()) for relative, content in files
@@ -222,6 +262,12 @@ def finalize_architect_bootstrap(
     current_agents_digest = dict(digests).get("AGENTS.md")
     if initial_agents_digest and current_agents_digest != initial_agents_digest:
         raise RuntimeError("Canonical AGENTS.md changed while the Architect mission was running.")
+    for name in names:
+        loaded_digest = dict(digests).get(f"skills/{name}/SKILL.md")
+        if loaded_digest != catalog[name]:
+            raise RuntimeError(
+                f"Canonical skill '{name}' changed while the Architect mission was running."
+            )
     return CanonicalBootstrap(
         source_root=bootstrap.source_root,
         source_sha256=_source_sha256(files),
@@ -230,6 +276,8 @@ def finalize_architect_bootstrap(
         mechanism=bootstrap.mechanism,
         selected_skills=names,
         source_files=digests,
+        skill_catalog=bootstrap.skill_catalog,
+        skill_catalog_sha256=bootstrap.skill_catalog_sha256,
     )
 
 

@@ -57,6 +57,11 @@ class CanonicalBootstrapTests(unittest.TestCase):
             self.assertEqual(metadata["canonical_bootstrap_delivery"], "trusted_inline")
             self.assertEqual(metadata["canonical_bootstrap_mechanism"], "ephemeral-run-artifact")
             self.assertEqual(metadata["canonical_bootstrap_selected_skills"], [])
+            self.assertEqual(
+                metadata["canonical_bootstrap_skill_catalog"]["task-specific"],
+                hashlib.sha256((root / "skills" / "task-specific" / "SKILL.md").read_bytes()).hexdigest(),
+            )
+            self.assertTrue(metadata["canonical_bootstrap_skill_catalog_sha256"])
             self.assertTrue(snapshot.artifact_path)
             self.assertTrue(snapshot.artifact_path.is_relative_to(artifact_dir.resolve()))
             self.assertIn(str(root), snapshot.artifact_path.read_text(encoding="utf-8"))
@@ -89,6 +94,18 @@ class CanonicalBootstrapTests(unittest.TestCase):
                 metadata["canonical_bootstrap_source_files"]["skills/task-specific/SKILL.md"],
                 skill_digest,
             )
+
+    def test_architect_skill_change_after_dispatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodexGlobal"
+            root.mkdir()
+            _write_fixture(root)
+            snapshot = bootstrap.create_canonical_bootstrap(role="architect", root=root)
+            skill = root / "skills" / "task-specific" / "SKILL.md"
+            skill.write_text("# changed after dispatch\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "changed while the Architect mission was running"):
+                bootstrap.finalize_architect_bootstrap(snapshot, ["task-specific"])
 
     def test_unattended_architect_reads_task_before_loading_its_skill(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

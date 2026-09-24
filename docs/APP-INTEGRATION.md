@@ -29,7 +29,9 @@ Perfis OpenAI-compatible e perfis Claude Code restritos nao podem atuar como
 Architect: o dispatcher os recusa antes de montar ou enviar o bootstrap, pois
 nao conseguem abrir as skills canonicas selecionadas a partir do briefing. O
 plano declara os nomes das skills carregadas; o control plane verifica os
-arquivos canonicos e grava seus hashes no provenance da fase.
+arquivos canonicos contra um snapshot de hashes criado antes do despacho e
+grava o catalogo e os hashes selecionados no provenance da fase. Uma skill que
+mudar durante a missao causa falha fechada.
 
 Quando o fluxo completo `dual-codex run` e usado, cada fase resolve o ator
 novamente a partir de `[roles]` no momento da chamada. Architect e Reviewer
