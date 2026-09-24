@@ -20,6 +20,9 @@ from dual_codex.orchestrator import execute
 from dual_codex.process import CommandError, CommandResult
 
 
+ARCHITECT_BASELINE = ["memory", "ponytail", "project-phase-review", "project-security-review"]
+
+
 class ConfiguredActorRoutingTests(unittest.TestCase):
     def setUp(self) -> None:
         self._instructions = tempfile.TemporaryDirectory()
@@ -187,7 +190,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
-                        "skills_loaded": ["ponytail"],
+                        "skills_loaded": list(ARCHITECT_BASELINE),
                     }
                 elif role == "executor":
                     payload = {
@@ -227,7 +230,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
             self.assertTrue(all(item["configured_actor"] for item in provenance["configured_actor_routing"]))
             architect_provenance = provenance["configured_actor_routing"][0]
-            self.assertEqual(architect_provenance["canonical_bootstrap_selected_skills"], ["ponytail"])
+            self.assertEqual(architect_provenance["canonical_bootstrap_selected_skills"], ARCHITECT_BASELINE)
             self.assertEqual(
                 architect_provenance["canonical_bootstrap_skill_digests"]["ponytail"],
                 hashlib.sha256(
@@ -290,7 +293,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     "acceptance_criteria": [],
                     "risks": [],
                     "files_to_inspect": [],
-                    "skills_loaded": ["ponytail"],
+                    "skills_loaded": list(ARCHITECT_BASELINE),
                 },
                 "executor": {
                     "summary": "implementation",
@@ -409,7 +412,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     "acceptance_criteria": [],
                     "risks": [],
                     "files_to_inspect": [],
-                    "skills_loaded": ["ponytail"],
+                    "skills_loaded": list(ARCHITECT_BASELINE),
                 },
                 "executor": {
                     "summary": "implementation",
@@ -587,7 +590,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             repository.mkdir()
 
             def fake_runner(**kwargs):
-                kwargs["output_path"].write_text(json.dumps({"skills_loaded": ["ponytail"]}), encoding="utf-8")
+                kwargs["output_path"].write_text(json.dumps({"skills_loaded": list(ARCHITECT_BASELINE)}), encoding="utf-8")
                 return CommandResult(
                     ["fake"],
                     0,
@@ -621,7 +624,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
 
             def fake_runner(**kwargs):
                 seen_schemas[kwargs["role"]] = kwargs["schema_path"]
-                payload = {"skills_loaded": ["ponytail"]} if kwargs["role"] == "architect" else {}
+                payload = {"skills_loaded": list(ARCHITECT_BASELINE)} if kwargs["role"] == "architect" else {}
                 kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
                 return CommandResult(["fake"], 0, "", "")
 
@@ -835,7 +838,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 observed.append((kwargs["role"], kwargs["agent"].account_name, kwargs["agent"].backend))
                 if kwargs["role"] == "architect":
                     kwargs["output_path"].write_text(
-                        json.dumps({"skills_loaded": ["ponytail"]}), encoding="utf-8"
+                        json.dumps({"skills_loaded": list(ARCHITECT_BASELINE)}), encoding="utf-8"
                     )
                 return CommandResult(["fake"], 0, "", "")
 
@@ -925,18 +928,18 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             def fake_app_server(**kwargs):
                 observed.update(kwargs)
                 self.assertIn("BEGIN CANONICAL BOOTSTRAP SNAPSHOT", kwargs["prompt"])
-                self.assertIn("inline AGENTS.md below is authoritative", kwargs["prompt"])
+                self.assertIn("inline AGENTS.md and mandatory Architect baseline skills below are", kwargs["prompt"])
                 self.assertNotIn("Read C:\\CodexGlobal", kwargs["prompt"])
                 self.assertNotIn("Read the complete ephemeral bootstrap artifact", kwargs["prompt"])
                 self.assertNotIn("Get-Content", kwargs["prompt"])
                 self.assertIn("canonical_source_path:", kwargs["prompt"])
                 self.assertIn("first read only the supplied task/architect artifact", kwargs["prompt"])
                 self.assertIn("Do not ask the user to choose or identify skills", kwargs["prompt"])
-                self.assertIn("No skills were preselected by the control plane", kwargs["prompt"])
-                self.assertNotIn("# memory", kwargs["prompt"])
-                self.assertNotIn("# project-security-review", kwargs["prompt"])
+                self.assertIn("Mandatory Architect baseline skills already loaded", kwargs["prompt"])
+                self.assertIn("# memory", kwargs["prompt"])
+                self.assertIn("# project-security-review", kwargs["prompt"])
                 kwargs["output_path"].write_text(
-                    json.dumps({"skills_loaded": ["ponytail"]}), encoding="utf-8"
+                    json.dumps({"skills_loaded": list(ARCHITECT_BASELINE)}), encoding="utf-8"
                 )
                 return expected
 
@@ -964,16 +967,16 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertTrue(result.metadata["canonical_bootstrap_artifact_sha256"])
             self.assertEqual(
                 result.metadata["canonical_bootstrap_delivery"],
-                "mixed",
+                "trusted_inline",
             )
             self.assertIn("skills/ponytail/SKILL.md", result.metadata["canonical_bootstrap_source_files"])
-            self.assertNotIn(
+            self.assertIn(
                 "skills/ponytail/SKILL.md",
                 result.metadata["canonical_bootstrap_artifact_source_files"],
             )
             self.assertEqual(
                 result.metadata["canonical_bootstrap_selected_skills"],
-                ["ponytail"],
+                ARCHITECT_BASELINE,
             )
             self.assertNotIn(r"C:\CodexGlobal", result.command)
             self.assertFalse(Path(result.metadata["canonical_bootstrap_artifact"]).exists())

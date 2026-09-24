@@ -18,22 +18,29 @@ e so considera perfis explicitamente autorizados para o role.
    `correct` ligado por `parent_request_id`. Nao ha correcao automatica sem
    essa evidencia.
 
-No bootstrap do role `architect`, o App injeta o `AGENTS.md` canonico e deixa
-a selecao de skills para o proprio Architect. Em uma missao unattended, ele
-pode ler o briefing ou artefato fornecido em modo somente leitura, escolhe e
-le por completo as skills canonicas aplicaveis sem perguntar ao usuario e so
-entao inspeciona o repositorio ou planeja. A execucao para em fail-closed se
-uma skill exigida nao puder ser carregada.
+No bootstrap do role `architect`, o App injeta o `AGENTS.md` canonico e o
+baseline obrigatorio de skills. Em uma missao unattended, o Architect pode
+primeiro ler o briefing ou artefato fornecido como contexto somente leitura;
+depois escolhe e le por completo as skills canonicas adicionais aplicaveis,
+sem perguntar ao usuario. So entao inspeciona o repositorio ou planeja. A
+execucao para em fail-closed se uma skill exigida nao puder ser carregada, e o
+plano declara o baseline e todas as skills adicionais carregadas.
 
 Perfis OpenAI-compatible e perfis Claude Code restritos nao podem atuar como
 Architect: o dispatcher os recusa antes de montar ou enviar o bootstrap, pois
 nao conseguem abrir as skills canonicas selecionadas a partir do briefing. O
-plano declara os nomes das skills carregadas; o control plane verifica os
-arquivos canonicos contra um snapshot de hashes criado antes do despacho. O
-provenance registra separadamente o artefato inline de `AGENTS.md`, as fontes
-canonicas selecionadas depois da leitura do briefing e o catalogo completo. A
-entrega e marcada como mista quando as skills vierem por referencia a fonte.
-Uma skill que mudar durante a missao causa falha fechada.
+plano declara os nomes das skills carregadas; o control plane exige o baseline
+e verifica todos os arquivos canonicos contra hashes registrados antes e
+depois do despacho. O provenance separa `AGENTS.md` e skills do baseline
+injetados inline, skills adicionais escolhidas depois da leitura do briefing e
+o catalogo completo. A entrega e marcada como mista quando uma skill adicional
+vier por referencia a fonte. Uma skill que mudar durante a missao causa falha
+fechada.
+
+A interface mostra somente os roles suportados pelo backend do perfil e
+permite remover atribuicoes antigas que ficaram invalidas. O registro tambem
+rejeita atribuicoes primarias, fallbacks ou trocas incompatíveis, inclusive ao
+alterar o backend de um perfil.
 
 Quando o fluxo completo `dual-codex run` e usado, cada fase resolve o ator
 novamente a partir de `[roles]` no momento da chamada. Architect e Reviewer

@@ -1214,8 +1214,9 @@ function latestMutationCanApply(sequence,latestSequence){return sequence===lates
 function setDraftSectionDirty(draft,section,dirty){if(!draft)return false;const key=section==='settings'?'dirtySettings':'dirtyRoles';draft[key]=Boolean(dirty);draft.dirty=Boolean(draft.dirtySettings||draft.dirtyRoles);return draft.dirty}
 function shouldPreserveDashboardDraft(draft){return Boolean(draft&&(draft.dirty||draft.dirtySettings||draft.dirtyRoles))}
 function shouldReplaceDashboardCard(draft){return !shouldPreserveDashboardDraft(draft)}
+function dashboardRoleOptions(roleNames,assignedRoles,supportedRoles){const assigned=new Set(Array.isArray(assignedRoles)?assignedRoles:[]);const supported=new Set(Array.isArray(supportedRoles)?supportedRoles:[]);return [...new Set(Array.isArray(roleNames)?roleNames:[])].filter(role=>supported.has(role)||assigned.has(role)).map(role=>({role,supported:supported.has(role),assigned:assigned.has(role)}))}
 if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardState={responseIsCurrent,snapshotIsCurrent,latestMutationCanApply,setDraftSectionDirty,shouldPreserveDashboardDraft,shouldReplaceDashboardCard};
-if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardCapabilities={modelCapabilities,reconcileCapabilitySelection};
+if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardCapabilities={modelCapabilities,reconcileCapabilitySelection,dashboardRoleOptions};
 """
 
 SCRIPT = CAPABILITY_SCRIPT + """
@@ -1348,11 +1349,12 @@ function draftFor(account, reset) {
   }
   return existing;
 }
-function roleEditor(account, draft) {
+function roleEditor(draft, capabilities) {
   const assigned = new Set(draft.roles || []);
   const fallback = new Set(draft.fallback_roles || []);
-  const primary = ROLE_NAMES.map(role => '<label class="check"><input type="checkbox" data-primary-role value="' + role + '"' + (assigned.has(role) ? ' checked' : '') + '>' + role + '</label>').join('');
-  const fallbackRows = ROLE_NAMES.filter(role => role !== 'orchestrator').map(role => '<label class="check"><input type="checkbox" data-fallback-role value="' + role + '"' + (fallback.has(role) ? ' checked' : '') + '>' + role + '</label>').join('');
+  const supportedRoles = capabilities && Array.isArray(capabilities.supported_roles) ? capabilities.supported_roles : [];
+  const primary = dashboardRoleOptions(ROLE_NAMES, [...assigned], supportedRoles).map(option => '<label class="check"><input type="checkbox" data-primary-role data-role-supported="' + option.supported + '" value="' + option.role + '"' + (option.assigned ? ' checked' : '') + '>' + option.role + (option.supported ? '' : ' <span class="sub">unsupported by provider</span>') + '</label>').join('');
+  const fallbackRows = dashboardRoleOptions(ROLE_NAMES.filter(role => role !== 'orchestrator'), [...fallback], supportedRoles).map(option => '<label class="check"><input type="checkbox" data-fallback-role data-role-supported="' + option.supported + '" value="' + option.role + '"' + (option.assigned ? ' checked' : '') + '>' + option.role + (option.supported ? '' : ' <span class="sub">unsupported by provider</span>') + '</label>').join('');
   return '<fieldset class="role-editor"><legend>Primary roles</legend><div class="role-options">' + primary + '</div><details class="fallback-details"><summary>Fallback eligibility</summary><div class="role-options">' + fallbackRows + '</div></details></fieldset>';
 }
 function card(account, draft) {
@@ -1375,7 +1377,7 @@ function card(account, draft) {
   const error = account.last_error ? '<div class="error" data-runtime-error>' + esc(String(account.last_error).split(';')[0]) + '</div>' : '';
   return '<article class="card" data-account="' + esc(account.name) + '" data-provider="' + esc(provider) + '">' +
     '<div class="card-head"><div><h3>' + esc(account.label || account.name) + '</h3><div class="sub" data-provider-line>' + esc(providerLabel) + ' · ' + esc(account.name) + '</div></div><div data-runtime-pill>' + pill(account.runtime_state) + '</div></div>' +
-    '<div class="control">' + roleEditor(account, draft) + '<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite"></span><button class="button secondary" data-roles-save data-mutation>Save roles</button></div></div>' +
+    '<div class="control">' + roleEditor(draft, capabilities) + '<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite"></span><button class="button secondary" data-roles-save data-mutation>Save roles</button></div></div>' +
     '<div class="grid"><div class="field"><label>Model</label><select data-model>' + options(models, draft.model, draft.model ? false : (account.configured.model_label || 'Provider default')) + '</select></div><div class="field"><label>Effort</label><select data-effort ' + (state.reasoning_disabled ? 'disabled' : '') + '>' + rendered.efforts + '</select></div></div>' +
     '<div class="save-row"><span class="feedback" data-feedback aria-live="polite"></span><button class="button" data-save data-mutation>Save</button></div>' +
     '<details class="advanced"><summary>Details</summary><div class="grid"><div class="field"><label>Effective model</label><output>' + esc(account.effective && account.effective.model || 'Unknown') + '</output></div><div class="field"><label>Effective reasoning</label><output>' + esc(account.effective && account.effective.reasoning_effort || 'Unknown') + '</output></div><div class="field"><label>Service tier</label><select data-tier ' + (state.service_tier_disabled ? 'disabled' : '') + '>' + rendered.tiers + '</select></div><div class="field"><label>Backend</label><select data-backend ' + (executor ? 'disabled' : '') + '>' + backendOptions + '</select></div></div><div class="feedback" data-capability-feedback aria-live="polite">' + esc(state.message || 'Capabilities match the selected provider.') + '</div><div class="sub">Availability: ' + esc(availabilityLabel(account)) + '</div><div class="detail-grid"><div><span class="metric-label">State root</span><div class="value">' + esc(account.codex_home) + '</div></div><div><span class="metric-label">Usage</span><div class="value">Lifetime tokens: ' + fmtTokens(usage) + '</div></div></div>' + (thread ? '<div class="thread"><div class="metric-label">Persistent thread</div><div class="value">' + esc(thread.name || thread.id || 'Unknown') + '</div><div class="sub">' + esc(thread.status || 'Unknown') + ' · token usage ' + (account.token_usage ? 'available' : 'not available') + '</div></div>' : '') + error + '</details></article>';
@@ -1573,6 +1575,8 @@ async function loadProviderCatalog(cardNode, backend) {
     draft.providerModels = cardNode._providerModels;
     draft.providerCapabilities = cardNode._providerCapabilities;
     dashboardState.drafts.set(name, draft);
+    const roleEditorNode = cardNode.querySelector('.role-editor');
+    if (roleEditorNode) roleEditorNode.outerHTML = roleEditor(draft, cardNode._providerCapabilities);
     const model = cardNode.querySelector('[data-model]');
     if (model) {
       model.innerHTML = options(cardNode._providerModels, '', payload.provider_label ? payload.provider_label + ' default' : 'Provider default');
@@ -1699,6 +1703,10 @@ document.addEventListener('change', event => {
   const cardNode = target && target.closest && target.closest('.card[data-account]');
   if (!cardNode) return;
   if (target.matches('[data-primary-role], [data-fallback-role]')) {
+    if (target.dataset.roleSupported === 'false') {
+      target.checked = false;
+      target.disabled = true;
+    }
     markDraft(cardNode, 'roles');
     return;
   }

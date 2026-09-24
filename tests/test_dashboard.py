@@ -360,6 +360,8 @@ console.log(JSON.stringify({
   fixed: capabilityHelper.reconcileCapabilitySelection(models, 'fixed', 'high', '', {effort_levels: ['low', 'medium', 'high']}),
   providerDefault: capabilityHelper.reconcileCapabilitySelection(models, '', 'high', '', {effort_levels: []}),
   missingDefault: capabilityHelper.reconcileCapabilitySelection(models.map(model => ({...model, is_default: false})), '', 'high', 'fast'),
+  apiRoles: capabilityHelper.dashboardRoleOptions(['orchestrator', 'architect', 'reviewer', 'executor'], [], ['orchestrator', 'reviewer']),
+  staleArchitect: capabilityHelper.dashboardRoleOptions(['orchestrator', 'architect', 'reviewer', 'executor'], ['architect'], ['orchestrator', 'reviewer']),
 }));
 """
         result = subprocess.run([node, "-"], input=source, text=True, capture_output=True, check=True)
@@ -379,6 +381,11 @@ console.log(JSON.stringify({
         self.assertTrue(payload["providerDefault"]["reasoning_disabled"])
         self.assertIsNone(payload["missingDefault"]["selected_model"])
         self.assertTrue(payload["missingDefault"]["reasoning_disabled"])
+        self.assertNotIn("architect", [row["role"] for row in payload["apiRoles"]])
+        stale = next(row for row in payload["staleArchitect"] if row["role"] == "architect")
+        self.assertFalse(stale["supported"])
+        self.assertTrue(stale["assigned"])
+        self.assertIn("target.dataset.roleSupported === 'false'", SCRIPT)
 
     def test_backend_rejects_invalid_model_reasoning_and_tier_combinations(self) -> None:
         service = DashboardService(self.config)

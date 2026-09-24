@@ -24,6 +24,7 @@ _DEFAULT_SELECTED_SKILLS = (
     "project-phase-review",
     "project-security-review",
 )
+_MANDATORY_ARCHITECT_SKILLS = _DEFAULT_SELECTED_SKILLS
 
 
 @dataclass(frozen=True)
@@ -109,13 +110,13 @@ def _normalise_skill_names(selected_skills: Iterable[str] | None) -> tuple[str, 
 def select_required_skills(role: str, task: str = "") -> tuple[str, ...]:
     """Return skills the control plane can safely preselect for a phase.
 
-    Architect skill selection is deferred to the actor because the applicable
-    set depends on the task brief. Other configured phases retain their bounded
-    transport set.
+    Architect task-specific skill selection is deferred to the actor because
+    the applicable set depends on the task brief. Its mandatory baseline and
+    other configured phases retain their bounded transport set.
     """
 
     if role == "architect":
-        return ()
+        return _normalise_skill_names(_MANDATORY_ARCHITECT_SKILLS)
     selected = {"memory", "ponytail"}
     if role == "reviewer":
         selected.update({"project-phase-review", "project-security-review"})
@@ -200,9 +201,11 @@ def create_canonical_bootstrap(
     """Validate canonical policy and optionally materialize one ephemeral snapshot."""
 
     source_root = canonical_instructions_root(root)
-    selected = _normalise_skill_names(
-        () if selected_skills is None and role == "architect" else selected_skills
-    )
+    if role == "architect":
+        requested_skills = () if selected_skills is None else tuple(selected_skills)
+        selected = _normalise_skill_names((*_MANDATORY_ARCHITECT_SKILLS, *requested_skills))
+    else:
+        selected = _normalise_skill_names(selected_skills)
     skill_catalog = _canonical_skill_catalog(source_root) if role == "architect" else ()
     skill_catalog_sha256 = _skill_catalog_sha256(skill_catalog)
     files = _canonical_files(source_root, selected_skills=selected)
@@ -262,6 +265,13 @@ def finalize_architect_bootstrap(
     names = _normalise_skill_names(selected_skills)
     if len(names) != len(selected_skills):
         raise ValueError("Architect plan 'skills_loaded' must not contain duplicate skill names.")
+    missing_mandatory = [name for name in _MANDATORY_ARCHITECT_SKILLS if name not in names]
+    if missing_mandatory:
+        raise ValueError(
+            "Architect plan 'skills_loaded' must include the mandatory baseline skills: "
+            + ", ".join(missing_mandatory)
+            + "."
+        )
 
     catalog = dict(bootstrap.skill_catalog)
     missing_from_catalog = [name for name in names if name not in catalog]
@@ -334,7 +344,7 @@ def configured_actor_prompt(
     text = str(prompt)
     if BOOTSTRAP_MARKER in text:
         return text, bootstrap
-    deferred_architect_skills = role == "architect" and not bootstrap.selected_skills
+    deferred_architect_skills = role == "architect"
     artifact = bootstrap.artifact_path
     if artifact is None:
         transport = "The trusted host could not provide an inline canonical bootstrap artifact. Fail closed."
@@ -347,8 +357,9 @@ def configured_actor_prompt(
             source_description = (
                 "The trusted Dual Agents control plane loaded the canonical AGENTS.md "
                 f"directly from {bootstrap.source_root} and verified its SHA-256 value. "
-                "The inline AGENTS.md below is authoritative and already loaded. Skills "
-                "were intentionally left unselected because selection depends on the task. "
+                "The inline AGENTS.md and mandatory Architect baseline skills below are "
+                "authoritative, verified, and already loaded. Additional task-specific "
+                "skills were intentionally left unselected because selection depends on the task. "
             )
             source_access = (
                 "Do not reread AGENTS.md or this transport artifact. For this unattended "
@@ -356,8 +367,9 @@ def configured_actor_prompt(
                 "read-only context; if none is referenced, use the TASK content in this "
                 "prompt. This is the authorized read-only pre-read exception; inspect no "
                 "other task or repository files and start no task work yet. "
-                "Then select all applicable skills from the canonical catalog at "
-                f"{bootstrap.source_root / 'skills'} and read each complete SKILL.md. Do not "
+                "Then select all additional applicable skills from the canonical catalog at "
+                f"{bootstrap.source_root / 'skills'} and read each complete SKILL.md. The "
+                "mandatory baseline skills listed below are already loaded. Do not "
                 "ask the user to choose or identify skills. If a required skill is unavailable, "
                 "stop without asking for clarification. Do not inspect repository files, plan, "
                 "edit, or run task commands until AGENTS.md and all selected skills are loaded. "
@@ -382,8 +394,8 @@ def configured_actor_prompt(
         )
     if deferred_architect_skills:
         skill_status = (
-            "No skills were preselected by the control plane; this does not mean no skill "
-            "applies. Select and load them yourself after reading the task context."
+            f"Mandatory Architect baseline skills already loaded: {', '.join(bootstrap.selected_skills)}. "
+            "Select and load any additional task-specific skills yourself after reading the task context."
         )
     else:
         skill_status = (

@@ -717,7 +717,7 @@ class ClaudeCodeAdapter:
     adapter = "claude_code"
 
     def capabilities(self, config: Any, account: Any) -> Any:
-        from .providers import ProviderCapabilities
+        from .providers import ProviderCapabilities, supported_roles_for_backend
 
         snapshot = capability_snapshot(config.claude_command, cwd=config.project_root, account=account)
         if not snapshot.get("available"):
@@ -730,10 +730,11 @@ class ClaudeCodeAdapter:
                 isolation_note="Claude Code credentials remain provider-owned; no credential files are copied.",
                 profile_isolation=True,
                 error=_safe_error(snapshot.get("error")),
+                supported_roles=supported_roles_for_backend(account.backend),
             )
         # Restricted Claude runs in the repository and cannot read the
         # machine-wide skill catalog without a separately granted path.
-        roles = tuple(role for role in snapshot.get("roles", ()) if role != "architect")
+        roles = supported_roles_for_backend(account.backend)
         efforts = tuple(snapshot.get("efforts", ()))
         auth_status = claude_status(config.claude_command, cwd=config.project_root, account=account)
         credential_status = "configured" if auth_status == "OK" else "missing" if auth_status in {"NOT CONFIGURED", "NOT LOGGED IN"} else "unknown"

@@ -92,7 +92,12 @@ class OrchestratorTests(unittest.TestCase):
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
-                        "skills_loaded": ["ponytail"],
+                        "skills_loaded": [
+                            "memory",
+                            "ponytail",
+                            "project-phase-review",
+                            "project-security-review",
+                        ],
                     }
                 elif role == "executor":
                     payload = {

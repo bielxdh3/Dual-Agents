@@ -20,7 +20,7 @@ import urllib.request
 from urllib.parse import urlsplit, urlunsplit
 
 from .antigravity import antigravity_status
-from .config import AccountConfig, AgentConfig, OrchestratorConfig
+from .config import AccountConfig, AgentConfig, OrchestratorConfig, SUPPORTED_ROLES
 from .process import CommandResult, _prepare_command
 
 
@@ -91,6 +91,21 @@ class ProviderCapabilities:
         if self.runtime_status in {"Unavailable", "Unknown"}:
             return False
         return not self.supported_roles or role in self.supported_roles
+
+
+_BACKEND_SUPPORTED_ROLES = {
+    "app_server": tuple(SUPPORTED_ROLES),
+    "windows": tuple(SUPPORTED_ROLES),
+    "antigravity": ("executor",),
+    "api": ("orchestrator", "reviewer"),
+    "claude_code": ("reviewer", "executor"),
+}
+
+
+def supported_roles_for_backend(backend: str) -> tuple[str, ...]:
+    """Return declarative role support, independent of runtime availability."""
+
+    return _BACKEND_SUPPORTED_ROLES.get(backend, ())
 
 
 class ProviderAdapter(Protocol):
@@ -250,7 +265,7 @@ class CodexAdapter:
             isolation_note="Codex profile state is isolated by the account CODEX_HOME.",
             credential_status="provider-managed",
             runtime_status="Configured",
-            supported_roles=("orchestrator", "architect", "reviewer", "executor"),
+            supported_roles=supported_roles_for_backend(account.backend),
         )
 
 
@@ -380,7 +395,7 @@ class AntigravityAdapter:
                 isolation_note="The installed agy 1.2.7 exposes no profile/state-root isolation flag.",
                 credential_status="provider-managed",
                 runtime_status="Unavailable",
-                supported_roles=("executor",),
+                supported_roles=supported_roles_for_backend(account.backend),
                 error=_safe_error(exc),
             )
         models = _parse_antigravity_models(result.stdout)
@@ -405,7 +420,7 @@ class AntigravityAdapter:
             runtime_status="Authenticated" if status == "OK" and result.returncode == 0 else "Unavailable",
             authenticated=status == "OK" and result.returncode == 0,
             error=error,
-            supported_roles=("executor",),
+            supported_roles=supported_roles_for_backend(account.backend),
         )
 
 
@@ -445,7 +460,7 @@ class OpenAICompatibleAdapter:
             runtime_status="Configured" if error is None and credential_status == "configured" else "Unavailable",
             authenticated=credential_status == "configured",
             error=error,
-            supported_roles=("orchestrator", "reviewer"),
+            supported_roles=supported_roles_for_backend(account.backend),
         )
 
     def run(

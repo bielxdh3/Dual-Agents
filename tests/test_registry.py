@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import redirect_stdout
+from dataclasses import replace
 from io import StringIO
 import os
 from pathlib import Path
@@ -13,12 +14,15 @@ from dual_codex.config import ConfigError, load_config
 from dual_codex.registry import (
     AccountConfig,
     add_account,
+    assign_role,
     ensure_codex_profile,
     logout_account,
     migrate_legacy_config,
     remove_account,
     rename_account,
+    set_roles_for_account,
     swap_roles,
+    update_account_settings,
     unassign_role,
     write_registry_config,
 )
@@ -83,6 +87,47 @@ class RegistryTests(unittest.TestCase):
                 from dual_codex.registry import assign_role
 
                 assign_role(config, "executor", "missing")
+
+    def test_provider_role_support_is_enforced_for_assignments_and_backend_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.toml"
+            _write_registry(path)
+            config = load_config(path)
+            api_account = replace(
+                config.accounts["spare"],
+                name="api",
+                codex_home=Path(temp) / "profiles" / "api",
+                backend="api",
+                provider_type="api",
+                adapter_type="openai_compatible",
+                auth_mode="environment",
+                auth_reference="env:TEST_API_KEY",
+                base_url="https://api.example.test/v1",
+            )
+            config = replace(config, accounts={**config.accounts, "api": api_account})
+            original = path.read_bytes()
+
+            with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+                assign_role(config, "architect", "api")
+            with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+                set_roles_for_account(config, "api", ["architect"])
+            with self.assertRaisesRegex(ConfigError, "does not support fallback role\\(s\\): architect"):
+                set_roles_for_account(config, "api", [], fallback_roles=["architect"])
+
+            invalid_swap = replace(config, roles={**config.roles, "reviewer": "api"})
+            with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+                swap_roles(invalid_swap, "architect", "reviewer")
+
+            with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+                update_account_settings(
+                    config,
+                    "primary",
+                    backend="api",
+                    auth_mode="environment",
+                    auth_reference="env:TEST_API_KEY",
+                    base_url="https://api.example.test/v1",
+                )
+            self.assertEqual(path.read_bytes(), original)
 
     def test_role_swap_output_keeps_requested_role_order(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

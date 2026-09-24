@@ -15,6 +15,9 @@ from dual_codex.process import CommandResult, _prepare_command
 from dual_codex.terminal import TerminalError
 
 
+ARCHITECT_BASELINE = ["memory", "ponytail", "project-phase-review", "project-security-review"]
+
+
 def _agent(sandbox: str, *, backend: str = "windows") -> AgentConfig:
     return AgentConfig(
         codex_home=Path("C:/CodexProfiles/test"),
@@ -59,10 +62,13 @@ class CodexCommandTests(unittest.TestCase):
             repository = root / "target"
             repository.mkdir()
             canonical_root = root / "canonical"
+            canonical_root.mkdir()
             skill_path = canonical_root / "skills" / "ponytail" / "SKILL.md"
-            skill_path.parent.mkdir(parents=True)
             (canonical_root / "AGENTS.md").write_text("Follow global policy.\n", encoding="utf-8")
-            skill_path.write_text("Use the simplest implementation.\n", encoding="utf-8")
+            for name in ARCHITECT_BASELINE:
+                skill = canonical_root / "skills" / name / "SKILL.md"
+                skill.parent.mkdir(parents=True, exist_ok=True)
+                skill.write_text(f"# {name}\n", encoding="utf-8")
             output_path = root / "plan.json"
             expected = CommandResult(["codex", "terminal"], 0, "", "")
             agent = _agent("read-only", backend="windows")
@@ -95,10 +101,10 @@ class CodexCommandTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "skills_loaded"):
                 dispatch_architect_plan([])
 
-            result = dispatch_architect_plan(["ponytail"])
+            result = dispatch_architect_plan(ARCHITECT_BASELINE)
 
             self.assertIs(result, expected)
-            self.assertEqual(result.metadata["canonical_bootstrap_selected_skills"], ["ponytail"])
+            self.assertEqual(result.metadata["canonical_bootstrap_selected_skills"], ARCHITECT_BASELINE)
             self.assertEqual(
                 result.metadata["canonical_bootstrap_skill_digests"]["ponytail"],
                 hashlib.sha256(skill_path.read_bytes()).hexdigest(),
