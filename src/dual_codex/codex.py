@@ -5,6 +5,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
+from uuid import uuid4
 
 from .bootstrap import (
     BOOTSTRAP_MARKER,
@@ -688,8 +689,19 @@ def run_codex_terminal(
     reuse_existing: bool = False,
     progress: Callable[[str], None] | None = None,
 ) -> CommandResult:
-    from .terminal import TerminalError, TerminalManager, TerminalSetupRequiredError
+    from .terminal import (
+        TERMINAL_INLINE_MESSAGE_MAX,
+        TerminalError,
+        TerminalManager,
+        TerminalSetupRequiredError,
+        executor_task_artifact_dir,
+    )
 
+    resolved_role = role or ("executor" if agent.sandbox == "workspace-write" else "architect")
+    temporary_task_artifact_path: Path | None = None
+    temporary_task_artifact_content = ""
+    task_input_attempted = False
+    task_turn_completed = False
     transport = "file" if task_artifact_path is not None else "inline"
     artifact = str(task_artifact_path.resolve()) if task_artifact_path is not None else ""
     metadata = {
@@ -707,8 +719,56 @@ def run_codex_terminal(
             f"Task artifact does not exist: {task_artifact_path}",
             metadata,
         )
-    manager = TerminalManager(config)
     try:
+        manager = TerminalManager(config)
+        if task_artifact_path is None and len(prompt) > TERMINAL_INLINE_MESSAGE_MAX:
+            temporary_task_artifact_content = f"# Dual Codex {resolved_role} instructions\n\n{prompt.rstrip()}\n"
+            if agent.sandbox == "read-only":
+                # Read-only Codex rejects extra roots; stage the prompt under cwd and remove it after the turn.
+                repository_root = Path(repository).expanduser().resolve()
+                if not repository_root.is_dir():
+                    raise TerminalError(f"Task repository does not exist: {repository_root}")
+                for _attempt in range(3):
+                    candidate = repository_root / f".dual-codex-task-{uuid4().hex}.md"
+                    try:
+                        with candidate.open("x", encoding="utf-8", newline="\n") as stream:
+                            stream.write(temporary_task_artifact_content)
+                        task_artifact_path = candidate
+                        break
+                    except FileExistsError:
+                        continue
+                if task_artifact_path is None:
+                    raise TerminalError("Could not allocate a unique read-only task artifact.")
+                temporary_task_artifact_path = task_artifact_path
+            else:
+                if resolved_role != "executor":
+                    raise TerminalError("Only the configured Executor may use writable terminal task transport.")
+                artifact_dir = executor_task_artifact_dir(config, create=True)
+                task_artifact_path = artifact_dir / f"{resolved_role}-{uuid4().hex}.md"
+                task_artifact_path.write_text(temporary_task_artifact_content, encoding="utf-8", newline="\n")
+            content = temporary_task_artifact_content
+            task_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            prompt = (
+                f'Read the complete {resolved_role} instructions from "{task_artifact_path}" '
+                "and return the requested result."
+            )
+            transport = "file"
+            artifact = str(task_artifact_path.resolve())
+            metadata.update(
+                {
+                    "task_transport": transport,
+                    "task_artifact": artifact,
+                    "task_sha256": task_sha256,
+                }
+            )
+        if task_artifact_path is not None and not task_artifact_path.is_file():
+            return CommandResult(
+                ["codex", "--no-alt-screen", "--sandbox", agent.sandbox],
+                1,
+                "",
+                f"Task artifact does not exist: {task_artifact_path}",
+                metadata,
+            )
         if reuse_existing:
             try:
                 manager._load(session_id)
@@ -735,11 +795,16 @@ def run_codex_terminal(
             # artifact captured by the orchestrator.
             add_dirs = ()
         else:
-            add_dirs = (task_artifact_path.parent.resolve(),) if task_artifact_path is not None else ()
+            artifact_parent = task_artifact_path.parent.resolve() if task_artifact_path is not None else None
+            add_dirs = (
+                (artifact_parent,)
+                if artifact_parent is not None and not same_path(artifact_parent, repository)
+                else ()
+            )
         ensure_kwargs = {
             "session_id": session_id,
             "agent": agent,
-            "role": role or ("executor" if agent.sandbox == "workspace-write" else "architect"),
+            "role": resolved_role,
             "repository": repository,
             "approval_policy": "never" if agent.sandbox == "workspace-write" else "on-request",
             "add_dirs": add_dirs,
@@ -753,8 +818,10 @@ def run_codex_terminal(
         cursor = manager.turn_cursor(session.session_id)
         lease_owner = manager.begin_automation_turn(session.session_id)
         try:
+            task_input_attempted = True
             turn_start = manager.send(session.session_id, prompt, lease_owner=lease_owner)
             result = manager.wait_for_turn(session.session_id, cursor=cursor, progress=progress)
+            task_turn_completed = True
         finally:
             manager.release_input_lease(session.session_id, lease_owner)
         assistant = result.get("assistant", "")
@@ -766,6 +833,24 @@ def run_codex_terminal(
         terminal_pid = int(status_snapshot.get("pid") or session.pid)
         host_pid = int(status_snapshot.get("host_pid") or session.pid)
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        if temporary_task_artifact_path is not None:
+            archived_task_artifact = output_path.with_name(f"{output_path.stem}-{uuid4().hex}.task.md")
+            archived_task_artifact.write_text(temporary_task_artifact_content, encoding="utf-8", newline="\n")
+            artifact = str(archived_task_artifact.resolve())
+            metadata.update(
+                {
+                    "task_transport": "file",
+                    "task_artifact": artifact,
+                    "task_sha256": task_sha256,
+                }
+            )
+            turn_start.update(
+                {
+                    "task_transport": "file",
+                    "task_artifact": artifact,
+                    "task_sha256": task_sha256,
+                }
+            )
         output_path.write_text(
             json.dumps(report, ensure_ascii=False) if report is not None else assistant,
             encoding="utf-8",
@@ -821,7 +906,7 @@ def run_codex_terminal(
                 },
             },
         )
-    except TerminalError as exc:
+    except (TerminalError, OSError) as exc:
         metadata["terminal_error_type"] = type(exc).__name__
         if isinstance(exc, TerminalSetupRequiredError):
             metadata["terminal_setup_required"] = True
@@ -832,3 +917,12 @@ def run_codex_terminal(
             str(exc),
             metadata,
         )
+    finally:
+        if temporary_task_artifact_path is not None:
+            if task_input_attempted and not task_turn_completed:
+                metadata["task_artifact_cleanup_pending"] = str(temporary_task_artifact_path)
+            else:
+                try:
+                    temporary_task_artifact_path.unlink(missing_ok=True)
+                except OSError as exc:
+                    metadata["task_artifact_cleanup_error"] = str(exc)
