@@ -57,6 +57,39 @@ def _config(root: Path, repository: Path) -> OrchestratorConfig:
     )
 
 
+def _write_terminal_session(
+    config: OrchestratorConfig,
+    account: str,
+    repository: Path,
+    *,
+    role: str = "executor",
+    process_start_identity: str = "host-start",
+    process_epoch: str = "host-epoch",
+) -> tuple[TerminalSession, Path]:
+    session_id = session_id_for(account, repository)
+    sessions = config.runs_dir / "terminal-sessions"
+    record = sessions / f"{session_id}.json"
+    session = TerminalSession(
+        session_id=session_id,
+        account=account,
+        label="Executor",
+        role=role,
+        repository=repository,
+        codex_home=config.runs_dir / "profiles" / account,
+        pipe=rf"\\.\pipe\dual-codex-{session_id}-aaaaaaaaaaaaaaaa",
+        pid=123,
+        started_at="now",
+        log_file=sessions / f"{session_id}.pty.log",
+        session_file=str(record.resolve()),
+        process_started_at=1.0,
+        process_start_identity=process_start_identity,
+        process_epoch=process_epoch,
+    )
+    sessions.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps(session.as_dict()), encoding="utf-8")
+    return session, record
+
+
 def _normal_screen(prompt: str = "Improve documentation in @filename") -> str:
     return (
         "\u2502 >_ OpenAI Codex (v0.146.1)                  \u2502\n"
@@ -140,11 +173,12 @@ class TerminalTests(unittest.TestCase):
             record.write_text(json.dumps(session.as_dict()), encoding="utf-8")
             manager = TerminalManager.__new__(TerminalManager)
             manager.config = config
-            manager.status = lambda _session_id: {"state": "unreachable"}
-
             replacement = replace(session, state="ready", process_start_identity="new-process")
             manager.start = lambda **_kwargs: replacement
-            with patch("dual_codex.terminal._process_start_identity", return_value=""), patch(
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                side_effect=TerminalError("named pipe does not exist"),
+            ), patch("dual_codex.terminal._process_start_identity", return_value=""), patch(
                 "dual_codex.terminal._process_is_alive", return_value=False
             ):
                 result = manager.ensure(
@@ -1568,6 +1602,8 @@ function idleScreen(model) {{
             with patch(
                 "dual_codex.terminal._pipe_request",
                 side_effect=TerminalError("temporary pipe outage"),
+            ), patch("dual_codex.terminal._process_start_identity", return_value=""), patch(
+                "dual_codex.terminal._process_is_alive", return_value=True
             ):
                 rows = manager.list()
             self.assertEqual(rows[0]["state"], "unreachable")
@@ -1593,6 +1629,242 @@ function idleScreen(model) {{
             ):
                 self.assertEqual(manager.list(), [])
             self.assertFalse(identity_record.exists())
+
+    def test_list_removes_unreachable_record_when_host_pid_is_dead_and_pipe_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, record = _write_terminal_session(config, "biel4", repository)
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                side_effect=TerminalError("named pipe does not exist"),
+            ), patch("dual_codex.terminal._process_start_identity", return_value=""), patch(
+                "dual_codex.terminal._process_is_alive", return_value=False
+            ):
+                self.assertEqual(manager.list(), [])
+
+            self.assertFalse(record.exists())
+
+    def test_unconfigured_unreachable_actor_does_not_block_executor_in_dirty_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+            (repository / "dirty.txt").write_text("already dirty\n", encoding="utf-8")
+            dirty = subprocess.run(
+                ["git", "status", "--short"], cwd=repository, capture_output=True, text=True, check=True
+            ).stdout
+            self.assertTrue(dirty.strip())
+
+            config = _config(root, repository)
+            stale, stale_record = _write_terminal_session(
+                config,
+                "biel4",
+                repository,
+                process_start_identity="biel4-live-process",
+            )
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            replacement = replace(stale, session_id=session_id_for("codex-secundario", repository))
+            started: list[dict[str, object]] = []
+            manager.start = lambda **kwargs: (started.append(kwargs) or replacement)
+            agent = AgentConfig(
+                codex_home=root / "codex-secundario-profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                label="Executor",
+                backend="windows",
+            )
+
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                side_effect=TerminalError("named pipe does not exist"),
+            ), patch(
+                "dual_codex.terminal._process_start_identity",
+                return_value="biel4-live-process",
+            ), patch("dual_codex.terminal._process_is_alive", return_value=True):
+                rows = manager.list()
+                result = manager.ensure(
+                    session_id=session_id_for("codex-secundario", repository),
+                    agent=agent,
+                    role="executor",
+                    repository=repository,
+                    add_dirs=(),
+                )
+
+            self.assertEqual(rows[0]["state"], "unreachable")
+            self.assertTrue(stale_record.exists())
+            self.assertEqual(result.session_id, session_id_for("codex-secundario", repository))
+            self.assertEqual(len(started), 1)
+
+    def test_same_scope_ambiguous_live_session_still_blocks_executor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, record = _write_terminal_session(config, "codex-secundario", repository)
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            agent = AgentConfig(
+                codex_home=session.codex_home,
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                label="Executor",
+                backend="windows",
+            )
+            manager.start = lambda **_kwargs: self.fail("ambiguous live session must block replacement")
+
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                side_effect=TerminalError("temporary named-pipe outage"),
+            ), patch(
+                "dual_codex.terminal._process_start_identity",
+                return_value=session.process_start_identity,
+            ), patch("dual_codex.terminal._process_is_alive", return_value=True), self.assertRaisesRegex(
+                TerminalError, "could not be verified"
+            ):
+                manager.ensure(
+                    session_id=session.session_id,
+                    agent=agent,
+                    role="executor",
+                    repository=repository,
+                    add_dirs=(),
+                )
+
+            self.assertTrue(record.exists())
+
+    def test_running_session_with_role_mismatch_is_not_reused(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, _record = _write_terminal_session(
+                config,
+                "codex-secundario",
+                repository,
+                role="architect",
+            )
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            manager.status = lambda _session_id: {"state": "running"}
+            manager.start = lambda **_kwargs: self.fail("role-mismatched session must not be reused")
+            agent = AgentConfig(
+                codex_home=session.codex_home,
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                label="Executor",
+                backend="windows",
+            )
+
+            with self.assertRaisesRegex(TerminalError, "role identity mismatch"):
+                manager.ensure(
+                    session_id=session.session_id,
+                    agent=agent,
+                    role="executor",
+                    repository=repository,
+                    add_dirs=(),
+                )
+
+    def test_identity_mismatch_is_never_reported_as_running(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, record = _write_terminal_session(config, "codex-secundario", repository)
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                return_value={
+                    "ok": True,
+                    "state": {
+                        "session_id": session.session_id,
+                        "pipe": session.pipe,
+                        "host_pid": session.pid,
+                        "host_started_at": session.process_started_at,
+                        "process_start_identity": session.process_start_identity,
+                        "process_epoch": "wrong-epoch",
+                        "alive": True,
+                    },
+                },
+            ):
+                status = manager.status(session.session_id)
+
+            self.assertEqual(status["state"], "identity_invalid")
+            self.assertFalse(status["identity_match"])
+            self.assertFalse(record.exists())
+
+    def test_codex_secondary_proceeds_after_stale_biel4_reconciliation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            _, stale_record = _write_terminal_session(
+                config,
+                "biel4",
+                repository,
+                process_start_identity="old-biel4-process",
+            )
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            agent = AgentConfig(
+                codex_home=root / "codex-secundario-profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                label="Executor",
+                backend="windows",
+            )
+            configured_session = replace(
+                _write_terminal_session(
+                    config,
+                    "codex-secundario",
+                    repository,
+                    process_start_identity="new-host-process",
+                )[0],
+                state="ready",
+            )
+            configured_record = config.runs_dir / "terminal-sessions" / f"{configured_session.session_id}.json"
+            configured_record.unlink()
+            started: list[dict[str, object]] = []
+            manager.start = lambda **kwargs: (started.append(kwargs) or configured_session)
+
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                side_effect=TerminalError("named pipe does not exist"),
+            ), patch("dual_codex.terminal._process_start_identity", return_value=""), patch(
+                "dual_codex.terminal._process_is_alive", return_value=False
+            ):
+                self.assertEqual(manager.list(), [])
+                result = manager.ensure(
+                    session_id=configured_session.session_id,
+                    agent=agent,
+                    role="executor",
+                    repository=repository,
+                    add_dirs=(),
+                )
+
+            self.assertFalse(stale_record.exists())
+            self.assertEqual(result.account, "codex-secundario")
+            self.assertEqual(len(started), 1)
 
     def test_persistent_ensure_reuses_same_session_without_restarting(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1735,8 +2007,24 @@ function idleScreen(model) {{
                 def terminate(self):
                     return None
 
+            active_session: dict[str, TerminalSession] = {}
+
             def ready(_pipe, _payload):
-                return {"ok": True, "state": {"alive": True}}
+                session = active_session.get("session")
+                if session is None:
+                    return {"ok": True, "state": {"alive": True}}
+                return {
+                    "ok": True,
+                    "state": {
+                        "alive": True,
+                        "session_id": session.session_id,
+                        "pipe": session.pipe,
+                        "host_pid": session.pid,
+                        "host_started_at": session.process_started_at,
+                        "process_start_identity": session.process_start_identity,
+                        "process_epoch": session.process_epoch,
+                    },
+                }
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "inherited-secret"}), patch(
                 "dual_codex.terminal.os.name", "nt"
@@ -1744,7 +2032,9 @@ function idleScreen(model) {{
                 "dual_codex.terminal.shutil.which", return_value="node"
             ), patch("dual_codex.terminal.subprocess.Popen", return_value=FakeProcess()) as popen, patch(
                 "dual_codex.terminal._pipe_request", side_effect=ready
-            ), patch("dual_codex.terminal.TerminalManager.wait_until_ready"):
+            ), patch("dual_codex.terminal._process_start_identity", return_value="host-start"), patch(
+                "dual_codex.terminal.TerminalManager.wait_until_ready"
+            ):
                 manager = TerminalManager(config)
                 session = manager.start(
                     session_id="biel4-test",
@@ -1753,6 +2043,7 @@ function idleScreen(model) {{
                     repository=repository,
                     add_dirs=(artifact_dir,),
                 )
+                active_session["session"] = session
                 self.assertEqual(session.account, "biel4")
                 self.assertEqual(session.add_dirs, (artifact_dir.resolve(),))
                 self.assertEqual(session.task_artifact_dir, artifact_dir.resolve())
