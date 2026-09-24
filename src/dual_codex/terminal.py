@@ -828,39 +828,100 @@ class TerminalManager:
             result = _pipe_request(session.pipe, {"op": "status"})
             state = result["state"]
             identity_match = True
+            expected_record = _record_path(self.config, session_id).resolve()
+            identity_complete = bool(
+                session.session_file
+                and same_path(Path(session.session_file), expected_record)
+                and session.account
+                and session.role
+                and session.process_epoch
+                and session.repository_identity
+                and session.codex_home_identity
+                and session.pid > 0
+                and session.process_started_at > 0
+                and (os.name != "nt" or session.process_start_identity)
+            )
             try:
-                identity_match = (
-                    str(state.get("session_id", session.session_id)) == session.session_id
-                    and (not state.get("pipe") or str(state.get("pipe")) == session.pipe)
-                )
+                host_session_id = state.get("session_id")
+                host_pipe = state.get("pipe")
+                if host_session_id is None or host_pipe is None:
+                    identity_complete = False
+                else:
+                    identity_match &= (
+                        str(host_session_id) == session.session_id
+                        and str(host_pipe) == session.pipe
+                    )
             except (AttributeError, TypeError, ValueError):
                 identity_match = False
-            if state.get("host_pid") and int(getattr(session, "pid", 0) or 0):
-                try:
-                    identity_match &= int(state["host_pid"]) == int(session.pid)
-                except (TypeError, ValueError):
-                    identity_match = False
-            if state.get("host_started_at") and getattr(session, "process_started_at", 0.0):
-                try:
-                    identity_match &= abs(
-                        float(state["host_started_at"]) - float(session.process_started_at)
-                    ) <= 10.0
-                except (TypeError, ValueError):
-                    identity_match = False
+            if int(getattr(session, "pid", 0) or 0):
+                if state.get("host_pid") is None:
+                    identity_complete = False
+                else:
+                    try:
+                        identity_match &= int(state["host_pid"]) == int(session.pid)
+                    except (TypeError, ValueError):
+                        identity_match = False
+            if getattr(session, "process_started_at", 0.0):
+                if state.get("host_started_at") is None:
+                    identity_complete = False
+                else:
+                    try:
+                        identity_match &= abs(
+                            float(state["host_started_at"]) - float(session.process_started_at)
+                        ) <= 10.0
+                    except (TypeError, ValueError):
+                        identity_match = False
             recorded_identity = session.process_start_identity
             actual_identity = str(state.get("process_start_identity", "")) or _process_start_identity(session.pid)
-            if recorded_identity and actual_identity and recorded_identity != actual_identity:
-                identity_match = False
-            if recorded_identity and not actual_identity and os.name == "nt":
-                identity_match = False
-            if session.process_epoch and state.get("process_epoch") and session.process_epoch != state.get("process_epoch"):
-                identity_match = False
-            lifecycle = "running" if state.get("alive") and identity_match else (
-                "identity_invalid" if state.get("alive") else "exited"
-            )
-            return {**session.as_dict(), **state, "identity_match": identity_match, "state": lifecycle}
-        except (TerminalError, AttributeError, TypeError, ValueError):
-            return {**session.as_dict(), "state": "unreachable"}
+            if recorded_identity and actual_identity:
+                identity_match &= recorded_identity == actual_identity
+            elif recorded_identity and os.name == "nt":
+                identity_complete = False
+            if session.process_epoch:
+                observed_epoch = state.get("process_epoch")
+                if not observed_epoch:
+                    identity_complete = False
+                else:
+                    identity_match &= str(observed_epoch) == session.process_epoch
+            alive = state.get("alive")
+            if alive is False:
+                lifecycle = "exited"
+            elif alive is not True:
+                identity_complete = False
+                lifecycle = "unreachable"
+            elif not identity_match:
+                lifecycle = "identity_invalid"
+            elif not identity_complete:
+                lifecycle = "unreachable"
+            else:
+                lifecycle = "running"
+            current = {
+                **session.as_dict(),
+                **state,
+                "session_id": session.session_id,
+                "account": session.account,
+                "label": session.label,
+                "role": session.role,
+                "repository": str(session.repository),
+                "codex_home": str(session.codex_home),
+                "pipe": session.pipe,
+                "session_file": session.session_file,
+                "repository_identity": session.repository_identity or path_identity_key(session.repository),
+                "codex_home_identity": session.codex_home_identity or path_identity_key(session.codex_home),
+                "identity_match": identity_match and identity_complete,
+                "state": lifecycle,
+            }
+        except (KeyError, TerminalError, AttributeError, TypeError, ValueError):
+            current = {**session.as_dict(), "identity_match": False, "state": "unreachable"}
+
+        if current["state"] in {"exited", "identity_invalid"}:
+            self._remove_record(session_id)
+        elif current["state"] == "unreachable":
+            stale_reason = self._stale_session_reason(session)
+            if stale_reason:
+                self._remove_record(session_id)
+                current = {**current, "state": "exited", "stale_reason": stale_reason}
+        return current
 
     @staticmethod
     def _visible_viewer_match(session: TerminalSession, status: dict[str, Any]) -> bool:
@@ -925,36 +986,13 @@ class TerminalManager:
             pass
 
     def _terminal_health(self, session: TerminalSession) -> str:
-        """Return only strong health evidence; transient pipe errors stay unknown."""
-
-        pipe = str(getattr(session, "pipe", "") or "")
-        if not pipe:
-            return "unknown"
-        try:
-            result = _pipe_request(pipe, {"op": "status"})
-            state = result.get("state")
-            if not isinstance(state, dict):
-                return "unknown"
-            session_id = str(getattr(session, "session_id", "") or "")
-            if session_id and str(state.get("session_id", session_id)) != session_id:
-                return "identity_invalid"
-            recorded_pipe = str(getattr(session, "pipe", "") or "")
-            if state.get("pipe") and str(state["pipe"]) != recorded_pipe:
-                return "identity_invalid"
-            recorded_host_pid = int(getattr(session, "pid", 0) or 0)
-            if state.get("host_pid") and recorded_host_pid and int(state["host_pid"]) != recorded_host_pid:
-                return "identity_invalid"
-            recorded_start = float(getattr(session, "process_started_at", 0.0) or 0.0)
-            observed_start = float(state.get("host_started_at", 0.0) or 0.0)
-            if recorded_start and observed_start and abs(recorded_start - observed_start) > 10.0:
-                return "identity_invalid"
-            if state.get("alive") is False:
-                return "dead"
-            if state.get("alive") is True:
-                return "alive"
-        except (TerminalError, AttributeError, TypeError, ValueError):
-            return "unknown"
-        return "unknown"
+        """Adapt canonical session status into failure-diagnostic health labels."""
+        state = self.status(str(getattr(session, "session_id", ""))).get("state")
+        return {
+            "running": "alive",
+            "exited": "dead",
+            "identity_invalid": "identity_invalid",
+        }.get(str(state), "unknown")
 
     @staticmethod
     def _find_codex_session_file(session: TerminalSession) -> tuple[Path, str] | None:
@@ -987,21 +1025,18 @@ class TerminalManager:
     ) -> str:
         health = self._terminal_health(session)
         diagnostics["terminal_health"] = health
-        if health in {"dead", "identity_invalid"}:
-            session_id = str(getattr(session, "session_id", "") or "")
-            if session_id:
-                self._remove_record(session_id)
         return health
 
     @staticmethod
-    def _stale_session_record(session: TerminalSession) -> bool:
+    def _stale_session_reason(session: TerminalSession) -> str:
         recorded_identity = str(getattr(session, "process_start_identity", "") or "")
-        actual_identity = _process_start_identity(int(getattr(session, "pid", 0) or 0))
-        if recorded_identity and actual_identity:
-            return actual_identity != recorded_identity
-        if actual_identity:
-            return False
-        return _process_is_alive(int(getattr(session, "pid", 0) or 0)) is False
+        pid = int(getattr(session, "pid", 0) or 0)
+        actual_identity = _process_start_identity(pid)
+        if recorded_identity and actual_identity and actual_identity != recorded_identity:
+            return "host PID now belongs to a different process identity"
+        if _process_is_alive(pid) is False:
+            return "recorded host process is no longer alive"
+        return ""
 
     def _handle_attempt_failure(
         self,
@@ -1488,10 +1523,8 @@ class TerminalManager:
             if current.get("state") in {"running", "starting"}:
                 raise TerminalError(f"Terminal session '{session_id}' already exists.")
             if current.get("state") == "unreachable":
-                stale = self._stale_session_record(self._load(session_id))
-                if not stale:
-                    raise TerminalError(f"Existing terminal session '{session_id}' could not be verified.")
-            record_path.unlink()
+                raise TerminalError(f"Existing terminal session '{session_id}' could not be verified.")
+            record_path.unlink(missing_ok=True)
         sessions = _session_dir(self.config)
         sessions.mkdir(parents=True, exist_ok=True)
         pipe = rf"\\.\pipe\dual-codex-{session_id}-{uuid4().hex}"
@@ -1584,9 +1617,14 @@ class TerminalManager:
             if current.get("state") == "running":
                 session = self._load(session_id)
                 requested_repository = Path(kwargs["repository"]).expanduser().resolve()
+                requested_role = str(kwargs.get("role", ""))
                 if not same_path(session.repository, requested_repository):
                     raise TerminalError(
                         f"Existing terminal session '{session_id}' repository identity mismatch."
+                    )
+                if session.role != requested_role:
+                    raise TerminalError(
+                        f"Existing terminal session '{session_id}' role identity mismatch."
                     )
                 agent = kwargs.get("agent")
                 if agent is not None and (
@@ -1614,12 +1652,8 @@ class TerminalManager:
                     require_visible=visible,
                 )
                 return self._load(session_id)
-            if current.get("state") in {"exited", "identity_invalid"}:
-                self._remove_record(session_id)
-            elif current.get("state") == "unreachable":
-                session = self._load(session_id)
-                if self._stale_session_record(session):
-                    self._remove_record(session_id)
+            if current.get("state") == "unreachable":
+                raise TerminalError(f"Existing terminal session '{session_id}' could not be verified.")
         return self.start(visible=visible, **kwargs)
 
     def reuse_existing(
@@ -2064,7 +2098,6 @@ class TerminalManager:
                 session = TerminalSession.from_record(json.loads(path.read_text(encoding="utf-8")))
                 row = self.status(session.session_id)
                 if row.get("state") in {"exited", "identity_invalid"}:
-                    self._remove_record(session.session_id)
                     continue
                 rows.append(row)
             except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError):
