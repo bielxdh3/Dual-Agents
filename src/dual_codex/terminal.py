@@ -627,6 +627,22 @@ def _helper_path(config: OrchestratorConfig) -> Path:
     return helper
 
 
+def _host_exit_error(log_file: Path, project_root: Path, exit_code: int) -> str:
+    try:
+        output = log_file.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        output = ""
+    if "Cannot find module 'node-pty'" in output or 'Cannot find module "node-pty"' in output:
+        return (
+            "ConPTY host exited before readiness because Node could not load 'node-pty'. "
+            f"Install the locked host dependency with 'npm ci' in {project_root}."
+        )
+    return (
+        "ConPTY host exited before its control pipe became ready "
+        f"(exit code {exit_code}); inspect {log_file}."
+    )
+
+
 def _terminal_environment(agent: AgentConfig) -> dict[str, str]:
     """Use the account profile, never an API key inherited from the orchestrator."""
     environment = codex_environment(agent)
@@ -1556,14 +1572,19 @@ class TerminalManager:
         process_started_at = time.time()
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
+            exit_code = process.poll()
+            if exit_code is not None:
+                raise TerminalError(_host_exit_error(log_file, self.config.project_root, exit_code))
             try:
                 _pipe_request(pipe, {"op": "status"})
                 break
             except TerminalError:
                 time.sleep(0.1)
         else:
-            if process.poll() is None:
-                process.terminate()
+            exit_code = process.poll()
+            if exit_code is not None:
+                raise TerminalError(_host_exit_error(log_file, self.config.project_root, exit_code))
+            process.terminate()
             raise TerminalError("ConPTY host did not become ready within 10 seconds.")
         session = TerminalSession(
             session_id=session_id, account=agent.account_name, label=agent.label,

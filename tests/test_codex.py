@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
+import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,7 +12,7 @@ from unittest.mock import patch
 from dual_codex.codex import run_codex_exec, run_codex_for_role, run_codex_terminal
 from dual_codex.config import AgentConfig
 from dual_codex.process import CommandResult, _prepare_command
-from dual_codex.terminal import TerminalError
+from dual_codex.terminal import TERMINAL_INLINE_MESSAGE_MAX, TerminalError
 
 
 def _agent(sandbox: str, *, backend: str = "windows") -> AgentConfig:
@@ -408,6 +409,75 @@ class CodexCommandTests(unittest.TestCase):
             self.assertIn(str(missing), result.stderr)
             self.assertEqual(result.metadata["task_transport"], "file")
             self.assertEqual(result.metadata["task_artifact"], str(missing.resolve()))
+
+    def test_oversized_architect_prompt_uses_repo_local_read_only_file_transport(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            runs_dir = root / "runs"
+            output_path = runs_dir / "run-1" / "plan.json"
+            config = SimpleNamespace(runs_dir=runs_dir)
+            session = SimpleNamespace(
+                session_id="biel3-test",
+                account="test-account",
+                label="Test account",
+                role="architect",
+                repository=repository,
+                codex_home=root / "profile",
+                pid=123,
+                process_started_at=1.0,
+                process_epoch="process-epoch",
+                process_start_identity="process-start",
+                session_file=str(root / "session.json"),
+                repository_identity="repository-identity",
+                codex_home_identity="codex-home-identity",
+                pipe=r"\\.\pipe\dual-codex-biel3-test-aaaaaaaaaaaaaaaa",
+                viewer_pid=0,
+                viewer_epoch="",
+            )
+            prompt = "Follow the read-only architect contract. " + ("x" * TERMINAL_INLINE_MESSAGE_MAX)
+
+            with patch("dual_codex.terminal.TerminalManager") as manager_type:
+                manager = manager_type.return_value
+                manager.ensure.return_value = session
+                manager.status.return_value = {"state": "running", "pid": 123, "host_pid": 123}
+                manager.turn_cursor.return_value = (None, 0)
+                manager.begin_automation_turn.return_value = "automation:probe"
+                manager.send.return_value = {"state": "turn_started"}
+                manager.wait_for_turn.return_value = {
+                    "assistant": "Architect turn completed.",
+                    "session_id": "codex-turn",
+                }
+
+                result = run_codex_terminal(
+                    config=config,
+                    agent=_agent("read-only"),
+                    repository=repository,
+                    prompt=prompt,
+                    output_path=output_path,
+                    session_id="biel3-test",
+                    role="architect",
+                )
+
+            artifact = Path(result.metadata["task_artifact"])
+            content = artifact.read_text(encoding="utf-8")
+            control_message = manager.send.call_args.args[1]
+            transport_path = Path(control_message.split('"')[1])
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.metadata["task_transport"], "file")
+            self.assertEqual(
+                result.metadata["task_sha256"],
+                hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            )
+            self.assertIn(prompt, content)
+            self.assertEqual(transport_path.parent.resolve(), repository.resolve())
+            self.assertFalse(transport_path.exists())
+            self.assertLessEqual(len(control_message), TERMINAL_INLINE_MESSAGE_MAX)
+            self.assertEqual(manager.ensure.call_args.kwargs["role"], "architect")
+            self.assertEqual(manager.ensure.call_args.kwargs["add_dirs"], ())
+            self.assertTrue(artifact.is_relative_to(output_path.parent.resolve()))
+            self.assertEqual(list(repository.glob(".dual-codex-task-*.md")), [])
 
     def test_strict_reuse_refuses_to_start_a_missing_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

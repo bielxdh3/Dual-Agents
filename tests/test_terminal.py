@@ -1991,8 +1991,8 @@ function idleScreen(model) {{
             artifact_dir = config.runs_dir / "executor-task-artifacts"
             agent = AgentConfig(
                 codex_home=root / "executor profile",
-                model="",
-                reasoning_effort="high",
+                model="gpt-6-luna",
+                reasoning_effort="max",
                 sandbox="workspace-write",
                 account_name="biel4",
                 label="Executor",
@@ -2049,11 +2049,18 @@ function idleScreen(model) {{
                 self.assertEqual(session.task_artifact_dir, artifact_dir.resolve())
                 command = [str(item) for item in popen.call_args.args[0]]
                 self.assertEqual(command[command.index("--add-dir") + 1], str(artifact_dir.resolve()))
+                self.assertEqual(command[command.index("--cwd") + 1], str(repository.resolve()))
+                self.assertEqual(command[command.index("--model") + 1], agent.model)
+                self.assertEqual(command[command.index("--reasoning-effort") + 1], agent.reasoning_effort)
+                self.assertEqual(command[command.index("--process-epoch") + 1], session.process_epoch)
                 record = json.loads(Path(session.session_file).read_text(encoding="utf-8"))
                 self.assertEqual(record["task_artifact_dir"], str(artifact_dir.resolve()))
+                self.assertEqual(record["target_model"], agent.model)
+                self.assertEqual(record["target_reasoning"], agent.reasoning_effort)
                 listed = manager.list()
                 self.assertEqual(listed[0]["task_artifact_dir"], str(artifact_dir.resolve()))
                 self.assertEqual(popen.call_args.kwargs["env"]["CODEX_HOME"], str(agent.codex_home))
+                self.assertEqual(popen.call_args.kwargs["env"]["TERM"], TERMINAL_TERM)
                 self.assertNotIn("OPENAI_API_KEY", popen.call_args.kwargs["env"])
                 self.assertNotIn("exec", [str(item) for item in popen.call_args.args[0]])
                 with self.assertRaises(TerminalError):
@@ -2063,6 +2070,58 @@ function idleScreen(model) {{
                         role="executor",
                         repository=repository,
                     )
+
+    def test_start_reports_missing_node_pty_when_host_exits_before_pipe_readiness(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            config = _config(root, repository)
+            agent = AgentConfig(
+                codex_home=root / "biel3-profile",
+                model="gpt-6-luna",
+                reasoning_effort="max",
+                sandbox="read-only",
+                account_name="biel3",
+                backend="windows",
+            )
+
+            class ExitedProcess:
+                pid = 1234
+
+                def poll(self):
+                    return 1
+
+                def terminate(self):
+                    raise AssertionError("an exited host must not be terminated")
+
+            def spawn_host(_command, **kwargs):
+                kwargs["stdout"].write("Error: Cannot find module 'node-pty'\n")
+                kwargs["stdout"].flush()
+                return ExitedProcess()
+
+            with patch("dual_codex.terminal.os.name", "nt"), patch(
+                "dual_codex.terminal.shutil.which", return_value="node"
+            ), patch(
+                "dual_codex.terminal.subprocess.CREATE_NEW_PROCESS_GROUP", 0, create=True
+            ), patch(
+                "dual_codex.terminal.subprocess.DETACHED_PROCESS", 0, create=True
+            ), patch(
+                "dual_codex.terminal.subprocess.Popen", side_effect=spawn_host
+            ), patch(
+                "dual_codex.terminal._pipe_request"
+            ) as pipe_request, patch(
+                "dual_codex.terminal.time.sleep", side_effect=AssertionError("startup should fail immediately")
+            ):
+                manager = TerminalManager(config)
+                with self.assertRaisesRegex(TerminalError, "node-pty.*npm ci"):
+                    manager.start(
+                        session_id="biel3-missing-node-pty",
+                        agent=agent,
+                        role="architect",
+                        repository=repository,
+                    )
+                pipe_request.assert_not_called()
 
 
 if __name__ == "__main__":
