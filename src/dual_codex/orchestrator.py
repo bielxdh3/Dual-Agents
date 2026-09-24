@@ -70,7 +70,7 @@ def execute(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
         task=_prompt(config, "architect.txt", task=task),
         repository=config.repository,
         output_path=plan_path,
-        schema_path=_schema(config, "plan.schema.json"),
+        schema_path=_schema(config, "architect-plan.schema.json"),
     )
     phase_provenance.append(dict(result.metadata))
     plan = load_json(plan_path)

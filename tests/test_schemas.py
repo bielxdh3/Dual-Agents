@@ -86,7 +86,7 @@ class SchemaTests(unittest.TestCase):
                 _assert_array_items(schema, path.name)
 
     def test_architect_plan_requires_loaded_skill_names_for_provenance(self) -> None:
-        schema = json.loads((SCHEMA_ROOT / "plan.schema.json").read_text(encoding="utf-8"))
+        schema = json.loads((SCHEMA_ROOT / "architect-plan.schema.json").read_text(encoding="utf-8"))
         plan = {
             "summary": "Plan summary",
             "steps": ["Inspect the repository"],
@@ -101,6 +101,18 @@ class SchemaTests(unittest.TestCase):
         incomplete.pop("skills_loaded")
         with self.assertRaisesRegex(AssertionError, "missing skills_loaded"):
             _validate(incomplete, schema)
+
+    def test_orchestrator_plan_does_not_require_architect_skill_provenance(self) -> None:
+        schema = json.loads((SCHEMA_ROOT / "plan.schema.json").read_text(encoding="utf-8"))
+        plan = {
+            "summary": "Plan summary",
+            "steps": ["Coordinate the requested work"],
+            "acceptance_criteria": [],
+            "risks": [],
+            "files_to_inspect": [],
+        }
+
+        _validate(plan, schema)
 
     def test_delegation_report_accepts_runtime_executor_report(self) -> None:
         schema = json.loads(

@@ -344,7 +344,7 @@ def _delegate_to_configured_actor(
         output_path = config.runs_dir / f".configured-{role}.json"
     if schema_path is None:
         schema_name = {
-            "architect": "plan.schema.json",
+            "architect": "architect-plan.schema.json",
             "executor": "delegation-report.schema.json",
             "reviewer": "review.schema.json",
             "orchestrator": "plan.schema.json",

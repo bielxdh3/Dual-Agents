@@ -611,6 +611,34 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertEqual(result.metadata["actual_actor"], "secondary")
             self.assertFalse(result.metadata["fallback_used"])
 
+    def test_default_plan_schemas_keep_architect_skill_provenance_role_scoped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = self._config(root)
+            repository = root / "repository"
+            repository.mkdir()
+            seen_schemas = {}
+
+            def fake_runner(**kwargs):
+                seen_schemas[kwargs["role"]] = kwargs["schema_path"]
+                payload = {"skills_loaded": ["ponytail"]} if kwargs["role"] == "architect" else {}
+                kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
+                return CommandResult(["fake"], 0, "", "")
+
+            with patch("dual_codex.codex.run_codex_for_role", side_effect=fake_runner):
+                for role in ("architect", "orchestrator"):
+                    delegate_to_configured_actor(
+                        config=config,
+                        role=role,
+                        task="return a plan",
+                        repository=repository,
+                        output_path=root / f"{role}.json",
+                    )
+
+            schema_root = config.project_root / "schemas"
+            self.assertEqual(seen_schemas["architect"], schema_root / "architect-plan.schema.json")
+            self.assertEqual(seen_schemas["orchestrator"], schema_root / "plan.schema.json")
+
     def test_one_role_scoped_fallback_is_selected_and_provenanced(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
