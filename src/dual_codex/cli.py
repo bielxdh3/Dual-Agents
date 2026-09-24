@@ -695,6 +695,11 @@ def main(argv: list[str] | None = None) -> int:
                 if account is None:
                     raise ConfigError(f"Unknown account '{args.account}'.")
                 agent = _account_agent(config, args.account, args.role)
+                if agent.backend != "windows":
+                    raise TerminalError(
+                        f"Native terminal start requires the 'windows' backend; account '{args.account}' "
+                        f"uses '{agent.backend}'."
+                    )
                 session = manager.start(
                     session_id=session_id_for(account.name, repository),
                     agent=agent,

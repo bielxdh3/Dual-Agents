@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 import subprocess
 import tempfile
@@ -9,6 +11,7 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from dual_codex.bootstrap import BOOTSTRAP_MARKER
+from dual_codex.cli import main as cli_main
 from dual_codex.codex import ActorAvailabilityError, classify_actor_failure, delegate_to_configured_actor, run_codex_for_role
 from dual_codex.config import AccountConfig, ConfigError, OrchestratorConfig
 from dual_codex.delegation import DelegationError, run_codex_exec as delegation_adapter
@@ -148,6 +151,181 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             )
             provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
             self.assertTrue(all(item["configured_actor"] for item in provenance["configured_actor_routing"]))
+
+    def test_mission_dispatches_claude_roles_and_codex_executor_without_native_start(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["claude"] = AccountConfig(
+                name="claude",
+                label="Claude",
+                codex_home=root / "claude-home",
+                model="claude-sonnet",
+                reasoning_effort="high",
+                backend="claude_code",
+                provider_type="anthropic",
+                adapter_type="claude_code",
+            )
+            accounts["codex-secundario"] = AccountConfig(
+                name="codex-secundario",
+                label="Codex Secundario",
+                codex_home=root / "codex-secundario-home",
+                model="gpt-5.6-luna",
+                reasoning_effort="medium",
+                backend="app_server",
+                provider_type="codex",
+                adapter_type="codex_cli",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={
+                    "orchestrator": "orchestrator",
+                    "architect": "claude",
+                    "reviewer": "claude",
+                    "executor": "codex-secundario",
+                },
+            )
+            config.repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=config.repository, check=True)
+            task = root / "task.md"
+            task.write_text("exercise configured provider routing", encoding="utf-8")
+            claude_roles: list[tuple[str, str, str]] = []
+            codex_roles: list[tuple[str, str, str]] = []
+
+            reports = {
+                "architect": {
+                    "summary": "plan",
+                    "steps": [],
+                    "acceptance_criteria": [],
+                    "risks": [],
+                    "files_to_inspect": [],
+                },
+                "executor": {
+                    "summary": "implementation",
+                    "files_changed": [],
+                    "commands_run": [],
+                    "tests": [],
+                    "remaining_issues": [],
+                },
+                "reviewer": {"verdict": "approved", "summary": "approved", "findings": []},
+            }
+
+            def fake_claude(**kwargs):
+                role = kwargs["role"]
+                agent = kwargs["agent"]
+                claude_roles.append((role, agent.account_name, agent.backend))
+                kwargs["output_path"].write_text(json.dumps(reports[role]), encoding="utf-8")
+                return CommandResult(["claude"], 0, "", "", {"session_id": f"claude-{role}"})
+
+            def fake_codex_app_server(**kwargs):
+                role = kwargs["role"]
+                agent = kwargs["agent"]
+                codex_roles.append((role, agent.account_name, agent.backend))
+                kwargs["output_path"].write_text(json.dumps(reports[role]), encoding="utf-8")
+                return CommandResult(["codex", "app-server"], 0, "", "")
+
+            with patch("dual_codex.claude_code.run_claude_code", side_effect=fake_claude) as claude, patch(
+                "dual_codex.codex.run_codex_app_server", side_effect=fake_codex_app_server
+            ) as codex, patch(
+                "dual_codex.codex.run_codex_terminal", side_effect=AssertionError("unexpected native Codex dispatch")
+            ) as terminal, patch(
+                "dual_codex.terminal.TerminalManager.start",
+                side_effect=AssertionError("Claude must not reach native terminal startup"),
+            ) as native_start:
+                outcome = execute(config, task)
+
+            self.assertEqual(outcome.verdict, "approved")
+            self.assertEqual(
+                claude_roles,
+                [("architect", "claude", "claude_code"), ("reviewer", "claude", "claude_code")],
+            )
+            self.assertEqual(claude.call_count, 2)
+            self.assertEqual(codex_roles, [("executor", "codex-secundario", "app_server")])
+            self.assertEqual(codex.call_count, 1)
+            terminal.assert_not_called()
+            native_start.assert_not_called()
+            observed_provenance = [
+                (item["role"], item["actor_id"], item["backend"], item["fallback_used"])
+                for item in outcome.phase_provenance
+            ]
+            self.assertEqual(
+                observed_provenance,
+                [
+                    ("architect", "claude", "claude_code", False),
+                    ("executor", "codex-secundario", "app_server", False),
+                    ("reviewer", "claude", "claude_code", False),
+                ],
+            )
+
+    def test_unsupported_provider_role_pairs_fail_closed_before_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = self._config(root)
+            repository = root / "repository"
+            repository.mkdir()
+            antigravity_agent = replace(config.agent_for_role("executor"), backend="antigravity")
+            api_agent = replace(config.agent_for_role("executor"), backend="api")
+
+            with patch("dual_codex.antigravity.run_antigravity") as antigravity, patch(
+                "dual_codex.providers.api_adapter"
+            ) as api_adapter, patch("dual_codex.codex.run_codex_terminal") as terminal:
+                with self.assertRaisesRegex(ValueError, "reserved for the Executor role"):
+                    run_codex_for_role(
+                        config=object(), agent=antigravity_agent, role="reviewer", repository=repository,
+                        prompt="review", output_path=root / "review.json", schema_path=root / "schema.json",
+                    )
+                with self.assertRaisesRegex(ValueError, "do not provide the workspace-write Executor role"):
+                    run_codex_for_role(
+                        config=object(), agent=api_agent, role="executor", repository=repository,
+                        prompt="implement", output_path=root / "implementation.json", schema_path=root / "schema.json",
+                    )
+
+            antigravity.assert_not_called()
+            api_adapter.assert_not_called()
+            terminal.assert_not_called()
+
+    def test_native_terminal_start_rejects_claude_before_manager_start(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["claude"] = AccountConfig(
+                name="claude",
+                label="Claude",
+                codex_home=root / "claude-home",
+                model="claude-sonnet",
+                reasoning_effort="high",
+                backend="claude_code",
+                provider_type="anthropic",
+                adapter_type="claude_code",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "reviewer": "claude"},
+            )
+
+            error = StringIO()
+            with redirect_stderr(error), patch("dual_codex.cli.load_config", return_value=config), patch(
+                "dual_codex.cli.TerminalManager"
+            ) as terminal_manager:
+                result = cli_main(
+                    [
+                        "--config",
+                        str(root / "config.toml"),
+                        "terminal",
+                        "start",
+                        "claude",
+                        "--role",
+                        "reviewer",
+                    ]
+                )
+
+            self.assertEqual(result, 1)
+            self.assertIn("requires the 'windows' backend", error.getvalue())
+            terminal_manager.return_value.start.assert_not_called()
 
     def test_codex_app_server_can_be_primary_executor(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
