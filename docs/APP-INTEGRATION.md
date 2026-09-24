@@ -25,6 +25,10 @@ le por completo as skills canonicas aplicaveis sem perguntar ao usuario e so
 entao inspeciona o repositorio ou planeja. A execucao para em fail-closed se
 uma skill exigida nao puder ser carregada.
 
+Perfis OpenAI-compatible sem acesso ao filesystem e ferramentas nao podem atuar
+como Architect: o dispatcher os recusa antes de montar ou enviar o bootstrap,
+pois nao conseguem abrir as skills canonicas selecionadas a partir do briefing.
+
 Quando o fluxo completo `dual-codex run` e usado, cada fase resolve o ator
 novamente a partir de `[roles]` no momento da chamada. Architect e Reviewer
 seguem os perfis configurados (inclusive quando compartilham o mesmo

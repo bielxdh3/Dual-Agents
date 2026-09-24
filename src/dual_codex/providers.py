@@ -445,7 +445,7 @@ class OpenAICompatibleAdapter:
             runtime_status="Configured" if error is None and credential_status == "configured" else "Unavailable",
             authenticated=credential_status == "configured",
             error=error,
-            supported_roles=("orchestrator", "architect", "reviewer"),
+            supported_roles=("orchestrator", "reviewer"),
         )
 
     def run(

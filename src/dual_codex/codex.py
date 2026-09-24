@@ -285,6 +285,16 @@ def _annotate_provider_result(
     return result
 
 
+def _ensure_actor_supports_role(agent: AgentConfig, role: str) -> None:
+    if agent.backend == "api" and role == "architect":
+        raise ValueError(
+            "OpenAI-compatible API profiles cannot serve the Architect role because they cannot read "
+            "the canonical task-specific skills required by the bootstrap. Configure a filesystem-capable backend."
+        )
+    if agent.backend == "api" and role == "executor":
+        raise ValueError("API profiles do not provide the workspace-write Executor role.")
+
+
 def _delegate_to_configured_actor(
     *,
     config,
@@ -308,6 +318,7 @@ def _delegate_to_configured_actor(
     if role not in SUPPORTED_ROLES:
         raise ValueError(f"Unsupported configured role '{role}'.")
     agent = config.agent_for_role(role)
+    _ensure_actor_supports_role(agent, role)
     if output_path is None:
         output_path = config.runs_dir / f".configured-{role}.json"
     if schema_path is None:
@@ -462,6 +473,7 @@ def run_codex_for_role(
     canonical_root = None
     bootstrap = None
     configured_resolver = getattr(config, "agent_for_role", None)
+    configured_agent = None
     if callable(configured_resolver):
         configured_agent = configured_resolver(role)
         if agent is None:
@@ -472,6 +484,10 @@ def run_codex_for_role(
                 "caller-supplied actor identity is not authoritative."
             )
         configured = True
+    if agent is None:
+        raise ValueError(f"Required role '{role}' is unassigned.")
+    _ensure_actor_supports_role(agent, role)
+    if callable(configured_resolver):
         if BOOTSTRAP_MARKER not in prompt:
             bootstrap = create_canonical_bootstrap(
                 role=role,
@@ -485,13 +501,7 @@ def run_codex_for_role(
                 selected_skills=select_required_skills(role, prompt),
             )
         canonical_root = bootstrap.source_root
-    if agent is None:
-        raise ValueError(f"Required role '{role}' is unassigned.")
     if agent.backend == "api":
-        if role == "executor":
-            raise ValueError(
-                "API profiles do not provide the workspace-write Executor role."
-            )
         from .providers import api_adapter
 
         try:

@@ -92,6 +92,44 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             config_path=root / "config.toml",
         )
 
+    def test_api_architect_is_rejected_before_bootstrap_or_provider_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["api-architect"] = AccountConfig(
+                name="api-architect",
+                label="OpenAI-compatible API",
+                codex_home=root / "api-home",
+                model="model-a",
+                reasoning_effort="high",
+                backend="api",
+                provider_type="api",
+                adapter_type="openai_compatible",
+                auth_mode="environment",
+                auth_reference="env:TEST_API_KEY",
+                base_url="https://api.example.test/v1",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "architect": "api-architect"},
+            )
+
+            with patch("dual_codex.codex.create_canonical_bootstrap") as create_bootstrap, patch(
+                "dual_codex.providers.api_adapter"
+            ) as api_adapter:
+                with self.assertRaisesRegex(ValueError, "cannot serve the Architect role"):
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="architect",
+                        task="Read the supplied task artifact and implement it.",
+                        repository=config.repository,
+                    )
+
+            create_bootstrap.assert_not_called()
+            api_adapter.assert_not_called()
+
     def test_full_topology_uses_configured_provider_backend_and_zero_native_spawn(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

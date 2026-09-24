@@ -181,13 +181,15 @@ other-family-high\tOther Family (High)
             (root / "repo").mkdir()
             path = root / "config.toml"
             path.write_text(
-                """[orchestrator]\nrepository = \"repo\"\n\n[accounts.api]\nbackend = \"api\"\nbase_url = \"https://api.example.test/v1\"\nauth_reference = \"env:TEST_PROVIDER_KEY\"\navailable_models = [\"model-a\"]\nsupported_reasoning_efforts = [\"low\", \"high\"]\nmodel = \"model-a\"\nreasoning_effort = \"high\"\n\n[roles]\narchitect = \"api\"\n""",
+                """[orchestrator]\nrepository = \"repo\"\n\n[accounts.api]\nbackend = \"api\"\nbase_url = \"https://api.example.test/v1\"\nauth_reference = \"env:TEST_PROVIDER_KEY\"\navailable_models = [\"model-a\"]\nsupported_reasoning_efforts = [\"low\", \"high\"]\nmodel = \"model-a\"\nreasoning_effort = \"high\"\n\n[roles]\nreviewer = \"api\"\n""",
                 encoding="utf-8",
             )
             config = load_config(path)
             capabilities = provider_capabilities(config, config.accounts["api"])
             self.assertEqual(capabilities.provider, "api")
             self.assertEqual(capabilities.effort_levels, ("low", "high"))
+            self.assertNotIn("architect", capabilities.supported_roles)
+            self.assertIn("reviewer", capabilities.supported_roles)
             self.assertNotIn("TEST_PROVIDER_KEY", json.dumps(capabilities.as_dict()))
 
     def test_codex_and_gemini_profiles_coexist_with_role_scoped_identity(self) -> None:
