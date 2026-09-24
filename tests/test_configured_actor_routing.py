@@ -964,7 +964,12 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertTrue(result.metadata["canonical_bootstrap_artifact_sha256"])
             self.assertEqual(
                 result.metadata["canonical_bootstrap_delivery"],
-                "trusted_inline",
+                "mixed",
+            )
+            self.assertIn("skills/ponytail/SKILL.md", result.metadata["canonical_bootstrap_source_files"])
+            self.assertNotIn(
+                "skills/ponytail/SKILL.md",
+                result.metadata["canonical_bootstrap_artifact_source_files"],
             )
             self.assertEqual(
                 result.metadata["canonical_bootstrap_selected_skills"],

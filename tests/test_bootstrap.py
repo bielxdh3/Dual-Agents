@@ -95,6 +95,39 @@ class CanonicalBootstrapTests(unittest.TestCase):
                 skill_digest,
             )
 
+    def test_architect_mixed_delivery_records_inline_artifact_and_skill_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodexGlobal"
+            root.mkdir()
+            _write_fixture(root)
+            snapshot = bootstrap.create_canonical_bootstrap(
+                role="architect",
+                root=root,
+                artifact_dir=Path(temp) / "run-artifacts",
+            )
+
+            finalized = bootstrap.finalize_architect_bootstrap(snapshot, ["task-specific"])
+            metadata = finalized.metadata()
+
+            self.assertEqual(metadata["canonical_bootstrap_delivery"], "mixed")
+            self.assertEqual(
+                metadata["canonical_bootstrap_artifact_source_files"],
+                {"AGENTS.md": metadata["canonical_bootstrap_source_files"]["AGENTS.md"]},
+            )
+            self.assertIn("skills/task-specific/SKILL.md", metadata["canonical_bootstrap_source_files"])
+            self.assertNotIn(
+                "skills/task-specific/SKILL.md",
+                metadata["canonical_bootstrap_artifact_source_files"],
+            )
+            self.assertEqual(
+                metadata["canonical_bootstrap_artifact_source_sha256"],
+                snapshot.source_sha256,
+            )
+            self.assertIn(
+                f"canonical_source_sha256: {metadata['canonical_bootstrap_artifact_source_sha256']}",
+                snapshot.artifact_path.read_text(encoding="utf-8"),
+            )
+
     def test_architect_skill_change_after_dispatch_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "CodexGlobal"

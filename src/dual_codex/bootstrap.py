@@ -39,8 +39,21 @@ class CanonicalBootstrap:
     source_files: tuple[tuple[str, str], ...] = ()
     skill_catalog: tuple[tuple[str, str], ...] = ()
     skill_catalog_sha256: str = ""
+    artifact_source_sha256: str = ""
+    artifact_source_files: tuple[tuple[str, str], ...] = ()
 
     def metadata(self) -> dict[str, object]:
+        artifact_source_files = dict(self.artifact_source_files)
+        source_files = dict(self.source_files)
+        if self.artifact_path is None:
+            delivery = "source-reference"
+        elif any(
+            artifact_source_files.get(relative) != digest
+            for relative, digest in source_files.items()
+        ):
+            delivery = "mixed"
+        else:
+            delivery = "trusted_inline"
         skill_digests = {
             relative[len("skills/") : -len("/SKILL.md")]: digest
             for relative, digest in self.source_files
@@ -54,8 +67,9 @@ class CanonicalBootstrap:
             "canonical_bootstrap_mechanism": self.mechanism,
             "canonical_bootstrap_artifact": str(self.artifact_path or ""),
             "canonical_bootstrap_artifact_sha256": self.artifact_sha256,
+            "canonical_bootstrap_artifact_source_sha256": self.artifact_source_sha256,
             "canonical_bootstrap_artifact_ephemeral": self.artifact_path is not None,
-            "canonical_bootstrap_delivery": "trusted_inline" if self.artifact_path is not None else "source-reference",
+            "canonical_bootstrap_delivery": delivery,
             "canonical_bootstrap_selected_skills": list(self.selected_skills),
             "canonical_bootstrap_skill_digests": skill_digests,
             "canonical_bootstrap_skill_catalog": dict(self.skill_catalog),
@@ -63,6 +77,7 @@ class CanonicalBootstrap:
             "canonical_bootstrap_source_files": {
                 relative: digest for relative, digest in self.source_files
             },
+            "canonical_bootstrap_artifact_source_files": artifact_source_files,
         }
 
 
@@ -222,6 +237,8 @@ def create_canonical_bootstrap(
             source_files,
             skill_catalog,
             skill_catalog_sha256,
+            source_sha256,
+            source_files,
         )
     except BaseException:
         try:
@@ -278,6 +295,8 @@ def finalize_architect_bootstrap(
         source_files=digests,
         skill_catalog=bootstrap.skill_catalog,
         skill_catalog_sha256=bootstrap.skill_catalog_sha256,
+        artifact_source_sha256=bootstrap.artifact_source_sha256,
+        artifact_source_files=bootstrap.artifact_source_files,
     )
 
 
