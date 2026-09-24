@@ -478,7 +478,7 @@ class ClaudeCodeTests(unittest.TestCase):
         self.assertIn('value="claude_code">Anthropic Claude', HTML)
         self.assertIn("data-profile-auth-mode", HTML)
         self.assertIn("auth_mode:", SCRIPT)
-        self.assertIn("body.backend==='claude_code'", SCRIPT)
+        self.assertIn("body={label,backend:'claude_code'", SCRIPT)
         self.assertIn("backend?.value!=='claude_code'", SCRIPT)
         self.assertIn("body.auth_reference", SCRIPT)
 
