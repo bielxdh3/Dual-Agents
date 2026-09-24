@@ -695,6 +695,11 @@ def main(argv: list[str] | None = None) -> int:
                 if account is None:
                     raise ConfigError(f"Unknown account '{args.account}'.")
                 agent = _account_agent(config, args.account, args.role)
+                if agent.backend != "windows":
+                    raise TerminalError(
+                        f"Native terminal start requires the 'windows' backend; account '{args.account}' "
+                        f"uses '{agent.backend}'."
+                    )
                 session = manager.start(
                     session_id=session_id_for(account.name, repository),
                     agent=agent,
@@ -781,11 +786,13 @@ def main(argv: list[str] | None = None) -> int:
             _role_command(args, config)
             return 0
 
-        outcome = execute(config, Path(args.task))
-        print(f"Run directory: {outcome.run_dir}")
-        print(f"Verdict: {outcome.verdict}")
-        print(f"Correction cycles: {outcome.correction_cycles}")
-        return 0 if outcome.verdict == "approved" else 2
+        if args.command == "run":
+            outcome = execute(config, Path(args.task))
+            print(f"Run directory: {outcome.run_dir}")
+            print(f"Verdict: {outcome.verdict}")
+            print(f"Correction cycles: {outcome.correction_cycles}")
+            return 0 if outcome.verdict == "approved" else 2
+        raise ValueError(f"Unsupported command '{args.command}'.")
     except KeyboardInterrupt:
         print("Interrupted", file=sys.stderr)
         return 130

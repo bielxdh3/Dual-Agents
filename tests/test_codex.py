@@ -79,6 +79,46 @@ class CodexCommandTests(unittest.TestCase):
             self.assertEqual(app_server.call_args.kwargs["repository"], repository)
             terminal.assert_not_called()
 
+    def test_role_dispatch_uses_api_adapter_without_native_terminal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            expected = CommandResult(["api"], 0, "", "")
+            agent = AgentConfig(
+                codex_home=root / "api-profile",
+                model="model-a",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="api-profile",
+                backend="api",
+                provider_type="api",
+                adapter_type="openai_compatible",
+                auth_mode="environment",
+                auth_reference="env:TEST_API_KEY",
+                base_url="https://api.example.test/v1",
+            )
+
+            with patch("dual_codex.providers.api_adapter") as api_adapter, patch(
+                "dual_codex.terminal.TerminalManager"
+            ) as terminal:
+                api_adapter.return_value.run.return_value = expected
+                result = run_codex_for_role(
+                    config=SimpleNamespace(),
+                    agent=agent,
+                    role="reviewer",
+                    repository=repository,
+                    prompt="Read the harmless brief.",
+                    output_path=root / "review.json",
+                    schema_path=root / "schema.json",
+                )
+
+            self.assertIs(result, expected)
+            self.assertEqual(api_adapter.return_value.run.call_args.kwargs["agent"].backend, "api")
+            self.assertEqual(result.metadata["provider"], "api")
+            self.assertFalse(result.metadata["fallback_used"])
+            terminal.assert_not_called()
+
     def test_role_dispatch_uses_antigravity_only_for_executor(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

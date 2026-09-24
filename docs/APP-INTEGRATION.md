@@ -27,6 +27,18 @@ perfil); Executor tambem pode ser um perfil Codex App Server. A execucao grava
 `primary_actor`, `actual_actor` e `fallback_used`. Nenhuma fase configurada e
 satisfeita por um worker generico ou por uma API de subagente nativo.
 
+Para executar essas fases configuradas, o control plane deve chamar `run`:
+
+```powershell
+.\scripts\dual-codex.ps1 --config <config> run <task-file>
+```
+
+Nao use `terminal list` ou `terminal start` para iniciar ou validar atores da
+missao. Esses comandos administram somente sessoes Codex nativas do backend
+`windows`; eles nao sao um launcher universal de perfis. `run` usa o dispatcher
+de ator configurado para selecionar o runtime correto, sem substituicao
+silenciosa.
+
 O App deve consultar `status --json` antes de delegar quando precisar confirmar
 role, label, repositorio, Git, a versao do Codex e a versao/status do `agy`.
 Delegacao e recusada se o backend nao suportar o role, se o `agy` nao passar o
