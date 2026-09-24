@@ -798,13 +798,16 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             def fake_app_server(**kwargs):
                 observed.update(kwargs)
                 self.assertIn("BEGIN CANONICAL BOOTSTRAP SNAPSHOT", kwargs["prompt"])
-                self.assertIn("authoritative canonical bootstrap", kwargs["prompt"])
+                self.assertIn("inline AGENTS.md below is authoritative", kwargs["prompt"])
                 self.assertNotIn("Read C:\\CodexGlobal", kwargs["prompt"])
                 self.assertNotIn("Read the complete ephemeral bootstrap artifact", kwargs["prompt"])
                 self.assertNotIn("Get-Content", kwargs["prompt"])
                 self.assertIn("canonical_source_path:", kwargs["prompt"])
-                self.assertIn("# memory", kwargs["prompt"])
-                self.assertIn("# project-security-review", kwargs["prompt"])
+                self.assertIn("first read only the supplied task/architect artifact", kwargs["prompt"])
+                self.assertIn("Do not ask the user to choose or identify skills", kwargs["prompt"])
+                self.assertIn("No skills were preselected by the control plane", kwargs["prompt"])
+                self.assertNotIn("# memory", kwargs["prompt"])
+                self.assertNotIn("# project-security-review", kwargs["prompt"])
                 return expected
 
             with patch("dual_codex.codex.run_codex_app_server", side_effect=fake_app_server) as app_server:
@@ -835,7 +838,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             )
             self.assertEqual(
                 result.metadata["canonical_bootstrap_selected_skills"],
-                ["memory", "ponytail", "project-phase-review", "project-security-review"],
+                [],
             )
             self.assertNotIn(r"C:\CodexGlobal", result.command)
             self.assertFalse(Path(result.metadata["canonical_bootstrap_artifact"]).exists())

@@ -82,15 +82,17 @@ def _normalise_skill_names(selected_skills: Iterable[str] | None) -> tuple[str, 
 
 
 def select_required_skills(role: str, task: str = "") -> tuple[str, ...]:
-    """Return the bounded skill set selected for a configured Codex phase.
+    """Return skills the control plane can safely preselect for a phase.
 
-    The global policy makes memory and Ponytail mandatory for coding work. The
-    architect/reviewer phases additionally require phase and security review;
-    no unrelated skill tree content is transported.
+    Architect skill selection is deferred to the actor because the applicable
+    set depends on the task brief. Other configured phases retain their bounded
+    transport set.
     """
 
+    if role == "architect":
+        return ()
     selected = {"memory", "ponytail"}
-    if role in {"architect", "reviewer"}:
+    if role == "reviewer":
         selected.update({"project-phase-review", "project-security-review"})
     return _normalise_skill_names(selected)
 
@@ -151,7 +153,9 @@ def create_canonical_bootstrap(
     """Validate canonical policy and optionally materialize one ephemeral snapshot."""
 
     source_root = canonical_instructions_root(root)
-    selected = _normalise_skill_names(selected_skills)
+    selected = _normalise_skill_names(
+        () if selected_skills is None and role == "architect" else selected_skills
+    )
     files = _canonical_files(source_root, selected_skills=selected)
     source_sha256 = _source_sha256(files)
     source_files = tuple(
@@ -224,6 +228,7 @@ def configured_actor_prompt(
     text = str(prompt)
     if BOOTSTRAP_MARKER in text:
         return text, bootstrap
+    deferred_architect_skills = role == "architect" and not bootstrap.selected_skills
     artifact = bootstrap.artifact_path
     if artifact is None:
         transport = "The trusted host could not provide an inline canonical bootstrap artifact. Fail closed."
@@ -232,23 +237,57 @@ def configured_actor_prompt(
             snapshot = artifact.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as exc:
             raise FileNotFoundError(f"Canonical bootstrap artifact is unavailable: {artifact}") from exc
+        if deferred_architect_skills:
+            source_description = (
+                "The trusted Dual Agents control plane loaded the canonical AGENTS.md "
+                f"directly from {bootstrap.source_root} and verified its SHA-256 value. "
+                "The inline AGENTS.md below is authoritative and already loaded. Skills "
+                "were intentionally left unselected because selection depends on the task. "
+            )
+            source_access = (
+                "Do not reread AGENTS.md or this transport artifact. For this unattended "
+                "Architect run, first read only the supplied task/architect artifact as "
+                "read-only context; if none is referenced, use the TASK content in this "
+                "prompt. This is the authorized read-only pre-read exception; inspect no "
+                "other task or repository files and start no task work yet. "
+                "Then select all applicable skills from the canonical catalog at "
+                f"{bootstrap.source_root / 'skills'} and read each complete SKILL.md. Do not "
+                "ask the user to choose or identify skills. If a required skill is unavailable, "
+                "stop without asking for clarification. Do not inspect repository files, plan, "
+                "edit, or run task commands until AGENTS.md and all selected skills are loaded. "
+            )
+        else:
+            source_description = (
+                "The trusted Dual Agents control plane loaded the canonical instruction sources "
+                f"directly from {bootstrap.source_root} and verified their SHA-256 values. "
+                "The complete inline block below is the authoritative canonical bootstrap. "
+            )
+            source_access = (
+                "Do not issue filesystem or shell commands to re-read or rediscover the source "
+                "paths or this transport artifact. Apply the injected content exactly. "
+            )
         transport = (
-            "The trusted Dual Agents control plane loaded the canonical instruction sources "
-            f"directly from {bootstrap.source_root} and verified their SHA-256 values. "
-            "For this turn, the complete inline block below is the authoritative canonical "
-            "bootstrap. Do not issue filesystem or shell commands to re-read or rediscover "
-            "the source paths or this transport artifact. Apply the injected content exactly. "
-            "If the block is missing or invalid, stop fail-closed. Begin inline bootstrap:\n"
+            f"{source_description}{source_access}If the block is missing or invalid, fail closed. "
+            "Begin inline bootstrap:\n"
             f"--- BEGIN CANONICAL BOOTSTRAP SNAPSHOT ---\n{snapshot}\n"
             "--- END CANONICAL BOOTSTRAP SNAPSHOT ---"
+        )
+    if deferred_architect_skills:
+        skill_status = (
+            "No skills were preselected by the control plane; this does not mean no skill "
+            "applies. Select and load them yourself after reading the task context."
+        )
+    else:
+        skill_status = (
+            f"Selected canonical skills: {', '.join(bootstrap.selected_skills) or '(none)'}. "
+            "Treat the injected AGENTS.md and selected SKILL.md content as already loaded "
+            "canonical policy; do not attempt any bootstrap filesystem access."
         )
     prefix = (
         f"{BOOTSTRAP_MARKER}\n"
         f"{transport}\n"
         f"Canonical source path: {bootstrap.source_root}; source_sha256={bootstrap.source_sha256}. "
-        f"Selected canonical skills: {', '.join(bootstrap.selected_skills) or '(none)'}. "
-        "Treat the injected AGENTS.md and selected SKILL.md content as already loaded "
-        "canonical policy; do not attempt any bootstrap filesystem access.\n"
+        f"{skill_status}\n"
         f"Trusted configured phase role: {role}\n\n"
     )
     return prefix + text, bootstrap

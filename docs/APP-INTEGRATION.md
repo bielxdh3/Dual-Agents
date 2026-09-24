@@ -18,6 +18,13 @@ e so considera perfis explicitamente autorizados para o role.
    `correct` ligado por `parent_request_id`. Nao ha correcao automatica sem
    essa evidencia.
 
+No bootstrap do role `architect`, o App injeta o `AGENTS.md` canonico e deixa
+a selecao de skills para o proprio Architect. Em uma missao unattended, ele
+pode ler o briefing ou artefato fornecido em modo somente leitura, escolhe e
+le por completo as skills canonicas aplicaveis sem perguntar ao usuario e so
+entao inspeciona o repositorio ou planeja. A execucao para em fail-closed se
+uma skill exigida nao puder ser carregada.
+
 Quando o fluxo completo `dual-codex run` e usado, cada fase resolve o ator
 novamente a partir de `[roles]` no momento da chamada. Architect e Reviewer
 seguem os perfis configurados (inclusive quando compartilham o mesmo
