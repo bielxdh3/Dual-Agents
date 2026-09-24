@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 import subprocess
@@ -256,6 +256,149 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     ("architect", "claude", "claude_code", False),
                     ("executor", "codex-secundario", "app_server", False),
                     ("reviewer", "claude", "claude_code", False),
+                ],
+            )
+
+    def test_cli_run_bootstrap_routes_configured_topology_without_terminal_role_scan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["biel3"] = AccountConfig(
+                name="biel3",
+                label="biel3",
+                codex_home=root / "biel3-home",
+                model="gpt-primary",
+                reasoning_effort="high",
+                backend="windows",
+                provider_type="codex",
+                adapter_type="codex_cli",
+            )
+            accounts["claude"] = AccountConfig(
+                name="claude",
+                label="Claude",
+                codex_home=root / "claude-home",
+                model="claude-sonnet",
+                reasoning_effort="high",
+                backend="claude_code",
+                provider_type="anthropic",
+                adapter_type="claude_code",
+            )
+            accounts["codex-secundario"] = AccountConfig(
+                name="codex-secundario",
+                label="Codex Secundario",
+                codex_home=root / "codex-secundario-home",
+                model="gpt-5.6-luna",
+                reasoning_effort="medium",
+                backend="app_server",
+                provider_type="codex",
+                adapter_type="codex_cli",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={
+                    "orchestrator": "biel3",
+                    "architect": "biel3",
+                    "reviewer": "claude",
+                    "executor": "codex-secundario",
+                },
+            )
+            config.repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=config.repository, check=True)
+            task = root / "task.md"
+            task.write_text("exercise the configured mission entry point", encoding="utf-8")
+            route_calls: list[tuple[str, str, str]] = []
+            reports = {
+                "architect": {
+                    "summary": "plan",
+                    "steps": [],
+                    "acceptance_criteria": [],
+                    "risks": [],
+                    "files_to_inspect": [],
+                },
+                "executor": {
+                    "summary": "implementation",
+                    "files_changed": [],
+                    "commands_run": [],
+                    "tests": [],
+                    "remaining_issues": [],
+                },
+                "reviewer": {"verdict": "approved", "summary": "approved", "findings": []},
+            }
+
+            def fake_codex_terminal(**kwargs):
+                role = kwargs["role"]
+                agent = kwargs["agent"]
+                if agent.backend != "windows":
+                    raise AssertionError("Non-Windows configured roles must not use the native Codex adapter")
+                route_calls.append((role, agent.account_name, agent.backend))
+                kwargs["output_path"].write_text(json.dumps(reports[role]), encoding="utf-8")
+                return CommandResult(["codex", "terminal"], 0, "", "")
+
+            def fake_claude(**kwargs):
+                role = kwargs["role"]
+                agent = kwargs["agent"]
+                route_calls.append((role, agent.account_name, agent.backend))
+                kwargs["output_path"].write_text(json.dumps(reports[role]), encoding="utf-8")
+                return CommandResult(["claude"], 0, "", "", {"claude_session_id": "claude-review"})
+
+            def fake_app_server(**kwargs):
+                role = kwargs["role"]
+                agent = kwargs["agent"]
+                route_calls.append((role, agent.account_name, agent.backend))
+                kwargs["output_path"].write_text(json.dumps(reports[role]), encoding="utf-8")
+                return CommandResult(["codex", "app-server"], 0, "", "")
+
+            with patch("dual_codex.cli.load_config", return_value=config), patch(
+                "dual_codex.codex.run_codex_terminal", side_effect=fake_codex_terminal
+            ), patch("dual_codex.claude_code.run_claude_code", side_effect=fake_claude) as claude_adapter, patch(
+                "dual_codex.codex.run_codex_app_server", side_effect=fake_app_server
+            ) as app_server_adapter, patch("dual_codex.cli.TerminalManager") as terminal_manager, patch(
+                "dual_codex.terminal.TerminalManager.start",
+                side_effect=AssertionError("The configured Claude reviewer must never reach native terminal startup"),
+            ) as native_terminal_start, patch(
+                "dual_codex.terminal.TerminalManager.list",
+                return_value=[
+                    {"session_id": "biel4-stale", "account": "biel4", "role": "architect", "state": "exited"}
+                ],
+            ) as native_terminal_list, redirect_stdout(StringIO()):
+                # A historical biel4 row must not be consulted as role configuration.
+                terminal_manager.return_value.list.return_value = [
+                    {"session_id": "biel4-stale", "account": "biel4", "role": "architect", "state": "exited"}
+                ]
+                terminal_manager.return_value.start.side_effect = AssertionError(
+                    "The configured Claude reviewer must never reach native terminal startup"
+                )
+                result = cli_main(["--config", str(config.config_path), "run", str(task)])
+
+            self.assertEqual(result, 0)
+            self.assertEqual(
+                route_calls,
+                [
+                    ("architect", "biel3", "windows"),
+                    ("executor", "codex-secundario", "app_server"),
+                    ("reviewer", "claude", "claude_code"),
+                ],
+            )
+            claude_adapter.assert_called_once()
+            app_server_adapter.assert_called_once()
+            terminal_manager.return_value.start.assert_not_called()
+            terminal_manager.return_value.list.assert_not_called()
+            native_terminal_start.assert_not_called()
+            native_terminal_list.assert_not_called()
+            run_dirs = [path for path in config.runs_dir.iterdir() if path.is_dir()]
+            self.assertEqual(len(run_dirs), 1)
+            provenance = json.loads((run_dirs[0] / "provenance.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                [
+                    (item["role"], item["actor_id"], item["backend"], item["actual_actor"], item["fallback_used"])
+                    for item in provenance["configured_actor_routing"]
+                ],
+                [
+                    ("architect", "biel3", "windows", "biel3", False),
+                    ("executor", "codex-secundario", "app_server", "codex-secundario", False),
+                    ("reviewer", "claude", "claude_code", "claude", False),
                 ],
             )
 

@@ -1,5 +1,20 @@
 # Referencia CLI — Dual Agents
 
+## Missao com roles configurados
+
+Use o comando `run` para iniciar uma missao completa. Cada fase (Architect,
+Executor e Reviewer) e resolvida pelo role configurado e encaminhada ao
+runtime do backend correspondente:
+
+```powershell
+dual-codex --config <config> run <task.md>
+```
+
+`terminal start` e `terminal list` administram sessoes Codex nativas do backend
+`windows`; nao use esses comandos como launcher ou verificador universal de
+atores configurados. Confira `provenance.json` no diretorio da execucao para
+ver o ator e backend selecionados em cada fase.
+
 ## Delegacao
 
 ```text

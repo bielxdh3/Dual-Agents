@@ -26,6 +26,19 @@ When the user says “Use Dual Agents to implement this task.”:
    evidence to the user. Never claim success without reading the result and
    diff.
 
+For a mission that runs the configured Architect, Executor, and Reviewer
+roles, use the provider-aware `run` command:
+
+```powershell
+.\scripts\dual-codex.ps1 --config <config> run <task-file>
+```
+
+Do not use `terminal list` or `terminal start` to launch or validate configured
+mission actors. Those commands only inspect or start native Windows Codex
+sessions. `run` resolves each role through its configured profile and backend;
+review `provenance.json` to verify the selected actor, runtime, and fallback
+state. Unsupported role/provider combinations fail closed.
+
 Before delegating, use `status --json` when useful to verify the executor role,
 executor label, Antigravity/Gemini backend and `agy` status, the active
 repository, Git state, and CLI versions. Delegation refuses an unassigned,
