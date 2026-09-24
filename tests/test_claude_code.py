@@ -472,6 +472,29 @@ class ClaudeCodeTests(unittest.TestCase):
             self.assertEqual(capabilities.runtime_status, "Unavailable")
             self.assertFalse(provider_supports_role(config, account, "executor"))
 
+    def test_restricted_claude_capabilities_exclude_architect_role(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = self._config(root)
+            agent = self._agent(root)
+            account = type(
+                "Account",
+                (),
+                {**agent.__dict__, "name": "claude", "available_models": (), "supported_reasoning_efforts": ()},
+            )()
+            config = OrchestratorConfig(**{**config.__dict__, "accounts": {"claude": account}})
+            with patch("dual_codex.claude_code.capability_snapshot", return_value=self._snapshot(agent)), patch(
+                "dual_codex.claude_code.claude_status", return_value="OK"
+            ):
+                capabilities = provider_capabilities(config, account)
+
+            self.assertNotIn("architect", capabilities.supported_roles)
+            self.assertIn("reviewer", capabilities.supported_roles)
+            with patch("dual_codex.claude_code.capability_snapshot", return_value=self._snapshot(agent)), patch(
+                "dual_codex.claude_code.claude_status", return_value="OK"
+            ):
+                self.assertFalse(provider_supports_role(config, account, "architect"))
+
     def test_dashboard_exposes_claude_profile_and_auth_controls(self) -> None:
         from dual_codex.dashboard import HTML, SCRIPT
 

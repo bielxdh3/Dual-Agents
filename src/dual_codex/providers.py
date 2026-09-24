@@ -549,6 +549,8 @@ def provider_supports_role(config: OrchestratorConfig, account: AccountConfig, r
 
     if role == "executor" and account.backend == "api":
         return False
+    if role == "architect" and account.backend == "claude_code":
+        return False
     if role in {"architect", "reviewer", "orchestrator"} and account.backend == "antigravity":
         return False
     try:

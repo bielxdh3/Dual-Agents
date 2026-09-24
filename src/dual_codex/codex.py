@@ -12,6 +12,7 @@ from .bootstrap import (
     cleanup_canonical_bootstrap,
     configured_actor_prompt,
     create_canonical_bootstrap,
+    finalize_architect_bootstrap,
     select_required_skills,
 )
 from .config import AgentConfig, SUPPORTED_ROLES
@@ -266,8 +267,13 @@ def _annotate_provider_result(
     repository: Path | None = None,
     canonical_root: Path | None = None,
     bootstrap=None,
+    output_path: Path | None = None,
     configured_actor: bool = True,
 ) -> CommandResult:
+    if role == "architect" and bootstrap is not None:
+        if output_path is None:
+            raise ValueError("Architect output path is required for canonical skill provenance.")
+        bootstrap = _finalize_architect_output(bootstrap, output_path)
     result.metadata.update(
         configured_actor_provenance(
             agent=agent,
@@ -285,11 +291,26 @@ def _annotate_provider_result(
     return result
 
 
+def _finalize_architect_output(bootstrap, output_path: Path):
+    try:
+        architect_plan = json.loads(output_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Architect result is unavailable for canonical skill provenance.") from exc
+    if not isinstance(architect_plan, dict):
+        raise ValueError("Architect result must be an object for canonical skill provenance.")
+    return finalize_architect_bootstrap(bootstrap, architect_plan.get("skills_loaded"))
+
+
 def _ensure_actor_supports_role(agent: AgentConfig, role: str) -> None:
     if agent.backend == "api" and role == "architect":
         raise ValueError(
             "OpenAI-compatible API profiles cannot serve the Architect role because they cannot read "
             "the canonical task-specific skills required by the bootstrap. Configure a filesystem-capable backend."
+        )
+    if agent.backend == "claude_code" and role == "architect":
+        raise ValueError(
+            "Restricted Claude Code profiles cannot read the canonical task-specific skills required by the "
+            "Architect bootstrap. Configure an Architect backend with explicit canonical skill access."
         )
     if agent.backend == "api" and role == "executor":
         raise ValueError("API profiles do not provide the workspace-write Executor role.")
@@ -401,6 +422,9 @@ def _delegate_to_configured_actor(
             result = invoke(fallback_config, fallback_agent)
             actual_agent = fallback_agent
             fallback_used = True
+        if role == "architect":
+            bootstrap = _finalize_architect_output(bootstrap, output_path)
+            result.metadata.update(bootstrap.metadata())
         provenance = configured_actor_provenance(
             agent=actual_agent,
             role=role,
@@ -514,7 +538,7 @@ def run_codex_for_role(
             )
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
-                bootstrap=bootstrap, configured_actor=configured)
+                bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
         finally:
             cleanup_canonical_bootstrap(bootstrap)
     if agent.backend == "claude_code":
@@ -545,6 +569,7 @@ def run_codex_for_role(
                 repository=repository,
                 canonical_root=canonical_root,
                 bootstrap=bootstrap,
+                output_path=output_path,
                 configured_actor=configured,
             )
         finally:
@@ -570,7 +595,7 @@ def run_codex_for_role(
             )
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
-                bootstrap=bootstrap, configured_actor=configured)
+                bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
         finally:
             cleanup_canonical_bootstrap(bootstrap)
     if agent.backend == "app_server":
@@ -600,6 +625,7 @@ def run_codex_for_role(
                 repository=repository,
                 canonical_root=canonical_root,
                 bootstrap=bootstrap,
+                output_path=output_path,
                 configured_actor=configured,
             )
         finally:
@@ -631,6 +657,7 @@ def run_codex_for_role(
         role,
         repository=repository,
         canonical_root=canonical_root,
+        output_path=output_path,
         configured_actor=configured,
     )
 

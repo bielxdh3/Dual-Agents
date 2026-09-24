@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -63,6 +64,31 @@ class CanonicalBootstrapTests(unittest.TestCase):
 
             bootstrap.cleanup_canonical_bootstrap(snapshot)
             self.assertFalse(snapshot.artifact_path.exists())
+
+    def test_architect_skill_provenance_requires_and_hashes_canonical_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodexGlobal"
+            root.mkdir()
+            _write_fixture(root)
+            snapshot = bootstrap.create_canonical_bootstrap(role="architect", root=root)
+
+            with self.assertRaisesRegex(ValueError, "skills_loaded"):
+                bootstrap.finalize_architect_bootstrap(snapshot, [])
+            with self.assertRaisesRegex(FileNotFoundError, "Required canonical skill"):
+                bootstrap.finalize_architect_bootstrap(snapshot, ["missing"])
+
+            finalized = bootstrap.finalize_architect_bootstrap(snapshot, ["task-specific"])
+            metadata = finalized.metadata()
+            skill_digest = hashlib.sha256(
+                (root / "skills" / "task-specific" / "SKILL.md").read_bytes()
+            ).hexdigest()
+            self.assertEqual(finalized.selected_skills, ("task-specific",))
+            self.assertNotEqual(finalized.source_sha256, snapshot.source_sha256)
+            self.assertEqual(metadata["canonical_bootstrap_skill_digests"], {"task-specific": skill_digest})
+            self.assertEqual(
+                metadata["canonical_bootstrap_source_files"]["skills/task-specific/SKILL.md"],
+                skill_digest,
+            )
 
     def test_unattended_architect_reads_task_before_loading_its_skill(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

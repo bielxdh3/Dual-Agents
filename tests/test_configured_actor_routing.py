@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -130,6 +131,41 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             create_bootstrap.assert_not_called()
             api_adapter.assert_not_called()
 
+    def test_restricted_claude_architect_is_rejected_before_bootstrap_or_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["claude"] = AccountConfig(
+                name="claude",
+                label="Restricted Claude Code",
+                codex_home=root / "claude-home",
+                model="claude-sonnet",
+                reasoning_effort="high",
+                backend="claude_code",
+                provider_type="anthropic",
+                adapter_type="claude_code",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "architect": "claude"},
+            )
+
+            with patch("dual_codex.codex.create_canonical_bootstrap") as create_bootstrap, patch(
+                "dual_codex.claude_code.run_claude_code"
+            ) as run_claude:
+                with self.assertRaisesRegex(ValueError, "Restricted Claude Code profiles cannot read"):
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="architect",
+                        task="Read the supplied task artifact and implement it.",
+                        repository=config.repository,
+                    )
+
+            create_bootstrap.assert_not_called()
+            run_claude.assert_not_called()
+
     def test_full_topology_uses_configured_provider_backend_and_zero_native_spawn(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -151,6 +187,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
+                        "skills_loaded": ["ponytail"],
                     }
                 elif role == "executor":
                     payload = {
@@ -189,6 +226,15 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             )
             provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
             self.assertTrue(all(item["configured_actor"] for item in provenance["configured_actor_routing"]))
+            architect_provenance = provenance["configured_actor_routing"][0]
+            self.assertEqual(architect_provenance["canonical_bootstrap_selected_skills"], ["ponytail"])
+            self.assertEqual(
+                architect_provenance["canonical_bootstrap_skill_digests"]["ponytail"],
+                hashlib.sha256(
+                    (Path(self._instructions.name) / "skills" / "ponytail" / "SKILL.md").read_bytes()
+                ).hexdigest(),
+            )
+            self.assertIn("skills/ponytail/SKILL.md", architect_provenance["canonical_bootstrap_source_files"])
 
     def test_mission_dispatches_claude_roles_and_codex_executor_without_native_start(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -220,7 +266,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 accounts=accounts,
                 roles={
                     "orchestrator": "orchestrator",
-                    "architect": "claude",
+                    "architect": "codex-secundario",
                     "reviewer": "claude",
                     "executor": "codex-secundario",
                 },
@@ -239,6 +285,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     "acceptance_criteria": [],
                     "risks": [],
                     "files_to_inspect": [],
+                    "skills_loaded": ["ponytail"],
                 },
                 "executor": {
                     "summary": "implementation",
@@ -277,11 +324,14 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertEqual(outcome.verdict, "approved")
             self.assertEqual(
                 claude_roles,
-                [("architect", "claude", "claude_code"), ("reviewer", "claude", "claude_code")],
+                [("reviewer", "claude", "claude_code")],
             )
-            self.assertEqual(claude.call_count, 2)
-            self.assertEqual(codex_roles, [("executor", "codex-secundario", "app_server")])
-            self.assertEqual(codex.call_count, 1)
+            self.assertEqual(claude.call_count, 1)
+            self.assertEqual(
+                codex_roles,
+                [("architect", "codex-secundario", "app_server"), ("executor", "codex-secundario", "app_server")],
+            )
+            self.assertEqual(codex.call_count, 2)
             terminal.assert_not_called()
             native_start.assert_not_called()
             observed_provenance = [
@@ -291,7 +341,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertEqual(
                 observed_provenance,
                 [
-                    ("architect", "claude", "claude_code", False),
+                    ("architect", "codex-secundario", "app_server", False),
                     ("executor", "codex-secundario", "app_server", False),
                     ("reviewer", "claude", "claude_code", False),
                 ],
@@ -354,6 +404,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     "acceptance_criteria": [],
                     "risks": [],
                     "files_to_inspect": [],
+                    "skills_loaded": ["ponytail"],
                 },
                 "executor": {
                     "summary": "implementation",
@@ -531,6 +582,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             repository.mkdir()
 
             def fake_runner(**kwargs):
+                kwargs["output_path"].write_text(json.dumps({"skills_loaded": ["ponytail"]}), encoding="utf-8")
                 return CommandResult(
                     ["fake"],
                     0,
@@ -748,6 +800,10 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
 
             def fake_runner(**kwargs):
                 observed.append((kwargs["role"], kwargs["agent"].account_name, kwargs["agent"].backend))
+                if kwargs["role"] == "architect":
+                    kwargs["output_path"].write_text(
+                        json.dumps({"skills_loaded": ["ponytail"]}), encoding="utf-8"
+                    )
                 return CommandResult(["fake"], 0, "", "")
 
             with patch("dual_codex.codex.run_codex_for_role", side_effect=fake_runner):
@@ -846,6 +902,9 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 self.assertIn("No skills were preselected by the control plane", kwargs["prompt"])
                 self.assertNotIn("# memory", kwargs["prompt"])
                 self.assertNotIn("# project-security-review", kwargs["prompt"])
+                kwargs["output_path"].write_text(
+                    json.dumps({"skills_loaded": ["ponytail"]}), encoding="utf-8"
+                )
                 return expected
 
             with patch("dual_codex.codex.run_codex_app_server", side_effect=fake_app_server) as app_server:
@@ -876,7 +935,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             )
             self.assertEqual(
                 result.metadata["canonical_bootstrap_selected_skills"],
-                [],
+                ["ponytail"],
             )
             self.assertNotIn(r"C:\CodexGlobal", result.command)
             self.assertFalse(Path(result.metadata["canonical_bootstrap_artifact"]).exists())

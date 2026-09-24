@@ -92,6 +92,7 @@ class OrchestratorTests(unittest.TestCase):
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
+                        "skills_loaded": ["ponytail"],
                     }
                 elif role == "executor":
                     payload = {

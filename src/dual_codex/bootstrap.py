@@ -39,6 +39,11 @@ class CanonicalBootstrap:
     source_files: tuple[tuple[str, str], ...] = ()
 
     def metadata(self) -> dict[str, object]:
+        skill_digests = {
+            relative[len("skills/") : -len("/SKILL.md")]: digest
+            for relative, digest in self.source_files
+            if relative.startswith("skills/") and relative.endswith("/SKILL.md")
+        }
         return {
             "canonical_bootstrap_required": True,
             "canonical_bootstrap_source": "machine-wide",
@@ -50,6 +55,7 @@ class CanonicalBootstrap:
             "canonical_bootstrap_artifact_ephemeral": self.artifact_path is not None,
             "canonical_bootstrap_delivery": "trusted_inline" if self.artifact_path is not None else "source-reference",
             "canonical_bootstrap_selected_skills": list(self.selected_skills),
+            "canonical_bootstrap_skill_digests": skill_digests,
             "canonical_bootstrap_source_files": {
                 relative: digest for relative, digest in self.source_files
             },
@@ -194,6 +200,39 @@ def create_canonical_bootstrap(
         raise
 
 
+def finalize_architect_bootstrap(
+    bootstrap: CanonicalBootstrap,
+    selected_skills: object,
+) -> CanonicalBootstrap:
+    """Verify the Architect's reported skill set against canonical files."""
+
+    if not isinstance(selected_skills, list) or not selected_skills or any(
+        not isinstance(name, str) for name in selected_skills
+    ):
+        raise ValueError("Architect plan must list the loaded canonical skills in 'skills_loaded'.")
+    names = _normalise_skill_names(selected_skills)
+    if len(names) != len(selected_skills):
+        raise ValueError("Architect plan 'skills_loaded' must not contain duplicate skill names.")
+
+    files = _canonical_files(bootstrap.source_root, selected_skills=names)
+    digests = tuple(
+        (relative, hashlib.sha256(content).hexdigest()) for relative, content in files
+    )
+    initial_agents_digest = dict(bootstrap.source_files).get("AGENTS.md")
+    current_agents_digest = dict(digests).get("AGENTS.md")
+    if initial_agents_digest and current_agents_digest != initial_agents_digest:
+        raise RuntimeError("Canonical AGENTS.md changed while the Architect mission was running.")
+    return CanonicalBootstrap(
+        source_root=bootstrap.source_root,
+        source_sha256=_source_sha256(files),
+        artifact_path=bootstrap.artifact_path,
+        artifact_sha256=bootstrap.artifact_sha256,
+        mechanism=bootstrap.mechanism,
+        selected_skills=names,
+        source_files=digests,
+    )
+
+
 def bootstrap_artifact_dir(repository: Path, output_path: Path) -> Path:
     """Choose a per-run directory already readable by the provider sandbox."""
 
@@ -255,6 +294,8 @@ def configured_actor_prompt(
                 "ask the user to choose or identify skills. If a required skill is unavailable, "
                 "stop without asking for clarification. Do not inspect repository files, plan, "
                 "edit, or run task commands until AGENTS.md and all selected skills are loaded. "
+                "In the final plan, list every fully loaded skill directory name in the required "
+                "top-level skills_loaded field so the control plane can verify its provenance. "
             )
         else:
             source_description = (

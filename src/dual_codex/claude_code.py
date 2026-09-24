@@ -731,7 +731,9 @@ class ClaudeCodeAdapter:
                 profile_isolation=True,
                 error=_safe_error(snapshot.get("error")),
             )
-        roles = tuple(snapshot.get("roles", ()))
+        # Restricted Claude runs in the repository and cannot read the
+        # machine-wide skill catalog without a separately granted path.
+        roles = tuple(role for role in snapshot.get("roles", ()) if role != "architect")
         efforts = tuple(snapshot.get("efforts", ()))
         auth_status = claude_status(config.claude_command, cwd=config.project_root, account=account)
         credential_status = "configured" if auth_status == "OK" else "missing" if auth_status in {"NOT CONFIGURED", "NOT LOGGED IN"} else "unknown"
