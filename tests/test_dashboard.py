@@ -7,6 +7,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 from urllib.request import Request, urlopen
 from unittest.mock import patch
@@ -80,6 +82,155 @@ executor = "secondary"
         self.assertEqual(reloaded.accounts["primary"].reasoning_effort, "medium")
         self.assertEqual(reloaded.accounts["primary"].service_tier, "fast")
         self.assertNotIn(b"\xef\xbb\xbf", self.config_path.read_bytes()[:3])
+
+    def test_model_save_invalidates_cache_and_does_not_depend_on_fallback(self) -> None:
+        service = DashboardService(self.config)
+        with patch("dual_codex.dashboard.login_status", return_value="NOT LOGGED IN"):
+            service.collect_account("secondary", force=True)
+            self.assertFalse(self.config.fallback_enabled)
+            saved = service.save_settings(
+                "secondary",
+                {"model": "gpt-6-luna", "reasoning_effort": "high", "scope": "future_turns"},
+            )
+            self.assertEqual(saved["saved"]["model"], "gpt-6-luna")
+            self.assertEqual(service.collect_account("secondary")["configured"]["model"], "gpt-6-luna")
+        self.assertEqual(load_config(self.config_path).accounts["secondary"].model, "gpt-6-luna")
+
+    def test_inflight_old_account_read_cannot_repopulate_invalidated_cache(self) -> None:
+        account = replace(self.config.accounts["secondary"], backend="app_server", model="")
+        config = replace(self.config, accounts={**self.config.accounts, "secondary": account})
+        service = DashboardService(config)
+        first_model_list = threading.Event()
+        release_first = threading.Event()
+        call_lock = threading.Lock()
+        model_lists = 0
+        stale_reads: list[dict[str, object]] = []
+
+        def app_server(*, method: str, **_kwargs: object) -> dict[str, object]:
+            nonlocal model_lists
+            if method == "model/list":
+                with call_lock:
+                    model_lists += 1
+                    call_number = model_lists
+                if call_number == 1:
+                    first_model_list.set()
+                    self.assertTrue(release_first.wait(timeout=5))
+                    model_id = "gpt-5.6-luna"
+                else:
+                    model_id = "gpt-6-luna"
+                return {"data": [{"id": model_id, "displayName": model_id, "isDefault": True, "supportedReasoningEfforts": [{"reasoningEffort": "high"}]}]}
+            return {"data": []}
+
+        with patch("dual_codex.dashboard.app_server_call", side_effect=app_server), patch(
+            "dual_codex.dashboard.app_server_events", return_value=[]
+        ), patch("dual_codex.dashboard.login_status", return_value="OK"):
+            reader = threading.Thread(target=lambda: stale_reads.append(service.collect_account("secondary", force=True)))
+            reader.start()
+            self.assertTrue(first_model_list.wait(timeout=5))
+            saved = service.save_settings(
+                "secondary",
+                {"model": "gpt-6-luna", "reasoning_effort": "high", "scope": "future_turns"},
+            )
+            self.assertEqual(saved["saved"]["model"], "gpt-6-luna")
+            release_first.set()
+            reader.join(timeout=5)
+            self.assertFalse(reader.is_alive())
+            self.assertEqual(stale_reads[0]["configured"]["model"], "")
+            self.assertEqual(service.collect_account("secondary")["configured"]["model"], "gpt-6-luna")
+        self.assertEqual(service._cache["secondary"][2]["configured"]["model"], "gpt-6-luna")
+
+    def test_primary_and_fallback_roles_persist_in_one_mutation(self) -> None:
+        service = DashboardService(self.config)
+        result = service.set_roles(
+            {"account": "primary", "roles": ["architect"], "fallback_roles": ["reviewer", "executor"]}
+        )
+        self.assertEqual(result["fallback_roles"], ["reviewer", "executor"])
+        service.set_roles({"account": "primary", "roles": ["orchestrator", "architect"]})
+        service.update_profile("primary", {"fallback_roles": ["reviewer"]})
+        persisted = load_config(self.config_path)
+        self.assertEqual(persisted.accounts["primary"].fallback_roles, ("reviewer",))
+        self.assertEqual(persisted.roles["orchestrator"], "primary")
+        self.assertEqual(persisted.roles["architect"], "primary")
+        service.save_settings("primary", {"model": "after-roles", "scope": "future_turns"})
+        persisted = load_config(self.config_path)
+        self.assertEqual(persisted.accounts["primary"].fallback_roles, ("reviewer",))
+        self.assertEqual(persisted.roles["architect"], "primary")
+
+    def test_late_frontend_response_and_dirty_draft_are_ignored(self) -> None:
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("Node.js is required for the dashboard state regression test")
+        source = CAPABILITY_SCRIPT + """
+const state = globalThis.dualCodexDashboardState;
+const mixedDraft = {dirtySettings: true, dirtyRoles: true, dirty: true};
+state.setDraftSectionDirty(mixedDraft, 'settings', false);
+const rolesRemainDirty = state.shouldPreserveDashboardDraft(mixedDraft);
+state.setDraftSectionDirty(mixedDraft, 'roles', false);
+console.log(JSON.stringify({
+  late: state.responseIsCurrent(1, 2, 1, 2),
+  current: state.responseIsCurrent(2, 2, 2, 1),
+  staleRevision: state.responseIsCurrent(3, 3, 1, 2),
+  mixedRevisionSnapshot: state.snapshotIsCurrent(3, 3, [3, 2], 3),
+  currentSnapshot: state.snapshotIsCurrent(3, 3, [3, 3], 3),
+  unrelatedMutation: state.latestMutationCanApply(1, 1),
+  lateMutation: state.latestMutationCanApply(1, 2),
+  dirty: state.shouldPreserveDashboardDraft({dirty: true}),
+  clean: state.shouldPreserveDashboardDraft({dirty: false}),
+  replaceDirtyCard: state.shouldReplaceDashboardCard({dirty: true}),
+  replaceCleanCard: state.shouldReplaceDashboardCard({dirty: false}),
+  rolesRemainDirty,
+  cleanAfterBothSaves: state.shouldReplaceDashboardCard(mixedDraft),
+}));
+"""
+        result = subprocess.run([node, "-"], input=source, text=True, capture_output=True, check=True)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["late"])
+        self.assertTrue(payload["current"])
+        self.assertFalse(payload["staleRevision"])
+        self.assertFalse(payload["mixedRevisionSnapshot"])
+        self.assertTrue(payload["currentSnapshot"])
+        self.assertTrue(payload["unrelatedMutation"])
+        self.assertFalse(payload["lateMutation"])
+        self.assertTrue(payload["dirty"])
+        self.assertFalse(payload["clean"])
+        self.assertFalse(payload["replaceDirtyCard"])
+        self.assertTrue(payload["replaceCleanCard"])
+        self.assertTrue(payload["rolesRemainDirty"])
+        self.assertTrue(payload["cleanAfterBothSaves"])
+
+    def test_installed_app_server_catalog_accepts_new_model_id(self) -> None:
+        account = replace(self.config.accounts["secondary"], backend="app_server", model="")
+        config = replace(self.config, accounts={**self.config.accounts, "secondary": account})
+        service = DashboardService(config)
+        service._cache["secondary"] = (
+            time.monotonic(),
+            service._revision,
+            {"models": [{"id": "gpt-5.6-luna"}], "capabilities": {"effort_levels": ["high"]}},
+        )
+
+        def call(*, method, **_kwargs):
+            if method == "model/list":
+                return {
+                    "data": [{
+                        "id": "gpt-6-luna",
+                        "displayName": "GPT-6 Luna",
+                        "isDefault": True,
+                        "defaultReasoningEffort": "high",
+                        "supportedReasoningEfforts": [{"reasoningEffort": "high"}],
+                    }]
+                }
+            return {"data": []} if method == "thread/list" else {}
+
+        with patch("dual_codex.dashboard.app_server_call", side_effect=call), patch(
+            "dual_codex.dashboard.app_server_events", return_value=[]
+        ), patch("dual_codex.dashboard.login_status", return_value="OK"):
+            service.save_settings(
+                "secondary",
+                {"model": "gpt-6-luna", "reasoning_effort": "high", "scope": "future_turns"},
+            )
+        saved = load_config(self.config_path)
+        self.assertEqual(saved.roles["executor"], "secondary")
+        self.assertEqual(saved.accounts["secondary"].model, "gpt-6-luna")
 
     def test_profile_management_crud_is_metadata_only_and_immediate(self) -> None:
         service = DashboardService(self.config)
@@ -283,12 +434,21 @@ console.log(JSON.stringify({
         self.assertIn("Provider default", SCRIPT)
         self.assertIn("This model does not expose configurable effort", SCRIPT)
         self.assertIn("No active turn", SCRIPT)
-        self.assertIn("applyClaudeUx", SCRIPT)
-        self.assertIn("isExecutor||a.provider==='anthropic'", SCRIPT)
+        self.assertIn("function applyClaudeUx", SCRIPT)
+        self.assertIn("provider === 'anthropic'", SCRIPT)
+        self.assertIn("claude_code|Anthropic Claude", SCRIPT)
+        self.assertIn("Anthropic Claude</option>", HTML)
         self.assertIn("PROFILES / ACCOUNTS", HTML)
         self.assertIn("Add profile", HTML)
         self.assertIn("data-profile-auth", SCRIPT)
         self.assertIn("Remove metadata", SCRIPT)
+        self.assertIn("shouldPreserveDashboardDraft", SCRIPT)
+        self.assertIn("updateCardTelemetry(existing, account)", SCRIPT)
+        self.assertIn("function reportRefreshError(error)", SCRIPT)
+        self.assertNotIn("$('#accounts').innerHTML", SCRIPT)
+        self.assertIn("<details class=\"advanced\">", SCRIPT)
+        self.assertNotIn("dashboardFetch", SCRIPT)
+        self.assertNotIn("window.alert", SCRIPT)
 
     def test_claude_model_effort_persistence_reconciles_no_effort_models(self) -> None:
         account = replace(

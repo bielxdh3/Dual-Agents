@@ -259,8 +259,10 @@ class DashboardService:
     def __init__(self, config: OrchestratorConfig, repository: Path | None = None) -> None:
         self.config = config
         self.repository = (repository or config.repository).expanduser().resolve()
-        self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
+        self._cache: dict[str, tuple[float, int, dict[str, Any]]] = {}
+        self._revision = 0
         self._lock = threading.RLock()
+        self._mutation_lock = threading.RLock()
         self._auth_jobs: dict[str, threading.Thread] = {}
         self._auth_results: dict[str, dict[str, Any]] = {}
 
@@ -301,7 +303,18 @@ class DashboardService:
         }
 
     def _reload(self) -> None:
-        self.config = load_config(self.config.config_path)
+        reloaded = load_config(self.config.config_path)
+        with self._lock:
+            self.config = reloaded
+
+    def _invalidate_cache(self, *names: str) -> None:
+        with self._lock:
+            self._revision += 1
+            if names:
+                for name in names:
+                    self._cache.pop(name, None)
+            else:
+                self._cache.clear()
 
     def _call(self, agent: AgentConfig, method: str, params: dict[str, Any] | None, *, role: str = "") -> tuple[dict[str, Any], str | None]:
         result = app_server_call(
@@ -353,16 +366,19 @@ class DashboardService:
     def collect_account(self, name: str, *, force: bool = False) -> dict[str, Any]:
         name = validate_account_name(name)
         with self._lock:
+            revision = self._revision
             cached = self._cache.get(name)
-            if cached and not force and time.monotonic() - cached[0] < 3:
-                return cached[1]
-        account = self.config.accounts.get(name)
+            if cached and cached[1] == revision and not force and time.monotonic() - cached[0] < 3:
+                return cached[2]
+            config = self.config
+        account = config.accounts.get(name)
         if account is None:
             raise DashboardError(f"Unknown account '{name}'.")
         auth_raw = self._auth_raw(name, account)
         provider = provider_for_backend(account.backend) if account.backend in {"antigravity", "api"} else (account.provider_type or provider_for_backend(account.backend))
         provider_name = provider_label(provider, account.backend)
         base: dict[str, Any] = {
+            "revision": revision,
             "name": account.name,
             "profile_id": account.name,
             "stable_key": account.name,
@@ -411,7 +427,8 @@ class DashboardService:
             base["runtime_state"] = "Disabled"
             base["last_error"] = "Profile is disabled; provider-native state was retained."
             with self._lock:
-                self._cache[name] = (time.monotonic(), base)
+                if revision == self._revision:
+                    self._cache[name] = (time.monotonic(), revision, base)
             return base
         if account.backend != "app_server":
             discovered = provider_capabilities(self.config, account)
@@ -468,7 +485,8 @@ class DashboardService:
             if discovered.error:
                 base["last_error"] = discovered.error
             with self._lock:
-                self._cache[name] = (time.monotonic(), base)
+                if revision == self._revision:
+                    self._cache[name] = (time.monotonic(), revision, base)
             return base
 
         agent = _agent_for_account(account)
@@ -575,7 +593,8 @@ class DashboardService:
         }
         base["last_error"] = "; ".join(errors)[:800] if errors else None
         with self._lock:
-            self._cache[name] = (time.monotonic(), base)
+            if revision == self._revision:
+                self._cache[name] = (time.monotonic(), revision, base)
         return base
 
     def accounts(self, *, force: bool = False) -> list[dict[str, Any]]:
@@ -633,43 +652,50 @@ class DashboardService:
         fallback_roles = body.get("fallback_roles", [])
         if not isinstance(fallback_roles, list) or any(not isinstance(value, str) for value in fallback_roles):
             raise DashboardError("fallback_roles must be a list of role names.")
-        try:
-            created = add_account(
-                self.config,
-                name,
-                label=label,
-                codex_home=body.get("codex_home") or None,
-                model=body.get("model", "") or "",
-                reasoning_effort=body.get("reasoning_effort", "") or "",
-                runtime_model=body.get("runtime_model", "") or "",
-                fixed_mode=body.get("fixed_mode", "") or "",
-                backend=backend,
-                provider_type=body.get("provider_type"),
-                adapter_type=body.get("adapter_type"),
-                auth_mode=body.get("auth_mode"),
-                auth_reference=body.get("auth_reference", "") or "",
-                base_url=body.get("base_url", "") or "",
-                available_models=body.get("available_models", ()) or (),
-                supported_reasoning_efforts=body.get("supported_reasoning_efforts", ()) or (),
-                fallback_roles=fallback_roles,
-                enabled=enabled,
-                authenticate=False,
-                output=lambda _message: None,
-            )
-        except ConfigError as exc:
-            raise DashboardError(str(exc)) from exc
-        self._reload()
-        with self._lock:
-            self._cache.clear()
-            self._auth_results.pop(created.name, None)
-        account = self.config.accounts[created.name]
+        with self._mutation_lock:
+            try:
+                created = add_account(
+                    self.config,
+                    name,
+                    label=label,
+                    codex_home=body.get("codex_home") or None,
+                    model=body.get("model", "") or "",
+                    reasoning_effort=body.get("reasoning_effort", "") or "",
+                    runtime_model=body.get("runtime_model", "") or "",
+                    fixed_mode=body.get("fixed_mode", "") or "",
+                    backend=backend,
+                    provider_type=body.get("provider_type"),
+                    adapter_type=body.get("adapter_type"),
+                    auth_mode=body.get("auth_mode"),
+                    auth_reference=body.get("auth_reference", "") or "",
+                    base_url=body.get("base_url", "") or "",
+                    available_models=body.get("available_models", ()) or (),
+                    supported_reasoning_efforts=body.get("supported_reasoning_efforts", ()) or (),
+                    fallback_roles=fallback_roles,
+                    enabled=enabled,
+                    authenticate=False,
+                    output=lambda _message: None,
+                )
+            except ConfigError as exc:
+                raise DashboardError(str(exc)) from exc
+            self._reload()
+            self._invalidate_cache()
+            with self._lock:
+                self._auth_results.pop(created.name, None)
+                revision = self._revision
+                account = self.config.accounts[created.name]
         return {
             "schema_version": 1,
+            "revision": revision,
             "profile": self._profile_details(account),
             "message": "Profile metadata saved; provider authentication remains a separate action.",
         }
 
     def update_profile(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
+        with self._mutation_lock:
+            return self._update_profile(name, body)
+
+    def _update_profile(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(body, dict):
             raise DashboardError("Profile update body must be a JSON object.")
         allowed = {"label", "display_name", "new_name", "enabled", "fallback_roles"}
@@ -708,10 +734,11 @@ class DashboardService:
         if not (set(body) & {"label", "display_name", "new_name", "enabled", "fallback_roles"}):
             raise DashboardError("Profile update requires a display name, profile ID, or enabled value.")
         self._reload()
+        self._invalidate_cache()
         with self._lock:
-            self._cache.clear()
+            revision = self._revision
         account = self.config.accounts[current_name]
-        return {"schema_version": 1, "profile": self._profile_details(account), "message": "Profile updated."}
+        return {"schema_version": 1, "revision": revision, "profile": self._profile_details(account), "message": "Profile updated."}
 
     def remove_profile(self, name: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         body = body or {}
@@ -722,14 +749,17 @@ class DashboardService:
             active = self._auth_jobs.get(current_name)
             if active is not None and active.is_alive():
                 raise DashboardError("Authentication is still in progress for this profile.")
-        remove_account(self.config, current_name, delete_profile=False)
-        self._reload()
-        with self._lock:
-            self._cache.clear()
-            self._auth_jobs.pop(current_name, None)
-            self._auth_results.pop(current_name, None)
+        with self._mutation_lock:
+            remove_account(self.config, current_name, delete_profile=False)
+            self._reload()
+            self._invalidate_cache()
+            with self._lock:
+                self._auth_jobs.pop(current_name, None)
+                self._auth_results.pop(current_name, None)
+                revision = self._revision
         return {
             "schema_version": 1,
+            "revision": revision,
             "account": current_name,
             "metadata_removed": True,
             "provider_state_deleted": False,
@@ -784,7 +814,7 @@ class DashboardService:
                 with self._lock:
                     self._auth_results[account.name] = result
                     self._auth_jobs.pop(account.name, None)
-                    self._cache.pop(account.name, None)
+                self._invalidate_cache(account.name)
 
             thread = threading.Thread(
                 target=worker,
@@ -825,12 +855,13 @@ class DashboardService:
                 raise DashboardError("Run /logout in Claude Code; Dual Agents never handles Claude credentials.")
             if account.backend not in {"windows", "app_server"}:
                 raise DashboardError("Logout is only supported for native provider profiles.")
-            result = logout_account(self.config, account.name)
+            with self._mutation_lock:
+                result = logout_account(self.config, account.name)
             if result != "OK":
                 raise DashboardError("Provider logout failed.")
             with self._lock:
                 self._auth_results.pop(account.name, None)
-                self._cache.pop(account.name, None)
+            self._invalidate_cache(account.name)
             return self.auth_status(account.name)
         raise DashboardError("Unsupported authentication action.")
 
@@ -849,7 +880,8 @@ class DashboardService:
             except OSError:
                 pass
         with self._lock:
-            cached_accounts = [value[1] for value in self._cache.values() if time.monotonic() - value[0] < 30]
+            revision = self._revision
+            cached_accounts = [value[2] for value in self._cache.values() if value[1] == revision and time.monotonic() - value[0] < 30]
         if not cached_accounts:
             app_server_health = "not_checked"
         elif any(item.get("capabilities", {}).get("app_server") and not item.get("last_error") for item in cached_accounts):
@@ -858,6 +890,7 @@ class DashboardService:
             app_server_health = "unavailable"
         return {
             "schema_version": 1,
+            "revision": revision,
             "dual_codex_version": __version__,
             "codex_cli": {"path": executable or self.config.codex_command, "version": version},
             "repository": str(self.repository),
@@ -889,7 +922,7 @@ class DashboardService:
                 "capabilities": {"runtime_status": "Disabled", "error": "Profile is disabled."},
             }
         if backend is None or backend == account.backend:
-            account_data = self.collect_account(name)
+            account_data = self.collect_account(name, force=True)
         else:
             if backend not in SUPPORTED_BACKENDS:
                 raise DashboardError("backend must be one of the supported provider backends.")
@@ -928,6 +961,10 @@ class DashboardService:
         return {"schema_version": 1, "account": name, "rate_limits": account["rate_limits"], "usage": account["usage"], "thread": account["thread"], "token_usage": account["token_usage"], "refreshed_at": account["refreshed_at"]}
 
     def save_settings(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
+        with self._mutation_lock:
+            return self._save_settings(name, body)
+
+    def _save_settings(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(body, dict):
             raise DashboardError("Settings body must be a JSON object.")
         allowed = {
@@ -974,7 +1011,7 @@ class DashboardService:
         for field, value in (("available_models", available_models), ("supported_reasoning_efforts", supported_reasoning_efforts)):
             if value is not None and (not isinstance(value, list) or any(not isinstance(item, str) for item in value)):
                 raise DashboardError(f"{field} must be a list of strings.")
-        current = self.collect_account(name)
+        current = self.collect_account(name, force=True)
         models = current.get("models", [])
         target_backend = account.backend if backend is None else backend
         target_account = account
@@ -1058,10 +1095,12 @@ class DashboardService:
             supported_reasoning_efforts=supported_reasoning_efforts,
         )
         self._reload()
+        self._invalidate_cache(name)
         with self._lock:
-            self._cache.pop(name, None)
+            revision = self._revision
         return {
             "schema_version": 1,
+            "revision": revision,
             "account": name,
             "scope": "future_turns",
             "current_thread_changed": False,
@@ -1071,6 +1110,9 @@ class DashboardService:
                 "service_tier": updated.service_tier,
                 "backend": updated.backend,
                 "provider": updated.provider_type,
+                "provider_label": provider_label(updated.provider_type, updated.backend),
+                "runtime_model": updated.runtime_model,
+                "fixed_mode": updated.fixed_mode,
                 "credential_configured": bool(updated.auth_reference),
             },
             "message": "Saved for future Dual Codex turns; current persistent thread unchanged.",
@@ -1079,35 +1121,57 @@ class DashboardService:
     def assign(self, body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(body, dict) or set(body) != {"role", "account"}:
             raise DashboardError("Role assignment requires exactly role and account.")
-        previous, current = assign_role(self.config, body["role"], body["account"])
-        self._reload()
-        with self._lock:
-            self._cache.clear()
-        return {"schema_version": 1, "role": body["role"], "previous": previous, "account": current}
+        with self._mutation_lock:
+            previous, current = assign_role(self.config, body["role"], body["account"])
+            self._reload()
+            self._invalidate_cache()
+            with self._lock:
+                revision = self._revision
+        return {"schema_version": 1, "revision": revision, "role": body["role"], "previous": previous, "account": current}
 
     def set_roles(self, body: dict[str, Any]) -> dict[str, Any]:
-        if not isinstance(body, dict) or set(body) != {"account", "roles"}:
-            raise DashboardError("Role update requires exactly account and roles.")
+        if not isinstance(body, dict) or not {"account", "roles"}.issubset(body) or set(body) - {"account", "roles", "fallback_roles"}:
+            raise DashboardError("Role update requires account, roles, and optional fallback_roles.")
         if not isinstance(body["roles"], list):
             raise DashboardError("roles must be a list of role names.")
-        resulting = set_roles_for_account(self.config, body["account"], body["roles"])
-        self._reload()
-        with self._lock:
-            self._cache.clear()
+        fallback_roles = body.get("fallback_roles")
+        if fallback_roles is not None and (
+            not isinstance(fallback_roles, list) or any(not isinstance(role, str) for role in fallback_roles)
+        ):
+            raise DashboardError("fallback_roles must be a list of role names.")
+        with self._mutation_lock:
+            resulting = set_roles_for_account(
+                self.config,
+                body["account"],
+                body["roles"],
+                fallback_roles=fallback_roles,
+            )
+            self._reload()
+            self._invalidate_cache()
+            with self._lock:
+                revision = self._revision
+                account = self.config.accounts[body["account"]]
         return {
             "schema_version": 1,
+            "revision": revision,
             "account": body["account"],
             "roles": resulting,
+            "fallback_roles": list(account.fallback_roles),
             "message": "Roles updated",
         }
 
     def set_fallback(self, body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(body, dict) or set(body) != {"enabled"} or not isinstance(body["enabled"], bool):
             raise DashboardError("Fallback settings require exactly a boolean enabled field.")
-        set_fallback_enabled(self.config, body["enabled"])
-        self._reload()
+        with self._mutation_lock:
+            set_fallback_enabled(self.config, body["enabled"])
+            self._reload()
+            self._invalidate_cache()
+            with self._lock:
+                revision = self._revision
         return {
             "schema_version": 1,
+            "revision": revision,
             "fallback_enabled": self.config.fallback_enabled,
             "message": "Automatic configured-actor fallback updated for future dispatches.",
         }
@@ -1122,71 +1186,571 @@ HTML = """<!doctype html>
 <section id="executor-view" class="executor-view" hidden aria-labelledby="executor-heading"><div class="executor-head"><div><p class="eyebrow">LIVE EXECUTOR</p><h2 id="executor-heading">EXECUTOR LIVE</h2><div id="executor-status" class="executor-status" aria-live="polite">IDLE · Waiting for an Executor run.</div></div><div class="executor-actions"><label class="toggle"><input id="executor-follow" type="checkbox" checked> Follow Live</label><button id="executor-pause" class="button secondary" type="button">Pause</button><button id="executor-clear" class="button secondary" type="button">Clear View</button></div></div><div class="executor-meta"><div><span>STATE</span><strong id="executor-state">IDLE</strong></div><div><span>MODEL</span><strong id="executor-model">Unknown</strong></div><div><span>REASONING</span><strong id="executor-reasoning">Unknown</strong></div><div><span>SERVICE TIER</span><strong id="executor-tier">Unknown</strong></div><div><span>THREAD / TURN</span><strong id="executor-thread">Unknown</strong></div><div><span>ELAPSED</span><strong id="executor-elapsed">Unknown</strong></div><div><span>TOKENS</span><strong id="executor-tokens">Unknown</strong></div></div><div class="executor-plan"><div class="executor-label">CURRENT PLAN</div><pre id="executor-plan-content">Unknown / Not available</pre></div><div class="executor-tabs" role="tablist" aria-label="Executor activity"><button class="executor-tab active" data-executor-tab="activity" role="tab" aria-selected="true">Activity</button><button class="executor-tab" data-executor-tab="commands" role="tab" aria-selected="false">Commands</button><button class="executor-tab" data-executor-tab="diffs" role="tab" aria-selected="false">Live Diff</button><button class="executor-tab" data-executor-tab="files" role="tab" aria-selected="false">Files</button></div><div id="executor-feed" class="executor-feed" aria-live="polite"><div class="empty">No Executor activity yet.</div></div></section>
 <footer><span>Loopback-only dashboard</span><span id="updated"></span></footer></main></body></html>"""
 
+HTML = HTML.replace('<option value="api">API / OpenAI-compatible</option>', '<option value="api">API / OpenAI-compatible</option><option value="claude_code">Anthropic Claude</option>')
+HTML = HTML.replace(
+    '</select></div><div class="field"><label for="profile-home">CODEX_HOME / state root</label>',
+    '</select></div><div class="field" data-profile-claude-auth-field hidden><label for="profile-auth-mode">Auth mode</label><select id="profile-auth-mode" data-profile-auth-mode><option value="provider_native">Claude Code managed login</option><option value="environment">Anthropic API key via env reference</option></select></div><div class="field"><label for="profile-home">CODEX_HOME / state root</label>',
+)
+HTML = HTML.replace(
+    '<div class="field" data-profile-api-field hidden><label for="profile-auth-reference">API secret reference</label>',
+    '<div class="field" data-profile-auth-field hidden><label for="profile-auth-reference">API / Claude secret reference</label>',
+)
+
 STYLES = """:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--panel2:#18233b;--text:#edf2ff;--muted:#9eacc8;--line:#293653;--accent:#78a9ff;--good:#53d6a3;--warn:#ffc56d;--bad:#ff7f92;--shadow:0 18px 48px #05081180}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0,#1d2b52 0,#0b1020 42%);font:15px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text)}.shell{width:min(1200px,calc(100% - 32px));margin:0 auto;padding:36px 0 28px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:28px}.eyebrow{color:var(--accent);font-size:11px;letter-spacing:.16em;font-weight:700;margin:0 0 8px}.hero h1{font-size:clamp(34px,6vw,64px);line-height:1;margin:0 0 12px;letter-spacing:-.05em}.lede{color:var(--muted);font-size:17px;margin:0}.health{border:1px solid var(--line);background:#101a2eaa;border-radius:999px;padding:9px 14px;color:var(--muted);white-space:nowrap}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:38px}.stat,.card{background:linear-gradient(160deg,#15213a,#0f1729);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.stat{padding:16px}.stat .label{color:var(--muted);font-size:12px}.stat strong{display:block;margin-top:6px;font-size:18px;overflow-wrap:anywhere}.section-head{display:flex;align-items:end;justify-content:space-between;margin-bottom:16px}.section-head h2{margin:0;font-size:28px;letter-spacing:-.03em}.button{border:0;border-radius:10px;padding:10px 15px;color:var(--text);font-weight:700;cursor:pointer;background:var(--accent);color:#071127}.button.secondary{background:#1c2a47;color:var(--text);border:1px solid var(--line)}.accounts{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}.card{padding:20px}.card-head{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:15px}.card h3{font-size:22px;margin:0;overflow-wrap:anywhere}.sub{color:var(--muted);font-size:13px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:800;white-space:nowrap}.pill.good{background:#153d35;color:var(--good)}.pill.warn{background:#4a371d;color:var(--warn)}.pill.bad{background:#4a202d;color:var(--bad)}.pill.neutral{background:#24314b;color:var(--muted)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}.field{display:flex;flex-direction:column;gap:5px}.field label,.metric-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.field output,.value{font-weight:650;overflow-wrap:anywhere}.field select{width:100%;background:#0c1425;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px}.field small,.hint{color:var(--muted);font-size:12px}.control{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}.save-row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px}.feedback{font-size:12px;color:var(--muted);min-height:18px}.bars{display:grid;gap:8px;margin-top:8px}.bar-head{display:flex;justify-content:space-between;color:var(--muted);font-size:12px}.bar{height:7px;background:#0a1120;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}.thread{padding:10px;background:#0d1628;border-radius:10px;margin-top:10px}.empty{color:var(--muted);padding:28px;border:1px dashed var(--line);border-radius:14px;text-align:center}.error{color:var(--bad);font-size:12px;margin-top:8px}footer{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:28px}@media(max-width:700px){.shell{width:min(100% - 20px,1200px);padding-top:22px}.hero{display:block}.health{display:inline-flex;margin-top:16px}.summary{grid-template-columns:1fr 1fr}.accounts{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.section-head h2{font-size:24px}}"""
 
 STYLES += ".role-editor{border:0;padding:0;margin:0}.role-editor legend{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0}.role-options{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.check{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;color:var(--text);font-size:13px}.check input{accent-color:var(--accent)}"
 
 STYLES += ".profile-form{background:linear-gradient(160deg,#15213a,#0f1729);border:1px solid var(--line);border-radius:14px;padding:18px;margin:0 0 18px;box-shadow:var(--shadow)}.profile-form h3{margin:0;font-size:20px}.profile-form input,.profile-form select,.profile-row input{width:100%;background:#0c1425;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px}.profile-form[hidden]{display:none}.profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-bottom:28px}.profile-row{background:#101a2e;border:1px solid var(--line);border-radius:12px;padding:14px}.profile-row h3{margin:0 0 4px;font-size:18px}.profile-row .profile-meta{display:grid;gap:4px;color:var(--muted);font-size:12px;margin:10px 0}.profile-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.profile-actions .button{font-size:12px;padding:8px 10px}.profile-row .profile-note{color:var(--warn);font-size:12px;margin-top:8px}.profile-row .feedback{margin-top:8px}.profile-row .pill{margin-left:6px}"
+STYLES += ".advanced,.fallback-panel{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}.advanced summary,.fallback-panel summary,.fallback-details summary{cursor:pointer;color:var(--muted);font-size:12px;font-weight:700}.advanced[open] summary,.fallback-panel[open] summary,.fallback-details[open] summary{color:var(--text)}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.runtime-line{margin:8px 0 0}.fallback-panel{border:0;padding:0;margin:0}.fallback-panel .toggle{margin-top:8px}.fallback-panel .feedback{display:inline}.button:disabled,.toggle input:disabled{opacity:.6;cursor:wait}@media(max-width:700px){.detail-grid{grid-template-columns:1fr}}"
 
 STYLES += """.view-tabs{display:flex;gap:8px;margin:0 0 18px;border-bottom:1px solid var(--line);padding-bottom:10px}.view-tab{border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted);padding:8px 12px;font:700 12px/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.08em;cursor:pointer}.view-tab:hover,.view-tab.active{background:#18243b;border-color:var(--line);color:var(--text)}.executor-view[hidden]{display:none}.executor-view{background:#080d17;border:1px solid #263550;border-radius:12px;box-shadow:0 18px 48px #05081180;color:#dce8ff;font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;overflow:hidden}.executor-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;padding:18px;border-bottom:1px solid #263550}.executor-head h2{font:700 clamp(24px,5vw,42px)/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:-.05em;margin:0 0 8px}.executor-head .eyebrow,.executor-label,.executor-meta span{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.executor-status{color:#91a5c5;min-height:20px}.executor-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.executor-actions .button{font:700 12px/1 ui-monospace,SFMono-Regular,Consolas,monospace;padding:9px 11px}.toggle{display:inline-flex;align-items:center;gap:6px;color:#a9bbd8;white-space:nowrap}.toggle input{accent-color:var(--accent)}.executor-meta{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:#263550;border-bottom:1px solid #263550}.executor-meta>div{background:#0d1524;padding:11px 12px;min-width:0}.executor-meta span{display:block;color:#7284a5;font-size:10px;letter-spacing:.1em}.executor-meta strong{display:block;margin-top:5px;color:#e7efff;font-size:13px;overflow-wrap:anywhere}.executor-meta strong[data-state="WORKING"]{color:var(--warn)}.executor-meta strong[data-state="COMPLETE"]{color:var(--good)}.executor-meta strong[data-state="FAILED"]{color:var(--bad)}.executor-plan{padding:14px 18px;border-bottom:1px solid #263550}.executor-label{color:#7284a5;font-size:10px;letter-spacing:.1em}.executor-plan pre{margin:8px 0 0;color:#c7d5ef;white-space:pre-wrap;overflow-wrap:anywhere;max-height:130px;overflow:auto}.executor-tabs{display:flex;gap:4px;padding:10px 12px 0;background:#0d1524}.executor-tab{border:0;border-bottom:2px solid transparent;background:transparent;color:#8194b5;padding:9px 10px;cursor:pointer;font:700 11px/1 ui-monospace,SFMono-Regular,Consolas,monospace}.executor-tab.active{border-bottom-color:var(--accent);color:#edf2ff}.executor-feed{max-height:520px;overflow:auto;padding:0 12px 12px;background:#0a111d}.executor-row{display:grid;grid-template-columns:112px 160px minmax(0,1fr);gap:10px;border-bottom:1px solid #1b2941;padding:10px 6px;min-width:0}.executor-row .executor-time,.executor-row .executor-kind{color:#768bad;font-size:11px;overflow-wrap:anywhere}.executor-row .executor-kind{color:#a9bbd8}.executor-row .executor-message{color:#dce8ff;white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}.executor-empty{color:#7e91b2;padding:24px 8px;text-align:center}.executor-view .empty{border-color:#263550;border-radius:0;padding:24px;background:#0a111d}@media(max-width:800px){.executor-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.executor-head{display:block}.executor-actions{justify-content:flex-start;margin-top:14px}.executor-row{grid-template-columns:84px 1fr}.executor-row .executor-message{grid-column:1/-1}.view-tabs{overflow:auto}}"""
 
 CAPABILITY_SCRIPT = """function modelCapabilities(models, modelId){const rows=Array.isArray(models)?models:[];const inherited=!modelId;const selected=inherited?rows.find(row=>row&&row.is_default):rows.find(row=>row&&row.id===modelId);if(!selected)return null;const efforts=Array.isArray(selected.reasoning_efforts)?[...new Set(selected.reasoning_efforts.filter(value=>typeof value==='string'))]:[];const tiers=Array.isArray(selected.service_tiers)?selected.service_tiers.filter(value=>value&&typeof value.id==='string'):[];return {selected,inherited,reasoning_efforts:efforts,default_reasoning:typeof selected.default_reasoning==='string'?selected.default_reasoning:null,fixed_mode:typeof selected.fixed_mode==='string'?selected.fixed_mode:'',service_tiers:tiers,default_service_tier:typeof selected.default_service_tier==='string'?selected.default_service_tier:null}}
 function capabilityValue(current,values,preferred){if(values.includes(current))return {value:current,changed:false};const value=values.includes(preferred)?preferred:(values[0]||'');return {value,changed:current!==value}}
-function reconcileCapabilitySelection(models,modelId,currentReasoning,currentTier,providerCapabilities){const selected=modelCapabilities(models,modelId);const advertised=providerCapabilities&&Array.isArray(providerCapabilities.effort_levels)?[...new Set(providerCapabilities.effort_levels.filter(value=>typeof value==='string'))]:[];if(!selected&&!advertised.length)return {selected_model:null,reasoning_efforts:[],reasoning_value:'',reasoning_disabled:true,fixed_mode:'',service_tiers:[],service_tier_value:'',service_tier_disabled:true,message:'Capabilities unavailable for this provider.'};const inherited=Boolean(selected&&selected.inherited&&providerCapabilities);const fixedMode=inherited?'':(selected&&selected.fixed_mode||'');const efforts=inherited?[]:(selected?selected.reasoning_efforts:advertised);const defaultReasoning=selected&&selected.default_reasoning||'';const reasoning=fixedMode||inherited?{value:'',changed:Boolean(currentReasoning)}:efforts.length?capabilityValue(currentReasoning,efforts,defaultReasoning):{value:'',changed:Boolean(currentReasoning)};const tiers=selected?selected.service_tiers:[];const tierIds=tiers.map(tier=>tier.id);const tier=tierIds.includes(currentTier)?{value:currentTier,changed:false}:{value:'',changed:Boolean(currentTier)};const messages=[];if(inherited)messages.push('Provider default controls the model and effort.');else if(fixedMode)messages.push(`${fixedMode} (fixed for this model).`);else if(!efforts.length)messages.push(selected?'This model does not expose configurable effort.':'Reasoning capabilities are not advertised by the selected provider.');if(!tierIds.length)messages.push('No service tier is advertised by the selected provider.');if(reasoning.changed)messages.push('Reasoning updated because the selected model does not support the previous effort.');if(tier.changed)messages.push('Service tier reset to Default / OFF because the selected provider does not advertise it.');return {selected_model:selected?selected.selected.id:null,reasoning_efforts:efforts,reasoning_value:reasoning.value,reasoning_disabled:inherited||fixedMode||!efforts.length,fixed_mode:fixedMode,service_tiers:tiers,service_tier_value:tier.value,service_tier_disabled:!tierIds.length,message:messages.join(' ')}}
+function reconcileCapabilitySelection(models,modelId,currentReasoning,currentTier,providerCapabilities){const selected=modelCapabilities(models,modelId);const advertised=providerCapabilities&&Array.isArray(providerCapabilities.effort_levels)?[...new Set(providerCapabilities.effort_levels.filter(value=>typeof value==='string'))]:[];if(!selected&&!advertised.length)return {selected_model:null,reasoning_efforts:[],reasoning_value:'',reasoning_disabled:true,fixed_mode:'',service_tiers:[],service_tier_value:'',service_tier_disabled:true,message:'Capabilities unavailable for this provider.'};const inherited=Boolean(selected&&selected.inherited&&providerCapabilities);const fixedMode=inherited?'':(selected&&selected.fixed_mode||'');const efforts=inherited?[]:(selected?selected.reasoning_efforts:advertised);const defaultReasoning=selected&&selected.default_reasoning||'';const reasoning=fixedMode||inherited?{value:'',changed:Boolean(currentReasoning)}:efforts.length?capabilityValue(currentReasoning,efforts,defaultReasoning):{value:'',changed:Boolean(currentReasoning)};const tiers=selected?selected.service_tiers:[];const tierIds=tiers.map(tier=>tier.id);const tier=tierIds.includes(currentTier)?{value:currentTier,changed:false}:{value:'',changed:Boolean(currentTier)};const messages=[];if(inherited)messages.push('Provider default controls the model and effort.');else if(fixedMode)messages.push(`${fixedMode} (fixed for this model).`);else if(!efforts.length)messages.push('Reasoning capabilities are not advertised by the selected provider.');if(!tierIds.length)messages.push('No service tier is advertised by the selected provider.');if(reasoning.changed)messages.push('Reasoning updated because the selected model does not support the previous value.');if(tier.changed)messages.push('Service tier reset to Default / OFF because the selected provider does not advertise it.');return {selected_model:selected?selected.selected.id:null,reasoning_efforts:efforts,reasoning_value:reasoning.value,reasoning_disabled:inherited||fixedMode||!efforts.length,fixed_mode:fixedMode,service_tiers:tiers,service_tier_value:tier.value,service_tier_disabled:!tierIds.length,message:messages.join(' ')}}
+function responseIsCurrent(sequence,latestSequence,incomingRevision,currentRevision){return sequence===latestSequence&&(incomingRevision==null||currentRevision==null||incomingRevision>=currentRevision)}
+function snapshotIsCurrent(sequence,latestSequence,incomingRevisions,currentRevision){return sequence===latestSequence&&(incomingRevisions||[]).every(value=>value==null||currentRevision==null||value>=currentRevision)}
+function latestMutationCanApply(sequence,latestSequence){return sequence===latestSequence}
+function setDraftSectionDirty(draft,section,dirty){if(!draft)return false;const key=section==='settings'?'dirtySettings':'dirtyRoles';draft[key]=Boolean(dirty);draft.dirty=Boolean(draft.dirtySettings||draft.dirtyRoles);return draft.dirty}
+function shouldPreserveDashboardDraft(draft){return Boolean(draft&&(draft.dirty||draft.dirtySettings||draft.dirtyRoles))}
+function shouldReplaceDashboardCard(draft){return !shouldPreserveDashboardDraft(draft)}
+if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardState={responseIsCurrent,snapshotIsCurrent,latestMutationCanApply,setDraftSectionDirty,shouldPreserveDashboardDraft,shouldReplaceDashboardCard};
 if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardCapabilities={modelCapabilities,reconcileCapabilitySelection};
 """
 
-SCRIPT = CAPABILITY_SCRIPT + """const $=s=>document.querySelector(s);const esc=v=>{if(v==null)return 'Not available';return String(v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]))};const fmtTokens=v=>v==null?'Not available':Number(v).toLocaleString();const fmtReset=v=>{if(!v)return 'No reset published';const d=Math.max(0,Math.floor(Number(v)-Date.now()/1000));if(d<60)return `${d}s`;if(d<3600)return `${Math.floor(d/60)}m`;return `${Math.floor(d/3600)}h ${Math.floor(d%3600/60)}m`};
-async function get(path,opts){const r=await fetch(path,opts);const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
-function pill(state){const c=state==='Idle'||state==='Connected'?'good':state==='Working'||state==='Rate limited'?'warn':state==='Unavailable'?'bad':'neutral';return `<span class="pill ${c}">${esc(state)}</span>`}
-function bar(row){return (row.windows||[]).map(w=>{const p=Math.max(0,Math.min(100,Number(w.used_percent)||0));return `<div><div class="bar-head"><span>${esc(w.kind)} · ${p}% used</span><span>resets ${fmtReset(w.resets_at)}</span></div><div class="bar"><i style="width:${p}%"></i></div></div>`}).join('')||'<span class="hint">Not available</span>'}
-function options(items,current,inherit){let out=inherit?`<option value="">${esc(typeof inherit==='string'?inherit:'Provider default')}</option>`:'';for(const i of items||[])out+=`<option value="${esc(i.id)}" ${i.id===current?'selected':''}>${esc(i.display_name||i.id)}</option>`;if(current&&!Array.from(items||[]).some(i=>i&&i.id===current))out+=`<option value="${esc(current)}" selected>${esc(current)}</option>`;return out}
-function applyClaudeUx(){document.querySelectorAll('.card[data-provider="anthropic"]').forEach(card=>{const labels=[...card.querySelectorAll('.field label')];for(const label of labels){if(/Fast requested|Effective service tier|Service tier \/ Fast/i.test(label.textContent||''))label.closest('.field')?.remove()}const backend=card.querySelector('[data-backend]');if(backend){backend.disabled=true;backend.title='Provider identity is managed by this Claude profile.';const parent=backend.closest('.field');if(parent&&!parent.querySelector('small')){const note=document.createElement('small');note.textContent='Provider identity is managed by this Claude profile.';parent.appendChild(note)}}const selected=(card._providerModels||[]).find(row=>row&&row.id===card.querySelector('[data-model]')?.value);if(selected&&Array.isArray(selected.reasoning_efforts)&&!selected.reasoning_efforts.length){for(const label of [...card.querySelectorAll('.field label')])if(label.textContent==='Configured reasoning'){const output=label.closest('.field')?.querySelector('output');if(output)output.textContent='Not configurable'}}for(const label of [...card.querySelectorAll('.field label')])if(/^Effective (model|reasoning)$/i.test(label.textContent||'')){const output=label.closest('.field')?.querySelector('output');if(output&&output.textContent==='Unknown')output.textContent='No active turn'}})}
- function capabilityOptions(state){const efforts=state.fixed_mode?`<option value="" selected>${esc(state.fixed_mode)} (fixed)</option>`:state.reasoning_efforts.length?state.reasoning_efforts.map(value=>`<option value="${esc(value)}" ${value===state.reasoning_value?'selected':''}>${esc(value)}</option>`).join(''):'<option value="">Capabilities unavailable</option>';const tiers='<option value="" '+(!state.service_tier_value?'selected':'')+'>Default / OFF</option>'+state.service_tiers.map(tier=>`<option value="${esc(tier.id)}" ${tier.id===state.service_tier_value?'selected':''}>${esc(tier.name||tier.id)}</option>`).join('');return {efforts,tiers}}
-function renderCapabilities(card,models,announce){const model=card.querySelector('[data-model]').value;const effort=card.querySelector('[data-effort]');const tier=card.querySelector('[data-tier]');const state=reconcileCapabilitySelection(models,model,effort.value,tier.value,card._providerCapabilities||{});const options=capabilityOptions(state);effort.innerHTML=options.efforts;effort.value=state.reasoning_value;effort.disabled=state.reasoning_disabled;tier.innerHTML=options.tiers;tier.value=state.service_tier_value;tier.disabled=state.service_tier_disabled;const feedback=card.querySelector('[data-capability-feedback]');if(announce||state.message)feedback.textContent=state.message||'Capabilities match the selected provider.';return state}
-const ROLE_NAMES=['orchestrator','architect','reviewer','executor'];
-function roleEditor(a){const assigned=new Set(a.roles||[]);const fallback=new Set(a.fallback_roles||[]);return `<fieldset class="role-editor"><legend>Primary role assignment</legend><div class="role-options">${ROLE_NAMES.map(role=>`<label class="check"><input type="checkbox" data-primary-role value="${role}" ${assigned.has(role)?'checked':''}>${role}</label>`).join('')}</div><legend>Fallback eligibility</legend><div class="role-options">${ROLE_NAMES.filter(role=>role!=='orchestrator').map(role=>`<label class="check"><input type="checkbox" data-fallback-role value="${role}" ${fallback.has(role)?'checked':''}>${role}</label>`).join('')}</div><small>Fallback is only used when the global switch is enabled and the primary actor is unavailable.</small></fieldset>`}
-function card(a){const model=a.configured.model||'';const providerCapabilities=a.capabilities||{};const state=reconcileCapabilitySelection(a.models,model,a.configured.reasoning_effort,a.configured.service_tier,providerCapabilities);const capabilityOptionsForCard=capabilityOptions(state);const usage=a.usage?.summary?.lifetimeTokens;const thread=a.thread;const isExecutor=(a.roles||[]).includes('executor');const backendOptions=isExecutor?`<option value="${esc(a.backend)}" selected>${esc(a.provider_label||a.backend)}</option>`:`<option value="app_server" ${a.backend==='app_server'?'selected':''}>Codex App Server</option><option value="windows" ${a.backend==='windows'?'selected':''}>Codex Native Windows TUI</option><option value="antigravity" ${a.backend==='antigravity'?'selected':''}>Antigravity / Gemini</option><option value="api" ${a.backend==='api'?'selected':''}>API / OpenAI-compatible</option>`;const defaultLabel=a.configured.model?'':(a.configured.model_label||'Provider default');return `<article class="card" data-account="${esc(a.name)}" data-provider="${esc(a.provider||'unknown')}"><div class="card-head"><div><h3>${esc(a.label||a.name)}</h3><div class="sub">${esc(a.name)} · ${esc(a.provider_label||a.backend)} · ${esc(a.codex_home)}</div><div class="sub">Roles: ${esc((a.roles||[]).join(', ')||'none')} · Runtime: ${esc(a.runtime_state)}</div></div>${pill(a.runtime_state)}</div><div class="control">${roleEditor(a)}<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite">No role changes yet.</span><button class="button secondary" data-roles-save>Apply roles</button></div></div><div class="grid"><div class="field"><label>Configured model</label><output>${esc(a.configured.model_label)}</output></div><div class="field"><label>Effective model</label><output>${esc(a.effective.model||'Unknown')}</output></div><div class="field"><label>Configured reasoning</label><output>${esc(a.configured.reasoning_effort||'Provider default')}</output></div><div class="field"><label>Effective reasoning</label><output>${esc(a.effective.reasoning_effort||'Unknown')}</output></div><div class="field"><label>Fast requested / tier</label><output>${esc(a.configured.service_tier||'OFF / default')}</output></div><div class="field"><label>Effective service tier</label><output>${esc(a.effective.service_tier||'Unknown')}</output></div></div><div class="control"><div class="field"><label>Save for future turns</label><select data-model>${options(a.models,model,defaultLabel||'Provider default')}</select><small>Empty means inherit the selected provider default. Current thread is not changed.</small></div><div class="grid"><div class="field"><label>Reasoning / effort</label><select data-effort ${state.reasoning_disabled?'disabled':''}>${capabilityOptionsForCard.efforts}</select></div><div class="field"><label>Service tier / Fast</label><select data-tier ${state.service_tier_disabled?'disabled':''}>${capabilityOptionsForCard.tiers}</select></div><div class="field"><label>Backend / provider</label><select data-backend ${isExecutor?'disabled':''}>${backendOptions}</select></div></div><div class="feedback" data-capability-feedback aria-live="polite">${esc(state.message||'Capabilities match the selected provider.')}</div><div class="save-row"><span class="feedback" data-feedback>Settings are future-turn only.</span><button class="button" data-save>Save settings</button></div></div><div class="control"><div class="metric-label">Usage / rate-limit capacity</div><div class="bars">${(a.rate_limits||[]).map(bar).join('')||'<span class="hint">Not available</span>'}</div><div class="sub" style="margin-top:9px">Lifetime tokens: ${fmtTokens(usage)}</div>${thread?`<div class="thread"><div class="metric-label">Persistent thread</div><div class="value">${esc(thread.name||thread.id||'Unknown')}</div><div class="sub">${esc(thread.status||'Unknown')} · token usage ${a.token_usage?'available':'Not available'}</div></div>`:'<div class="thread sub">Persistent thread: Not available</div>'}</div>${a.profile?.isolation_note?`<div class="hint">${esc(a.profile.isolation_note)}</div>`:''}${a.last_error?`<div class="error">Provider: ${esc(a.last_error)}</div>`:''}</article>`}
- async function refresh(notice){const [s,as]=await Promise.all([get('/api/status'),get('/api/accounts')]);const healthy=as.accounts.some(a=>a.capabilities&&((a.capabilities.app_server&&!a.last_error)||a.runtime_state==='Connected'||a.runtime_state==='Configured'));$('#health').textContent=`Providers: ${healthy?'available':s.app_server_health}`;$('#summary').innerHTML=[['Dual Agents',s.dual_codex_version],['Codex CLI',s.codex_cli.version],['Repository',s.repository],['Git',s.git_state]].map(x=>`<div class="stat"><div class="label">${x[0]}</div><strong>${esc(x[1])}</strong></div>`).join('');renderProfiles(as.accounts);$('#accounts').innerHTML=as.accounts.map(card).join('')||'<div class="empty">No profiles configured.</div>';document.querySelectorAll('.card[data-account]').forEach(node=>{const account=as.accounts.find(row=>row.name===node.dataset.account);node._providerCapabilities=account?.capabilities||{};node._providerModels=account?.models||[];});$('#updated').textContent=`Updated ${new Date().toLocaleTimeString()}`;bindProfileManager();document.querySelectorAll('[data-model]').forEach(select=>select.addEventListener('change',()=>renderCapabilities(select.closest('.card'),select.closest('.card')._providerModels||[],true)));document.querySelectorAll('[data-backend]').forEach(select=>select.addEventListener('change',()=>{const card=select.closest('.card');const account=as.accounts.find(row=>row.name===card.dataset.account);if(account){card._providerCapabilities=account.capabilities||{};card._providerModels=account.models||[];renderCapabilities(card,card._providerModels,true)}}));document.querySelectorAll('[data-save]').forEach(btn=>btn.addEventListener('click',async()=>{const c=btn.closest('.card');const f=c.querySelector('[data-feedback]');f.textContent='Saving…';const body={model:c.querySelector('[data-model]').value,backend:c.querySelector('[data-backend]').value,scope:'future_turns'};const effort=c.querySelector('[data-effort]');const tier=c.querySelector('[data-tier]');if(effort.disabled){const selected=(c._providerModels||[]).find(row=>row&&row.id===body.model);if(selected&&selected.fixed_mode)body.reasoning_effort='';}else body.reasoning_effort=effort.value;if(!tier.disabled)body.service_tier=tier.value;try{await get(`/api/accounts/${encodeURIComponent(c.dataset.account)}/settings`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});f.textContent='Saved for future turns; current thread unchanged.';await refresh()}catch(e){f.textContent=e.message}}));document.querySelectorAll('[data-roles-save]').forEach(btn=>btn.addEventListener('click',async()=>{const c=btn.closest('.card');const f=c.querySelector('[data-role-feedback]');const roles=[...c.querySelectorAll('[data-role]:checked')].map(input=>input.value);f.textContent='Applying…';try{await get('/api/roles/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:c.dataset.account,roles})});await refresh({account:c.dataset.account,message:'Roles updated'});const updated=document.querySelector(`[data-account="${c.dataset.account}"] [data-role-feedback]`);if(updated)updated.textContent='Roles updated';}catch(err){f.textContent=err.message}}))}
-$('#refresh').addEventListener('click',()=>refresh().catch(e=>$('#accounts').innerHTML=`<div class="empty">${esc(e.message)}</div>`));refresh().catch(e=>{$('#health').textContent='Unavailable';$('#accounts').innerHTML=`<div class="empty">${esc(e.message)}</div>`});"""
+SCRIPT = CAPABILITY_SCRIPT + """
+const $ = selector => document.querySelector(selector);
+const esc = value => { if (value == null) return 'Not available'; return String(value).replace(/[&<>\"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[character])); };
+const fmtTokens = value => value == null ? 'Not available' : Number(value).toLocaleString();
+const fmtReset = value => { if (!value) return 'No reset published'; const seconds = Math.max(0, Math.floor(Number(value) - Date.now() / 1000)); if (seconds < 60) return seconds + 's'; if (seconds < 3600) return Math.floor(seconds / 60) + 'm'; return Math.floor(seconds / 3600) + 'h ' + Math.floor(seconds % 3600 / 60) + 'm'; };
+const dashboardState = {
+  accounts: new Map(),
+  drafts: new Map(),
+  profileDrafts: new Map(),
+  revision: 0,
+  refreshSerial: 0,
+  mutations: new Map(),
+  busyCards: new Set(),
+  roleMutationPending: false,
+};
+function revisionValue(payload) {
+  const value = Number(payload && payload.revision);
+  return Number.isFinite(value) ? value : null;
+}
+function responseIsCurrent(sequence, latestSequence, incomingRevision, currentRevision) {
+  return sequence === latestSequence && (incomingRevision == null || currentRevision == null || incomingRevision >= currentRevision);
+}
+function latestMutationCanApply(sequence, latestSequence) {
+  return sequence === latestSequence;
+}
+if (typeof globalThis !== 'undefined') globalThis.dualCodexDashboardState = {responseIsCurrent, latestMutationCanApply};
+
+async function get(path, opts) {
+  const response = await fetch(path, opts);
+  const payload = await response.json();
+  if (!response.ok) throw Error(payload.error || 'Request failed');
+  return payload;
+}
+function pill(state) {
+  const value = String(state || 'Unknown');
+  const className = value === 'Idle' || value === 'Connected' ? 'good' : value === 'Working' || value === 'Rate limited' ? 'warn' : value === 'Unavailable' ? 'bad' : 'neutral';
+  return '<span class="pill ' + className + '">' + esc(value) + '</span>';
+}
+function bar(row) {
+  return (row.windows || []).map(window => {
+    const percent = Math.max(0, Math.min(100, Number(window.used_percent) || 0));
+    return '<div><div class="bar-head"><span>' + esc(window.kind) + ' · ' + percent + '% used</span><span>resets ' + fmtReset(window.resets_at) + '</span></div><div class="bar"><i style="width:' + percent + '%"></i></div></div>';
+  }).join('') || '<span class="hint">Not available</span>';
+}
+function options(items, current, inherit) {
+  let output = inherit ? '<option value="">' + esc(typeof inherit === 'string' ? inherit : 'Provider default') + '</option>' : '';
+  for (const item of items || []) output += '<option value="' + esc(item.id) + '"' + (item.id === current ? ' selected' : '') + '>' + esc(item.display_name || item.id) + '</option>';
+  if (current && !(items || []).some(item => item && item.id === current)) output += '<option value="' + esc(current) + '" selected>' + esc(current) + '</option>';
+  return output;
+}
+function capabilityOptions(state) {
+  const efforts = state.fixed_mode
+    ? '<option value="" selected>' + esc(state.fixed_mode) + ' (fixed)</option>'
+    : state.reasoning_efforts.length
+      ? state.reasoning_efforts.map(value => '<option value="' + esc(value) + '"' + (value === state.reasoning_value ? ' selected' : '') + '>' + esc(value) + '</option>').join('')
+      : '<option value="">' + (state.selected_model ? 'This model does not expose configurable effort' : 'Capabilities unavailable') + '</option>';
+  const tiers = '<option value=""' + (!state.service_tier_value ? ' selected' : '') + '>Default / OFF</option>' +
+    state.service_tiers.map(tier => '<option value="' + esc(tier.id) + '"' + (tier.id === state.service_tier_value ? ' selected' : '') + '>' + esc(tier.name || tier.id) + '</option>').join('');
+  return {efforts, tiers};
+}
+function renderCapabilities(cardNode, models, announce) {
+  const model = cardNode.querySelector('[data-model]');
+  const effort = cardNode.querySelector('[data-effort]');
+  const tier = cardNode.querySelector('[data-tier]');
+  if (!model || !effort) return null;
+  const state = reconcileCapabilitySelection(models, model.value, effort.value, tier?.value || '', cardNode._providerCapabilities || {});
+  const rendered = capabilityOptions(state);
+  effort.innerHTML = rendered.efforts;
+  effort.value = state.reasoning_value;
+  effort.disabled = state.reasoning_disabled;
+  if (tier) {
+    tier.innerHTML = rendered.tiers;
+    tier.value = state.service_tier_value;
+    tier.disabled = state.service_tier_disabled;
+  }
+  const feedback = cardNode.querySelector('[data-capability-feedback]');
+  if (feedback && (announce || state.message)) feedback.textContent = state.message || 'Capabilities match the selected provider.';
+  applyClaudeUx(cardNode);
+  return state;
+}
+function applyClaudeUx(cardNode) {
+  if (!cardNode) return;
+  const claude = cardNode.dataset.provider === 'anthropic';
+  const tierField = cardNode.querySelector('[data-tier]')?.closest('.field');
+  if (tierField) tierField.hidden = claude;
+  const backend = cardNode.querySelector('[data-backend]');
+  if (backend) {
+    backend.disabled = claude || Boolean(cardNode.querySelector('[data-primary-role][value="executor"]')?.checked);
+    backend.title = claude ? 'Provider identity is managed by this profile.' : '';
+  }
+  if (claude) {
+    const selected = (cardNode._providerModels || []).find(row => row && row.id === cardNode.querySelector('[data-model]')?.value);
+    if (selected && Array.isArray(selected.reasoning_efforts) && !selected.reasoning_efforts.length) {
+      const effort = cardNode.querySelector('[data-effort]');
+      if (effort) effort.title = 'This model does not expose configurable effort.';
+    }
+    for (const label of [...cardNode.querySelectorAll('.field label')]) {
+      if (/^Effective (model|reasoning)$/i.test(label.textContent || '')) {
+        const output = label.closest('.field')?.querySelector('output');
+        if (output && output.textContent === 'Unknown') output.textContent = 'No active turn';
+      }
+    }
+  }
+}
+const ROLE_NAMES = ['orchestrator', 'architect', 'reviewer', 'executor'];
+function draftFromAccount(account) {
+  const configured = account.configured || {};
+  return {
+    model: configured.model || '',
+    effort: configured.reasoning_effort || '',
+    tier: configured.service_tier || '',
+    backend: account.backend || '',
+    provider: account.provider || '',
+    providerLabel: account.provider_label || '',
+    roles: [...(account.roles || [])],
+    fallback_roles: [...(account.fallback_roles || [])],
+    dirtySettings: false,
+    dirtyRoles: false,
+    dirty: false,
+  };
+}
+function draftFor(account, reset) {
+  const existing = dashboardState.drafts.get(account.name);
+  if (!existing || reset && !existing.dirty) {
+    const draft = draftFromAccount(account);
+    dashboardState.drafts.set(account.name, draft);
+    return draft;
+  }
+  return existing;
+}
+function roleEditor(account, draft) {
+  const assigned = new Set(draft.roles || []);
+  const fallback = new Set(draft.fallback_roles || []);
+  const primary = ROLE_NAMES.map(role => '<label class="check"><input type="checkbox" data-primary-role value="' + role + '"' + (assigned.has(role) ? ' checked' : '') + '>' + role + '</label>').join('');
+  const fallbackRows = ROLE_NAMES.filter(role => role !== 'orchestrator').map(role => '<label class="check"><input type="checkbox" data-fallback-role value="' + role + '"' + (fallback.has(role) ? ' checked' : '') + '>' + role + '</label>').join('');
+  return '<fieldset class="role-editor"><legend>Primary roles</legend><div class="role-options">' + primary + '</div><details class="fallback-details"><summary>Fallback eligibility</summary><div class="role-options">' + fallbackRows + '</div></details></fieldset>';
+}
+function card(account, draft) {
+  const configured = account.configured || {};
+  const models = draft.providerModels || account.models;
+  const capabilities = draft.providerCapabilities || account.capabilities || {};
+  const provider = draft.provider || account.provider || 'unknown';
+  const providerLabel = draft.providerLabel || account.provider_label || account.backend;
+  const state = reconcileCapabilitySelection(models, draft.model, draft.effort, draft.tier, capabilities);
+  const rendered = capabilityOptions(state);
+  const executor = (draft.roles || []).includes('executor');
+  const backendOptions = executor || provider === 'anthropic'
+    ? '<option value="' + esc(draft.backend) + '" selected>' + esc(providerLabel || draft.backend) + '</option>'
+    : ['app_server|Codex App Server', 'windows|Codex Native Windows TUI', 'antigravity|Antigravity / Gemini', 'api|API / OpenAI-compatible', 'claude_code|Anthropic Claude'].map(pair => {
+        const parts = pair.split('|');
+        return '<option value="' + parts[0] + '"' + (parts[0] === draft.backend ? ' selected' : '') + '>' + parts[1] + '</option>';
+      }).join('');
+  const usage = account.usage && account.usage.summary ? account.usage.summary.lifetimeTokens : null;
+  const thread = account.thread;
+  const error = account.last_error ? '<div class="error" data-runtime-error>' + esc(String(account.last_error).split(';')[0]) + '</div>' : '';
+  return '<article class="card" data-account="' + esc(account.name) + '" data-provider="' + esc(provider) + '">' +
+    '<div class="card-head"><div><h3>' + esc(account.label || account.name) + '</h3><div class="sub" data-provider-line>' + esc(providerLabel) + ' · ' + esc(account.name) + '</div></div><div data-runtime-pill>' + pill(account.runtime_state) + '</div></div>' +
+    '<div class="control">' + roleEditor(account, draft) + '<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite"></span><button class="button secondary" data-roles-save data-mutation>Save roles</button></div></div>' +
+    '<div class="grid"><div class="field"><label>Model</label><select data-model>' + options(models, draft.model, draft.model ? false : (account.configured.model_label || 'Provider default')) + '</select></div><div class="field"><label>Effort</label><select data-effort ' + (state.reasoning_disabled ? 'disabled' : '') + '>' + rendered.efforts + '</select></div></div>' +
+    '<div class="save-row"><span class="feedback" data-feedback aria-live="polite"></span><button class="button" data-save data-mutation>Save</button></div>' +
+    '<details class="advanced"><summary>Details</summary><div class="grid"><div class="field"><label>Effective model</label><output>' + esc(account.effective && account.effective.model || 'Unknown') + '</output></div><div class="field"><label>Effective reasoning</label><output>' + esc(account.effective && account.effective.reasoning_effort || 'Unknown') + '</output></div><div class="field"><label>Service tier</label><select data-tier ' + (state.service_tier_disabled ? 'disabled' : '') + '>' + rendered.tiers + '</select></div><div class="field"><label>Backend</label><select data-backend ' + (executor ? 'disabled' : '') + '>' + backendOptions + '</select></div></div><div class="feedback" data-capability-feedback aria-live="polite">' + esc(state.message || 'Capabilities match the selected provider.') + '</div><div class="sub">Availability: ' + esc(availabilityLabel(account)) + '</div><div class="detail-grid"><div><span class="metric-label">State root</span><div class="value">' + esc(account.codex_home) + '</div></div><div><span class="metric-label">Usage</span><div class="value">Lifetime tokens: ' + fmtTokens(usage) + '</div></div></div>' + (thread ? '<div class="thread"><div class="metric-label">Persistent thread</div><div class="value">' + esc(thread.name || thread.id || 'Unknown') + '</div><div class="sub">' + esc(thread.status || 'Unknown') + ' · token usage ' + (account.token_usage ? 'available' : 'not available') + '</div></div>' : '') + error + '</details></article>';
+}
+function bindCardData(node, account, draft) {
+  node._providerCapabilities = draft?.providerCapabilities || account.capabilities || {};
+  node._providerModels = draft?.providerModels || account.models || [];
+  for (const [selector, suffix] of [['[data-model]', 'model'], ['[data-effort]', 'effort'], ['[data-tier]', 'tier'], ['[data-backend]', 'backend']]) {
+    const control = node.querySelector(selector);
+    const label = control && control.parentElement.querySelector('label');
+    if (control && label) {
+      control.id = suffix + '-' + account.name;
+      label.htmlFor = control.id;
+    }
+  }
+  applyClaudeUx(node);
+}
+function updateCardTelemetry(node, account) {
+  if (!node) return;
+  const state = node.querySelector('[data-runtime-state]');
+  if (state) state.textContent = account.runtime_state || 'Unknown';
+  const runtimePill = node.querySelector('[data-runtime-pill]');
+  if (runtimePill) runtimePill.innerHTML = pill(account.runtime_state);
+  const provider = node.querySelector('[data-provider-line]');
+  const draft = dashboardState.drafts.get(account.name);
+  if (provider && (!draft?.dirty || draft.backend === account.backend)) provider.textContent = (account.provider_label || account.backend || 'Provider') + ' · ' + account.name;
+}
+function renderOneAccount(name) {
+  const account = dashboardState.accounts.get(name);
+  const current = document.querySelector('.card[data-account="' + CSS.escape(name) + '"]');
+  if (!account || !current) return;
+  const replacement = document.createElement('template');
+  const draft = draftFor(account);
+  replacement.innerHTML = card(account, draft);
+  const node = replacement.content.firstElementChild;
+  current.replaceWith(node);
+  bindCardData(node, account, draft);
+  syncMutationButtons();
+}
+function updateRoleControls(name, draft) {
+  const cardNode = document.querySelector('.card[data-account="' + CSS.escape(name) + '"]');
+  if (!cardNode) return;
+  const roles = new Set(draft.roles || []);
+  const fallback = new Set(draft.fallback_roles || []);
+  cardNode.querySelectorAll('[data-primary-role]').forEach(input => { input.checked = roles.has(input.value); });
+  cardNode.querySelectorAll('[data-fallback-role]').forEach(input => { input.checked = fallback.has(input.value); });
+}
+function renderAccounts(accounts) {
+  const target = $('#accounts');
+  if (!target) return;
+  const rows = Array.isArray(accounts) ? accounts : [];
+  if (rows.length) target.querySelector('.empty')?.remove();
+  const names = new Set(rows.map(account => account.name));
+  dashboardState.accounts = new Map(rows.map(account => [account.name, account]));
+  for (const account of rows) {
+    const incoming = revisionValue(account);
+    if (incoming != null) dashboardState.revision = Math.max(dashboardState.revision, incoming);
+    const existing = document.querySelector('.card[data-account="' + CSS.escape(account.name) + '"]');
+    const draft = dashboardState.drafts.get(account.name);
+    if (!draft || shouldReplaceDashboardCard(draft)) {
+      const cleanDraft = draftFor(account, true);
+      const replacement = document.createElement('template');
+      replacement.innerHTML = card(account, cleanDraft);
+      const node = replacement.content.firstElementChild;
+      if (existing) existing.replaceWith(node); else target.appendChild(node);
+      bindCardData(node, account, cleanDraft);
+    } else {
+      updateCardTelemetry(existing, account);
+    }
+  }
+  for (const node of [...target.querySelectorAll('.card[data-account]')]) if (!names.has(node.dataset.account)) node.remove();
+  if (!rows.length) target.innerHTML = '<div class="empty">No profiles configured.</div>';
+  syncMutationButtons();
+}
+function markDraft(cardNode, section) {
+  const name = cardNode && cardNode.dataset.account;
+  if (!name) return null;
+  const draft = dashboardState.drafts.get(name) || draftFromAccount(dashboardState.accounts.get(name) || {name});
+  if (!section || section === 'settings') {
+    draft.model = cardNode.querySelector('[data-model]')?.value || '';
+    draft.effort = cardNode.querySelector('[data-effort]')?.value || '';
+    draft.tier = cardNode.querySelector('[data-tier]')?.value || '';
+    draft.backend = cardNode.querySelector('[data-backend]')?.value || draft.backend;
+    setDraftSectionDirty(draft, 'settings', true);
+  }
+  if (!section || section === 'roles') {
+    draft.roles = [...cardNode.querySelectorAll('[data-primary-role]:checked')].map(input => input.value);
+    draft.fallback_roles = [...cardNode.querySelectorAll('[data-fallback-role]:checked')].map(input => input.value);
+    setDraftSectionDirty(draft, 'roles', true);
+  }
+  draft.dirty = Boolean(draft.dirtySettings || draft.dirtyRoles);
+  dashboardState.drafts.set(name, draft);
+  return draft;
+}
+function nextMutation(key) {
+  const next = Number(dashboardState.mutations.get(key) || 0) + 1;
+  dashboardState.mutations.set(key, next);
+  return next;
+}
+function mutationIsCurrent(key, sequence, payload) {
+  const incoming = revisionValue(payload);
+  if (!latestMutationCanApply(sequence, dashboardState.mutations.get(key))) return false;
+  if (incoming != null) dashboardState.revision = Math.max(dashboardState.revision, incoming);
+  return true;
+}
+function syncMutationButtons() {
+  document.querySelectorAll('.card[data-account]').forEach(cardNode => {
+    const busy = dashboardState.busyCards.has(cardNode.dataset.account);
+    cardNode.querySelectorAll('[data-mutation]').forEach(button => {
+      button.disabled = busy || (dashboardState.roleMutationPending && button.matches('[data-roles-save]'));
+    });
+  });
+}
+function setCardBusy(cardNode, busy) {
+  const name = cardNode?.dataset.account;
+  if (name) {
+    if (busy) dashboardState.busyCards.add(name);
+    else dashboardState.busyCards.delete(name);
+  }
+  cardNode?.querySelectorAll('[data-model], [data-effort], [data-tier], [data-backend], [data-primary-role], [data-fallback-role]').forEach(control => {
+    if (busy) {
+      control.dataset.disabledBeforeMutation = String(control.disabled);
+      control.disabled = true;
+    } else if (control.dataset.disabledBeforeMutation != null) {
+      control.disabled = control.dataset.disabledBeforeMutation === 'true';
+      delete control.dataset.disabledBeforeMutation;
+    }
+  });
+  syncMutationButtons();
+}
+function applySettingsResponse(name, payload, cardNode) {
+  const account = dashboardState.accounts.get(name);
+  const saved = payload.saved || {};
+  if (!account) return;
+  account.configured = Object.assign({}, account.configured || {}, {
+    model: saved.model ?? account.configured?.model ?? '',
+    model_label: saved.model || 'Provider default',
+    reasoning_effort: saved.reasoning_effort ?? account.configured?.reasoning_effort ?? '',
+    service_tier: saved.service_tier ?? account.configured?.service_tier ?? '',
+  });
+  account.backend = saved.backend || account.backend;
+  account.provider = saved.provider || account.provider;
+  account.provider_label = saved.provider_label || account.provider_label;
+  if (cardNode?._providerModels) account.models = cardNode._providerModels;
+  if (cardNode?._providerCapabilities) account.capabilities = cardNode._providerCapabilities;
+  const draft = dashboardState.drafts.get(name) || draftFromAccount(account);
+  draft.model = account.configured.model || '';
+  draft.effort = account.configured.reasoning_effort || '';
+  draft.tier = account.configured.service_tier || '';
+  draft.backend = account.backend;
+  draft.provider = account.provider;
+  draft.providerLabel = account.provider_label;
+  draft.providerModels = cardNode?._providerModels || account.models;
+  draft.providerCapabilities = cardNode?._providerCapabilities || account.capabilities;
+  setDraftSectionDirty(draft, 'settings', false);
+  dashboardState.drafts.set(name, draft);
+  renderOneAccount(name);
+}
+function applyRolesResponse(name, payload) {
+  const roles = payload.roles || {};
+  for (const [accountName, account] of dashboardState.accounts) {
+    account.roles = Object.keys(roles).filter(role => roles[role] === accountName);
+    if (accountName === name) account.fallback_roles = [...(payload.fallback_roles || [])];
+    const draft = dashboardState.drafts.get(accountName) || draftFromAccount(account);
+    if (accountName === name || !draft.dirtyRoles) {
+      draft.roles = [...account.roles];
+      if (accountName === name) draft.fallback_roles = [...account.fallback_roles];
+      setDraftSectionDirty(draft, 'roles', false);
+    }
+    dashboardState.drafts.set(accountName, draft);
+    if (!draft.dirtyRoles) {
+      if (draft.dirtySettings) updateRoleControls(accountName, draft);
+      else renderOneAccount(accountName);
+    }
+  }
+  syncMutationButtons();
+}
+async function loadProviderCatalog(cardNode, backend) {
+  const name = cardNode.dataset.account;
+  const key = 'catalog:' + name;
+  const sequence = nextMutation(key);
+  const save = cardNode.querySelector('[data-save]');
+  const feedback = cardNode.querySelector('[data-capability-feedback]');
+  if (save) save.disabled = true;
+  if (feedback) feedback.textContent = 'Loading provider capabilities…';
+  try {
+    const payload = await get('/api/accounts/' + encodeURIComponent(name) + '/models?backend=' + encodeURIComponent(backend));
+    if (!mutationIsCurrent(key, sequence, payload)) return;
+    cardNode._providerCapabilities = payload.capabilities || {};
+    cardNode._providerModels = payload.models || [];
+    cardNode.dataset.provider = payload.provider || cardNode.dataset.provider;
+    const draft = dashboardState.drafts.get(name) || draftFromAccount(dashboardState.accounts.get(name) || {name});
+    draft.provider = payload.provider || draft.provider;
+    draft.providerLabel = payload.provider_label || draft.providerLabel;
+    draft.providerModels = cardNode._providerModels;
+    draft.providerCapabilities = cardNode._providerCapabilities;
+    dashboardState.drafts.set(name, draft);
+    const model = cardNode.querySelector('[data-model]');
+    if (model) {
+      model.innerHTML = options(cardNode._providerModels, '', payload.provider_label ? payload.provider_label + ' default' : 'Provider default');
+      model.value = '';
+    }
+    renderCapabilities(cardNode, cardNode._providerModels, true);
+    const provider = cardNode.querySelector('[data-provider-line]');
+    if (provider) provider.textContent = (payload.provider_label || backend) + ' · ' + name;
+    markDraft(cardNode, 'settings');
+  } catch (error) {
+    if (dashboardState.mutations.get(key) === sequence && feedback) feedback.textContent = error.message || 'Capabilities unavailable.';
+  } finally {
+    if (dashboardState.mutations.get(key) === sequence && save) save.disabled = false;
+  }
+}
+async function saveSettings(cardNode, button) {
+  const name = cardNode.dataset.account;
+  const key = 'settings:' + name;
+  const sequence = nextMutation(key);
+  const feedback = cardNode.querySelector('[data-feedback]');
+  const draft = markDraft(cardNode, 'settings');
+  const effort = cardNode.querySelector('[data-effort]');
+  const tier = cardNode.querySelector('[data-tier]');
+  const body = {
+    model: draft.model,
+    reasoning_effort: effort && effort.disabled ? '' : draft.effort,
+    service_tier: tier && tier.disabled ? '' : draft.tier,
+    backend: draft.backend,
+    scope: 'future_turns',
+  };
+  setCardBusy(cardNode, true);
+  if (feedback) feedback.textContent = 'Saving…';
+  try {
+    const payload = await get('/api/accounts/' + encodeURIComponent(name) + '/settings', {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    if (!mutationIsCurrent(key, sequence, payload)) return;
+    applySettingsResponse(name, payload, cardNode);
+    const current = document.querySelector('.card[data-account="' + CSS.escape(name) + '"] [data-feedback]');
+    if (current) current.textContent = 'Saved.';
+  } catch (error) {
+    if (dashboardState.mutations.get(key) === sequence && feedback) feedback.textContent = error.message || 'Settings save failed.';
+  } finally {
+    if (dashboardState.mutations.get(key) === sequence) setCardBusy(cardNode, false);
+  }
+}
+async function saveRoles(cardNode) {
+  if (dashboardState.roleMutationPending) return;
+  const name = cardNode.dataset.account;
+  const key = 'roles';
+  const sequence = nextMutation(key);
+  const feedback = cardNode.querySelector('[data-role-feedback]');
+  const draft = markDraft(cardNode, 'roles');
+  dashboardState.roleMutationPending = true;
+  syncMutationButtons();
+  setCardBusy(cardNode, true);
+  if (feedback) feedback.textContent = 'Saving…';
+  try {
+    const payload = await get('/api/roles/set', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({account: name, roles: draft.roles, fallback_roles: draft.fallback_roles})});
+    if (!mutationIsCurrent(key, sequence, payload)) return;
+    applyRolesResponse(name, payload);
+    const current = document.querySelector('.card[data-account="' + CSS.escape(name) + '"] [data-role-feedback]');
+    if (current) current.textContent = 'Saved.';
+  } catch (error) {
+    if (dashboardState.mutations.get(key) === sequence && feedback) feedback.textContent = error.message || 'Role save failed.';
+  } finally {
+    if (dashboardState.mutations.get(key) === sequence) {
+      dashboardState.roleMutationPending = false;
+      setCardBusy(cardNode, false);
+    }
+  }
+}
+async function refresh() {
+  const sequence = ++dashboardState.refreshSerial;
+  const results = await Promise.all([get('/api/status'), get('/api/accounts?refresh=1')]);
+  const status = results[0];
+  const accountsPayload = results[1];
+  const incoming = [revisionValue(status), ...(accountsPayload.accounts || []).map(revisionValue)].filter(value => value != null);
+  const revision = incoming.length ? Math.max(...incoming) : null;
+  if (!snapshotIsCurrent(sequence, dashboardState.refreshSerial, incoming, dashboardState.revision)) return;
+  if (revision != null) dashboardState.revision = revision;
+  const accounts = accountsPayload.accounts || [];
+  const healthy = accounts.some(account => account.capabilities && ((account.capabilities.app_server && !account.last_error) || account.runtime_state === 'Connected' || account.runtime_state === 'Configured'));
+  $('#health').textContent = 'Providers: ' + (healthy ? 'available' : status.app_server_health);
+  $('#summary').innerHTML = [['Dual Agents', status.dual_codex_version], ['Codex CLI', status.codex_cli.version], ['Repository', status.repository], ['Git', status.git_state]].map(item => '<div class="stat"><div class="label">' + esc(item[0]) + '</div><strong>' + esc(item[1]) + '</strong></div>').join('');
+  const fallback = $('#fallback-enabled');
+  if (fallback && !fallback.disabled) fallback.checked = Boolean(status.fallback_enabled);
+  renderProfiles(accounts);
+  renderAccounts(accounts);
+  $('#updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  const refreshFeedback = $('#refresh-feedback');
+  if (refreshFeedback) refreshFeedback.textContent = '';
+  if (typeof bindProfileManager === 'function') bindProfileManager();
+}
+function reportRefreshError(error) {
+  $('#health').textContent = 'Unavailable';
+  let feedback = $('#refresh-feedback');
+  const button = $('#refresh');
+  if (!feedback && button) {
+    feedback = document.createElement('span');
+    feedback.id = 'refresh-feedback';
+    feedback.className = 'feedback';
+    feedback.setAttribute('aria-live', 'polite');
+    button.insertAdjacentElement('afterend', feedback);
+  }
+  if (feedback) feedback.textContent = error.message || 'Refresh failed.';
+}
+document.addEventListener('change', event => {
+  const target = event.target;
+  if (target && target.id === 'fallback-enabled') {
+    const checkbox = target;
+    const key = 'fallback';
+    const sequence = nextMutation(key);
+    checkbox.disabled = true;
+    get('/api/fallback', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({enabled: checkbox.checked})}).then(payload => {
+      if (mutationIsCurrent(key, sequence, payload)) checkbox.checked = Boolean(payload.fallback_enabled);
+    }).catch(error => {
+      if (dashboardState.mutations.get(key) === sequence) {
+        checkbox.checked = !checkbox.checked;
+        const feedback = document.querySelector('[data-fallback-feedback]');
+        if (feedback) feedback.textContent = error.message || 'Fallback setting failed.';
+      }
+    }).finally(() => { if (dashboardState.mutations.get(key) === sequence) checkbox.disabled = false; });
+    return;
+  }
+  const cardNode = target && target.closest && target.closest('.card[data-account]');
+  if (!cardNode) return;
+  if (target.matches('[data-primary-role], [data-fallback-role]')) {
+    markDraft(cardNode, 'roles');
+    return;
+  }
+  if (target.matches('[data-model], [data-effort], [data-tier]')) {
+    if (target.matches('[data-model]')) {
+      markDraft(cardNode, 'settings');
+      renderCapabilities(cardNode, cardNode._providerModels || [], true);
+      markDraft(cardNode, 'settings');
+    } else markDraft(cardNode, 'settings');
+    return;
+  }
+  if (target.matches('[data-backend]')) {
+    markDraft(cardNode, 'settings');
+    loadProviderCatalog(cardNode, target.value);
+  }
+});
+document.addEventListener('click', event => {
+  const settings = event.target.closest && event.target.closest('[data-save]');
+  if (settings) {
+    event.preventDefault();
+    saveSettings(settings.closest('.card[data-account]'), settings);
+    return;
+  }
+  const roles = event.target.closest && event.target.closest('[data-roles-save]');
+  if (roles) {
+    event.preventDefault();
+    saveRoles(roles.closest('.card[data-account]'));
+  }
+});
+document.getElementById('refresh')?.addEventListener('click', () => refresh().catch(reportRefreshError));
+document.addEventListener('input', event => {
+  const target = event.target;
+  if (target && target.matches && target.matches('[data-profile-label-edit]')) dashboardState.profileDrafts.set(target.closest('[data-profile-row]')?.dataset.profileRow || '', target.value);
+});
+"""
+
 
 LIVE_EXECUTOR_SCRIPT = """const EXECUTOR_MAX_ROWS=128;const executorLive={rows:[],cursor:0,snapshot:null,tab:'activity',source:null,reconnect:null,paused:false,follow:true,clearedAt:null,startedAt:null,endedAt:null,connection:'Waiting for an Executor run.'};const executorText=(value,fallback='Unknown')=>value==null||value===''?fallback:String(value);const executorObject=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};const executorNumber=value=>Number.isFinite(Number(value))?Number(value):null;function executorSet(id,value){const node=document.getElementById(id);if(node)node.textContent=executorText(value)}function executorDate(value){const time=Date.parse(value||'');return Number.isFinite(time)?time:null}function executorDuration(start,end){if(start==null)return 'Unknown';const seconds=Math.max(0,Math.floor((end-start)/1000));if(seconds<60)return `${seconds}s`;if(seconds<3600)return `${Math.floor(seconds/60)}m ${seconds%60}s`;return `${Math.floor(seconds/3600)}h ${Math.floor(seconds%3600/60)}m`}function executorDetailText(event){const detail=executorObject(event&&event.detail);if(typeof event?.detail==='string'&&event.detail)return event.detail;for(const key of ['text','output','stdout','stderr','delta','chunk','message','command','path','diff','patch'])if(typeof detail[key]==='string'&&detail[key])return detail[key];return executorText(event&&event.method,'Observed event')}function executorBucket(event){if(!event)return 'activity';if(event.kind==='command_execution')return 'commands';if(event.kind==='file_change')return 'files';const method=executorText(event.method,'').toLowerCase();const detail=executorObject(event.detail);return method.includes('diff')||method.includes('patch')||typeof detail.diff==='string'||typeof detail.patch==='string'?'diffs':'activity'}function executorTokenText(value){const usage=executorObject(value);const total=executorNumber(usage.total);const last=executorNumber(usage.last);if(total==null&&last==null)return 'Unknown';const parts=[];if(total!=null)parts.push(`total ${total.toLocaleString()}`);if(last!=null)parts.push(`last ${last.toLocaleString()}`);return parts.join(' · ')}function executorPlanText(value){if(value==null||value==='')return 'Unknown / Not available';if(typeof value==='string')return value;try{const text=JSON.stringify(value,null,2);return text==='{}'||text==='[]'?'Unknown / Not available':text}catch(_){return 'Unknown / Not available'}}function executorUpdateMetaFromEvent(event){const next=Object.assign({},executorLive.snapshot||{});const detail=executorObject(event.detail);const turn=executorObject(detail.turn);for(const [field,keys] of Object.entries({model:['model'],reasoning_effort:['reasoningEffort','reasoning_effort'],service_tier:['serviceTier','service_tier','tier']})){if(!next[field])for(const source of [turn,detail])for(const key of keys)if(typeof source[key]==='string'&&source[key]){next[field]=source[key];break}}if(!next.thread_id&&event.thread_id)next.thread_id=event.thread_id;if(!next.turn_id&&event.turn_id)next.turn_id=event.turn_id;if(!next.plan&&detail.plan!=null)next.plan=detail.plan;if(event.kind==='token_usage'&&detail.tokenUsage)next.token_usage=detail.tokenUsage;executorLive.snapshot=next}function executorRenderMeta(){const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();executorSet('executor-state',state);const stateNode=document.getElementById('executor-state');if(stateNode)stateNode.dataset.state=state;executorSet('executor-model',snapshot.model);executorSet('executor-reasoning',snapshot.reasoning_effort);executorSet('executor-tier',snapshot.service_tier);const thread=executorText(snapshot.thread_id);const turn=executorText(snapshot.turn_id);executorSet('executor-thread',`${thread} / ${turn}`);executorSet('executor-tokens',executorTokenText(snapshot.token_usage));executorSet('executor-plan-content',executorPlanText(snapshot.plan));executorSet('executor-elapsed',executorDuration(executorLive.startedAt,executorLive.endedAt||Date.now()));executorSet('executor-status',`${state} · ${executorLive.connection}`)}function executorVisibleRows(){if(executorLive.tab==='activity')return executorLive.rows;if(executorLive.tab==='commands')return executorLive.rows.filter(event=>executorBucket(event)==='commands');if(executorLive.tab==='files')return executorLive.rows.filter(event=>executorBucket(event)==='files');return executorLive.rows.filter(event=>executorBucket(event)==='diffs')}function executorRenderRows(){const feed=document.getElementById('executor-feed');if(!feed)return;const rows=executorVisibleRows();const fragment=document.createDocumentFragment();if(!rows.length){const empty=document.createElement('div');empty.className='executor-empty';empty.textContent=executorLive.tab==='activity'?'No Executor activity yet.':`No ${executorLive.tab} evidence available.`;fragment.appendChild(empty)}else for(const event of rows){const row=document.createElement('div');row.className='executor-row';const timestamp=document.createElement('time');timestamp.className='executor-time';timestamp.textContent=executorText(event.timestamp);const kind=document.createElement('span');kind.className='executor-kind';kind.textContent=`${executorText(event.kind,'notification')} / ${executorText(event.state,'observed')}`;const message=document.createElement('span');message.className='executor-message';message.textContent=executorDetailText(event);row.append(timestamp,kind,message);fragment.appendChild(row)}feed.replaceChildren(fragment);if(executorLive.follow&&!executorLive.paused)feed.scrollTop=feed.scrollHeight}function executorRender(){executorRenderMeta();executorRenderRows()}function executorRememberTimes(){const starts=executorLive.rows.filter(event=>event.kind==='turn'&&event.state==='started').map(event=>executorDate(event.timestamp)).filter(value=>value!=null);if(starts.length&&!executorLive.startedAt)executorLive.startedAt=Math.min(...starts);const last=executorLive.rows[executorLive.rows.length-1];const state=executorText(executorLive.snapshot?.state,'IDLE').toUpperCase();if(last&&(state==='COMPLETE'||state==='FAILED'))executorLive.endedAt=executorDate(last.timestamp)||executorLive.endedAt}function executorSetSnapshot(value){const snapshot=executorObject(value);executorLive.snapshot=snapshot;executorLive.cursor=Math.max(executorLive.cursor,executorNumber(snapshot.cursor)||0);if(executorLive.clearedAt==null)executorLive.rows=Array.isArray(snapshot.events)?snapshot.events.slice(-EXECUTOR_MAX_ROWS):[];executorRememberTimes();executorRender()}function executorAddEvent(value,eventName){const event=executorObject(value);const sequence=executorNumber(event.sequence);if(sequence==null||sequence<=executorLive.cursor)return;executorLive.cursor=sequence;executorUpdateMetaFromEvent(event);if(executorLive.clearedAt==null||sequence>executorLive.clearedAt){executorLive.rows.push(event);executorLive.rows=executorLive.rows.slice(-EXECUTOR_MAX_ROWS)}const state=eventName==='failed'||event.kind==='error'||['failed','failure','error'].includes(event.state)?'FAILED':eventName==='complete'||event.kind==='turn'&&['completed','complete'].includes(event.state)?'COMPLETE':event.kind==='turn'&&event.state==='started'?'WORKING':executorText(executorLive.snapshot?.state,'IDLE').toUpperCase();executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{cursor:sequence,state});if(event.kind==='turn'&&event.state==='started'&&!executorLive.startedAt)executorLive.startedAt=executorDate(event.timestamp);if(state==='COMPLETE'||state==='FAILED')executorLive.endedAt=executorDate(event.timestamp)||executorLive.endedAt;executorRender()}function executorConnect(){if(typeof EventSource==='undefined'){executorLive.connection='Live stream is not supported by this browser.';executorRenderMeta();return}if(executorLive.source)executorLive.source.close();const source=new EventSource(`/api/live-executor/events?cursor=${encodeURIComponent(String(executorLive.cursor))}`);executorLive.source=source;source.onopen=()=>{executorLive.connection=`Live stream connected · cursor ${executorLive.cursor}`;executorRenderMeta()};source.addEventListener('snapshot',event=>{try{executorSetSnapshot(JSON.parse(event.data));executorLive.connection=`Live stream connected · cursor ${executorLive.cursor}`;executorRenderMeta()}catch(_){executorLive.connection='Invalid live snapshot received.';executorRenderMeta()}});for(const name of ['live','complete','failed'])source.addEventListener(name,event=>{try{executorAddEvent(JSON.parse(event.data),name);executorLive.connection=`Live stream connected · cursor ${executorLive.cursor}`;executorRenderMeta()}catch(_){executorLive.connection='Invalid live event received.';executorRenderMeta()}});source.onerror=()=>{if(executorLive.source!==source)return;source.close();executorLive.source=null;executorLive.connection='Live stream disconnected; reconnecting.';executorRenderMeta();if(executorLive.reconnect==null)executorLive.reconnect=setTimeout(()=>{executorLive.reconnect=null;executorConnect()},1000)}}function executorShowView(target){document.querySelectorAll('[data-account-view]').forEach(node=>{node.hidden=target!=='accounts'});const view=document.getElementById('executor-view');if(view)view.hidden=target!=='executor';document.querySelectorAll('[data-view-target]').forEach(button=>{const active=button.dataset.viewTarget===target;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active))});if(target==='executor'&&!executorLive.source)executorConnect()}document.querySelectorAll('[data-view-target]').forEach(button=>button.addEventListener('click',()=>executorShowView(button.dataset.viewTarget)));document.querySelectorAll('[data-executor-tab]').forEach(button=>button.addEventListener('click',()=>{executorLive.tab=button.dataset.executorTab;document.querySelectorAll('[data-executor-tab]').forEach(tab=>{const active=tab===button;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active))});executorRenderRows()}));document.getElementById('executor-follow')?.addEventListener('change',event=>{executorLive.follow=event.target.checked;if(executorLive.follow)executorRenderRows()});document.getElementById('executor-pause')?.addEventListener('click',event=>{executorLive.paused=!executorLive.paused;event.currentTarget.textContent=executorLive.paused?'Resume':'Pause';if(!executorLive.paused){executorLive.follow=true;const follow=document.getElementById('executor-follow');if(follow)follow.checked=true;executorRenderRows()}});document.getElementById('executor-clear')?.addEventListener('click',()=>{executorLive.rows=[];executorLive.clearedAt=executorLive.cursor;executorLive.connection='View cleared; server history retained.';executorRender()});setInterval(executorRenderMeta,1000);executorRender();"""
 SCRIPT += """function profileValue(value){return value==null?'':String(value)}function profileCard(a){const p=a.profile||{};const actions=Array.isArray(p.auth_actions)?p.auth_actions:[];const buttons=actions.filter(action=>action!=='status').map(action=>`<button class=\"button secondary\" data-profile-auth=\"${esc(action)}\" data-profile-id=\"${esc(a.name)}\">${action==='reauthenticate'?'Re-authenticate':action[0].toUpperCase()+action.slice(1)}</button>`).join('');const statusButton=actions.includes('status')?`<button class=\"button secondary\" data-profile-auth=\"status\" data-profile-id=\"${esc(a.name)}\">Check status</button>`:'';const removeDisabled=(a.roles||[]).length?'disabled':'';return `<article class=\"profile-row\" data-profile-row=\"${esc(a.name)}\"><h3>${esc(p.display_name||a.label||a.name)} ${pill(p.auth_status||a.login)}</h3><div class=\"profile-meta\"><span>ID: ${esc(a.name)}</span><span>Provider: ${esc(p.provider_label||a.provider_label||a.backend)}</span><span>State root: ${esc(p.state_root||a.codex_home)}</span><span>Enabled: ${esc(a.enabled?'yes':'no')} · Auth: ${esc(p.auth_status||a.auth_status||a.login)}</span><span>Roles: ${esc((a.roles||[]).join(', ')||'none')}</span></div><input data-profile-label-edit value=\"${esc(profileValue(p.display_name||a.label||a.name))}\" aria-label=\"Display name for ${esc(a.name)}\"><div class=\"profile-actions\"><button class=\"button\" data-profile-label-save data-profile-id=\"${esc(a.name)}\">Save name</button><button class=\"button secondary\" data-profile-enabled data-profile-id=\"${esc(a.name)}\">${a.enabled?'Disable':'Enable'}</button>${statusButton}${buttons}<button class=\"button secondary\" data-profile-remove data-profile-id=\"${esc(a.name)}\" ${removeDisabled}>Remove metadata</button></div>${p.isolation_note?`<div class=\"profile-note\">${esc(p.isolation_note)}</div>`:''}<div class=\"feedback\" data-profile-row-feedback aria-live=\"polite\"></div></article>`}function renderProfiles(accounts){const target=document.getElementById('profiles');if(target)target.innerHTML=(accounts||[]).map(profileCard).join('')||'<div class=\"empty\">No profiles configured.</div>'}function profileBackendFields(){const backend=document.querySelector('[data-profile-backend]');const api=backend&&backend.value==='api';document.querySelectorAll('[data-profile-api-field]').forEach(node=>{node.hidden=!api})}function bindProfileManager(){const add=document.getElementById('add-profile');const form=document.getElementById('profile-form');const cancel=document.getElementById('cancel-profile');const save=document.getElementById('save-profile');const backend=document.querySelector('[data-profile-backend]');if(add&&form)add.onclick=()=>{form.hidden=false;document.querySelector('[data-profile-label]')?.focus()};if(cancel&&form)cancel.onclick=()=>{form.hidden=true};if(backend)backend.onchange=profileBackendFields;profileBackendFields();if(save&&form)save.onclick=async()=>{const feedback=document.querySelector('[data-profile-feedback]');const label=document.querySelector('[data-profile-label]')?.value.trim()||'';if(!label){feedback.textContent='Display name is required.';return}const body={label,backend:backend?.value||'windows',model:document.querySelector('[data-profile-model]')?.value||'',reasoning_effort:document.querySelector('[data-profile-effort]')?.value||'',enabled:Boolean(document.querySelector('[data-profile-enabled]')?.checked)};const name=document.querySelector('[data-profile-name]')?.value.trim();const home=document.querySelector('[data-profile-home]')?.value.trim();if(name)body.name=name;if(home)body.codex_home=home;if(body.backend==='api'){body.base_url=document.querySelector('[data-profile-base-url]')?.value.trim()||'';body.auth_reference=document.querySelector('[data-profile-auth-reference]')?.value.trim()||''}feedback.textContent='Saving…';try{await get('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});form.hidden=true;feedback.textContent='Profile saved.';await refresh()}catch(error){feedback.textContent=error.message||'Profile save failed.'}};document.querySelectorAll('[data-profile-label-save]').forEach(button=>button.onclick=async()=>{const row=button.closest('[data-profile-row]');const feedback=row?.querySelector('[data-profile-row-feedback]');const label=row?.querySelector('[data-profile-label-edit]')?.value.trim()||'';feedback.textContent='Saving…';try{await get(`/api/accounts/${encodeURIComponent(button.dataset.profileId)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({label})});await refresh()}catch(error){feedback.textContent=error.message||'Profile update failed.'}});document.querySelectorAll('[data-profile-enabled]').forEach(button=>button.onclick=async()=>{const row=button.closest('[data-profile-row]');const feedback=row?.querySelector('[data-profile-row-feedback]');const enabled=button.textContent.trim()!=='Enable';feedback.textContent='Saving…';try{await get(`/api/accounts/${encodeURIComponent(button.dataset.profileId)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});await refresh()}catch(error){feedback.textContent=error.message||'Profile update failed.'}});document.querySelectorAll('[data-profile-remove]').forEach(button=>button.onclick=async()=>{if(button.disabled||!window.confirm('Remove profile metadata? Provider-native state will be retained.'))return;const row=button.closest('[data-profile-row]');const feedback=row?.querySelector('[data-profile-row-feedback]');feedback.textContent='Removing…';try{await get(`/api/accounts/${encodeURIComponent(button.dataset.profileId)}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:true})});await refresh()}catch(error){feedback.textContent=error.message||'Profile removal failed.'}});document.querySelectorAll('[data-profile-auth]').forEach(button=>button.onclick=async()=>{const action=button.dataset.profileAuth;if(action==='logout'&&!window.confirm('Log out this provider profile?'))return;const row=button.closest('[data-profile-row]');const feedback=row?.querySelector('[data-profile-row-feedback]');feedback.textContent='Working…';try{const payload=await get(`/api/accounts/${encodeURIComponent(button.dataset.profileId)}/auth`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,confirm:action==='logout'})});feedback.textContent=payload.message||payload.status||'Authentication status updated.';if(action!=='authenticate'&&action!=='reauthenticate')await refresh()}catch(error){feedback.textContent=error.message||'Authentication action failed.'}})}"""
+SCRIPT += """profileCard=account=>{const p=account.profile||{};const actions=Array.isArray(p.auth_actions)?p.auth_actions:[];const buttons=actions.filter(action=>action!=='status').map(action=>`<button class=\"button secondary\" data-profile-auth=\"${esc(action)}\" data-profile-id=\"${esc(account.name)}\">${action==='reauthenticate'?'Re-authenticate':action[0].toUpperCase()+action.slice(1)}</button>`).join('');const statusButton=actions.includes('status')?`<button class=\"button secondary\" data-profile-auth=\"status\" data-profile-id=\"${esc(account.name)}\">Check status</button>`:'';const status=p.auth_status||account.auth_status||account.login;const removeDisabled=(account.roles||[]).length?'disabled':'';return `<article class=\"profile-row\" data-profile-row=\"${esc(account.name)}\"><div class=\"card-head\"><div><h3>${esc(p.display_name||account.label||account.name)}</h3><div class=\"sub\">${esc(p.provider_label||account.provider_label||account.backend)}</div></div>${pill(status)}</div><details class=\"advanced\"><summary>Details</summary><div class=\"profile-meta\"><span>ID: ${esc(account.name)}</span><span>State root: ${esc(p.state_root||account.codex_home)}</span><span>Enabled: ${esc(account.enabled?'yes':'no')} · Auth: ${esc(status)}</span><span>Roles: ${esc((account.roles||[]).join(', ')||'none')}</span></div>${p.isolation_note?`<div class=\"profile-note\">${esc(p.isolation_note)}</div>`:''}</details><input data-profile-label-edit value=\"${esc(p.display_name||account.label||account.name)}\" aria-label=\"Display name for ${esc(account.name)}\"><div class=\"profile-actions\"><button class=\"button\" data-profile-label-save data-profile-id=\"${esc(account.name)}\">Save name</button><button class=\"button secondary\" data-profile-enabled data-profile-id=\"${esc(account.name)}\">${account.enabled?'Disable':'Enable'}</button>${statusButton}${buttons}<button class=\"button secondary\" data-profile-remove data-profile-id=\"${esc(account.name)}\" ${removeDisabled}>Remove metadata</button></div><div class=\"feedback\" data-profile-row-feedback aria-live=\"polite\"></div></article>`};"""
 SCRIPT += LIVE_EXECUTOR_SCRIPT
 SCRIPT += """const dualProfileManager=bindProfileManager;bindProfileManager=function(){dualProfileManager();const backend=document.querySelector('[data-profile-backend]');const sync=()=>{const api=backend&&backend.value==='api';const claude=backend&&backend.value==='claude_code';document.querySelectorAll('[data-profile-api-field]').forEach(node=>{node.hidden=!api});document.querySelectorAll('[data-profile-auth-field]').forEach(node=>{node.hidden=!(api||claude)});document.querySelectorAll('[data-profile-claude-auth-field]').forEach(node=>{node.hidden=!claude})};if(backend){backend.onchange=sync;sync()}const save=document.getElementById('save-profile');if(!save)return;const baseSave=save.onclick;save.onclick=async event=>{if(backend?.value!=='claude_code'){return baseSave?.(event)}const feedback=document.querySelector('[data-profile-feedback]');const label=document.querySelector('[data-profile-label]')?.value.trim()||'';if(!label){feedback.textContent='Display name is required.';return}const authMode=document.querySelector('[data-profile-auth-mode]')?.value||'provider_native';const body={label,backend:'claude_code',auth_mode:authMode,model:document.querySelector('[data-profile-model]')?.value||'',reasoning_effort:document.querySelector('[data-profile-effort]')?.value||'',enabled:Boolean(document.querySelector('[data-profile-enabled]')?.checked)};const name=document.querySelector('[data-profile-name]')?.value.trim();const home=document.querySelector('[data-profile-home]')?.value.trim();if(name)body.name=name;if(home)body.codex_home=home;if(authMode==='environment')body.auth_reference=document.querySelector('[data-profile-auth-reference]')?.value.trim()||'';feedback.textContent='Saving…';try{await get('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});document.getElementById('profile-form').hidden=true;feedback.textContent='Profile saved.';await refresh()}catch(error){feedback.textContent=error.message||'Profile save failed.'}}};"""
 SCRIPT += """const executorAddEventFromStream=executorAddEvent;executorAddEvent=(value,eventName)=>{const payload=executorObject(value);if((eventName==='complete'||eventName==='failed')&&payload.sequence==null&&payload.cursor!=null&&Array.isArray(payload.events)){executorSetSnapshot(payload);return}executorAddEventFromStream(value,eventName)};"""
-SCRIPT += """document.addEventListener('change',event=>{const target=event.target;if(!(target instanceof HTMLSelectElement))return;const card=target.closest('.card[data-account]');if(!card)return;if(target.matches('[data-model]')&&card._providerModels){renderCapabilities(card,card._providerModels,true);return}if(!target.matches('[data-backend]'))return;const feedback=card.querySelector('[data-capability-feedback]');feedback.textContent='Loading provider capabilities…';get(`/api/accounts/${encodeURIComponent(card.dataset.account)}/models?backend=${encodeURIComponent(target.value)}`).then(payload=>{card._providerCapabilities=payload.capabilities||{};card._providerModels=payload.models||[];const model=card.querySelector('[data-model]');if(model){model.innerHTML=options(card._providerModels,'',payload.provider_label?`${payload.provider_label} default`:'Provider default');model.value=''}renderCapabilities(card,card._providerModels,true)}).catch(error=>{feedback.textContent=error.message||'Capabilities unavailable for this provider.'})});"""
-SCRIPT += """const dashboardFetch=window.fetch.bind(window);window.fetch=(input,init)=>{if(typeof input==='string'&&input==='/api/accounts')input='/api/accounts?refresh=1';return dashboardFetch(input,init)};"""
 SCRIPT += """const executorTokenAmount=value=>{const direct=executorNumber(value);if(direct!=null)return direct;const object=executorObject(value);for(const key of ['totalTokens','total_tokens','tokens','value']){const amount=executorNumber(object[key]);if(amount!=null)return amount}return null};executorTokenText=value=>{const usage=executorObject(value);const total=executorTokenAmount(usage.totalTokens??usage.total??usage.tokens);const last=executorTokenAmount(usage.lastTokens??usage.last??usage.recent);if(total==null&&last==null)return 'Unknown';const parts=[];if(total!=null)parts.push(`total ${total.toLocaleString()}`);if(last!=null)parts.push(`last ${last.toLocaleString()}`);return parts.join(' · ')};const executorRenderMetaFromSnapshot=executorRenderMeta;executorRenderMeta=()=>{const snapshot=executorLive.snapshot||{};const started=executorDate(snapshot.started_at);const completed=executorDate(snapshot.completed_at);if(started!=null)executorLive.startedAt=started;if(completed!=null)executorLive.endedAt=completed;else if(executorText(snapshot.state,'IDLE').toUpperCase()==='WORKING')executorLive.endedAt=null;executorRenderMetaFromSnapshot()};const executorAddEventWithTimes=executorAddEvent;executorAddEvent=(value,eventName)=>{const event=executorObject(value);if(event.kind==='turn'&&event.state==='started'){executorLive.startedAt=executorDate(event.timestamp);executorLive.endedAt=null;if(executorLive.snapshot)executorLive.snapshot=Object.assign({},executorLive.snapshot,{started_at:event.timestamp,completed_at:null})}executorAddEventWithTimes(value,eventName)};"""
 SCRIPT += """function executorSyncServerTimes(){const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();const started=executorDate(snapshot.started_at);const ended=executorDate(snapshot.ended_at||snapshot.completed_at);if(started!=null)executorLive.startedAt=started;if(state==='WORKING')executorLive.endedAt=null;else if(ended!=null)executorLive.endedAt=ended;else if(executorLive.startedAt!=null&&Number.isFinite(Number(snapshot.elapsed_seconds)))executorLive.endedAt=executorLive.startedAt+Math.max(0,Number(snapshot.elapsed_seconds))*1000}const executorRenderMetaServerTruthBase=executorRenderMeta;executorRenderMeta=()=>{executorSyncServerTimes();executorRenderMetaServerTruthBase();const snapshot=executorLive.snapshot||{};const state=executorText(snapshot.state,'IDLE').toUpperCase();const reason=['STALE','DISCONNECTED'].includes(state)?executorText(snapshot.stale_reason,'Executor activity is no longer live.'):'';const status=document.getElementById('executor-status');if(status)status.textContent=`${state} · ${reason||executorLive.connection}`};const executorSetSnapshotServerTruthBase=executorSetSnapshot;executorSetSnapshot=value=>{executorSetSnapshotServerTruthBase(value);executorSyncServerTimes();executorRenderMeta()};function executorRecordLateEvent(event){const sequence=executorNumber(event.sequence);if(sequence==null||sequence<=executorLive.cursor)return;executorLive.cursor=sequence;executorUpdateMetaFromEvent(event);if(executorLive.clearedAt==null||sequence>executorLive.clearedAt){executorLive.rows.push(event);executorLive.rows=executorLive.rows.slice(-EXECUTOR_MAX_ROWS)}executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{cursor:sequence});executorRender()}const executorAddEventServerTruthBase=executorAddEvent;executorAddEvent=(value,eventName)=>{const event=executorObject(value);const snapshot=executorLive.snapshot||{};const currentState=executorText(snapshot.state,'IDLE').toUpperCase();const sameRun=!event.run_id||!snapshot.run_id||event.run_id===snapshot.run_id;if(['COMPLETE','FAILED','STALE','DISCONNECTED'].includes(currentState)&&sameRun&&event.kind==='turn'&&event.state==='started'){executorRecordLateEvent(event);return}if(event.run_id&&snapshot.run_id&&event.run_id!==snapshot.run_id){executorLive.snapshot=Object.assign({},snapshot,{run_id:event.run_id,request_id:event.request_id||null,state:'IDLE',started_at:null,ended_at:null,completed_at:null,elapsed_seconds:null});executorLive.startedAt=null;executorLive.endedAt=null}executorAddEventServerTruthBase(value,eventName);if(event.kind==='run'&&['completed','complete','failed','failure','cancelled','canceled'].includes(event.state)){const terminalState=['completed','complete'].includes(event.state)?'COMPLETE':'FAILED';const detail=executorObject(event.detail);const ended=executorDate(detail.ended_at)||executorDate(event.timestamp);const started=executorDate(detail.started_at);executorLive.snapshot=Object.assign({},executorLive.snapshot||{},{state:terminalState,started_at:started==null?executorLive.snapshot?.started_at:detail.started_at,ended_at:detail.ended_at||executorLive.snapshot?.ended_at||event.timestamp,completed_at:ended==null?executorLive.snapshot?.completed_at:event.timestamp});if(started!=null)executorLive.startedAt=started;if(ended!=null)executorLive.endedAt=ended}executorSyncServerTimes();executorRenderMeta()};setInterval(()=>{const state=executorText(executorLive.snapshot?.state,'IDLE').toUpperCase();if(state!=='WORKING')executorRenderMeta()},1000);"""
 
 # Keep the availability ladder visible without treating Connected/Idle as proof.
 SCRIPT += """function availabilityLabel(a){const s=a.availability||{};const labels=['Configured'];if(s.authenticated)labels.push('Authenticated');if(s.runtime_initialized)labels.push('Runtime initialized');if(s.thread_bound)labels.push('Thread bound');if(s.dispatchable)labels.push('Dispatchable');if(s.active)labels.push('Active');return labels.join(' · ')}"""
-SCRIPT = SCRIPT.replace('Roles: ${esc((a.roles||[]).join(\', \')||\'none\')} · Runtime: ${esc(a.runtime_state)}', 'Roles: ${esc((a.roles||[]).join(\', \')||\'none\')} · Runtime: ${esc(a.runtime_state)} · ${esc(availabilityLabel(a))}')
 
-# Keep provider-specific presentation close to the generated dashboard
-# contract without duplicating the large card template.
-SCRIPT = SCRIPT.replace("node._providerModels=account?.models||[];});$('#updated')", "node._providerModels=account?.models||[];});applyClaudeUx();$('#updated')")
-SCRIPT = SCRIPT.replace(":'<option value=\"\">Capabilities unavailable</option>'", ":'<option value=\"\">This model does not expose configurable effort.</option>'")
-SCRIPT = SCRIPT.replace("if(selected&&selected.fixed_mode)body.reasoning_effort=''", "if(selected&&(selected.fixed_mode||c.dataset.provider==='anthropic'))body.reasoning_effort=''")
-SCRIPT = SCRIPT.replace("if(!tier.disabled)body.service_tier=tier.value", "if(tier&&!tier.disabled)body.service_tier=tier.value")
-SCRIPT = SCRIPT.replace("const tier=card.querySelector('[data-tier]');const state=reconcileCapabilitySelection(models,model,effort.value,tier.value", "const tier=card.querySelector('[data-tier]');const state=reconcileCapabilitySelection(models,model,effort.value,tier?.value||''")
-SCRIPT = SCRIPT.replace("tier.innerHTML=options.tiers;tier.value=state.service_tier_value;tier.disabled=state.service_tier_disabled", "if(tier){tier.innerHTML=options.tiers;tier.value=state.service_tier_value;tier.disabled=state.service_tier_disabled}")
-SCRIPT = SCRIPT.replace("a.capabilities&&((a.capabilities.app_server&&!a.last_error)||a.runtime_state==='Connected'||a.runtime_state==='Configured')", "a.availability&&a.availability.dispatchable")
-SCRIPT = SCRIPT.replace("const backendOptions=isExecutor?", "const backendOptions=isExecutor||a.provider==='anthropic'?")
-
-HTML = HTML.replace('<div class="save-row"><button id="add-profile"', '<div class="save-row"><label class="check"><input id="fallback-enabled" type="checkbox"> Enable automatic configured-actor fallback</label><button id="add-profile"')
-HTML = HTML.replace('<option value="api">API / OpenAI-compatible</option>', '<option value="api">API / OpenAI-compatible</option><option value="claude_code">Anthropic Claude</option>')
-HTML = HTML.replace('</select></div><div class="field"><label for="profile-home">CODEX_HOME / state root</label>', '</select></div><div class="field" data-profile-claude-auth-field hidden><label for="profile-auth-mode">Auth mode</label><select id="profile-auth-mode" data-profile-auth-mode><option value="provider_native">Claude Code managed login</option><option value="environment">Anthropic API key via env reference</option></select></div><div class="field"><label for="profile-home">CODEX_HOME / state root</label>')
-HTML = HTML.replace('<div class="field" data-profile-api-field hidden><label for="profile-auth-reference">API secret reference</label>', '<div class="field" data-profile-auth-field hidden><label for="profile-auth-reference">API / Claude secret reference</label>')
-SCRIPT = SCRIPT.replace("const body={label,backend:backend?.value||'windows',model:", "const body={label,backend:backend?.value||'windows',auth_mode:backend?.value==='api'?'environment':(document.querySelector('[data-profile-auth-mode]')?.value||'provider_native'),model:")
-SCRIPT = SCRIPT.replace("if(body.backend==='api'){body.base_url=", "if(body.backend==='api'){body.base_url=")
-SCRIPT = SCRIPT.replace("body.auth_reference=document.querySelector('[data-profile-auth-reference]')?.value.trim()||''}feedback", "body.auth_reference=document.querySelector('[data-profile-auth-reference]')?.value.trim()||''}if(body.backend==='claude_code'){body.auth_reference=document.querySelector('[data-profile-auth-reference]')?.value.trim()||''}feedback")
-SCRIPT = SCRIPT.replace("const api=backend&&backend.value==='api';document.querySelectorAll('[data-profile-api-field]').forEach(node=>{node.hidden=!api})", "const api=backend&&backend.value==='api';const claude=backend&&backend.value==='claude_code';document.querySelectorAll('[data-profile-api-field]').forEach(node=>{node.hidden=!api});document.querySelectorAll('[data-profile-auth-field]').forEach(node=>{node.hidden=!(api||claude)});document.querySelectorAll('[data-profile-claude-auth-field]').forEach(node=>{node.hidden=!claude})")
-SCRIPT = SCRIPT.replace('API / OpenAI-compatible</option>`', 'API / OpenAI-compatible</option><option value="claude_code" ${a.backend===\'claude_code\'?\'selected\':\'\'}>Anthropic Claude</option>`')
-SCRIPT = SCRIPT.replace("c.querySelectorAll('[data-role]:checked')", "c.querySelectorAll('[data-primary-role]:checked')")
-SCRIPT = SCRIPT.replace("const healthy=as.accounts.some", "const fallbackToggle=document.getElementById('fallback-enabled');if(fallbackToggle)fallbackToggle.checked=Boolean(s.fallback_enabled);const healthy=as.accounts.some")
-SCRIPT += """document.addEventListener('change',event=>{if(event.target.id!=='fallback-enabled')return;get('/api/fallback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:event.target.checked})}).catch(error=>{event.target.checked=!event.target.checked;window.alert(error.message||'Fallback setting failed.')})});document.addEventListener('click',async event=>{const button=event.target.closest?.('[data-roles-save]');if(!button)return;event.stopImmediatePropagation();const card=button.closest('.card');const feedback=card?.querySelector('[data-role-feedback]');const roles=[...card.querySelectorAll('[data-primary-role]:checked')].map(input=>input.value);const fallback_roles=[...card.querySelectorAll('[data-fallback-role]:checked')].map(input=>input.value);feedback.textContent='Applying…';try{await get('/api/roles/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:card.dataset.account,roles})});await get(`/api/accounts/${encodeURIComponent(card.dataset.account)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fallback_roles})});await refresh();}catch(error){feedback.textContent=error.message||'Role settings failed.'}},true);"""
+HTML = HTML.replace('<div class="save-row"><button id="add-profile"', '<div class="save-row"><details class="fallback-panel"><summary>Fallback</summary><label class="toggle"><input id="fallback-enabled" type="checkbox"> Automatic fallback <span class="feedback" data-fallback-feedback aria-live="polite"></span></label></details><button id="add-profile"');
+SCRIPT += """const renderProfilesBase=renderProfiles;renderProfiles=accounts=>{const drafts=new Map(dashboardState.profileDrafts);renderProfilesBase(accounts);document.querySelectorAll('[data-profile-row]').forEach(row=>{const value=drafts.get(row.dataset.profileRow);const input=row.querySelector('[data-profile-label-edit]');if(value!==undefined&&input)input.value=value})};"""
+SCRIPT += """refresh().catch(reportRefreshError);"""
 
 class _Handler(BaseHTTPRequestHandler):
     server: "_HTTPServer"

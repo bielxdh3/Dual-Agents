@@ -644,8 +644,9 @@ def set_roles_for_account(
     config: OrchestratorConfig,
     account_name: str,
     roles: Iterable[str],
+    fallback_roles: Iterable[str] | None = None,
 ) -> dict[str, str]:
-    """Atomically replace one account's complete role set."""
+    """Atomically replace one account's primary and fallback role sets."""
     if config.legacy:
         raise ConfigError("Run 'dual-codex migrate-config' before changing roles.")
     account_name = validate_account_name(account_name)
@@ -667,7 +668,22 @@ def set_roles_for_account(
     resulting = {role: owner for role, owner in current.items() if owner != account_name}
     resulting.update({role: account_name for role in requested})
     resulting = _validated_role_map(config.accounts, resulting)
-    write_registry_config(config.config_path, config.accounts, resulting)
+    accounts = dict(config.accounts)
+    if fallback_roles is not None:
+        if isinstance(fallback_roles, (str, bytes)):
+            raise ConfigError("fallback_roles must be a list of role names.")
+        validated_fallback: list[str] = []
+        for raw_role in fallback_roles:
+            if not isinstance(raw_role, str):
+                raise ConfigError("fallback_roles must contain only strings.")
+            role = validate_role_name(raw_role)
+            if role not in validated_fallback:
+                validated_fallback.append(role)
+        accounts[account_name] = replace(
+            accounts[account_name],
+            fallback_roles=tuple(validated_fallback),
+        )
+    write_registry_config(config.config_path, accounts, resulting)
     return resulting
 
 
