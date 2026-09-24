@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
+import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -51,6 +52,58 @@ class CodexCommandTests(unittest.TestCase):
             self.assertTrue(terminal.call_args.kwargs["session_id"].startswith("test-account-"))
             self.assertEqual(terminal.call_args.kwargs["agent"].backend, "windows")
             direct.assert_not_called()
+
+    def test_configured_windows_architect_result_is_validated_and_annotated(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            canonical_root = root / "canonical"
+            skill_path = canonical_root / "skills" / "ponytail" / "SKILL.md"
+            skill_path.parent.mkdir(parents=True)
+            (canonical_root / "AGENTS.md").write_text("Follow global policy.\n", encoding="utf-8")
+            skill_path.write_text("Use the simplest implementation.\n", encoding="utf-8")
+            output_path = root / "plan.json"
+            expected = CommandResult(["codex", "terminal"], 0, "", "")
+            agent = _agent("read-only", backend="windows")
+            config = SimpleNamespace(
+                codex_command="codex",
+                agent_for_role=lambda role: agent,
+            )
+
+            def dispatch_architect_plan(skills_loaded):
+                def write_architect_plan(**kwargs):
+                    kwargs["output_path"].write_text(
+                        json.dumps({"skills_loaded": skills_loaded}),
+                        encoding="utf-8",
+                    )
+                    return expected
+
+                with patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", canonical_root), patch(
+                    "dual_codex.codex.run_codex_terminal", side_effect=write_architect_plan
+                ):
+                    return run_codex_for_role(
+                        config=config,
+                        agent=agent,
+                        role="architect",
+                        repository=repository,
+                        prompt="Read the supplied task artifact, then load ponytail.",
+                        output_path=output_path,
+                        schema_path=root / "schema.json",
+                    )
+
+            with self.assertRaisesRegex(ValueError, "skills_loaded"):
+                dispatch_architect_plan([])
+
+            result = dispatch_architect_plan(["ponytail"])
+
+            self.assertIs(result, expected)
+            self.assertEqual(result.metadata["canonical_bootstrap_selected_skills"], ["ponytail"])
+            self.assertEqual(
+                result.metadata["canonical_bootstrap_skill_digests"]["ponytail"],
+                hashlib.sha256(skill_path.read_bytes()).hexdigest(),
+            )
+            self.assertTrue(result.metadata["canonical_bootstrap_skill_catalog_sha256"])
 
     def test_role_dispatch_uses_app_server_without_terminal_handshake(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

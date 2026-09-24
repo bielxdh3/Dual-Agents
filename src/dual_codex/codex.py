@@ -657,6 +657,7 @@ def run_codex_for_role(
         role,
         repository=repository,
         canonical_root=canonical_root,
+        bootstrap=bootstrap,
         output_path=output_path,
         configured_actor=configured,
     )

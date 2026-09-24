@@ -91,8 +91,8 @@ A **profile is not a role**. A profile owns provider metadata and authentication
 |---|:---:|:---:|:---:|:---:|---|
 | **Codex** | ✅ | ✅ | ✅ | ✅ | Isolated by `CODEX_HOME`; native Windows and App Server transports are supported where configured. |
 | **Antigravity / Gemini** | — | — | ✅ | — | Headless executor through the installed `agy` runtime. Current runtime does not advertise isolated multi-account state roots. |
-| **Anthropic Claude** | — | ✅ | ⚠️ | ✅ | Isolated with `CLAUDE_CONFIG_DIR`. Native-Windows Executor is file-edit-only; command-running Executor is blocked. |
-| **OpenAI-compatible API** | ✅ | ✅ | — | ✅ | BYOK through `env:VARIABLE`; no local tool/workspace execution is claimed. |
+| **Anthropic Claude** | — | — | ⚠️ | ✅ | Restricted Claude profiles cannot read canonical Architect skills. Native-Windows Executor is file-edit-only; command-running Executor is blocked. |
+| **OpenAI-compatible API** | ✅ | — | — | ✅ | BYOK through `env:VARIABLE`; supports non-tool roles only and provides no local tool/workspace execution. |
 
 Provider support is capability-driven. A configured profile is rejected before dispatch when its runtime cannot safely satisfy the selected role.
 
@@ -102,8 +102,8 @@ Provider support is capability-driven. A configured profile is rejected before d
 - reassign roles without re-authenticating an existing profile;
 - use **Codex** as an Architect, Reviewer, Orchestrator, or Executor;
 - use **Antigravity/Gemini** as a structured headless Executor;
-- use **Claude Code** for bounded Architect/Reviewer work and file-edit-only execution on native Windows;
-- use declared **OpenAI-compatible API** profiles for non-tool roles;
+- use **Claude Code** for bounded Reviewer work and file-edit-only execution on native Windows;
+- use declared **OpenAI-compatible API** profiles for supported non-tool roles;
 - configure provider-aware models, reasoning/effort, and supported service tiers;
 - keep Codex state isolated by `CODEX_HOME` and Claude state by `CLAUDE_CONFIG_DIR`;
 - preserve exact provider sessions where the adapter supports safe continuation;
@@ -125,7 +125,7 @@ Provider support is capability-driven. A configured profile is rejected before d
 | Role/profile separation | Implemented |
 | Codex provider | Implemented |
 | Antigravity/Gemini provider | Implemented for Executor |
-| Claude Code provider | Implemented; read-only roles and native-Windows file-only Executor bounded |
+| Claude Code provider | Implemented for Reviewer; native-Windows Executor is file-edit-only |
 | OpenAI-compatible API profiles | Implemented for declared non-tool roles |
 | Role-scoped fallback | Implemented; disabled by default |
 | Dashboard profile management | Implemented |
