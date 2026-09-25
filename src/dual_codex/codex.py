@@ -494,7 +494,20 @@ def _delegate_to_configured_actor(
             fallback_name = candidates[0]
             fallback_config = replace(config, roles={**config.roles, role: fallback_name})
             fallback_agent = fallback_config.agent_for_role(role)
-            result = invoke(fallback_config, fallback_agent)
+            try:
+                result = invoke(fallback_config, fallback_agent)
+            except ActorResultError as fallback_error:
+                fallback_error.metadata.update({
+                    "primary_actor": primary_agent.account_name,
+                    "actual_actor": fallback_agent.account_name,
+                    "fallback_enabled": fallback_enabled,
+                    "fallback_used": True,
+                    "failed_actor": failed_actor,
+                    "fallback_actor": fallback_agent.account_name,
+                    "fallback_reason": fallback_reason,
+                    "fallback_failure_class": fallback_failure_class,
+                })
+                raise
             actual_agent = fallback_agent
             fallback_used = True
         if role == "architect":

@@ -425,6 +425,7 @@ class DashboardService:
             "last_error": None,
             "refreshed_at": _now(),
         }
+        base["capabilities"]["supported_roles"] = list(supported_roles_for_backend(account.backend))
         if not account.enabled:
             base["login"] = "DISABLED"
             base["auth_status"] = "Disabled"

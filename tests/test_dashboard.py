@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from dual_codex.config import load_config
+from dual_codex.config import ConfigError, load_config
 from dual_codex.claude_code import _save_session
 from dual_codex.dashboard import (
     CAPABILITY_SCRIPT,
@@ -30,6 +30,7 @@ from dual_codex.dashboard import (
 from dual_codex.live_events import LiveEventJournal
 from dual_codex.paths import same_path
 from dual_codex.providers import ProviderCapabilities, provider_default_label
+from dual_codex.registry import assign_role
 
 
 def _mutation_headers(server: DashboardServer, *, origin: str | None = None, content_type: str = "application/json") -> dict[str, str]:
@@ -266,6 +267,58 @@ console.log(JSON.stringify({
             payload["capabilities"]["supported_roles"],
             ["orchestrator", "architect", "reviewer", "executor"],
         )
+
+    def test_disabled_profiles_keep_declared_roles_for_dashboard_options(self) -> None:
+        app_server = replace(self.config.accounts["secondary"], enabled=False)
+        claude = replace(
+            self.config.accounts["primary"],
+            backend="claude_code",
+            provider_type="anthropic",
+            adapter_type="claude_code",
+            enabled=False,
+        )
+        config = replace(
+            self.config,
+            accounts={**self.config.accounts, "secondary": app_server, "primary": claude},
+            roles={},
+        )
+        service = DashboardService(config)
+        with patch.object(service, "_auth_raw", return_value="OK"), patch(
+            "dual_codex.dashboard.provider_capabilities"
+        ) as runtime_probe:
+            app_payload = service.collect_account("secondary", force=True)
+            claude_payload = service.collect_account("primary", force=True)
+
+        runtime_probe.assert_not_called()
+        self.assertEqual(app_payload["roles"], [])
+        self.assertEqual(
+            app_payload["capabilities"]["supported_roles"],
+            ["orchestrator", "architect", "reviewer", "executor"],
+        )
+        self.assertEqual(claude_payload["roles"], [])
+        self.assertEqual(claude_payload["capabilities"]["supported_roles"], ["reviewer"])
+
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("Node.js is required for the dashboard role options regression test")
+        source = CAPABILITY_SCRIPT + f"""
+const helper = globalThis.dualCodexDashboardCapabilities;
+const roles = ['orchestrator', 'architect', 'reviewer', 'executor'];
+console.log(JSON.stringify({{
+  appServer: helper.dashboardRoleOptions(roles, [], {json.dumps(app_payload['capabilities']['supported_roles'])}),
+  claude: helper.dashboardRoleOptions(roles, [], {json.dumps(claude_payload['capabilities']['supported_roles'])}),
+}}));
+"""
+        result = subprocess.run([node, "-"], input=source, text=True, capture_output=True, check=True)
+        options = json.loads(result.stdout)
+        self.assertEqual(
+            [option["role"] for option in options["appServer"]],
+            ["orchestrator", "architect", "reviewer", "executor"],
+        )
+        self.assertTrue(all(option["supported"] for option in options["appServer"]))
+        self.assertEqual(options["claude"], [{"role": "reviewer", "supported": True, "assigned": False}])
+        with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+            assign_role(config, "architect", "primary")
 
     def test_profile_management_crud_is_metadata_only_and_immediate(self) -> None:
         service = DashboardService(self.config)

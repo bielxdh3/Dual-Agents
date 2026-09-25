@@ -224,6 +224,116 @@ class OrchestratorTests(unittest.TestCase):
             self.assertIn("missing required field", architect_provenance["architect_result_validation_error"])
             self.assertTrue(architect_provenance["canonical_bootstrap_source_sha256"])
 
+    def test_invalid_fallback_architect_plan_preserves_primary_failure_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "disposable-mission"
+            repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+            architect = AccountConfig(
+                name="biel3",
+                label="Architect",
+                codex_home=root / "architect-home",
+                model="",
+                reasoning_effort="high",
+                backend="windows",
+            )
+            fallback = AccountConfig(
+                name="fallback",
+                label="Fallback",
+                codex_home=root / "fallback-home",
+                model="",
+                reasoning_effort="high",
+                backend="app_server",
+                fallback_roles=("architect",),
+            )
+            third = replace(fallback, name="third", label="Third", codex_home=root / "third-home")
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=0,
+                require_clean_git=True,
+                codex_command="codex",
+                accounts={"biel3": architect, "fallback": fallback, "third": third},
+                roles={"architect": "biel3", "orchestrator": "biel3"},
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+                fallback_enabled=True,
+            )
+            task = root / "brief.md"
+            task.write_text("Plan a small UI change.", encoding="utf-8")
+            primary_unavailable = CommandResult(
+                ["codex"],
+                1,
+                "",
+                "primary provider unavailable",
+                {"availability_failure_class": "provider_unavailable"},
+            )
+            invalid_plan = CommandResult(
+                ["codex", "app-server"],
+                0,
+                '{"summary":"Fallback completed with an invalid plan."}',
+                "",
+            )
+            fallback_actors: list[str] = []
+
+            def run_fallback(**kwargs):
+                fallback_actors.append(kwargs["agent"].account_name)
+                return invalid_plan
+
+            with patch("dual_codex.providers.provider_supports_role", return_value=True), patch(
+                "dual_codex.codex.run_codex_terminal", return_value=primary_unavailable
+            ) as primary, patch(
+                "dual_codex.codex.run_codex_app_server", side_effect=run_fallback
+            ) as fallback_dispatch:
+                with self.assertRaises(ActorResultError) as raised:
+                    execute(config, task)
+
+            primary.assert_called_once()
+            fallback_dispatch.assert_called_once()
+            self.assertEqual(fallback_actors, ["fallback"])
+            error = raised.exception
+            self.assertEqual(error.actor, "fallback")
+            self.assertIn("Architect plan validation failed", str(error))
+            self.assertEqual(error.metadata["primary_actor"], "biel3")
+            self.assertEqual(error.metadata["actual_actor"], "fallback")
+            self.assertTrue(error.metadata["fallback_enabled"])
+            self.assertTrue(error.metadata["fallback_used"])
+            self.assertEqual(error.metadata["failed_actor"], "biel3")
+            self.assertEqual(error.metadata["fallback_actor"], "fallback")
+            self.assertEqual(error.metadata["fallback_failure_class"], "provider_unavailable")
+            self.assertEqual(
+                error.metadata["fallback_reason"],
+                "Codex architect failed through the configured Windows terminal backend: primary provider unavailable",
+            )
+            self.assertIn("missing required field", error.metadata["architect_result_validation_error"])
+            self.assertEqual(error.metadata["actor_id"], "fallback")
+            self.assertTrue(error.metadata["canonical_bootstrap_required"])
+            self.assertTrue(error.metadata["canonical_bootstrap_source_sha256"])
+
+            run_dirs = [
+                path
+                for path in config.runs_dir.iterdir()
+                if (path / "provenance.json").is_file()
+            ]
+            self.assertEqual(len(run_dirs), 1)
+            provenance = json.loads((run_dirs[0] / "provenance.json").read_text(encoding="utf-8"))
+            architect_provenance = provenance["configured_actor_routing"][0]
+            for key in (
+                "primary_actor",
+                "actual_actor",
+                "fallback_enabled",
+                "fallback_used",
+                "failed_actor",
+                "fallback_actor",
+                "fallback_failure_class",
+                "fallback_reason",
+                "architect_result_validation_error",
+                "canonical_bootstrap_required",
+                "canonical_bootstrap_source_sha256",
+            ):
+                self.assertEqual(architect_provenance[key], error.metadata[key], key)
+
 
 if __name__ == "__main__":
     unittest.main()
