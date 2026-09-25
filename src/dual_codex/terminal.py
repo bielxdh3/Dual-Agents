@@ -924,6 +924,8 @@ class TerminalManager:
     def _cleanup_pending_task_artifacts(
         self,
         session: TerminalSession,
+        *,
+        lifecycle: str,
     ) -> TerminalSession:
         pending = session.pending_task_artifact_cleanup
         if not pending:
@@ -945,14 +947,15 @@ class TerminalManager:
                 if now < not_before:
                     remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
                     continue
-                if activity is None:
-                    try:
-                        activity = self._codex_turn_activity(session)
-                    except (OSError, ValueError, TypeError):
-                        activity = {"active": None}
-                if activity.get("active") is not False:
-                    remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
-                    continue
+                if lifecycle not in {"exited", "identity_invalid"}:
+                    if activity is None:
+                        try:
+                            activity = self._codex_turn_activity(session)
+                        except (OSError, ValueError, TypeError):
+                            activity = {"active": None}
+                    if activity.get("active") is not False:
+                        remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+                        continue
             artifact_path = Path(artifact_text)
             if (
                 artifact_path.is_symlink()
@@ -1076,7 +1079,7 @@ class TerminalManager:
             stale_reason = self._stale_session_reason(session)
             if stale_reason:
                 current = {**current, "state": "exited", "stale_reason": stale_reason}
-        session = self._cleanup_pending_task_artifacts(session)
+        session = self._cleanup_pending_task_artifacts(session, lifecycle=current["state"])
         current.pop("pending_task_artifact_cleanup", None)
         if current["state"] in {"exited", "identity_invalid"} and not session.pending_task_artifact_cleanup:
             self._remove_record(session_id)

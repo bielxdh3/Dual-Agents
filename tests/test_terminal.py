@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from dual_codex.config import AgentConfig, OrchestratorConfig
 from dual_codex.cli import _VtKeyBuffer, _WindowsConsoleModes, _interactive_attach, _windows_vt_console, _write_terminal_output
-from dual_codex.paths import same_path
+from dual_codex.paths import path_identity_key, same_path
 from dual_codex.terminal import (
     TerminalError,
     TerminalSetupRequiredError,
@@ -1704,6 +1704,59 @@ function idleScreen(model) {{
             turn_activity.assert_not_called()
             self.assertFalse(artifact.exists())
             self.assertFalse(record.exists())
+
+    def test_expired_task_artifact_is_reaped_after_terminal_exit_without_rollout_end_event(self) -> None:
+        for terminal_state in ("exited", "identity_invalid"):
+            with self.subTest(terminal_state=terminal_state), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                repository = root / "repo"
+                repository.mkdir()
+                config = _config(root, repository)
+                session, record = _write_terminal_session(config, "biel3", repository, role="architect")
+                session = replace(
+                    session,
+                    repository_identity=path_identity_key(repository),
+                    codex_home_identity=path_identity_key(session.codex_home),
+                )
+                record.write_text(json.dumps(session.as_dict()), encoding="utf-8")
+                artifact = repository / ".dual-codex-task-0123456789abcdef0123456789abcdef.md"
+                content = "# Dual Codex architect instructions\n\nRead the brief.\n"
+                artifact.write_text(content, encoding="utf-8", newline="\n")
+                cursor_path = session.codex_home / "sessions" / "rollout.jsonl"
+                cursor_path.parent.mkdir(parents=True)
+                cursor_path.write_text('{"payload":{"type":"turn_started"}}\n', encoding="utf-8")
+                manager = TerminalManager.__new__(TerminalManager)
+                manager.config = config
+                manager.defer_task_artifact_cleanup(
+                    session.session_id,
+                    artifact,
+                    hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                    cursor=(cursor_path, 0),
+                )
+                raw_record = json.loads(record.read_text(encoding="utf-8"))
+                raw_record["pending_task_artifact_cleanup"][0][2] = 0
+                record.write_text(json.dumps(raw_record), encoding="utf-8")
+
+                host_state = {
+                    "session_id": session.session_id,
+                    "pipe": session.pipe,
+                    "host_pid": session.pid,
+                    "host_started_at": session.process_started_at,
+                    "process_start_identity": session.process_start_identity,
+                    "process_epoch": session.process_epoch,
+                    "alive": terminal_state != "exited",
+                }
+                if terminal_state == "identity_invalid":
+                    host_state["process_epoch"] = "different-epoch"
+                with patch(
+                    "dual_codex.terminal._pipe_request",
+                    return_value={"ok": True, "state": host_state},
+                ), patch.object(manager, "_codex_turn_activity", return_value={"active": True}) as activity:
+                    manager.reconcile_pending_task_artifact_cleanup(repository)
+
+                activity.assert_not_called()
+                self.assertFalse(artifact.exists())
+                self.assertFalse(record.exists())
 
     def test_list_removes_unreachable_record_when_host_pid_is_dead_and_pipe_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
