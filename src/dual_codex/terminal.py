@@ -33,6 +33,7 @@ TERMINAL_LIVE_READ_MAX_BYTES = 65536
 TERMINAL_SUBMIT_DELAY_SECONDS = 0.1
 TERMINAL_COMPOSER_ACK_TIMEOUT_SECONDS = 5.0
 TERMINAL_TERM = "xterm-256color"
+WINDOWS_READ_ONLY_SANDBOX_MODE = "unelevated"
 _COMPLETED_EVENTS = {"turn_completed", "turn_complete", "task_completed", "task_complete"}
 _ABORTED_EVENTS = {"turn_aborted", "task_aborted"}
 _TURN_START_EVENTS = {"task_started", "turn_started", "turn_start"}
@@ -504,6 +505,7 @@ class TerminalSession:
     visible_required: bool = False
     target_model: str = ""
     target_reasoning: str = ""
+    windows_sandbox_mode: str = ""
     pending_task_artifact_cleanup: tuple[tuple[str, str, float, str, int], ...] = ()
 
     @classmethod
@@ -540,6 +542,7 @@ class TerminalSession:
             visible_required=bool(raw.get("visible_required", False)),
             target_model=str(raw.get("target_model", "")),
             target_reasoning=str(raw.get("target_reasoning", "")),
+            windows_sandbox_mode=str(raw.get("windows_sandbox_mode", "")),
             pending_task_artifact_cleanup=tuple(
                 (
                     str(item[0]),
@@ -584,6 +587,7 @@ class TerminalSession:
             "visible_required": self.visible_required,
             "target_model": self.target_model,
             "target_reasoning": self.target_reasoning,
+            "windows_sandbox_mode": self.windows_sandbox_mode,
         }
         if self.pending_task_artifact_cleanup:
             result["pending_task_artifact_cleanup"] = [
@@ -603,6 +607,16 @@ def session_id_for(account: str, repository: Path) -> str:
     return validate_session_id(f"{account}-{digest}")
 
 
+def windows_sandbox_mode_for(sandbox: str) -> str:
+    """Return the explicit native Windows sandbox implementation for a TUI sandbox."""
+
+    if sandbox == "read-only":
+        return WINDOWS_READ_ONLY_SANDBOX_MODE
+    if sandbox == "workspace-write":
+        return ""
+    raise TerminalError(f"Unsupported sandbox '{sandbox}'.")
+
+
 def interactive_command_args(
     repository: Path,
     *,
@@ -610,12 +624,17 @@ def interactive_command_args(
     approval_policy: str,
     model: str = "",
     reasoning_effort: str = "",
+    windows_sandbox_mode: str = "",
 ) -> list[str]:
     if sandbox not in {"read-only", "workspace-write"}:
         raise TerminalError(f"Unsupported sandbox '{sandbox}'.")
     if approval_policy not in {"on-request", "never"}:
         raise TerminalError(f"Unsupported approval policy '{approval_policy}'.")
+    if windows_sandbox_mode not in {"", "unelevated", "elevated"}:
+        raise TerminalError(f"Unsupported Windows sandbox mode '{windows_sandbox_mode}'.")
     args = ["--no-alt-screen", "--cd", str(repository), "--sandbox", sandbox, "-a", approval_policy]
+    if windows_sandbox_mode:
+        args.extend(["-c", f'windows.sandbox="{windows_sandbox_mode}"'])
     if model:
         args.extend(["--model", model])
     if reasoning_effort:
@@ -1695,6 +1714,7 @@ class TerminalManager:
         node = _node_path(self.config)
         helper = _helper_path(self.config)
         process_epoch = uuid4().hex
+        windows_sandbox_mode = windows_sandbox_mode_for(agent.sandbox)
         command = [
             node, str(helper), "--session-id", session_id, "--pipe", pipe,
             "--cwd", str(repository), "--codex-command", self.config.codex_command,
@@ -1702,6 +1722,7 @@ class TerminalManager:
             "--model", agent.model,
             "--reasoning-effort", agent.reasoning_effort,
             "--process-epoch", process_epoch,
+            "--windows-sandbox-mode", windows_sandbox_mode,
         ]
         if resolved_add_dirs:
             command.extend(["--add-dir", str(resolved_add_dirs[0])])
@@ -1736,6 +1757,7 @@ class TerminalManager:
             session_id=session_id, account=agent.account_name, label=agent.label,
             role=role, repository=repository, codex_home=agent.codex_home,
             target_model=agent.model, target_reasoning=agent.reasoning_effort,
+            windows_sandbox_mode=windows_sandbox_mode,
             pipe=pipe, pid=process.pid, started_at=datetime.now(timezone.utc).isoformat(),
             log_file=log_file, session_file=str(record_path.resolve()), add_dirs=resolved_add_dirs,
             process_started_at=process_started_at,
@@ -1809,6 +1831,12 @@ class TerminalManager:
                     raise TerminalError(
                         f"Existing terminal session '{session_id}' account or CODEX_HOME identity mismatch."
                     )
+                if agent is not None:
+                    expected_windows_sandbox_mode = windows_sandbox_mode_for(agent.sandbox)
+                    if session.windows_sandbox_mode != expected_windows_sandbox_mode:
+                        raise TerminalError(
+                            f"Existing terminal session '{session_id}' Windows sandbox mode identity mismatch."
+                        )
                 if agent is not None and session.target_model and session.target_model != agent.model:
                     raise TerminalError(f"Existing terminal session '{session_id}' model identity mismatch.")
                 if agent is not None and session.target_reasoning and session.target_reasoning != agent.reasoning_effort:
@@ -1858,6 +1886,8 @@ class TerminalManager:
             raise TerminalError("Strict reuse-existing refused: repository identity mismatch.")
         if not same_path(session.codex_home, agent.codex_home):
             raise TerminalError("Strict reuse-existing refused: CODEX_HOME identity mismatch.")
+        if session.windows_sandbox_mode != windows_sandbox_mode_for(agent.sandbox):
+            raise TerminalError("Strict reuse-existing refused: Windows sandbox mode identity mismatch.")
         if getattr(session, "target_model", "") and session.target_model != agent.model:
             raise TerminalError("Strict reuse-existing refused: model identity mismatch.")
         if getattr(session, "target_reasoning", "") and session.target_reasoning != agent.reasoning_effort:
