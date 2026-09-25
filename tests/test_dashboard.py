@@ -232,6 +232,27 @@ console.log(JSON.stringify({
         self.assertEqual(saved.roles["executor"], "secondary")
         self.assertEqual(saved.accounts["secondary"].model, "gpt-6-luna")
 
+    def test_app_server_capabilities_advertise_assignable_roles(self) -> None:
+        account = replace(
+            self.config.accounts["secondary"],
+            backend="app_server",
+            provider_type="codex",
+            adapter_type="codex_cli",
+        )
+        config = replace(self.config, accounts={**self.config.accounts, "secondary": account})
+        service = DashboardService(config)
+        with patch.object(service, "_auth_raw", return_value="OK"), patch.object(
+            service, "_call", return_value=({}, None)
+        ), patch.object(service, "_thread", return_value=(None, None)), patch.object(
+            service, "_token_usage", return_value=None
+        ), patch("dual_codex.dashboard.app_server_events", return_value=[]):
+            payload = service.collect_account("secondary", force=True)
+
+        self.assertEqual(
+            payload["capabilities"]["supported_roles"],
+            ["orchestrator", "architect", "reviewer", "executor"],
+        )
+
     def test_profile_management_crud_is_metadata_only_and_immediate(self) -> None:
         service = DashboardService(self.config)
         home = Path(self.temp.name) / "profiles" / "codex-secondary"

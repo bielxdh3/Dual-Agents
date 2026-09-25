@@ -47,6 +47,7 @@ from .providers import (
     provider_default_label,
     provider_for_backend,
     provider_label,
+    supported_roles_for_backend,
 )
 
 
@@ -562,6 +563,7 @@ class DashboardService:
             "profile_isolation": True,
             "isolation_note": "Codex profile state is isolated by the account CODEX_HOME.",
             "credential_status": "provider-managed",
+            "supported_roles": list(supported_roles_for_backend(account.backend)),
         }
         base["profile"] = {
             **base["profile"],
