@@ -63,10 +63,38 @@ $skillHash = Get-Sha256 $skillSource
 $launcherHash = Get-Sha256 $launcherSource
 
 $agentsText = Normalize-Lf (Get-Content -LiteralPath $agentsPath -Raw -Encoding UTF8)
-$sectionPattern = '(?ms)^## Dual Agents architecture\n.*?(?=^## Shared global instructions\b[^\n]*$)'
-$sectionMatches = [regex]::Matches($agentsText, $sectionPattern)
-if ($sectionMatches.Count -ne 1) { throw "Expected exactly one canonical 'Dual Agents architecture' section before 'Shared global instructions'." }
-$currentSection = $sectionMatches[0].Value.TrimEnd("`n")
+$sectionHeadings = [regex]::Matches($agentsText, '(?m)^## Dual Agents architecture[ \t]*$')
+$sharedAnchors = [regex]::Matches($agentsText, '(?m)^## Shared global instructions\b[^\n]*$')
+$beginMarker = '<!-- DUAL_AGENTS_GLOBAL_ARCHITECTURE_BEGIN -->'
+$endMarker = '<!-- DUAL_AGENTS_GLOBAL_ARCHITECTURE_END -->'
+$beginMarkers = [regex]::Matches($agentsText, [regex]::Escape($beginMarker))
+$endMarkers = [regex]::Matches($agentsText, [regex]::Escape($endMarker))
+
+if ($sectionHeadings.Count -gt 1) { throw "Global AGENTS.md has multiple 'Dual Agents architecture' sections; refusing an ambiguous update." }
+if ($sharedAnchors.Count -ne 1) { throw "Expected exactly one canonical 'Shared global instructions' anchor in global AGENTS.md." }
+if ($beginMarkers.Count -ne $endMarkers.Count -or $beginMarkers.Count -gt 1) {
+    throw "Global AGENTS.md has conflicting or partial Dual Agents architecture markers."
+}
+
+$sectionMatch = $null
+$currentSection = $null
+if ($sectionHeadings.Count -eq 0) {
+    if ($beginMarkers.Count -ne 0) { throw "Global AGENTS.md has Dual Agents markers without an architecture section." }
+} else {
+    $sectionMatch = $sectionHeadings[0]
+    $sharedAnchor = $sharedAnchors[0]
+    if ($sectionMatch.Index -ge $sharedAnchor.Index) {
+        throw "The Dual Agents architecture section must appear before the shared global instructions anchor."
+    }
+    $currentSection = $agentsText.Substring($sectionMatch.Index, $sharedAnchor.Index - $sectionMatch.Index).TrimEnd("`n")
+    if ($beginMarkers.Count -eq 1) {
+        $beginIndex = $beginMarkers[0].Index
+        $endIndex = $endMarkers[0].Index
+        if ($beginIndex -lt $sectionMatch.Index -or $endIndex -lt $beginIndex -or $endIndex -ge $sharedAnchor.Index) {
+            throw "Global AGENTS.md has misplaced or corrupt Dual Agents architecture markers."
+        }
+    }
+}
 $manifest = [ordered]@{
     schema_version = 1
     repository_root = $repositoryRoot
@@ -92,7 +120,7 @@ if (-not $Verify) {
 }
 
 if ($Verify) {
-    if ($currentSection -ne $architecture) { throw "Global Dual Agents architecture differs from the repo-owned source." }
+    if ($null -eq $currentSection -or $currentSection -ne $architecture) { throw "Global Dual Agents architecture differs from the repo-owned source." }
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "Global integration manifest is missing." }
     $currentManifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($currentManifest.repository_root -ne $repositoryRoot -or $currentManifest.config_path -ne $configPathResolved) {
@@ -114,6 +142,13 @@ if ($Verify) {
     exit 0
 }
 
+$backupPath = Join-Path $globalRoot "AGENTS.md.pre-dual-agents.bak"
+if ($currentSection -ne $architecture -and $currentSection -notmatch '<!-- DUAL_AGENTS_GLOBAL_ARCHITECTURE_BEGIN -->') {
+    if (-not (Test-Path -LiteralPath $backupPath -PathType Leaf)) {
+        Copy-Item -LiteralPath $agentsPath -Destination $backupPath
+    }
+}
+
 foreach ($directory in @((Split-Path -Parent $skillDestination), (Split-Path -Parent $wrapperDestination))) {
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
 }
@@ -124,16 +159,19 @@ foreach ($file in $filesToVerify) {
     Write-AtomicText $marker ($file.Hash + "`n")
 }
 
-$backupPath = Join-Path $globalRoot "AGENTS.md.pre-dual-agents.bak"
-if ($currentSection -ne $architecture -and $currentSection -notmatch '<!-- DUAL_AGENTS_GLOBAL_ARCHITECTURE_BEGIN -->') {
-    if (-not (Test-Path -LiteralPath $backupPath -PathType Leaf)) {
-        Copy-Item -LiteralPath $agentsPath -Destination $backupPath
-    }
-}
 $newline = if ((Get-Content -LiteralPath $agentsPath -Raw -Encoding UTF8).Contains("`r`n")) { "`r`n" } else { "`n" }
 $globalArchitecture = $architecture -replace "`n", $newline
 $replacement = $globalArchitecture + $newline + $newline
-$updatedAgents = [regex]::Replace($agentsText, $sectionPattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($match) $replacement }, 1)
+if ($null -ne $sectionMatch) {
+    $updatedAgents = $agentsText.Substring(0, $sectionMatch.Index) + $replacement + $agentsText.Substring($sharedAnchor.Index)
+} else {
+    $insertionIndex = $sharedAnchors[0].Index
+    $prefix = $agentsText.Substring(0, $insertionIndex)
+    if ($prefix.EndsWith("`n`n")) { $separatorBefore = "" }
+    elseif ($prefix.EndsWith("`n")) { $separatorBefore = "`n" }
+    else { $separatorBefore = "`n`n" }
+    $updatedAgents = $prefix + $separatorBefore + $globalArchitecture + $newline + $newline + $agentsText.Substring($insertionIndex)
+}
 Write-AtomicText $agentsPath $updatedAgents
 Write-AtomicText $manifestPath $manifestText
 Write-Output "Dual Agents global integration installed from '$repositoryRoot'."
