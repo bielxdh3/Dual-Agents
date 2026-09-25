@@ -2275,3 +2275,10 @@ class TerminalManager:
             except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError):
                 continue
         return rows
+
+
+def reconcile_deferred_task_artifact_cleanup(config: OrchestratorConfig, repository: Path) -> None:
+    """Reconcile native ConPTY task files on hosts that support that transport."""
+    if os.name != "nt":
+        return
+    TerminalManager(config).reconcile_pending_task_artifact_cleanup(repository)

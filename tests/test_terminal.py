@@ -35,6 +35,7 @@ from dual_codex.terminal import (
     session_id_for,
     session_turn_started,
     session_turn_state,
+    reconcile_deferred_task_artifact_cleanup,
     _rollout_snapshot,
     _terminal_environment,
     executor_task_artifact_dir,
@@ -103,6 +104,18 @@ def _normal_screen(prompt: str = "Improve documentation in @filename") -> str:
 
 
 class TerminalTests(unittest.TestCase):
+    def test_deferred_task_artifact_reconciliation_skips_non_windows_hosts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            with patch("dual_codex.terminal.os.name", "posix"), patch(
+                "dual_codex.terminal.TerminalManager"
+            ) as manager_type:
+                reconcile_deferred_task_artifact_cleanup(config, repository)
+            manager_type.assert_not_called()
+
     def test_trust_prompt_is_a_typed_actionable_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

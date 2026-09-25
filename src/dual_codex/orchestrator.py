@@ -59,9 +59,9 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
 
     canonical_root = canonical_instructions_root()
     ensure_git_repository(config.repository)
-    from .terminal import TerminalManager
+    from .terminal import reconcile_deferred_task_artifact_cleanup
 
-    TerminalManager(config).reconcile_pending_task_artifact_cleanup(config.repository)
+    reconcile_deferred_task_artifact_cleanup(config, config.repository)
     if config.require_clean_git and status_porcelain(config.repository).strip():
         raise RuntimeError(
             "Repository has uncommitted changes. Commit/stash them or set "

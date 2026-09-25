@@ -1449,9 +1449,9 @@ def delegate(
         run_id = _run_id(config, request)
         with RepositoryLock(config.runs_dir, request.repository, request.request_id, run_id):
             ensure_git_repository(request.repository)
-            from .terminal import TerminalManager
+            from .terminal import reconcile_deferred_task_artifact_cleanup
 
-            TerminalManager(config).reconcile_pending_task_artifact_cleanup(request.repository)
+            reconcile_deferred_task_artifact_cleanup(config, request.repository)
             initial_git_status = status_porcelain(request.repository)
             dirty = bool(initial_git_status.strip())
             if dirty:
