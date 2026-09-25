@@ -919,6 +919,8 @@ def run_codex_terminal(
             readiness = {}
         terminal_pid = int(status_snapshot.get("pid") or session.pid)
         host_pid = int(status_snapshot.get("host_pid") or session.pid)
+        windows_sandbox_mode = str(getattr(session, "windows_sandbox_mode", "") or "")
+        metadata["windows_sandbox_mode"] = windows_sandbox_mode
         output_path.parent.mkdir(parents=True, exist_ok=True)
         if temporary_task_artifact_path is not None:
             archived_task_artifact = output_path.with_name(f"{output_path.stem}-{uuid4().hex}.task.md")
@@ -967,6 +969,7 @@ def run_codex_terminal(
                     "role": session.role,
                     "repository_identity": getattr(session, "repository_identity", "") or str(session.repository),
                     "codex_home_identity": getattr(session, "codex_home_identity", "") or str(session.codex_home),
+                    "windows_sandbox_mode": windows_sandbox_mode,
                     "codex_session_id": result.get("session_id", ""),
                     "repository": str(session.repository),
                     "codex_home": str(session.codex_home),
