@@ -12,7 +12,7 @@ from dual_codex.codex import ActorResultError
 from dual_codex.config import AccountConfig, AgentConfig, OrchestratorConfig
 from dual_codex.delegation import DelegationError, RepositoryLock
 from dual_codex.orchestrator import execute
-from dual_codex.process import CommandResult
+from dual_codex.process import CommandError, CommandResult
 
 
 class OrchestratorTests(unittest.TestCase):
@@ -124,6 +124,11 @@ class OrchestratorTests(unittest.TestCase):
                 agent: AgentConfig = kwargs["agent"]
                 seen.append((role, agent.account_name, agent.backend))
                 self.assertIn("harmless mission brief", kwargs["prompt"])
+                if role == "reviewer":
+                    self.assertIn("CONTROL-PLANE VERIFIED PHASE PROVENANCE", kwargs["prompt"])
+                    self.assertIn('"actual_actor": "biel3"', kwargs["prompt"])
+                    self.assertIn('"actual_actor": "biel4"', kwargs["prompt"])
+                    self.assertIn('"configured_actor": "biel3"', kwargs["prompt"])
                 if role == "architect":
                     payload = {
                         "summary": "plan",
@@ -146,7 +151,22 @@ class OrchestratorTests(unittest.TestCase):
                 import json
 
                 kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
-                return CommandResult(["codex"], 0, "", "")
+                return CommandResult(
+                    ["codex"],
+                    0,
+                    "",
+                    "",
+                    {
+                        "role": role,
+                        "primary_actor": agent.account_name,
+                        "actual_actor": agent.account_name,
+                        "provider": agent.provider_type,
+                        "backend": agent.backend,
+                        "fallback_enabled": False,
+                        "fallback_used": False,
+                        "repository": str(repository.resolve()),
+                    },
+                )
 
             with patch("dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner):
                 execute(config, task)
@@ -159,6 +179,121 @@ class OrchestratorTests(unittest.TestCase):
                     ("reviewer", "biel3", "windows"),
                 ],
             )
+
+    def test_failed_reviewer_dispatch_persists_prior_phase_and_failure_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "disposable-mission"
+            repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+            accounts = {
+                "architect": AccountConfig(
+                    name="architect",
+                    label="Architect",
+                    codex_home=root / "architect-home",
+                    model="",
+                    reasoning_effort="high",
+                    backend="windows",
+                ),
+                "executor": AccountConfig(
+                    name="executor",
+                    label="Executor",
+                    codex_home=root / "executor-home",
+                    model="",
+                    reasoning_effort="high",
+                    backend="app_server",
+                ),
+                "reviewer": AccountConfig(
+                    name="reviewer",
+                    label="Reviewer",
+                    codex_home=root / "reviewer-home",
+                    model="sonnet",
+                    reasoning_effort="high",
+                    backend="claude_code",
+                    provider_type="anthropic",
+                    adapter_type="claude_code",
+                ),
+            }
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=0,
+                require_clean_git=True,
+                codex_command="codex",
+                accounts=accounts,
+                roles={
+                    "architect": "architect",
+                    "executor": "executor",
+                    "reviewer": "reviewer",
+                    "orchestrator": "architect",
+                },
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+            )
+            task = root / "brief.md"
+            task.write_text("Make a small documentation edit.", encoding="utf-8")
+
+            def fail_reviewer(**kwargs):
+                payload = (
+                    {
+                        "summary": "plan",
+                        "steps": [],
+                        "acceptance_criteria": [],
+                        "risks": [],
+                        "files_to_inspect": [],
+                        "skills_loaded": [],
+                    }
+                    if kwargs["role"] == "architect"
+                    else {
+                        "summary": "implemented",
+                        "files_changed": [],
+                        "commands_run": [],
+                        "tests": [],
+                        "remaining_issues": [],
+                    }
+                )
+                if kwargs["role"] == "reviewer":
+                    raise CommandError("Configured reviewer runtime unavailable")
+                kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
+                agent = config.agent_for_role(kwargs["role"])
+                return CommandResult(
+                    ["fake"],
+                    0,
+                    "",
+                    "",
+                    {
+                        "phase": kwargs["role"],
+                        "role": kwargs["role"],
+                        "actor_id": agent.account_name,
+                        "actual_actor": agent.account_name,
+                        "provider": agent.provider_type,
+                        "backend": agent.backend,
+                        "repository": str(repository.resolve()),
+                        "fallback_used": False,
+                    },
+                )
+
+            with patch("dual_codex.orchestrator.delegate_to_configured_actor", side_effect=fail_reviewer):
+                with self.assertRaisesRegex(CommandError, "runtime unavailable"):
+                    execute(config, task)
+
+            run_dirs = [
+                path
+                for path in config.runs_dir.iterdir()
+                if (path / "provenance.json").is_file()
+            ]
+            self.assertEqual(len(run_dirs), 1)
+            provenance = json.loads((run_dirs[0] / "provenance.json").read_text(encoding="utf-8"))
+            phases = provenance["configured_actor_routing"]
+            self.assertEqual([phase["role"] for phase in phases], ["architect", "executor", "reviewer"])
+            failed = phases[-1]
+            self.assertTrue(failed["dispatch_failed"])
+            self.assertEqual(failed["failure_type"], "CommandError")
+            self.assertEqual(failed["actor_id"], "reviewer")
+            self.assertEqual(failed["actual_actor"], "reviewer")
+            self.assertEqual(failed["provider"], "anthropic")
+            self.assertEqual(failed["backend"], "claude_code")
+            self.assertEqual(failed["repository"], str(repository.resolve()))
 
     def test_invalid_architect_plan_persists_actual_actor_provenance_before_failing(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

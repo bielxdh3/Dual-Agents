@@ -49,6 +49,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
         self.addCleanup(self._bootstrap_patch.stop)
 
     def _config(self, root: Path, *, executor: str = "executor-b") -> OrchestratorConfig:
+        (root / "schema.json").write_text('{"type":"object"}', encoding="utf-8")
         accounts = {
             "orchestrator": AccountConfig(
                 name="orchestrator",
@@ -713,6 +714,60 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertEqual(result.metadata["failed_actor"], "executor-b")
             self.assertEqual(result.metadata["fallback_failure_class"], "provider_unavailable")
 
+    def test_failed_fallback_preserves_primary_and_fallback_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["orchestrator"] = replace(
+                accounts["orchestrator"], fallback_roles=("reviewer",)
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "reviewer": "secondary"},
+                fallback_enabled=True,
+            )
+            repository = root / "repository"
+            repository.mkdir()
+
+            def fail_primary_and_fallback(**kwargs):
+                if kwargs["agent"].account_name == "secondary":
+                    raise ActorAvailabilityError(
+                        "primary reviewer unavailable",
+                        failure_class="provider_unavailable",
+                        actor="secondary",
+                    )
+                raise CommandError(
+                    "Existing terminal session role identity mismatch",
+                    metadata={"terminal_session_id": "fallback-session"},
+                )
+
+            with patch("dual_codex.codex.run_codex_for_role", side_effect=fail_primary_and_fallback):
+                with self.assertRaises(CommandError) as raised:
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="reviewer",
+                        task="Review the changed README.",
+                        repository=repository,
+                        output_path=root / "review.json",
+                        schema_path=root / "review.schema.json",
+                    )
+
+            metadata = raised.exception.metadata
+            self.assertEqual(metadata["primary_actor"], "secondary")
+            self.assertEqual(metadata["actual_actor"], "orchestrator")
+            self.assertEqual(metadata["actor_id"], "orchestrator")
+            self.assertEqual(metadata["backend"], "windows")
+            self.assertTrue(metadata["fallback_enabled"])
+            self.assertTrue(metadata["fallback_used"])
+            self.assertTrue(metadata["fallback_attempt_failed"])
+            self.assertEqual(metadata["failed_actor"], "secondary")
+            self.assertEqual(metadata["fallback_actor"], "orchestrator")
+            self.assertEqual(metadata["fallback_failure_class"], "provider_unavailable")
+            self.assertEqual(metadata["fallback_error_type"], "CommandError")
+            self.assertEqual(metadata["terminal_session_id"], "fallback-session")
+
     def test_architect_fallback_keeps_shared_bootstrap_artifact_until_dispatch_finishes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -727,6 +782,8 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             )
             repository = root / "repository"
             repository.mkdir()
+            schema_path = root / "architect-plan.schema.json"
+            schema_path.write_text("{}", encoding="utf-8")
             captured_bootstraps = []
             create_bootstrap = create_canonical_bootstrap
 
@@ -756,7 +813,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     task="Read the brief and return an Architect plan.",
                     repository=repository,
                     output_path=root / "architect-plan.json",
-                    schema_path=root / "architect-plan.schema.json",
+                    schema_path=schema_path,
                 )
 
             self.assertTrue(result.metadata["fallback_used"])

@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .bootstrap import canonical_instructions_root
-from .codex import ActorResultError, _delegate_to_configured_actor
+from .codex import _delegate_to_configured_actor
 from .codex import configured_actor_provenance, run_codex_for_role
 from .config import ConfigError, OrchestratorConfig
 from .delegation import RepositoryLock
@@ -45,6 +45,34 @@ def _schema(config: OrchestratorConfig, name: str) -> Path:
     return config.project_root / "schemas" / name
 
 
+def _reviewer_phase_context(config: OrchestratorConfig, phase_provenance: list[dict]) -> dict:
+    fields = (
+        "role",
+        "primary_actor",
+        "actual_actor",
+        "provider",
+        "backend",
+        "fallback_enabled",
+        "fallback_used",
+        "repository",
+    )
+    reviewer = config.agent_for_role("reviewer")
+    return {
+        "completed_phases": [
+            {field: item.get(field, "") for field in fields}
+            for item in phase_provenance
+            if item.get("role") in {"architect", "executor"}
+        ],
+        "current_phase": {
+            "role": "reviewer",
+            "configured_actor": reviewer.account_name,
+            "provider": reviewer.provider_type,
+            "backend": reviewer.backend,
+            "actual_runtime_identity": "recorded by the control plane after this phase completes",
+        },
+    }
+
+
 def _write_provenance(
     config: OrchestratorConfig,
     canonical_root: Path,
@@ -74,6 +102,52 @@ def _write_provenance(
             "orchestrator": orchestrator_metadata,
         },
     )
+
+
+def _dispatch_phase(
+    *,
+    config: OrchestratorConfig,
+    canonical_root: Path,
+    run_dir: Path,
+    phase_provenance: list[dict],
+    role: str,
+    **kwargs,
+):
+    try:
+        result = delegate_to_configured_actor(config=config, role=role, **kwargs)
+    except Exception as exc:
+        try:
+            actor = config.agent_for_role(role)
+            failure = configured_actor_provenance(
+                agent=actor,
+                role=role,
+                repository=config.repository,
+                canonical_root=canonical_root,
+            )
+        except ConfigError as config_error:
+            failure = {
+                "phase": role,
+                "role": role,
+                "configured_actor": False,
+                "routing_error": str(config_error),
+                "fallback_used": False,
+            }
+        failure.update(getattr(exc, "metadata", {}))
+        failure.update(
+            {
+                "phase": role,
+                "role": role,
+                "dispatch_failed": True,
+                "failure_type": type(exc).__name__,
+            }
+        )
+        if getattr(exc, "failure_class", None):
+            failure["failure_class"] = exc.failure_class
+        phase_provenance.append(failure)
+        _write_provenance(config, canonical_root, run_dir, phase_provenance)
+        raise
+    phase_provenance.append(dict(result.metadata))
+    return result
 
 
 def execute(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
@@ -106,32 +180,31 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
     phase_provenance: list[dict] = []
 
     plan_path = run_dir / "plan.json"
-    try:
-        result = delegate_to_configured_actor(
-            config=config,
-            role="architect",
-            task=_prompt(config, "architect.txt", task=task),
-            repository=config.repository,
-            output_path=plan_path,
-            schema_path=_schema(config, "architect-plan.schema.json"),
-        )
-    except ActorResultError as exc:
-        phase_provenance.append(dict(exc.metadata))
-        _write_provenance(config, canonical_root, run_dir, phase_provenance)
-        raise
-    phase_provenance.append(dict(result.metadata))
+    result = _dispatch_phase(
+        config=config,
+        canonical_root=canonical_root,
+        run_dir=run_dir,
+        phase_provenance=phase_provenance,
+        role="architect",
+        task=_prompt(config, "architect.txt", task=task),
+        repository=config.repository,
+        output_path=plan_path,
+        schema_path=_schema(config, "architect-plan.schema.json"),
+    )
     plan = load_json(plan_path)
 
     implementation_path = run_dir / "implementation.json"
-    result = delegate_to_configured_actor(
+    result = _dispatch_phase(
         config=config,
+        canonical_root=canonical_root,
+        run_dir=run_dir,
+        phase_provenance=phase_provenance,
         role="executor",
         task=_prompt(config, "executor.txt", task=task, plan=dump_json(plan)),
         repository=config.repository,
         output_path=implementation_path,
         schema_path=_schema(config, "implementation.schema.json"),
     )
-    phase_provenance.append(dict(result.metadata))
     implementation = load_json(implementation_path)
 
     correction_cycles = 0
@@ -139,8 +212,11 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
         diff_text = status_and_diff(config.repository)
         (run_dir / f"diff-{correction_cycles}.md").write_text(diff_text, encoding="utf-8")
         review_path = run_dir / f"review-{correction_cycles}.json"
-        result = delegate_to_configured_actor(
+        result = _dispatch_phase(
             config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            phase_provenance=phase_provenance,
             role="reviewer",
             task=_prompt(
                 config,
@@ -149,12 +225,12 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
                 plan=dump_json(plan),
                 implementation=dump_json(implementation),
                 diff=diff_text,
+                phase_provenance=dump_json(_reviewer_phase_context(config, phase_provenance)),
             ),
             repository=config.repository,
             output_path=review_path,
             schema_path=_schema(config, "review.schema.json"),
         )
-        phase_provenance.append(dict(result.metadata))
         review = load_json(review_path)
         if review["verdict"] == "approved":
             break
@@ -163,8 +239,11 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
 
         correction_cycles += 1
         implementation_path = run_dir / f"correction-{correction_cycles}.json"
-        result = delegate_to_configured_actor(
+        result = _dispatch_phase(
             config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            phase_provenance=phase_provenance,
             role="executor",
             task=_prompt(
                 config,
@@ -177,7 +256,6 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
             output_path=implementation_path,
             schema_path=_schema(config, "implementation.schema.json"),
         )
-        phase_provenance.append(dict(result.metadata))
         implementation = load_json(implementation_path)
 
     _write_provenance(config, canonical_root, run_dir, phase_provenance)

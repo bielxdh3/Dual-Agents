@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import AbstractContextManager
+from dataclasses import replace
 from datetime import datetime, timezone
 import json
 import os
@@ -181,6 +182,10 @@ def _parser() -> argparse.ArgumentParser:
     status.add_argument("--json", action="store_true", dest="json_output")
     run = sub.add_parser("run", help="Run architect -> executor -> reviewer")
     run.add_argument("task", help="Markdown task file")
+    run.add_argument(
+        "--repository",
+        help="Explicit target repository (defaults to the repository in the config)",
+    )
 
     dashboard = sub.add_parser("dashboard", help="Open the local account control dashboard")
     dashboard.add_argument("--port", type=int, default=0, help="Loopback port (0 chooses a safe free port)")
@@ -788,6 +793,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "run":
+            if args.repository:
+                config = replace(config, repository=Path(args.repository).expanduser().resolve())
             outcome = execute(config, Path(args.task))
             print(f"Run directory: {outcome.run_dir}")
             print(f"Verdict: {outcome.verdict}")

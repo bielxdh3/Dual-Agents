@@ -1,22 +1,47 @@
 # Integracao Dual Agents com o Codex App
 
-O Codex App permanece como interface conversacional, Architect e autoridade de
-revisao. O role `executor` resolve o perfil configurado: Antigravity/Gemini
-ou Codex App Server. Fallback automatico e opcional, desativado por padrao,
-e so considera perfis explicitamente autorizados para o role.
+O Codex App e a porta de entrada conversacional. O control plane resolve
+Architect, Executor e Reviewer pelos roles configurados, pela matriz de
+capabilities do provider e pela disponibilidade real do runtime. A thread
+visivel nao precisa possuir internamente os outros atores. Fallback automatico
+e opcional, desativado por padrao, e so considera perfis explicitamente
+autorizados para o role.
 
 ## Fluxo diario
 
-1. Abra o Codex App.
-2. Abra o projeto alvo.
-3. Diga: `Use Dual Agents to implement this task.`
-4. O App inspeciona o alvo e prepara um pedido JSON preciso.
-5. O App chama `scripts/dual-codex.ps1 delegate` e aguarda a linha final.
-6. O App le `result.json`, `executor_report_file`, `git_status` e `diff_file`.
-7. O App revisa a implementacao real e apresenta o resultado.
-8. Para um finding blocking ou important concreto, o App cria um pedido
-   `correct` ligado por `parent_request_id`. Nao ha correcao automatica sem
-   essa evidencia.
+1. Abra o Codex App no projeto alvo e forneca a missao normalmente, inclusive
+   como arquivo Markdown anexado.
+2. A integracao global reconhece pedidos Dual Agents/Dual Codex, fases
+   Architect/Executor/Reviewer independentes, referencias ao lifecycle, ou
+   blockers que dependam da disponibilidade desses roles. Nenhuma frase fixa
+   e necessaria.
+3. A thread visivel localiza o Git root do projeto alvo e chama o launcher
+   global instalado com `run --repository <Git root> <task-file>`.
+4. `dual-codex run` resolve cada fase da configuracao e consulta capability e
+   runtime. A thread nao deduz disponibilidade olhando suas proprias tools.
+5. Leia o relatorio, `provenance.json`, o status Git e o diff do repositorio
+   alvo. Falhas reais do control plane permanecem fail-closed; nunca ofereca
+   single-agent como substituto.
+
+Um actor já iniciado como Architect, Executor ou Reviewer por `run` está dentro
+de uma fase vinculada ao schema do control plane. Essa fase conclui apenas seu
+papel e nao chama o entrypoint global de forma recursiva.
+
+## Instalacao global, atualizacao e verificacao
+
+A fonte da skill e do roteamento global fica versionada neste repositorio.
+Execute uma vez com o caminho do config Dual Agents que ja possui os roles:
+
+```powershell
+.\scripts\install-dual-agents-integration.ps1 -ConfigPath <config>
+.\scripts\install-dual-agents-integration.ps1 -Verify -ConfigPath <config>
+```
+
+O instalador sincroniza a skill e o launcher para `C:\CodexGlobal`, registra
+somente os caminhos do checkout/config (nao credenciais), atualiza a secao
+Dual Agents de `AGENTS.md`, e pode ser repetido para atualizar sem duplicar
+conteudo. `-Verify` nao escreve arquivos e falha se a instalacao divergir da
+fonte versionada.
 
 No bootstrap do role `architect`, o App injeta o `AGENTS.md` canonico e o
 baseline obrigatorio de skills. Em uma missao unattended, o Architect pode
@@ -51,10 +76,12 @@ perfil); Executor tambem pode ser um perfil Codex App Server. A execucao grava
 `primary_actor`, `actual_actor` e `fallback_used`. Nenhuma fase configurada e
 satisfeita por um worker generico ou por uma API de subagente nativo.
 
-Para executar essas fases configuradas, o control plane deve chamar `run`:
+Para executar essas fases configuradas, o control plane deve chamar `run` e
+passar explicitamente o projeto alvo, pois o config registrado pode ter outro
+`orchestrator.repository`:
 
 ```powershell
-.\scripts\dual-codex.ps1 --config <config> run <task-file>
+.\scripts\dual-codex.ps1 --config <config> run --repository <repo-alvo> <task-file>
 ```
 
 Nao use `terminal list` ou `terminal start` para iniciar ou validar atores da
@@ -63,10 +90,9 @@ missao. Esses comandos administram somente sessoes Codex nativas do backend
 de ator configurado para selecionar o runtime correto, sem substituicao
 silenciosa.
 
-O App deve consultar `status --json` antes de delegar quando precisar confirmar
-role, label, repositorio, Git, a versao do Codex e a versao/status do `agy`.
-Delegacao e recusada se o backend nao suportar o role, se o `agy` nao passar o
-probe de versao quando aplicavel ou se a arvore canonica
+O App pode consultar `status --json` para exibir role, label, repositorio, Git,
+versao do Codex e versao/status do `agy`. `run` e recusado se o backend nao
+suportar o role, se o runtime nao estiver disponivel quando aplicavel ou se a arvore canonica
 `C:\\CodexGlobal\\AGENTS.md` / `C:\\CodexGlobal\\skills` estiver indisponivel.
 
 ## Pedido minimo

@@ -14,7 +14,9 @@ from .config import AgentConfig
 
 
 class CommandError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, metadata: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.metadata = dict(metadata or {})
 
 
 DEFAULT_HOST_COMMAND_TIMEOUT = 30.0

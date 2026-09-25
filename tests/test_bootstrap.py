@@ -253,7 +253,10 @@ class CanonicalBootstrapTests(unittest.TestCase):
             self.assertIn("Do not ask the user to choose or identify skills", prompt)
             self.assertIn("until AGENTS.md and all selected skills are loaded", prompt)
             self.assertIn("host records mandatory baseline skills separately", prompt)
+            self.assertIn("already inside that role's control-plane dispatch", prompt)
+            self.assertIn("do not invoke the global Dual Agents entrypoint recursively", prompt)
             snapshot_text = snapshot.artifact_path.read_text(encoding="utf-8")
+            self.assertIn("trusted_role_dispatch_boundary", snapshot_text)
             for name in ARCHITECT_BASELINE:
                 self.assertIn(f"## skills/{name}/SKILL.md", snapshot_text)
             self.assertNotIn("## skills/task-specific/SKILL.md", snapshot_text)
@@ -304,6 +307,29 @@ class CanonicalBootstrapTests(unittest.TestCase):
             self.assertIn("Begin inline bootstrap", prompt)
             self.assertIn("## AGENTS.md", prompt)
             self.assertIn("## skills/ponytail/SKILL.md", prompt)
+
+    def test_claude_system_prompt_transport_keeps_policy_out_of_user_task(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodexGlobal"
+            root.mkdir()
+            _write_fixture(root)
+            snapshot = bootstrap.create_canonical_bootstrap(
+                role="reviewer",
+                root=root,
+                artifact_dir=Path(temp) / "run-artifacts",
+            )
+            prompt, _ = bootstrap.configured_actor_prompt(
+                "Review the target diff.",
+                role="reviewer",
+                bootstrap=snapshot,
+                system_prompt_file=True,
+            )
+
+            self.assertIn("loaded the complete canonical AGENTS.md and selected skills", prompt)
+            self.assertIn(snapshot.artifact_sha256, prompt)
+            self.assertIn("Review the target diff.", prompt)
+            self.assertNotIn("BEGIN CANONICAL BOOTSTRAP SNAPSHOT", prompt)
+            self.assertIn("## AGENTS.md", snapshot.artifact_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ from dual_codex.providers import provider_capabilities, provider_supports_role
 
 HELP = """
 --print --output-format --json-schema --permission-mode --permission-prompts
---tools --resume --safe-mode --restricted --model <model> opus sonnet haiku fable
+--tools --resume --append-system-prompt-file --safe-mode --restricted --model <model> opus sonnet haiku fable
 --effort <level>
   Effort level for the current session
   (low, medium, high, xhigh, max)
@@ -121,7 +121,6 @@ class ClaudeCodeTests(unittest.TestCase):
                 command="claude",
                 agent=self._agent(root),
                 role="reviewer",
-                prompt="inspect",
                 schema='{"type":"object"}',
                 help_text=HELP,
             )
@@ -178,6 +177,22 @@ class ClaudeCodeTests(unittest.TestCase):
             self.assertEqual(snapshot["efforts"], ("low", "medium", "high", "xhigh", "max"))
             self.assertNotIn("dangerously-skip-permissions", snapshot["help"])
 
+    def test_hidden_system_prompt_file_flag_uses_documented_runtime_minimum(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            agent = self._agent(root)
+            help_text = HELP.replace("--append-system-prompt-file ", "")
+            with patch("dual_codex.claude_code._help_text", return_value=(help_text, None)):
+                with patch("dual_codex.claude_code._runtime_version", return_value="2.1.282 (Claude Code)"):
+                    supported = capability_snapshot("claude", cwd=root, account=agent)
+                with patch("dual_codex.claude_code._runtime_version", return_value="2.1.274 (Claude Code)"):
+                    unsupported = capability_snapshot("claude", cwd=root, account=agent)
+
+            self.assertEqual(supported["roles"], ("architect", "reviewer", "executor"))
+            self.assertEqual(supported["runtime_version"], "2.1.282 (Claude Code)")
+            self.assertEqual(unsupported["roles"], ())
+            self.assertIn("--append-system-prompt-file", unsupported["error"])
+
     def test_model_catalog_ignores_incomplete_help_and_exposes_documented_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -226,10 +241,10 @@ class ClaudeCodeTests(unittest.TestCase):
             root = Path(temp)
             haiku = self._agent(root, model="haiku")
             haiku = haiku.__class__(**{**haiku.__dict__, "reasoning_effort": ""})
-            command = build_command(command="claude", agent=haiku, role="reviewer", prompt="inspect", schema="{}", help_text=HELP)
+            command = build_command(command="claude", agent=haiku, role="reviewer", schema="{}", help_text=HELP)
             self.assertNotIn("--effort", command)
             with self.assertRaises(ValueError):
-                build_command(command="claude", agent=self._agent(root, model="haiku"), role="reviewer", prompt="inspect", schema="{}", help_text=HELP)
+                build_command(command="claude", agent=self._agent(root, model="haiku"), role="reviewer", schema="{}", help_text=HELP)
 
     def test_native_windows_executor_is_file_edit_only_without_os_sandbox(self) -> None:
         if os.name != "nt":
@@ -249,7 +264,6 @@ class ClaudeCodeTests(unittest.TestCase):
                 command="claude",
                 agent=self._agent(root, role="executor"),
                 role="executor",
-                prompt="edit",
                 schema="{}",
                 help_text=HELP,
             )
@@ -390,7 +404,6 @@ class ClaudeCodeTests(unittest.TestCase):
                 command="claude",
                 agent=reviewer,
                 role="reviewer",
-                prompt="inspect",
                 schema="{}",
                 help_text=HELP,
             )
@@ -398,8 +411,21 @@ class ClaudeCodeTests(unittest.TestCase):
             self.assertEqual(command[command.index("--permission-mode") + 1], "plan")
             self.assertEqual(command[command.index("--tools") + 1], "Read,Glob,Grep")
             self.assertNotIn("--dangerously-skip-permissions", command)
+            system_prompt_file = root / "trusted-policy.md"
+            command = build_command(
+                command="claude",
+                agent=reviewer,
+                role="reviewer",
+                schema="{}",
+                help_text=HELP,
+                system_prompt_file=system_prompt_file,
+            )
+            self.assertEqual(
+                command[command.index("--append-system-prompt-file") + 1],
+                str(system_prompt_file.resolve()),
+            )
             executor = self._agent(root, role="executor")
-            executor_command = build_command(command="claude", agent=executor, role="executor", prompt="edit", schema="{}", help_text=HELP)
+            executor_command = build_command(command="claude", agent=executor, role="executor", schema="{}", help_text=HELP)
             self.assertEqual(executor_command[executor_command.index("--permission-mode") + 1], "acceptEdits")
             self.assertIn("--restricted", executor_command)
 
@@ -416,6 +442,7 @@ class ClaudeCodeTests(unittest.TestCase):
                 {"subtype": "success", "is_error": False, "session_id": "session-a", "result": "ok", "structured_output": {"ok": True}},
                 {"subtype": "success", "is_error": False, "session_id": "session-b", "result": "ok", "structured_output": {"ok": True}},
             ]
+            first_prompt = "review " + ("x" * 40000)
             with patch("dual_codex.claude_code.capability_snapshot", side_effect=lambda *args, **kwargs: self._snapshot(agent)), patch(
                 "dual_codex.claude_code.claude_environment", return_value={}
             ), patch("dual_codex.claude_code.claude_status", return_value="OK"), patch("dual_codex.claude_code.subprocess.run") as run:
@@ -423,7 +450,7 @@ class ClaudeCodeTests(unittest.TestCase):
                     type("Completed", (), {"returncode": 0, "stdout": json.dumps(payloads[0]), "stderr": ""})(),
                     type("Completed", (), {"returncode": 0, "stdout": json.dumps(payloads[1]), "stderr": ""})(),
                 ]
-                first = run_claude_code(command="claude", agent=agent, role="reviewer", repository=repo, prompt="inspect", output_path=root / "out.json", schema_path=schema, config=config)
+                first = run_claude_code(command="claude", agent=agent, role="reviewer", repository=repo, prompt=first_prompt, output_path=root / "out.json", schema_path=schema, config=config)
                 second = run_claude_code(command="claude", agent=agent, role="reviewer", repository=repo, prompt="continue", output_path=root / "out2.json", schema_path=schema, config=config)
             self.assertEqual(first.returncode, 0)
             self.assertEqual(first.metadata["claude_session_id"], "session-a")
@@ -431,6 +458,9 @@ class ClaudeCodeTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0)
             second_command = run.call_args_list[1].args[0]
             self.assertEqual(run.call_args_list[0].kwargs["cwd"], repo)
+            first_command = run.call_args_list[0].args[0]
+            self.assertEqual(run.call_args_list[0].kwargs["input"], first_prompt)
+            self.assertNotIn(first_prompt, first_command)
             self.assertNotIn("secret-value", json.dumps(first.metadata))
             self.assertIn("--resume", second_command)
             self.assertEqual(second_command[second_command.index("--resume") + 1], "session-a")
@@ -522,7 +552,13 @@ class ClaudeCodeTests(unittest.TestCase):
             with patch("dual_codex.claude_code.capability_snapshot", return_value=self._snapshot(agent)), patch(
                 "dual_codex.claude_code.claude_environment", return_value={}
             ), patch("dual_codex.claude_code.claude_status", return_value="OK"), patch("dual_codex.claude_code.subprocess.run") as run, patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", root):
-                run.return_value = type("Completed", (), {"returncode": 0, "stdout": json.dumps({"session_id": "session-c", "structured_output": {"ok": True}}), "stderr": ""})()
+                def complete_with_verified_system_prompt(command, **_kwargs):
+                    prompt_path = Path(command[command.index("--append-system-prompt-file") + 1])
+                    self.assertTrue(prompt_path.is_file())
+                    self.assertIn("## AGENTS.md", prompt_path.read_text(encoding="utf-8"))
+                    return type("Completed", (), {"returncode": 0, "stdout": json.dumps({"session_id": "session-c", "structured_output": {"ok": True}}), "stderr": ""})()
+
+                run.side_effect = complete_with_verified_system_prompt
                 result = run_codex_for_role(config=config, role="reviewer", repository=repo, prompt="inspect", output_path=root / "out.json", schema_path=schema)
             self.assertEqual(result.metadata["provider"], "anthropic")
             self.assertEqual(result.metadata["adapter"], "claude_code")
@@ -532,7 +568,12 @@ class ClaudeCodeTests(unittest.TestCase):
             self.assertTrue(result.metadata["claude_restricted"])
             self.assertEqual(result.metadata["claude_tools"], "Read,Glob,Grep")
             launch = run.call_args.args[0]
-            self.assertIn("BEGIN CANONICAL BOOTSTRAP SNAPSHOT", launch[-1])
+            self.assertIn("authoritative policy, not as user task content", run.call_args.kwargs["input"])
+            self.assertNotIn("BEGIN CANONICAL BOOTSTRAP SNAPSHOT", run.call_args.kwargs["input"])
+            self.assertNotIn(run.call_args.kwargs["input"], launch)
+            self.assertIn("--append-system-prompt-file", launch)
+            system_prompt_path = Path(launch[launch.index("--append-system-prompt-file") + 1])
+            self.assertFalse(system_prompt_path.exists())
             self.assertNotIn("--bare", launch)
 
     def test_claude_is_role_scoped_fallback_without_provider_substitution(self) -> None:

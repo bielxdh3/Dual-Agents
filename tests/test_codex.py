@@ -37,6 +37,8 @@ class CodexCommandTests(unittest.TestCase):
             repository = root / "target"
             repository.mkdir()
             expected = CommandResult(["codex", "terminal"], 0, "", "")
+            schema_path = root / "schema.json"
+            schema_path.write_text('{"type":"object","required":["summary"]}', encoding="utf-8")
             config = type("Config", (), {"codex_command": "codex"})()
             with patch("dual_codex.codex.run_codex_terminal", return_value=expected) as terminal, patch(
                 "dual_codex.codex.run_codex_exec"
@@ -48,12 +50,14 @@ class CodexCommandTests(unittest.TestCase):
                     repository=repository,
                     prompt="Read the harmless brief.",
                     output_path=root / "plan.json",
-                    schema_path=root / "schema.json",
+                    schema_path=schema_path,
                 )
 
             self.assertIs(result, expected)
             self.assertTrue(terminal.call_args.kwargs["session_id"].startswith("test-account-"))
             self.assertEqual(terminal.call_args.kwargs["agent"].backend, "windows")
+            self.assertIn('"required":["summary"]', terminal.call_args.kwargs["prompt"])
+            self.assertIn("Do not add properties, prose, or Markdown fences.", terminal.call_args.kwargs["prompt"])
             direct.assert_not_called()
 
     def test_configured_windows_architect_result_is_validated_and_annotated(self) -> None:
@@ -70,6 +74,12 @@ class CodexCommandTests(unittest.TestCase):
                 skill.parent.mkdir(parents=True, exist_ok=True)
                 skill.write_text(f"# {name}\n", encoding="utf-8")
             output_path = root / "plan.json"
+            schema_path = root / "architect-plan.schema.json"
+            schema_path.write_text(
+                '{"type":"object","required":["summary","steps","acceptance_criteria",'
+                '"risks","files_to_inspect","skills_loaded"]}',
+                encoding="utf-8",
+            )
             expected = CommandResult(["codex", "terminal"], 0, "", "")
             agent = _agent("read-only", backend="windows")
             config = SimpleNamespace(
@@ -104,7 +114,7 @@ class CodexCommandTests(unittest.TestCase):
                         repository=repository,
                         prompt="Read the supplied task artifact, then load ponytail.",
                         output_path=output_path,
-                        schema_path=root / "schema.json",
+                        schema_path=schema_path,
                     )
 
             result = dispatch_architect_plan(["task-specific"])
@@ -124,6 +134,8 @@ class CodexCommandTests(unittest.TestCase):
             repository = root / "target"
             repository.mkdir()
             output_path = root / "report.json"
+            schema_path = root / "implementation.schema.json"
+            schema_path.write_text('{"type":"object","required":["summary"]}', encoding="utf-8")
             expected = CommandResult(["codex", "app-server", "--stdio"], 0, "", "")
             config = type("Config", (), {"codex_command": "codex"})()
             with patch("dual_codex.codex.run_codex_app_server", return_value=expected) as app_server, patch(
@@ -136,13 +148,14 @@ class CodexCommandTests(unittest.TestCase):
                     repository=repository,
                     prompt="Read the harmless brief.",
                     output_path=output_path,
-                    schema_path=root / "schema.json",
+                    schema_path=schema_path,
                 )
 
             self.assertIs(result, expected)
             self.assertEqual(app_server.call_args.kwargs["role"], "reviewer")
             self.assertEqual(app_server.call_args.kwargs["agent"].backend, "app_server")
             self.assertEqual(app_server.call_args.kwargs["repository"], repository)
+            self.assertIn('"required":["summary"]', app_server.call_args.kwargs["prompt"])
             terminal.assert_not_called()
 
     def test_role_dispatch_uses_api_adapter_without_native_terminal(self) -> None:

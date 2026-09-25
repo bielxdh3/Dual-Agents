@@ -239,6 +239,11 @@ This is only an example. Roles are independent from profile names and providers.
 dual-codex run task.md
 ```
 
+When a registered config points to a different project, pass the target Git
+root explicitly with `--repository`. The Codex App entrypoint and one-time
+global skill installation are documented in
+[APP-INTEGRATION.md](docs/APP-INTEGRATION.md).
+
 For explicit delegation:
 
 ```powershell

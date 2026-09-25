@@ -73,9 +73,17 @@ O resultado pode ter `completed`, `failed`, `invalid_request`,
 stderr sanitizado, o estado do Git e o diff preservado.
 
 `dual-codex run` resolve Architect, Executor e Reviewer a partir de `[roles]`
-em cada fase. A execucao registra `provenance.json`; a identidade do perfil e
-o backend configurados sao vinculados ao transporte antes da chamada e nao
-podem ser substituidos pelo texto da tarefa.
+em cada fase. Use `--repository` quando o config global apontar para outro
+projeto; o caminho explícito passa a ser o repositório da missão e da
+proveniência:
+
+```powershell
+dual-codex --config <config> run --repository <repo-alvo> <task-file>
+```
+
+A execucao registra `provenance.json`; a identidade do perfil e o backend
+configurados sao vinculados ao transporte antes da chamada e nao podem ser
+substituidos pelo texto da tarefa.
 
 ## Operacoes existentes
 
@@ -83,7 +91,7 @@ podem ser substituidos pelo texto da tarefa.
 dual-codex status [--json]
 dual-codex dashboard [--port PORT] [--no-open]
 dual-codex doctor
-dual-codex run task.md
+dual-codex run [--repository PATH] task.md
 dual-codex publish --request-file publication.json --result-file publication-result.json
 dual-codex account ...
 dual-codex role ...

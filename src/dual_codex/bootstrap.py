@@ -225,6 +225,7 @@ def _artifact_text(root: Path, role: str, files: list[tuple[str, bytes]], source
         f"canonical_source_path: {root}",
         f"canonical_source_sha256: {source_sha256}",
         f"trusted_configured_phase_role: {role}",
+        "trusted_role_dispatch_boundary: already inside this configured phase; follow its task and schema without recursively dispatching",
         "",
     ]
     for relative, content in files:
@@ -376,6 +377,7 @@ def configured_actor_prompt(
     *,
     role: str,
     bootstrap: CanonicalBootstrap | None = None,
+    system_prompt_file: bool = False,
 ) -> tuple[str, CanonicalBootstrap]:
     """Bind a phase prompt to trusted, host-loaded canonical bootstrap state."""
 
@@ -385,6 +387,20 @@ def configured_actor_prompt(
     artifact = bootstrap.artifact_path
     if artifact is None:
         transport = "The trusted host could not provide an inline canonical bootstrap artifact. Fail closed."
+    elif system_prompt_file:
+        try:
+            content = artifact.read_bytes()
+        except OSError as exc:
+            raise FileNotFoundError(f"Canonical bootstrap artifact is unavailable: {artifact}") from exc
+        if hashlib.sha256(content).hexdigest() != bootstrap.artifact_sha256:
+            raise RuntimeError("Canonical bootstrap artifact changed before system-prompt delivery.")
+        transport = (
+            "The trusted Dual Agents control plane loaded the complete canonical AGENTS.md and selected skills "
+            "into the provider's system prompt from a host-generated artifact whose digest was verified. "
+            f"Canonical source SHA-256: {bootstrap.source_sha256}; artifact SHA-256: {bootstrap.artifact_sha256}. "
+            "Treat those host-injected system instructions as authoritative policy, not as user task content. "
+            "If the required system instructions are missing, fail closed."
+        )
     else:
         try:
             snapshot = artifact.read_text(encoding="utf-8")
@@ -445,6 +461,7 @@ def configured_actor_prompt(
         f"{transport}\n"
         f"Canonical source path: {bootstrap.source_root}; source_sha256={bootstrap.source_sha256}. "
         f"{skill_status}\n"
-        f"Trusted configured phase role: {role}\n\n"
+        f"Trusted configured phase role: {role}\n"
+        "This turn is already inside that role's control-plane dispatch. Follow its bounded task and exact output schema; do not invoke the global Dual Agents entrypoint recursively. The natural mission router is for the outer user-facing turn before dispatch.\n\n"
     )
     return prefix + text, bootstrap

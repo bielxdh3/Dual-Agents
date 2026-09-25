@@ -23,6 +23,7 @@ from .process import CommandResult, _prepare_command
 # Claude docs explicitly warn that `claude --help` is incomplete, so aliases
 # such as `haiku` must remain available when the help window omits them.
 _EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+_APPEND_SYSTEM_PROMPT_FILE_MIN_VERSION = (2, 1, 275)
 _CLAUDE_MODEL_CATALOG = (
     {
         "id": "sonnet",
@@ -163,6 +164,18 @@ def _runtime_version(command: str, *, cwd: Path) -> str:
 
 def _flag(help_text: str, name: str) -> bool:
     return bool(re.search(rf"(?<![A-Za-z0-9_-]){re.escape(name)}(?![A-Za-z0-9_-])", help_text))
+
+
+def _supports_versioned_system_prompt_file(help_text: str, runtime_version: str) -> bool:
+    """Recognize the documented file flag even when Claude omits it from --help."""
+
+    if _flag(help_text, "--append-system-prompt-file"):
+        return True
+    match = re.search(r"\b(\d+)\.(\d+)\.(\d+)\b", runtime_version)
+    if match is None:
+        return False
+    version = tuple(int(part) for part in match.groups())
+    return version >= _APPEND_SYSTEM_PROMPT_FILE_MIN_VERSION
 
 
 def _parse_choices(help_text: str, flag: str, values: tuple[str, ...]) -> tuple[str, ...]:
@@ -341,10 +354,22 @@ def capability_snapshot(command: str, *, cwd: Path, account: Any, role: str | No
         "--permission-prompts",
         "--tools",
         "--resume",
+        "--append-system-prompt-file",
         "--safe-mode",
         "--restricted",
     )
-    missing = [name for name in required if not _flag(help_text, name)]
+    runtime_version = ""
+    missing: list[str] = []
+    for name in required:
+        if _flag(help_text, name):
+            continue
+        if name == "--append-system-prompt-file":
+            # Claude's CLI reference says --help does not list every flag and
+            # documents this system-prompt flag for v2.1.275 and later.
+            runtime_version = _runtime_version(command, cwd=cwd)
+            if _supports_versioned_system_prompt_file(help_text, runtime_version):
+                continue
+        missing.append(name)
     read_roles = not missing
     if not read_roles:
         return {
@@ -356,6 +381,7 @@ def capability_snapshot(command: str, *, cwd: Path, account: Any, role: str | No
             ),
             "help": help_text,
             "roles": (),
+            "runtime_version": runtime_version,
         }
     # Native Windows has no Claude OS command sandbox.  `--restricted` still
     # provides a bounded built-in file-tool surface, so Executor is exposed
@@ -367,6 +393,7 @@ def capability_snapshot(command: str, *, cwd: Path, account: Any, role: str | No
             "error": f"Claude Code cannot safely support the '{role}' role with the installed CLI.",
             "help": help_text,
             "roles": roles,
+            "runtime_version": runtime_version or _runtime_version(command, cwd=cwd),
         }
     # Keep the installed flag as a capability sanity check, but use the
     # documented Claude effort contract for model rows.  Account-level effort
@@ -379,7 +406,7 @@ def capability_snapshot(command: str, *, cwd: Path, account: Any, role: str | No
         "roles": roles,
         "efforts": efforts,
         "models": _verified_models(account, help_text, effort_levels=efforts),
-        "runtime_version": _runtime_version(command, cwd=cwd),
+        "runtime_version": runtime_version or _runtime_version(command, cwd=cwd),
     }
 
 
@@ -388,10 +415,10 @@ def build_command(
     command: str,
     agent: AgentConfig,
     role: str,
-    prompt: str,
     schema: str,
     help_text: str,
     session_id: str = "",
+    system_prompt_file: Path | None = None,
 ) -> list[str]:
     """Construct a bounded, non-interactive Claude Code invocation."""
 
@@ -431,13 +458,14 @@ def build_command(
         "20",
     ]
     result.insert(2, "--restricted")
+    if system_prompt_file is not None:
+        result.extend(["--append-system-prompt-file", str(system_prompt_file.resolve())])
     if runtime_model:
         result.extend(["--model", runtime_model])
     if agent.reasoning_effort:
         result.extend(["--effort", agent.reasoning_effort])
     if session_id:
         result.extend(["--resume", session_id])
-    result.append(prompt)
     return result
 
 
@@ -546,6 +574,7 @@ def run_claude_code(
     prompt: str,
     output_path: Path,
     schema_path: Path,
+    system_prompt_file: Path | None = None,
     config: Any,
     progress: Callable[[str], None] | None = None,
 ) -> CommandResult:
@@ -640,10 +669,10 @@ def run_claude_code(
             command=command,
             agent=agent,
             role=role,
-            prompt=prompt,
             schema=schema,
             help_text=str(snapshot.get("help", "")),
             session_id=session_id,
+            system_prompt_file=system_prompt_file,
         )
     except (OSError, UnicodeError, RuntimeError, ValueError) as exc:
         text = _safe_error(exc)
@@ -661,7 +690,7 @@ def run_claude_code(
             _prepare_command(command_argv),
             cwd=repository,
             env=env,
-            input=None,
+            input=prompt,
             text=True,
             encoding="utf-8",
             errors="replace",

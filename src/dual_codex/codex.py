@@ -109,7 +109,7 @@ def _raise_dispatch_failure(result: CommandResult, *, role: str, agent: AgentCon
             actor=agent.account_name,
             metadata=result.metadata,
         )
-    raise CommandError(message)
+    raise CommandError(message, metadata=result.metadata)
 
 
 def run_codex_app_server(**kwargs) -> CommandResult:
@@ -469,6 +469,29 @@ def _delegate_to_configured_actor(
             })
             raise
         except ActorAvailabilityError as exc:
+            metadata = configured_actor_provenance(
+                agent=primary_agent,
+                role=role,
+                repository=repository,
+                canonical_root=canonical_root,
+                bootstrap=bootstrap,
+            )
+            metadata.update(exc.metadata)
+            metadata.update({
+                "phase": role,
+                "role": role,
+                "repository": str(repository.expanduser().resolve()),
+                "primary_actor": primary_agent.account_name,
+                "actual_actor": primary_agent.account_name,
+                "actor_id": primary_agent.account_name,
+                "profile_id": primary_agent.account_name,
+                "provider": primary_agent.provider_type,
+                "backend": primary_agent.backend,
+                "fallback_enabled": fallback_enabled,
+                "fallback_used": False,
+                "failed_actor": primary_agent.account_name,
+            })
+            exc.metadata = metadata
             if not fallback_enabled:
                 raise
             failed_actor = exc.actor
@@ -506,10 +529,66 @@ def _delegate_to_configured_actor(
                     "fallback_actor": fallback_agent.account_name,
                     "fallback_reason": fallback_reason,
                     "fallback_failure_class": fallback_failure_class,
+                    "fallback_attempt_failed": True,
+                    "fallback_error_type": type(fallback_error).__name__,
                 })
+                raise
+            except CommandError as fallback_error:
+                metadata = configured_actor_provenance(
+                    agent=fallback_agent,
+                    role=role,
+                    repository=repository,
+                    canonical_root=canonical_root,
+                    bootstrap=bootstrap,
+                )
+                metadata.update(getattr(fallback_error, "metadata", {}))
+                metadata.update({
+                    "phase": role,
+                    "role": role,
+                    "repository": str(repository.expanduser().resolve()),
+                    "primary_actor": primary_agent.account_name,
+                    "actual_actor": fallback_agent.account_name,
+                    "actor_id": fallback_agent.account_name,
+                    "profile_id": fallback_agent.account_name,
+                    "provider": fallback_agent.provider_type,
+                    "backend": fallback_agent.backend,
+                    "fallback_enabled": fallback_enabled,
+                    "fallback_used": True,
+                    "failed_actor": failed_actor,
+                    "fallback_actor": fallback_agent.account_name,
+                    "fallback_reason": fallback_reason,
+                    "fallback_failure_class": fallback_failure_class,
+                    "fallback_attempt_failed": True,
+                    "fallback_error_type": type(fallback_error).__name__,
+                })
+                fallback_error.metadata = metadata
                 raise
             actual_agent = fallback_agent
             fallback_used = True
+        except CommandError as exc:
+            metadata = configured_actor_provenance(
+                agent=primary_agent,
+                role=role,
+                repository=repository,
+                canonical_root=canonical_root,
+                bootstrap=bootstrap,
+            )
+            metadata.update(exc.metadata)
+            metadata.update({
+                "phase": role,
+                "role": role,
+                "repository": str(repository.expanduser().resolve()),
+                "primary_actor": primary_agent.account_name,
+                "actual_actor": primary_agent.account_name,
+                "actor_id": primary_agent.account_name,
+                "profile_id": primary_agent.account_name,
+                "provider": primary_agent.provider_type,
+                "backend": primary_agent.backend,
+                "fallback_enabled": fallback_enabled,
+                "fallback_used": False,
+            })
+            exc.metadata = metadata
+            raise
         if role == "architect":
             bootstrap = _finalize_architect_output(bootstrap, output_path)
             result.metadata.update(bootstrap.metadata())
@@ -608,8 +687,23 @@ def run_codex_for_role(
                 selected_skills=select_required_skills(role, prompt),
             )
             owns_bootstrap = True
-        prompt, bootstrap = configured_actor_prompt(prompt, role=role, bootstrap=bootstrap)
+        prompt, bootstrap = configured_actor_prompt(
+            prompt,
+            role=role,
+            bootstrap=bootstrap,
+            system_prompt_file=agent.backend == "claude_code",
+        )
         canonical_root = bootstrap.source_root
+
+    if agent.backend in {"windows", "app_server"}:
+        schema_text = schema_path.read_text(encoding="utf-8")
+        prompt = (
+            f"{prompt.rstrip()}\n\n"
+            "The control plane validates this turn against the exact JSON schema below. "
+            "Return exactly one JSON object that matches it. Do not add properties, prose, "
+            "or Markdown fences.\nOUTPUT JSON SCHEMA:\n"
+            f"{schema_text}"
+        )
 
     def cleanup_owned_bootstrap() -> None:
         if owns_bootstrap:
@@ -643,6 +737,7 @@ def run_codex_for_role(
                 prompt=prompt,
                 output_path=output_path,
                 schema_path=schema_path,
+                system_prompt_file=bootstrap.artifact_path if bootstrap is not None else None,
                 config=config,
                 progress=progress,
             )
