@@ -4,8 +4,11 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from dataclasses import replace
+import json
 from unittest.mock import patch
 
+from dual_codex.codex import ActorResultError
 from dual_codex.config import AccountConfig, AgentConfig, OrchestratorConfig
 from dual_codex.delegation import DelegationError, RepositoryLock
 from dual_codex.orchestrator import execute
@@ -156,6 +159,70 @@ class OrchestratorTests(unittest.TestCase):
                     ("reviewer", "biel3", "windows"),
                 ],
             )
+
+    def test_invalid_architect_plan_persists_actual_actor_provenance_before_failing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "disposable-mission"
+            repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+            architect = AccountConfig(
+                name="biel3",
+                label="Architect",
+                codex_home=root / "architect-home",
+                model="",
+                reasoning_effort="high",
+                backend="windows",
+            )
+            fallback = AccountConfig(
+                name="fallback",
+                label="Fallback",
+                codex_home=root / "fallback-home",
+                model="",
+                reasoning_effort="high",
+                backend="app_server",
+                fallback_roles=("architect",),
+            )
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=0,
+                require_clean_git=True,
+                codex_command="codex",
+                accounts={"biel3": architect, "fallback": fallback},
+                roles={"architect": "biel3", "orchestrator": "biel3"},
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+                fallback_enabled=True,
+            )
+            task = root / "brief.md"
+            task.write_text("Plan a small UI change.", encoding="utf-8")
+            invalid_plan = CommandResult(
+                ["codex"], 0, '{"summary":"Completed turn with an invalid plan."}', ""
+            )
+
+            with patch("dual_codex.providers.provider_supports_role", return_value=True), patch(
+                "dual_codex.codex.run_codex_terminal", return_value=invalid_plan
+            ) as primary, patch("dual_codex.codex.run_codex_app_server") as fallback_dispatch:
+                with self.assertRaises(ActorResultError):
+                    execute(config, task)
+
+            primary.assert_called_once()
+            fallback_dispatch.assert_not_called()
+            run_dirs = [
+                path
+                for path in config.runs_dir.iterdir()
+                if (path / "provenance.json").is_file()
+            ]
+            self.assertEqual(len(run_dirs), 1)
+            provenance = json.loads((run_dirs[0] / "provenance.json").read_text(encoding="utf-8"))
+            architect_provenance = provenance["configured_actor_routing"][0]
+            self.assertEqual(architect_provenance["actor_id"], "biel3")
+            self.assertEqual(architect_provenance["actual_actor"], "biel3")
+            self.assertTrue(architect_provenance["fallback_enabled"])
+            self.assertFalse(architect_provenance["fallback_used"])
+            self.assertIn("missing required field", architect_provenance["architect_result_validation_error"])
+            self.assertTrue(architect_provenance["canonical_bootstrap_source_sha256"])
 
 
 if __name__ == "__main__":

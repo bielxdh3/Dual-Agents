@@ -12,7 +12,7 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from dual_codex.cli import main as cli_main
-from dual_codex.codex import ActorAvailabilityError, classify_actor_failure, create_canonical_bootstrap, delegate_to_configured_actor, run_codex_for_role
+from dual_codex.codex import ActorAvailabilityError, ActorResultError, classify_actor_failure, create_canonical_bootstrap, delegate_to_configured_actor, run_codex_for_role
 from dual_codex.config import AccountConfig, ConfigError, OrchestratorConfig
 from dual_codex.delegation import DelegationError, run_codex_exec as delegation_adapter
 from dual_codex.orchestrator import execute
@@ -866,6 +866,67 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                         schema_path=root / "schema.json",
                     )
             self.assertEqual(app_server.call_count, 1)
+
+    def test_invalid_architect_plan_is_semantic_failure_and_never_falls_back(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["orchestrator"] = replace(
+                accounts["orchestrator"], fallback_roles=("architect",)
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                fallback_enabled=True,
+            )
+            repository = root / "repository"
+            repository.mkdir()
+            invalid = CommandResult(
+                ["codex", "app-server"],
+                0,
+                '{"summary":"Completed, but missing required fields."}',
+                "",
+            )
+
+            with patch("dual_codex.providers.provider_supports_role", return_value=True), patch(
+                "dual_codex.codex.run_codex_app_server", return_value=invalid
+            ) as primary, patch("dual_codex.codex.run_codex_terminal") as fallback:
+                with self.assertRaises(ActorResultError) as raised:
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="architect",
+                        task="Plan the requested change.",
+                        repository=repository,
+                        output_path=root / "architect-plan.json",
+                    )
+
+            self.assertEqual(primary.call_count, 1)
+            fallback.assert_not_called()
+            error = raised.exception
+            self.assertIn("Architect plan validation failed", str(error))
+            self.assertEqual(error.actor, "secondary")
+            self.assertEqual(error.metadata["actual_actor"], "secondary")
+            self.assertEqual(error.metadata["primary_actor"], "secondary")
+            self.assertEqual(error.metadata["actor_id"], "secondary")
+            self.assertTrue(error.metadata["canonical_bootstrap_required"])
+            self.assertIn("memory", error.metadata["canonical_bootstrap_host_loaded_skills"])
+            self.assertTrue(error.metadata["fallback_enabled"])
+            self.assertFalse(error.metadata["fallback_used"])
+            self.assertEqual(error.metadata["failed_actor"], "")
+            self.assertIn("missing required field", error.metadata["architect_result_validation_error"])
+            self.assertIsNone(
+                classify_actor_failure(
+                    CommandResult(
+                        ["codex", "app-server"],
+                        1,
+                        "",
+                        "Architect plan validation failed; provider runtime unavailable",
+                        {"architect_result_validation_error": "missing field"},
+                    ),
+                    backend="app_server",
+                )
+            )
 
     def test_role_reassignment_is_consumed_on_next_dispatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

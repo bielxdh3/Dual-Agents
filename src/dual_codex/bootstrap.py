@@ -114,6 +114,46 @@ def _normalise_skill_names(selected_skills: Iterable[str] | None) -> tuple[str, 
     return tuple(sorted(normalised))
 
 
+def _canonical_skill_lookup(catalog: Iterable[tuple[str, str]]) -> dict[str, str]:
+    by_casefold: dict[str, str] = {}
+    for name, _digest in catalog:
+        normalized = _normalise_skill_names((name,))
+        if normalized != (name,):
+            raise ValueError(f"Invalid canonical skill directory name: {name!r}")
+        key = name.casefold()
+        existing = by_casefold.get(key)
+        if existing is not None and existing != name:
+            raise ValueError(
+                "Canonical skill catalog contains names that collide after case folding: "
+                f"'{existing}' and '{name}'."
+            )
+        by_casefold[key] = name
+    return by_casefold
+
+
+def _resolve_architect_skill_names(
+    reported_names: Iterable[str],
+    catalog: Iterable[tuple[str, str]],
+) -> tuple[str, ...]:
+    lookup = _canonical_skill_lookup(catalog)
+    resolved: list[str] = []
+    seen: set[str] = set()
+    for raw_name in reported_names:
+        normalized = _normalise_skill_names((raw_name,))[0]
+        canonical = lookup.get(normalized.casefold())
+        if canonical is None:
+            raise FileNotFoundError(
+                "Required canonical skill was not present in the pre-dispatch catalog snapshot: "
+                + normalized
+            )
+        folded = canonical.casefold()
+        if folded in seen:
+            raise ValueError("Architect plan 'skills_loaded' contains duplicate skill names after case folding.")
+        seen.add(folded)
+        resolved.append(canonical)
+    return tuple(sorted(resolved))
+
+
 def select_required_skills(role: str, task: str = "") -> tuple[str, ...]:
     """Return skills the control plane can safely preselect for a phase.
 
@@ -154,7 +194,9 @@ def _canonical_skill_catalog(root: Path) -> tuple[tuple[str, str], ...]:
         if normalized != (name,):
             raise ValueError(f"Invalid canonical skill directory name: {name!r}")
         entries.append((name, hashlib.sha256(path.read_bytes()).hexdigest()))
-    return tuple(entries)
+    catalog = tuple(entries)
+    _canonical_skill_lookup(catalog)
+    return catalog
 
 
 def _skill_catalog_sha256(catalog: Iterable[tuple[str, str]]) -> str:
@@ -271,20 +313,15 @@ def finalize_architect_bootstrap(
         not isinstance(name, str) for name in selected_skills
     ):
         raise ValueError("Architect plan must list actor-selected canonical skills in 'skills_loaded'.")
-    reported = _normalise_skill_names(selected_skills)
-    if len(reported) != len(selected_skills):
-        raise ValueError("Architect plan 'skills_loaded' must not contain duplicate skill names.")
-    baseline = _normalise_skill_names(_MANDATORY_ARCHITECT_SKILLS)
-    actor_selected = tuple(name for name in reported if name not in baseline)
-    names = _normalise_skill_names((*baseline, *actor_selected))
-
     catalog = dict(bootstrap.skill_catalog)
-    missing_from_catalog = [name for name in names if name not in catalog]
-    if missing_from_catalog:
-        raise FileNotFoundError(
-            "Required canonical skills were not present in the pre-dispatch catalog snapshot: "
-            + ", ".join(missing_from_catalog)
-        )
+    baseline = _resolve_architect_skill_names(
+        bootstrap.host_loaded_skills or _MANDATORY_ARCHITECT_SKILLS,
+        bootstrap.skill_catalog,
+    )
+    reported = _resolve_architect_skill_names(selected_skills, bootstrap.skill_catalog)
+    baseline_names = {name.casefold() for name in baseline}
+    actor_selected = tuple(name for name in reported if name.casefold() not in baseline_names)
+    names = tuple(sorted((*baseline, *actor_selected)))
 
     files = _canonical_files(bootstrap.source_root, selected_skills=names)
     digests = tuple(

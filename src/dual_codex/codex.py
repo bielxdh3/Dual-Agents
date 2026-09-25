@@ -31,6 +31,15 @@ class ActorAvailabilityError(CommandError):
         self.metadata = dict(metadata or {})
 
 
+class ActorResultError(CommandError):
+    """A completed actor turn produced an invalid result; it is not fallback eligible."""
+
+    def __init__(self, message: str, *, actor: str, metadata: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.actor = actor
+        self.metadata = dict(metadata or {})
+
+
 _AVAILABILITY_MARKERS = {
     "quota": "quota_exhausted",
     "rate limit": "quota_exhausted",
@@ -51,6 +60,8 @@ _AVAILABILITY_MARKERS = {
 
 
 def classify_actor_failure(result: CommandResult, *, backend: str = "") -> str | None:
+    if result.metadata.get("architect_result_validation_error"):
+        return None
     text = f"{result.stderr}\n{result.stdout}".casefold()
     if any(
         marker in text
@@ -87,6 +98,9 @@ def classify_actor_failure(result: CommandResult, *, backend: str = "") -> str |
 def _raise_dispatch_failure(result: CommandResult, *, role: str, agent: AgentConfig, message: str) -> None:
     if result.returncode == 0:
         return
+    if result.metadata.get("architect_result_validation_error"):
+        actor = str(result.metadata.get("actual_actor") or result.metadata.get("actor_id") or agent.account_name)
+        raise ActorResultError(message, actor=actor, metadata=result.metadata)
     failure_class = classify_actor_failure(result, backend=agent.backend)
     if failure_class:
         raise ActorAvailabilityError(
@@ -282,6 +296,16 @@ def _annotate_provider_result(
             bootstrap = _finalize_architect_output(bootstrap, output_path)
         except ArchitectPlanError as exc:
             metadata = dict(result.metadata)
+            metadata.update(
+                configured_actor_provenance(
+                    agent=agent,
+                    role=role,
+                    repository=repository or Path("."),
+                    canonical_root=canonical_root,
+                    bootstrap=bootstrap,
+                    configured_actor=configured_actor,
+                )
+            )
             metadata["architect_result_validation_error"] = str(exc)
             return replace(
                 result,
@@ -432,6 +456,18 @@ def _delegate_to_configured_actor(
     try:
         try:
             result = invoke(config, primary_agent)
+        except ActorResultError as exc:
+            exc.metadata.update({
+                "primary_actor": primary_agent.account_name,
+                "actual_actor": exc.actor,
+                "fallback_enabled": fallback_enabled,
+                "fallback_used": False,
+                "failed_actor": "",
+                "fallback_actor": "",
+                "fallback_reason": "",
+                "fallback_failure_class": "",
+            })
+            raise
         except ActorAvailabilityError as exc:
             if not fallback_enabled:
                 raise

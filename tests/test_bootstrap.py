@@ -118,6 +118,54 @@ class CanonicalBootstrapTests(unittest.TestCase):
                 skill_digest,
             )
 
+    def test_architect_reported_skill_names_resolve_case_insensitively_to_catalog_names(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodexGlobal"
+            root.mkdir()
+            _write_fixture(root)
+            snapshot = bootstrap.create_canonical_bootstrap(role="architect", root=root)
+
+            baseline_report = bootstrap.finalize_architect_bootstrap(snapshot, ["Memory"])
+            self.assertIn("memory", baseline_report.selected_skills)
+            self.assertIn("memory", baseline_report.host_loaded_skills)
+            self.assertEqual(baseline_report.actor_selected_skills, ())
+
+            additional_report = bootstrap.finalize_architect_bootstrap(snapshot, ["Task-Specific"])
+            metadata = additional_report.metadata()
+            digest = hashlib.sha256(
+                (root / "skills" / "task-specific" / "SKILL.md").read_bytes()
+            ).hexdigest()
+            self.assertEqual(additional_report.actor_selected_skills, ("task-specific",))
+            self.assertEqual(metadata["canonical_bootstrap_actor_selected_skills"], ["task-specific"])
+            self.assertEqual(
+                metadata["canonical_bootstrap_actor_selected_skill_digests"],
+                {"task-specific": digest},
+            )
+            self.assertEqual(
+                metadata["canonical_bootstrap_skill_digests"]["task-specific"],
+                digest,
+            )
+
+    def test_architect_skill_report_rejects_casefold_duplicates_and_bad_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodexGlobal"
+            root.mkdir()
+            _write_fixture(root)
+            snapshot = bootstrap.create_canonical_bootstrap(role="architect", root=root)
+
+            with self.assertRaisesRegex(ValueError, "duplicate skill names after case folding"):
+                bootstrap.finalize_architect_bootstrap(
+                    snapshot, ["task-specific", "Task-Specific"]
+                )
+            with self.assertRaisesRegex(ValueError, "Invalid canonical skill name"):
+                bootstrap.finalize_architect_bootstrap(snapshot, ["../task-specific"])
+
+    def test_canonical_skill_catalog_casefold_collisions_fail_closed(self) -> None:
+        with self.assertRaisesRegex(ValueError, "collide after case folding"):
+            bootstrap._canonical_skill_lookup(
+                (("memory", "a" * 64), ("Memory", "b" * 64))
+            )
+
     def test_architect_mixed_delivery_records_inline_artifact_and_skill_sources(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "CodexGlobal"

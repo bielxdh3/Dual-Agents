@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .bootstrap import canonical_instructions_root
-from .codex import _delegate_to_configured_actor
+from .codex import ActorResultError, _delegate_to_configured_actor
 from .codex import configured_actor_provenance, run_codex_for_role
 from .config import ConfigError, OrchestratorConfig
 from .delegation import RepositoryLock
@@ -45,6 +45,37 @@ def _schema(config: OrchestratorConfig, name: str) -> Path:
     return config.project_root / "schemas" / name
 
 
+def _write_provenance(
+    config: OrchestratorConfig,
+    canonical_root: Path,
+    run_dir: Path,
+    phase_provenance: list[dict],
+) -> None:
+    try:
+        orchestrator_metadata = configured_actor_provenance(
+            agent=config.agent_for_role("orchestrator"),
+            role="orchestrator",
+            repository=config.repository,
+            canonical_root=canonical_root,
+        )
+    except ConfigError as exc:
+        orchestrator_metadata = {
+            "phase": "orchestrator",
+            "role": "orchestrator",
+            "configured_actor": False,
+            "routing_error": str(exc),
+            "fallback_used": False,
+        }
+    atomic_write_json(
+        run_dir / "provenance.json",
+        {
+            "schema_version": 1,
+            "configured_actor_routing": phase_provenance,
+            "orchestrator": orchestrator_metadata,
+        },
+    )
+
+
 def execute(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
     lock = RepositoryLock(config.runs_dir, config.repository, "run-" + uuid4().hex)
     with lock:
@@ -75,14 +106,19 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
     phase_provenance: list[dict] = []
 
     plan_path = run_dir / "plan.json"
-    result = delegate_to_configured_actor(
-        config=config,
-        role="architect",
-        task=_prompt(config, "architect.txt", task=task),
-        repository=config.repository,
-        output_path=plan_path,
-        schema_path=_schema(config, "architect-plan.schema.json"),
-    )
+    try:
+        result = delegate_to_configured_actor(
+            config=config,
+            role="architect",
+            task=_prompt(config, "architect.txt", task=task),
+            repository=config.repository,
+            output_path=plan_path,
+            schema_path=_schema(config, "architect-plan.schema.json"),
+        )
+    except ActorResultError as exc:
+        phase_provenance.append(dict(exc.metadata))
+        _write_provenance(config, canonical_root, run_dir, phase_provenance)
+        raise
     phase_provenance.append(dict(result.metadata))
     plan = load_json(plan_path)
 
@@ -144,29 +180,7 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
         phase_provenance.append(dict(result.metadata))
         implementation = load_json(implementation_path)
 
-    try:
-        orchestrator_metadata = configured_actor_provenance(
-            agent=config.agent_for_role("orchestrator"),
-            role="orchestrator",
-            repository=config.repository,
-            canonical_root=canonical_root,
-        )
-    except ConfigError as exc:
-        # Older configs may omit the informational orchestrator assignment;
-        # retain an explicit fail-closed status in the provenance artifact.
-        orchestrator_metadata = {
-            "phase": "orchestrator",
-            "role": "orchestrator",
-            "configured_actor": False,
-            "routing_error": str(exc),
-            "fallback_used": False,
-        }
-    provenance = {
-        "schema_version": 1,
-        "configured_actor_routing": phase_provenance,
-        "orchestrator": orchestrator_metadata,
-    }
-    atomic_write_json(run_dir / "provenance.json", provenance)
+    _write_provenance(config, canonical_root, run_dir, phase_provenance)
     report = render_markdown(
         task_file=task_file,
         plan=plan,
