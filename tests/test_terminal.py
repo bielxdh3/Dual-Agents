@@ -274,6 +274,7 @@ console.log(JSON.stringify(globalThis.__launchArgs));
             config = _config(root, repository)
             sessions = config.runs_dir / "terminal-sessions"
             sessions.mkdir(parents=True)
+            record = sessions / "biel3-old-session.json"
             session = TerminalSession(
                 session_id="biel3-old-session",
                 account="biel3",
@@ -285,9 +286,10 @@ console.log(JSON.stringify(globalThis.__launchArgs));
                 pid=123,
                 started_at="now",
                 log_file=sessions / "biel3-old-session.pty.log",
-                session_file=str((sessions / "biel3-old-session.json").resolve()),
+                session_file=str(record.resolve()),
                 windows_sandbox_mode="",
             )
+            record.write_text(json.dumps(session.as_dict()), encoding="utf-8")
             manager = TerminalManager.__new__(TerminalManager)
             manager.config = config
             agent = AgentConfig(
@@ -309,6 +311,44 @@ console.log(JSON.stringify(globalThis.__launchArgs));
                         repository=repository,
                         add_dirs=(),
                     )
+
+    def test_terminal_start_passes_read_only_windows_sandbox_mode_to_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="biel3",
+                label="Architect",
+                backend="windows",
+            )
+            fake_process = SimpleNamespace(pid=321, poll=lambda: None, terminate=lambda: None)
+            with patch("dual_codex.terminal._node_path", return_value="node"), patch(
+                "dual_codex.terminal._helper_path", return_value=config.project_root / "scripts" / "pty-host.js"
+            ), patch("dual_codex.terminal.subprocess.Popen", return_value=fake_process) as popen, patch(
+                "dual_codex.terminal._pipe_request", return_value={"ok": True}
+            ), patch("dual_codex.terminal._process_start_identity", return_value="start"), patch.object(
+                manager, "wait_until_ready"
+            ), patch("dual_codex.terminal.atomic_write_json"):
+                session = manager.start(
+                    session_id="biel3-read-only",
+                    agent=agent,
+                    role="architect",
+                    repository=repository,
+                    approval_policy="never",
+                )
+
+            command = [str(value) for value in popen.call_args.args[0]]
+            mode_index = command.index("--windows-sandbox-mode")
+            self.assertEqual(command[mode_index + 1], "unelevated")
+            self.assertEqual(session.windows_sandbox_mode, "unelevated")
 
     def test_session_id_rejects_path_traversal(self) -> None:
         with self.assertRaises(TerminalError):
