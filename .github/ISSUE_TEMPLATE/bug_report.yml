@@ -1,0 +1,89 @@
+name: Bug report
+description: Report a reproducible problem in Dual Agents
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Remove secrets, credentials, private repository content, and sensitive local paths before submitting.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Release/tag or commit SHA where the problem occurs.
+      placeholder: v0.x.y or abc1234
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Python and Node.js versions
+      placeholder: Python 3.12.x; Node.js 22.x
+    validations:
+      required: true
+
+  - type: input
+    id: provider
+    attributes:
+      label: Provider / backend / role
+      description: Identify the configured provider, backend, and role if relevant.
+      placeholder: Codex / app_server / executor
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest safe sequence that reproduces the issue.
+      placeholder: |
+        1. Configure ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or evidence
+      description: Paste only material that contains no secrets, auth state, or private repository data.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed tokens, credentials, authentication files, and private data from this report.
+          required: true
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: This is not an undisclosed security vulnerability. Security issues should follow SECURITY.md.
+          required: true

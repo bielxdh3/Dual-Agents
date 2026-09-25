@@ -1,0 +1,54 @@
+name: Feature request
+description: Propose an improvement to Dual Agents
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow or limitation are you trying to improve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches or workarounds have you considered?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Provider integration
+        - Role orchestration
+        - CLI
+        - Local dashboard
+        - Provenance / auditability
+        - Configuration
+        - Testing / CI
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: trust
+    attributes:
+      label: Trust-boundary impact
+      options:
+        - label: This may affect authentication, command execution, workspace writes, fallback behavior, secrets, or provider isolation.
+          required: false
