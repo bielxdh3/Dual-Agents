@@ -1833,7 +1833,7 @@ class TerminalManager:
                     )
                 if agent is not None:
                     expected_windows_sandbox_mode = windows_sandbox_mode_for(agent.sandbox)
-                    if session.windows_sandbox_mode != expected_windows_sandbox_mode:
+                    if str(getattr(session, "windows_sandbox_mode", "") or "") != expected_windows_sandbox_mode:
                         raise TerminalError(
                             f"Existing terminal session '{session_id}' Windows sandbox mode identity mismatch."
                         )
@@ -1886,7 +1886,7 @@ class TerminalManager:
             raise TerminalError("Strict reuse-existing refused: repository identity mismatch.")
         if not same_path(session.codex_home, agent.codex_home):
             raise TerminalError("Strict reuse-existing refused: CODEX_HOME identity mismatch.")
-        if session.windows_sandbox_mode != windows_sandbox_mode_for(agent.sandbox):
+        if str(getattr(session, "windows_sandbox_mode", "") or "") != windows_sandbox_mode_for(agent.sandbox):
             raise TerminalError("Strict reuse-existing refused: Windows sandbox mode identity mismatch.")
         if getattr(session, "target_model", "") and session.target_model != agent.model:
             raise TerminalError("Strict reuse-existing refused: model identity mismatch.")
