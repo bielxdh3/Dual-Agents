@@ -7,6 +7,44 @@ from typing import Callable, Iterable
 
 from .process import CommandError, CommandResult, DEFAULT_HOST_COMMAND_TIMEOUT, run_command
 
+_GIT_GLOBAL_FLAGS = {
+    "-p",
+    "-P",
+    "--paginate",
+    "--no-pager",
+    "--no-replace-objects",
+    "--no-optional-locks",
+    "--no-lazy-fetch",
+    "--bare",
+    "-v",
+}
+_ALLOWED_TRUSTED_CONFIG = {
+    "credential.helper": {"", "manager"},
+    "http.extraheader": {""},
+    "http.sslbackend": {"openssl"},
+    "http.sslverify": {"true"},
+}
+
+
+def _command_offset(git_args: list[str]) -> int:
+    index = 0
+    while index < len(git_args):
+        argument = git_args[index]
+        if argument in _GIT_GLOBAL_FLAGS:
+            index += 1
+            continue
+        if argument.startswith("-"):
+            if argument == "-c" and index + 1 < len(git_args):
+                key, separator, value = git_args[index + 1].partition("=")
+                allowed_values = _ALLOWED_TRUSTED_CONFIG.get(key.casefold())
+                if not separator or allowed_values is None or value.casefold() not in allowed_values:
+                    raise ValueError("run_git does not accept untrusted Git config overrides.")
+                index += 2
+                continue
+            raise ValueError("run_git does not accept Git global config or repository overrides.")
+        return index
+    return len(git_args)
+
 
 def run_git(
     command: Iterable[str],
@@ -15,7 +53,7 @@ def run_git(
     runner: Callable[..., CommandResult] = run_command,
     **kwargs,
 ) -> CommandResult:
-    """Run trusted host Git without repository hooks, fsmonitor, or filters."""
+    """Run trusted host Git without repository hooks or fsmonitor."""
 
     args = [str(part) for part in command]
     if not args or Path(args[0]).name.casefold() not in {"git", "git.exe"}:
@@ -23,8 +61,10 @@ def run_git(
     timeout = kwargs.get("timeout", DEFAULT_HOST_COMMAND_TIMEOUT)
     env = kwargs.get("env")
     # Git's content filters can launch repository-configured processes during
-    # status/diff. Read their names with the safe config subcommand, then
-    # override every executable filter entry for the actual host operation.
+    # status/diff. Disabling a filter changes Git's clean/smudge comparison
+    # semantics, so first reject commands where a filter applies to a tracked
+    # path. Unfiltered paths remain safe to inspect with filter commands
+    # disabled below.
     with tempfile.TemporaryDirectory(prefix="dual-codex-no-git-hooks-") as hooks_dir:
         safe_prefix = [
             args[0],
@@ -32,8 +72,6 @@ def run_git(
             f"core.hooksPath={hooks_dir}",
             "-c",
             "core.fsmonitor=",
-            "-c",
-            "diff.external=",
         ]
         probe = run_command(
             # Query all active config scopes: worktree-specific filter
@@ -66,11 +104,88 @@ def run_git(
             if kwargs.get("check", True):
                 raise CommandError(message)
             return failed
-        safe_args = [*safe_prefix]
+        git_args = args[1:]
+        command_offset = _command_offset(git_args)
+        command_name = git_args[command_offset] if command_offset < len(git_args) else ""
+        filter_paths: list[str] = []
+        if command_name in {"status", "diff"}:
+            tracked = run_command(
+                [*safe_prefix, "ls-files", "-z"],
+                cwd=cwd,
+                env=env,
+                check=False,
+                timeout=timeout,
+            )
+            if tracked.returncode != 0:
+                no_repository = "not a git repository" in tracked.stderr.casefold()
+                no_repository = no_repository or "not in a git directory" in tracked.stderr.casefold()
+                if not no_repository:
+                    message = "Could not safely inspect tracked paths for Git content filters."
+                    if tracked.returncode == 124:
+                        message = "Timed out while inspecting tracked paths for Git content filters."
+                    failed = CommandResult(args, tracked.returncode or 1, "", message)
+                    if kwargs.get("check", True):
+                        raise CommandError(message)
+                    return failed
+            else:
+                filter_paths.extend(path for path in tracked.stdout.split("\0") if path)
+        elif command_name == "hash-object":
+            for index, part in enumerate(git_args):
+                if part.startswith("--path="):
+                    filter_paths.append(part.partition("=")[2])
+                elif part == "--path" and index + 1 < len(git_args):
+                    filter_paths.append(git_args[index + 1])
+        if filter_paths:
+            if any("\ufffd" in path for path in filter_paths):
+                message = "Cannot safely inspect Git content filters because a tracked path is not valid UTF-8."
+                failed = CommandResult(args, 1, "", message)
+                if kwargs.get("check", True):
+                    raise CommandError(message)
+                return failed
+            attributes = run_command(
+                [*safe_prefix, "check-attr", "-z", "--stdin", "filter"],
+                cwd=cwd,
+                env=env,
+                stdin="".join(f"{path}\0" for path in filter_paths),
+                check=False,
+                timeout=timeout,
+            )
+            if attributes.returncode != 0:
+                message = "Could not safely inspect Git content-filter attributes."
+                if attributes.returncode == 124:
+                    message = "Timed out while inspecting Git content-filter attributes."
+                failed = CommandResult(args, attributes.returncode or 1, "", message)
+                if kwargs.get("check", True):
+                    raise CommandError(message)
+                return failed
+            fields = attributes.stdout.split("\0")
+            if fields and fields[-1] == "":
+                fields.pop()
+            if len(fields) % 3:
+                message = "Could not safely parse Git content-filter attributes."
+                failed = CommandResult(args, 1, "", message)
+                if kwargs.get("check", True):
+                    raise CommandError(message)
+                return failed
+            if any(fields[index + 2] not in {"", "unspecified", "unset"} for index in range(0, len(fields), 3)):
+                message = (
+                    "Trusted host Git cannot inspect paths that use Git content filters without executing "
+                    "repository-configured commands. Remove the filter attribute or use an unfiltered checkout."
+                )
+                failed = CommandResult(args, 1, "", message)
+                if kwargs.get("check", True):
+                    raise CommandError(message)
+                return failed
+        safe_args = [args[0], *git_args[:command_offset], *safe_prefix[1:]]
         for name in filter_names:
             for field, value in (("process", ""), ("clean", ""), ("smudge", ""), ("required", "false")):
                 safe_args.extend(("-c", f"{name}.{field}={value}"))
-        safe_args.extend(args[1:])
+        if command_name == "diff":
+            safe_args.extend(git_args[command_offset : command_offset + 1])
+            safe_args.extend(("--no-ext-diff", "--no-textconv"))
+            safe_args.extend(git_args[command_offset + 1 :])
+        else:
+            safe_args.extend(git_args[command_offset:])
         return runner(safe_args, cwd=cwd, **kwargs)
 
 
