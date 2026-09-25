@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from contextlib import nullcontext
 from io import BytesIO
@@ -1629,6 +1630,67 @@ function idleScreen(model) {{
             ):
                 self.assertEqual(manager.list(), [])
             self.assertFalse(identity_record.exists())
+
+    def test_pending_task_artifact_is_removed_after_terminal_turn_becomes_idle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, record = _write_terminal_session(config, "biel3", repository, role="architect")
+            artifact = repository / ".dual-codex-task-0123456789abcdef0123456789abcdef.md"
+            content = "# Dual Codex architect instructions\n\nRead the brief.\n"
+            artifact.write_text(content, encoding="utf-8", newline="\n")
+            cursor_path = session.codex_home / "sessions" / "rollout.jsonl"
+            cursor_path.parent.mkdir(parents=True)
+            cursor_path.write_text("", encoding="utf-8")
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            manager.defer_task_artifact_cleanup(
+                session.session_id,
+                artifact,
+                hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                cursor=(cursor_path, 0),
+            )
+
+            host_state = {
+                "session_id": session.session_id,
+                "pipe": session.pipe,
+                "host_pid": session.pid,
+                "host_started_at": session.process_started_at,
+                "process_start_identity": session.process_start_identity,
+                "process_epoch": session.process_epoch,
+                "alive": False,
+            }
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                return_value={"ok": True, "state": host_state},
+            ), patch.object(manager, "_codex_turn_activity", return_value={"active": True}):
+                manager.reconcile_pending_task_artifact_cleanup(repository)
+                self.assertTrue(artifact.exists(), "active Architect turn must keep its input artifact available")
+                self.assertTrue(manager.has_pending_task_artifact_cleanup(session.session_id))
+                with self.assertRaisesRegex(TerminalError, "previous Architect turn is still active"):
+                    manager.ensure(
+                        session_id=session.session_id,
+                        agent=object(),
+                        repository=repository,
+                        role="architect",
+                    )
+
+            cursor_path.write_text('{"payload":{"type":"turn_completed"}}\n', encoding="utf-8")
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                return_value={"ok": True, "state": host_state},
+            ), patch.object(manager, "_codex_turn_activity", return_value={"active": False}) as turn_activity, patch.object(
+                manager,
+                "_cleanup_pending_task_artifacts",
+                wraps=manager._cleanup_pending_task_artifacts,
+            ) as cleanup_pending:
+                manager.reconcile_pending_task_artifact_cleanup(repository)
+            cleanup_pending.assert_called_once()
+            turn_activity.assert_not_called()
+            self.assertFalse(artifact.exists())
+            self.assertFalse(record.exists())
 
     def test_list_removes_unreachable_record_when_host_pid_is_dead_and_pipe_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

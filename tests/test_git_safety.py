@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from dual_codex.git import ensure_git_repository, head_revision, status_and_diff
+from dual_codex.git import ensure_git_repository, head_revision, status_and_diff, status_porcelain
 from dual_codex.git import run_git
 from dual_codex.process import CommandError, CommandResult, run_command
 from dual_codex.publication import _run
@@ -18,6 +18,37 @@ from dual_codex.publication import _run
 
 @unittest.skipUnless(shutil.which("git"), "Git is required for repository safety regressions")
 class GitSafetyTests(unittest.TestCase):
+    def test_temporary_architect_task_artifact_names_cannot_hide_untracked_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repository = Path(temp) / "repository"
+            repository.mkdir()
+
+            def git(*args: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    ["git", *args], cwd=repository, check=True, text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                )
+
+            git("init", "-q")
+            git("config", "user.name", "Safety Test")
+            git("config", "user.email", "safety@example.invalid")
+            (repository / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+            git("add", "tracked.txt")
+            git("commit", "-qm", "initial")
+            task_artifact = repository / ".dual-codex-task-0123456789abcdef0123456789abcdef.md"
+            task_artifact.write_text("temporary prompt\n", encoding="utf-8")
+            unrelated = repository / ".dual-codex-task-not-a-uuid.md"
+            unrelated.write_text("user file\n", encoding="utf-8")
+
+            ordinary_status = git("status", "--porcelain").stdout
+            self.assertIn(task_artifact.name, ordinary_status)
+            safe_status = status_porcelain(repository)
+            self.assertIn(task_artifact.name, safe_status)
+            self.assertIn(unrelated.name, safe_status)
+            captured = status_and_diff(repository)
+            self.assertIn(task_artifact.name, captured)
+            self.assertIn(unrelated.name, captured)
+
     def test_host_inspection_and_publication_disable_repo_fsmonitor_and_hooks(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

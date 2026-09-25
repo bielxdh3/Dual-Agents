@@ -545,6 +545,60 @@ class CodexCommandTests(unittest.TestCase):
             self.assertTrue(artifact.is_relative_to(output_path.parent.resolve()))
             self.assertEqual(list(repository.glob(".dual-codex-task-*.md")), [])
 
+    def test_failed_oversized_architect_turn_defers_artifact_cleanup_until_turn_ends(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            session = SimpleNamespace(
+                session_id="biel3-test",
+                account="test-account",
+                label="Test account",
+                role="architect",
+                repository=repository,
+                codex_home=root / "profile",
+                pid=123,
+                process_started_at=1.0,
+                process_epoch="process-epoch",
+                process_start_identity="process-start",
+                session_file=str(root / "session.json"),
+                repository_identity="repository-identity",
+                codex_home_identity="codex-home-identity",
+                pipe=r"\\.\pipe\dual-codex-biel3-test-aaaaaaaaaaaaaaaa",
+                viewer_pid=0,
+                viewer_epoch="",
+            )
+            prompt = "Follow the read-only architect contract. " + ("x" * TERMINAL_INLINE_MESSAGE_MAX)
+
+            with patch("dual_codex.terminal.TerminalManager") as manager_type:
+                manager = manager_type.return_value
+                manager.ensure.return_value = session
+                manager.turn_cursor.return_value = (None, 0)
+                manager.begin_automation_turn.return_value = "automation:probe"
+                manager.send.return_value = {"state": "turn_started"}
+                manager.wait_for_turn.side_effect = TerminalError("Timed out waiting for the Architect turn.")
+
+                result = run_codex_terminal(
+                    config=SimpleNamespace(runs_dir=root / "runs"),
+                    agent=_agent("read-only"),
+                    repository=repository,
+                    prompt=prompt,
+                    output_path=root / "runs" / "run-1" / "plan.json",
+                    session_id="biel3-test",
+                    role="architect",
+                )
+
+            artifact = Path(result.metadata["task_artifact"])
+            self.assertEqual(result.returncode, 1)
+            self.assertTrue(artifact.is_file())
+            self.assertEqual(result.metadata["task_artifact_cleanup_pending"], str(artifact))
+            manager.defer_task_artifact_cleanup.assert_called_once_with(
+                "biel3-test",
+                artifact,
+                result.metadata["task_sha256"],
+                cursor=(None, 0),
+            )
+
     def test_strict_reuse_refuses_to_start_a_missing_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

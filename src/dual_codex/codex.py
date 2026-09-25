@@ -732,6 +732,9 @@ def run_codex_terminal(
     temporary_task_artifact_content = ""
     task_input_attempted = False
     task_turn_completed = False
+    manager = None
+    session = None
+    cursor: tuple[Path | None, int] | None = None
     transport = "file" if task_artifact_path is not None else "inline"
     artifact = str(task_artifact_path.resolve()) if task_artifact_path is not None else ""
     metadata = {
@@ -956,6 +959,16 @@ def run_codex_terminal(
         if temporary_task_artifact_path is not None:
             if task_input_attempted and not task_turn_completed:
                 metadata["task_artifact_cleanup_pending"] = str(temporary_task_artifact_path)
+                if manager is not None and session is not None:
+                    try:
+                        manager.defer_task_artifact_cleanup(
+                            session.session_id,
+                            temporary_task_artifact_path,
+                            task_sha256,
+                            cursor=cursor,
+                        )
+                    except (TerminalError, OSError, ValueError) as exc:
+                        metadata["task_artifact_cleanup_error"] = type(exc).__name__
             else:
                 try:
                     temporary_task_artifact_path.unlink(missing_ok=True)

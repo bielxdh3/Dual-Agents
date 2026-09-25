@@ -204,7 +204,7 @@ def head_revision(repository: Path) -> str:
 
 
 def status_and_diff(repository: Path) -> str:
-    status = run_git(["git", "status", "--short"], cwd=repository).stdout
+    status = status_porcelain(repository)
     unstaged = run_git(["git", "diff", "--no-ext-diff", "--no-textconv"], cwd=repository).stdout
     staged = run_git(["git", "diff", "--cached", "--no-ext-diff", "--no-textconv"], cwd=repository).stdout
     return (
