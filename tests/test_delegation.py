@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -19,7 +20,9 @@ from dual_codex.delegation import (
     DelegationError,
     InvalidRequestError,
     RepositoryLock,
+    _acquire_recovery_claim,
     _pid_alive,
+    _release_recovery_claim,
     delegate,
     parse_request,
     run_codex_exec as run_delegation_codex_exec,
@@ -31,7 +34,7 @@ from dual_codex.delegation import (
 )
 from dual_codex.cli import main
 from dual_codex.live_events import journal_path, read_journal
-from dual_codex.process import CommandResult, run_command
+from dual_codex.process import CommandError, CommandResult, run_command
 from dual_codex.terminal import TERMINAL_INLINE_MESSAGE_MAX, session_id_for
 
 
@@ -1187,6 +1190,88 @@ class DelegationTests(unittest.TestCase):
                 self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "new-request")
                 lock.release()
 
+    def test_concurrent_stale_lock_recovery_has_one_owner_and_preserves_new_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            first = RepositoryLock(root / "runs", repository, "first-request")
+            second = RepositoryLock(root / "runs", repository, "second-request")
+            first.path.parent.mkdir(parents=True)
+            first.path.write_text(
+                json.dumps({
+                    "pid": os.getpid(),
+                    "process_start": "old-process-instance",
+                    "request_id": "stale-request",
+                }),
+                encoding="utf-8",
+            )
+
+            start_together = threading.Barrier(2)
+            both_saw_stale = threading.Barrier(2)
+            owner_acquired = threading.Event()
+            other_finished = threading.Event()
+            state_guard = threading.Lock()
+            active_owners = 0
+            peak_owners = 0
+            outcomes: list[tuple[str, str]] = []
+
+            def synchronized_claim(path: Path) -> int | None:
+                # Both callers have already received FileExistsError on the
+                # same stale primary lock before either takes the claim.
+                both_saw_stale.wait(timeout=5)
+                return _acquire_recovery_claim(path)
+
+            def attempt(lock: RepositoryLock) -> None:
+                nonlocal active_owners, peak_owners
+                try:
+                    start_together.wait(timeout=5)
+                    lock.acquire()
+                except DelegationError as exc:
+                    outcomes.append(("rejected", str(exc)))
+                    other_finished.set()
+                    return
+                except Exception as exc:  # capture worker failures for the main assertion
+                    outcomes.append(("unexpected", repr(exc)))
+                    other_finished.set()
+                    return
+
+                with state_guard:
+                    active_owners += 1
+                    peak_owners = max(peak_owners, active_owners)
+                owner_acquired.set()
+                try:
+                    if not other_finished.wait(timeout=5):
+                        outcomes.append(("timeout", "second recovery did not finish"))
+                finally:
+                    with state_guard:
+                        active_owners -= 1
+                    lock.release()
+                outcomes.append(("acquired", lock.request_id))
+
+            with patch("dual_codex.delegation._pid_alive", return_value=True), patch(
+                "dual_codex.delegation._safe_process_start_token", return_value="current-process-instance"
+            ), patch("dual_codex.delegation._acquire_recovery_claim", side_effect=synchronized_claim):
+                workers = [
+                    threading.Thread(target=attempt, args=(lock,))
+                    for lock in (first, second)
+                ]
+                for worker in workers:
+                    worker.start()
+                for worker in workers:
+                    worker.join(timeout=7)
+
+            self.assertTrue(owner_acquired.is_set(), outcomes)
+            self.assertTrue(all(not worker.is_alive() for worker in workers), outcomes)
+            self.assertEqual(peak_owners, 1, outcomes)
+            self.assertEqual(active_owners, 0, outcomes)
+            self.assertEqual([kind for kind, _ in outcomes].count("acquired"), 1, outcomes)
+            self.assertEqual([kind for kind, _ in outcomes].count("rejected"), 1, outcomes)
+            self.assertFalse(first.path.exists())
+
+            claim = _acquire_recovery_claim(first.recovery_path)
+            self.assertIsNotNone(claim, "recovery claim should be released after contention")
+            _release_recovery_claim(claim)
+
     def test_delegate_cli_emits_sanitized_result_on_internal_runtime_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1217,6 +1302,45 @@ class DelegationTests(unittest.TestCase):
         self.assertIn("DUAL_CODEX_RESULT ", stdout.getvalue())
         self.assertIn('"result_file": "\\u0000invalid"', stdout.getvalue())
         self.assertNotIn("secret-value", stdout.getvalue() + stderr.getvalue())
+
+    def test_safe_git_command_error_preserves_request_and_cli_result_protocol(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            config = _make_config(root, repository)
+            request_file = root / "request.json"
+            result_path = root / "result.json"
+            request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with patch("dual_codex.delegation.antigravity_status", return_value="OK"), patch(
+                "dual_codex.git.run_git",
+                side_effect=CommandError(
+                    "Trusted host Git refused unsafe fsmonitor settings. TOKEN=secret-value"
+                ),
+            ), redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main([
+                    "--config", str(config.config_path), "delegate",
+                    "--request-file", str(request_file), "--result-file", str(result_path),
+                ])
+
+            self.assertEqual(exit_code, 1)
+            lines = stdout.getvalue().splitlines()
+            protocol_line = next(line for line in lines if line.startswith("DUAL_CODEX_RESULT "))
+            protocol = json.loads(protocol_line.removeprefix("DUAL_CODEX_RESULT "))
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertEqual(protocol["status"], "failed")
+            self.assertEqual(protocol["request_id"], "req-001")
+            self.assertEqual(result["request_id"], "req-001")
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("Trusted host Git refused unsafe fsmonitor settings", result["error"])
+            self.assertIn("TOKEN=[REDACTED]", result["error"])
+            self.assertNotIn("secret-value", stdout.getvalue() + stderr.getvalue())
+            self.assertNotIn("Traceback", stdout.getvalue() + stderr.getvalue())
+            self.assertIn("request_id", result)
+            self.assertIn("summary", result)
+            self.assertIn("exit_code", result)
 
     def test_pid_liveness_recognizes_current_and_dead_processes(self) -> None:
         self.assertTrue(_pid_alive(os.getpid()))

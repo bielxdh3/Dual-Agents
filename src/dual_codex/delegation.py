@@ -513,12 +513,58 @@ def _safe_process_start_token(pid: int) -> str | None:
         return None
 
 
+def _acquire_recovery_claim(path: Path) -> int | None:
+    """Try to serialize stale-lock recovery with a kernel-managed file lock."""
+
+    descriptor = os.open(path, os.O_CREAT | os.O_RDWR)
+    try:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        if os.name == "nt":
+            import msvcrt
+
+            try:
+                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+            except OSError:
+                os.close(descriptor)
+                return None
+        else:
+            import fcntl
+
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(descriptor)
+                return None
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _release_recovery_claim(descriptor: int) -> None:
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    finally:
+        os.close(descriptor)
+
+
 class RepositoryLock:
     """A conservative, repository-scoped lock for local executor runs."""
 
     def __init__(self, runs_dir: Path, repository: Path, request_id: str, run_id: str = "") -> None:
         digest = hashlib.sha256(path_identity_key(repository).encode("utf-8")).hexdigest()[:24]
         self.path = runs_dir / ".locks" / f"{digest}.json"
+        self.recovery_path = self.path.with_name(self.path.name + ".recovery")
         self.repository = repository
         self.request_id = request_id
         self.run_id = run_id
@@ -548,34 +594,39 @@ class RepositoryLock:
                 self._held = True
                 return
             except FileExistsError:
-                try:
-                    existing_text = self.path.read_text(encoding="utf-8")
-                    existing = json.loads(existing_text)
-                    pid = int(existing.get("pid", 0))
-                except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+                claim = _acquire_recovery_claim(self.recovery_path)
+                if claim is None:
                     raise DelegationError(
-                        f"Repository lock exists and cannot be inspected: {self.path}"
-                    ) from exc
-                stored_start = existing.get("process_start")
-                live_start = _safe_process_start_token(pid) if _pid_alive(pid) else None
-                if _pid_alive(pid) and (
-                    not isinstance(stored_start, str)
-                    or not stored_start
-                    or live_start is None
-                    or live_start == stored_start
-                ):
-                    raise DelegationError(
-                        "Repository is already delegated or in use; active request "
-                        f"'{existing.get('request_id', 'unknown')}'."
+                        f"Another process is recovering the repository lock: {self.path}"
                     )
                 try:
-                    if self.path.read_text(encoding="utf-8") != existing_text:
-                        continue
+                    try:
+                        existing = json.loads(self.path.read_text(encoding="utf-8"))
+                        pid = int(existing.get("pid", 0))
+                    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+                        if isinstance(exc, FileNotFoundError):
+                            continue
+                        raise DelegationError(
+                            f"Repository lock exists and cannot be inspected: {self.path}"
+                        ) from exc
+                    pid_alive = _pid_alive(pid)
+                    stored_start = existing.get("process_start")
+                    live_start = _safe_process_start_token(pid) if pid_alive else None
+                    if pid_alive and (
+                        not isinstance(stored_start, str)
+                        or not stored_start
+                        or live_start is None
+                        or live_start == stored_start
+                    ):
+                        raise DelegationError(
+                            "Repository is already delegated or in use; active request "
+                            f"'{existing.get('request_id', 'unknown')}'."
+                        )
                     self.path.unlink()
-                except FileNotFoundError:
-                    continue
                 except OSError as exc:
                     raise DelegationError(f"Could not recover stale repository lock: {self.path}") from exc
+                finally:
+                    _release_recovery_claim(claim)
         raise DelegationError(f"Repository lock acquisition raced: {self.path}")
 
     def release(self) -> None:
@@ -1742,7 +1793,7 @@ def delegate(
             repository=str(request.repository),
             reuse_existing=reuse_existing,
         )
-    except (ConfigError, DelegationError, OSError, ValueError) as exc:
+    except (ConfigError, DelegationError, CommandError, OSError, ValueError) as exc:
         finished_at = _timestamp()
         _publish_run_event(
             run_journal,
