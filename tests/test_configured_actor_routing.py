@@ -169,6 +169,41 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             create_bootstrap.assert_not_called()
             run_claude.assert_not_called()
 
+    def test_unsupported_claude_orchestrator_assignment_is_rejected_before_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["claude"] = AccountConfig(
+                name="claude",
+                label="Restricted Claude Code",
+                codex_home=root / "claude-home",
+                model="claude-sonnet",
+                reasoning_effort="high",
+                backend="claude_code",
+                provider_type="anthropic",
+                adapter_type="claude_code",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "orchestrator": "claude"},
+            )
+
+            with patch("dual_codex.codex.create_canonical_bootstrap") as create_bootstrap, patch(
+                "dual_codex.claude_code.run_claude_code"
+            ) as run_claude:
+                with self.assertRaisesRegex(ValueError, "cannot serve the configured 'orchestrator' role"):
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="orchestrator",
+                        task="Prepare a plan.",
+                        repository=config.repository,
+                    )
+
+            create_bootstrap.assert_not_called()
+            run_claude.assert_not_called()
+
     def test_full_topology_uses_configured_provider_backend_and_zero_native_spawn(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

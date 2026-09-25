@@ -302,6 +302,8 @@ def _finalize_architect_output(bootstrap, output_path: Path):
 
 
 def _ensure_actor_supports_role(agent: AgentConfig, role: str) -> None:
+    from .providers import supported_roles_for_backend
+
     if agent.backend == "api" and role == "architect":
         raise ValueError(
             "OpenAI-compatible API profiles cannot serve the Architect role because they cannot read "
@@ -314,6 +316,15 @@ def _ensure_actor_supports_role(agent: AgentConfig, role: str) -> None:
         )
     if agent.backend == "api" and role == "executor":
         raise ValueError("API profiles do not provide the workspace-write Executor role.")
+    if agent.backend == "antigravity" and role != "executor":
+        raise ValueError("Antigravity backend is reserved for the Executor role.")
+    supported_roles = supported_roles_for_backend(agent.backend)
+    if not supported_roles:
+        raise ValueError(f"Unsupported Codex backend '{agent.backend}'; no fallback is permitted.")
+    if role not in supported_roles:
+        raise ValueError(
+            f"Backend '{agent.backend}' cannot serve the configured '{role}' role."
+        )
 
 
 def _delegate_to_configured_actor(
