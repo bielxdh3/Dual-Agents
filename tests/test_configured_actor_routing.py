@@ -12,7 +12,7 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from dual_codex.cli import main as cli_main
-from dual_codex.codex import ActorAvailabilityError, classify_actor_failure, delegate_to_configured_actor, run_codex_for_role
+from dual_codex.codex import ActorAvailabilityError, classify_actor_failure, create_canonical_bootstrap, delegate_to_configured_actor, run_codex_for_role
 from dual_codex.config import AccountConfig, ConfigError, OrchestratorConfig
 from dual_codex.delegation import DelegationError, run_codex_exec as delegation_adapter
 from dual_codex.orchestrator import execute
@@ -712,6 +712,56 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertTrue(result.metadata["fallback_used"])
             self.assertEqual(result.metadata["failed_actor"], "executor-b")
             self.assertEqual(result.metadata["fallback_failure_class"], "provider_unavailable")
+
+    def test_architect_fallback_keeps_shared_bootstrap_artifact_until_dispatch_finishes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["orchestrator"] = replace(accounts["orchestrator"], fallback_roles=("architect",))
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "architect": "secondary"},
+                fallback_enabled=True,
+            )
+            repository = root / "repository"
+            repository.mkdir()
+            captured_bootstraps = []
+            create_bootstrap = create_canonical_bootstrap
+
+            def capture_bootstrap(**kwargs):
+                bootstrap = create_bootstrap(**kwargs)
+                captured_bootstraps.append(bootstrap)
+                return bootstrap
+
+            def primary_app_server(**_kwargs):
+                return CommandResult(["codex", "app-server"], 1, "", "provider unavailable")
+
+            def fallback_windows(**kwargs):
+                bootstrap = captured_bootstraps[0]
+                self.assertTrue(bootstrap.artifact_path.is_file())
+                plan = _architect_plan()
+                kwargs["output_path"].write_text(json.dumps(plan), encoding="utf-8")
+                return CommandResult(["codex", "windows"], 0, json.dumps(plan), "")
+
+            with patch("dual_codex.codex.create_canonical_bootstrap", side_effect=capture_bootstrap), patch(
+                "dual_codex.providers.provider_supports_role", return_value=True
+            ), patch("dual_codex.codex.run_codex_app_server", side_effect=primary_app_server), patch(
+                "dual_codex.codex.run_codex_terminal", side_effect=fallback_windows
+            ):
+                result = delegate_to_configured_actor(
+                    config=config,
+                    role="architect",
+                    task="Read the brief and return an Architect plan.",
+                    repository=repository,
+                    output_path=root / "architect-plan.json",
+                    schema_path=root / "architect-plan.schema.json",
+                )
+
+            self.assertTrue(result.metadata["fallback_used"])
+            self.assertEqual(result.metadata["actual_actor"], "orchestrator")
+            self.assertFalse(captured_bootstraps[0].artifact_path.exists())
 
     def test_fallback_candidate_order_is_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

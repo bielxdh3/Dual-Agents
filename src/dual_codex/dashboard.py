@@ -60,6 +60,7 @@ class DashboardError(ValueError):
 
 _ACCOUNT_PATH = re.compile(r"^/api/accounts/([A-Za-z0-9][A-Za-z0-9_-]*)(?:/(models|usage|settings|auth))?$")
 _SAFE_HOSTS = {"127.0.0.1", "localhost"}
+_SESSION_ID = re.compile(r"[A-Za-z0-9_-]{43}")
 LIVE_RECONCILIATION_SECONDS = 10.0
 _AUTH_STATUS_LABELS = {
     "OK": "Authenticated",
@@ -1831,7 +1832,7 @@ class _Handler(BaseHTTPRequestHandler):
         session_id = self._cookie_value("dual_codex_session")
         cookie_token = self._cookie_value("dual_codex_csrf")
         supplied = self.headers.get("X-Dual-Codex-CSRF", "")
-        if not re.fullmatch(r"[A-Za-z0-9_-]{43}", session_id):
+        if not _SESSION_ID.fullmatch(session_id):
             return False
         expected = self._session_csrf_token(session_id)
         return bool(
@@ -1954,7 +1955,7 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             if method == "GET" and path == "/":
                 session_id = self._cookie_value("dual_codex_session")
-                new_session = not session_id
+                new_session = not _SESSION_ID.fullmatch(session_id)
                 if new_session:
                     session_id = secrets.token_urlsafe(32)
                 csrf_token = self._session_csrf_token(session_id)

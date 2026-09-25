@@ -751,6 +751,36 @@ console.log(JSON.stringify({
             server.httpd.server_close()
             thread.join(timeout=3)
 
+    def test_root_replaces_a_malformed_dashboard_session_cookie(self) -> None:
+        server = DashboardServer(self.config)
+        thread = server.serve_in_thread()
+        try:
+            request = Request(server.url, headers={"Cookie": "dual_codex_session=stale"})
+            with urlopen(request, timeout=3) as response:
+                cookies = [value.split(";", 1)[0] for value in response.headers.get_all("Set-Cookie", [])]
+            cookie_values = dict(value.split("=", 1) for value in cookies)
+            self.assertRegex(cookie_values["dual_codex_session"], r"^[A-Za-z0-9_-]{43}$")
+            self.assertRegex(cookie_values["dual_codex_csrf"], r"^[a-f0-9]{64}$")
+
+            mutation = Request(
+                server.url + "api/fallback",
+                data=b'{"enabled":true}',
+                headers={
+                    "Content-Type": "application/json",
+                    "Origin": server.url.rstrip("/"),
+                    "Cookie": "; ".join(cookies),
+                    "X-Dual-Codex-CSRF": cookie_values["dual_codex_csrf"],
+                },
+                method="POST",
+            )
+            with urlopen(mutation, timeout=3) as response:
+                self.assertEqual(response.status, 200)
+            self.assertTrue(load_config(self.config_path).fallback_enabled)
+        finally:
+            server.httpd.shutdown()
+            server.httpd.server_close()
+            thread.join(timeout=3)
+
     def test_mocked_app_server_telemetry_keeps_dynamic_buckets_and_capabilities(self) -> None:
         self.config.accounts["primary"] = replace(self.config.accounts["primary"], backend="app_server")
 

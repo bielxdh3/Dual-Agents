@@ -535,6 +535,7 @@ def run_codex_for_role(
         raise ValueError(f"Unsupported configured role '{role}'.")
     configured = False
     canonical_root = None
+    owns_bootstrap = False
     configured_resolver = getattr(config, "agent_for_role", None)
     configured_agent = None
     if callable(configured_resolver):
@@ -557,8 +558,14 @@ def run_codex_for_role(
                 artifact_dir=bootstrap_artifact_dir(repository, output_path),
                 selected_skills=select_required_skills(role, prompt),
             )
+            owns_bootstrap = True
         prompt, bootstrap = configured_actor_prompt(prompt, role=role, bootstrap=bootstrap)
         canonical_root = bootstrap.source_root
+
+    def cleanup_owned_bootstrap() -> None:
+        if owns_bootstrap:
+            cleanup_canonical_bootstrap(bootstrap)
+
     if agent.backend == "api":
         from .providers import api_adapter
 
@@ -574,7 +581,7 @@ def run_codex_for_role(
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
                 bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
         finally:
-            cleanup_canonical_bootstrap(bootstrap)
+            cleanup_owned_bootstrap()
     if agent.backend == "claude_code":
         from .claude_code import run_claude_code
 
@@ -607,7 +614,7 @@ def run_codex_for_role(
                 configured_actor=configured,
             )
         finally:
-            cleanup_canonical_bootstrap(bootstrap)
+            cleanup_owned_bootstrap()
     if agent.backend == "antigravity":
         if role != "executor":
             raise ValueError("Antigravity backend is reserved for the Executor role.")
@@ -631,7 +638,7 @@ def run_codex_for_role(
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
                 bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
         finally:
-            cleanup_canonical_bootstrap(bootstrap)
+            cleanup_owned_bootstrap()
     if agent.backend == "app_server":
         from .terminal import session_id_for
 
@@ -664,7 +671,7 @@ def run_codex_for_role(
                 configured_actor=configured,
             )
         finally:
-            cleanup_canonical_bootstrap(bootstrap)
+            cleanup_owned_bootstrap()
     if agent.backend != "windows":
         raise ValueError(f"Unsupported Codex backend '{agent.backend}'; no fallback is permitted.")
     if role == "executor" and not hasattr(config, "runs_dir"):
@@ -683,7 +690,7 @@ def run_codex_for_role(
             progress=progress,
         )
     finally:
-        cleanup_canonical_bootstrap(bootstrap)
+        cleanup_owned_bootstrap()
     _raise_dispatch_failure(result, role=role, agent=agent,
         message=f"Codex {role} failed through the configured Windows terminal backend: {result.stderr}")
     return _annotate_provider_result(
