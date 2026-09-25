@@ -11,7 +11,6 @@ import unittest
 from dataclasses import replace
 from unittest.mock import patch
 
-from dual_codex.bootstrap import BOOTSTRAP_MARKER
 from dual_codex.cli import main as cli_main
 from dual_codex.codex import ActorAvailabilityError, classify_actor_failure, delegate_to_configured_actor, run_codex_for_role
 from dual_codex.config import AccountConfig, ConfigError, OrchestratorConfig
@@ -21,6 +20,17 @@ from dual_codex.process import CommandError, CommandResult
 
 
 ARCHITECT_BASELINE = ["memory", "ponytail", "project-phase-review", "project-security-review"]
+
+
+def _architect_plan() -> dict[str, object]:
+    return {
+        "summary": "Plan summary",
+        "steps": [],
+        "acceptance_criteria": [],
+        "risks": [],
+        "files_to_inspect": [],
+        "skills_loaded": [],
+    }
 
 
 class ConfiguredActorRoutingTests(unittest.TestCase):
@@ -225,7 +235,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
-                        "skills_loaded": list(ARCHITECT_BASELINE),
+                        "skills_loaded": [],
                     }
                 elif role == "executor":
                     payload = {
@@ -328,7 +338,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     "acceptance_criteria": [],
                     "risks": [],
                     "files_to_inspect": [],
-                    "skills_loaded": list(ARCHITECT_BASELINE),
+                    "skills_loaded": [],
                 },
                 "executor": {
                     "summary": "implementation",
@@ -447,7 +457,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     "acceptance_criteria": [],
                     "risks": [],
                     "files_to_inspect": [],
-                    "skills_loaded": list(ARCHITECT_BASELINE),
+                    "skills_loaded": [],
                 },
                 "executor": {
                     "summary": "implementation",
@@ -519,7 +529,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             terminal_manager.return_value.list.assert_not_called()
             native_terminal_start.assert_not_called()
             native_terminal_list.assert_not_called()
-            run_dirs = [path for path in config.runs_dir.iterdir() if path.is_dir()]
+            run_dirs = [path for path in config.runs_dir.iterdir() if (path / "provenance.json").is_file()]
             self.assertEqual(len(run_dirs), 1)
             provenance = json.loads((run_dirs[0] / "provenance.json").read_text(encoding="utf-8"))
             self.assertEqual(
@@ -625,7 +635,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             repository.mkdir()
 
             def fake_runner(**kwargs):
-                kwargs["output_path"].write_text(json.dumps({"skills_loaded": list(ARCHITECT_BASELINE)}), encoding="utf-8")
+                kwargs["output_path"].write_text(json.dumps(_architect_plan()), encoding="utf-8")
                 return CommandResult(
                     ["fake"],
                     0,
@@ -659,7 +669,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
 
             def fake_runner(**kwargs):
                 seen_schemas[kwargs["role"]] = kwargs["schema_path"]
-                payload = {"skills_loaded": list(ARCHITECT_BASELINE)} if kwargs["role"] == "architect" else {}
+                payload = _architect_plan() if kwargs["role"] == "architect" else {}
                 kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
                 return CommandResult(["fake"], 0, "", "")
 
@@ -873,7 +883,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 observed.append((kwargs["role"], kwargs["agent"].account_name, kwargs["agent"].backend))
                 if kwargs["role"] == "architect":
                     kwargs["output_path"].write_text(
-                        json.dumps({"skills_loaded": list(ARCHITECT_BASELINE)}), encoding="utf-8"
+                        json.dumps(_architect_plan()), encoding="utf-8"
                     )
                 return CommandResult(["fake"], 0, "", "")
 
@@ -974,7 +984,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 self.assertIn("# memory", kwargs["prompt"])
                 self.assertIn("# project-security-review", kwargs["prompt"])
                 kwargs["output_path"].write_text(
-                    json.dumps({"skills_loaded": list(ARCHITECT_BASELINE)}), encoding="utf-8"
+                    json.dumps(_architect_plan()), encoding="utf-8"
                 )
                 return expected
 
@@ -988,7 +998,8 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     schema_path=root / "schema.json",
                 )
             prompt = observed["prompt"]
-            self.assertIn(BOOTSTRAP_MARKER, prompt)
+            self.assertNotIn("[DUAL_CODEX_CANONICAL_BOOTSTRAP]", prompt)
+            self.assertIn("Begin inline bootstrap", prompt)
             self.assertIn("AGENTS.md", prompt)
             self.assertIn("skills", prompt)
             self.assertTrue(result.metadata["configured_actor"])

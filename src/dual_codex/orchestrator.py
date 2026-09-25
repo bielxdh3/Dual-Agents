@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from .bootstrap import canonical_instructions_root
 from .codex import _delegate_to_configured_actor
 from .codex import configured_actor_provenance, run_codex_for_role
 from .config import ConfigError, OrchestratorConfig
+from .delegation import RepositoryLock
 from .git import ensure_git_repository, status_and_diff, status_porcelain
 from .report import atomic_write_json, dump_json, load_json, render_markdown
 
@@ -44,6 +46,12 @@ def _schema(config: OrchestratorConfig, name: str) -> Path:
 
 
 def execute(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
+    lock = RepositoryLock(config.runs_dir, config.repository, "run-" + uuid4().hex)
+    with lock:
+        return _execute_locked(config, task_file)
+
+
+def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
     task_file = task_file.expanduser().resolve()
     task = _read(task_file).strip()
     if not task:

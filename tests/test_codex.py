@@ -65,7 +65,7 @@ class CodexCommandTests(unittest.TestCase):
             canonical_root.mkdir()
             skill_path = canonical_root / "skills" / "ponytail" / "SKILL.md"
             (canonical_root / "AGENTS.md").write_text("Follow global policy.\n", encoding="utf-8")
-            for name in ARCHITECT_BASELINE:
+            for name in (*ARCHITECT_BASELINE, "task-specific"):
                 skill = canonical_root / "skills" / name / "SKILL.md"
                 skill.parent.mkdir(parents=True, exist_ok=True)
                 skill.write_text(f"# {name}\n", encoding="utf-8")
@@ -80,7 +80,16 @@ class CodexCommandTests(unittest.TestCase):
             def dispatch_architect_plan(skills_loaded):
                 def write_architect_plan(**kwargs):
                     kwargs["output_path"].write_text(
-                        json.dumps({"skills_loaded": skills_loaded}),
+                        json.dumps(
+                            {
+                                "summary": "Plan summary",
+                                "steps": [],
+                                "acceptance_criteria": [],
+                                "risks": [],
+                                "files_to_inspect": [],
+                                "skills_loaded": skills_loaded,
+                            }
+                        ),
                         encoding="utf-8",
                     )
                     return expected
@@ -98,13 +107,11 @@ class CodexCommandTests(unittest.TestCase):
                         schema_path=root / "schema.json",
                     )
 
-            with self.assertRaisesRegex(ValueError, "skills_loaded"):
-                dispatch_architect_plan([])
-
-            result = dispatch_architect_plan(ARCHITECT_BASELINE)
+            result = dispatch_architect_plan(["task-specific"])
 
             self.assertIs(result, expected)
-            self.assertEqual(result.metadata["canonical_bootstrap_selected_skills"], ARCHITECT_BASELINE)
+            self.assertEqual(result.metadata["canonical_bootstrap_host_loaded_skills"], ARCHITECT_BASELINE)
+            self.assertEqual(result.metadata["canonical_bootstrap_actor_selected_skills"], ["task-specific"])
             self.assertEqual(
                 result.metadata["canonical_bootstrap_skill_digests"]["ponytail"],
                 hashlib.sha256(skill_path.read_bytes()).hexdigest(),
@@ -533,6 +540,7 @@ class CodexCommandTests(unittest.TestCase):
             self.assertFalse(transport_path.exists())
             self.assertLessEqual(len(control_message), TERMINAL_INLINE_MESSAGE_MAX)
             self.assertEqual(manager.ensure.call_args.kwargs["role"], "architect")
+            self.assertEqual(manager.ensure.call_args.kwargs["approval_policy"], "never")
             self.assertEqual(manager.ensure.call_args.kwargs["add_dirs"], ())
             self.assertTrue(artifact.is_relative_to(output_path.parent.resolve()))
             self.assertEqual(list(repository.glob(".dual-codex-task-*.md")), [])

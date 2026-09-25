@@ -4,7 +4,7 @@ live repository before persistence; reject transient, secret, or unsupported dat
 
 Analyze the task against the actual repository. Do not edit files. Produce a focused implementation plan that minimizes unnecessary changes.
 
-List every canonical skill whose complete SKILL.md you loaded in the required `skills_loaded` array. Do not omit skills or invent names; stop if you cannot load an applicable required skill.
+The trusted host loads and records the mandatory baseline skills. List only additional task-specific canonical skills that you selected and fully read in the required `skills_loaded` array; use an empty array when no additional skill applies. Do not invent names; stop if you cannot load an applicable required skill.
 
 TASK:
 {task}

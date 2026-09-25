@@ -17,7 +17,6 @@ from typing import Iterable
 
 
 CANONICAL_INSTRUCTIONS_ROOT = Path(r"C:\CodexGlobal")
-BOOTSTRAP_MARKER = "[DUAL_CODEX_CANONICAL_BOOTSTRAP]"
 _DEFAULT_SELECTED_SKILLS = (
     "memory",
     "ponytail",
@@ -42,6 +41,8 @@ class CanonicalBootstrap:
     skill_catalog_sha256: str = ""
     artifact_source_sha256: str = ""
     artifact_source_files: tuple[tuple[str, str], ...] = ()
+    host_loaded_skills: tuple[str, ...] = ()
+    actor_selected_skills: tuple[str, ...] = ()
 
     def metadata(self) -> dict[str, object]:
         artifact_source_files = dict(self.artifact_source_files)
@@ -60,6 +61,8 @@ class CanonicalBootstrap:
             for relative, digest in self.source_files
             if relative.startswith("skills/") and relative.endswith("/SKILL.md")
         }
+        host_digests = {name: skill_digests[name] for name in self.host_loaded_skills if name in skill_digests}
+        actor_digests = {name: skill_digests[name] for name in self.actor_selected_skills if name in skill_digests}
         return {
             "canonical_bootstrap_required": True,
             "canonical_bootstrap_source": "machine-wide",
@@ -73,6 +76,10 @@ class CanonicalBootstrap:
             "canonical_bootstrap_delivery": delivery,
             "canonical_bootstrap_selected_skills": list(self.selected_skills),
             "canonical_bootstrap_skill_digests": skill_digests,
+            "canonical_bootstrap_host_loaded_skills": list(self.host_loaded_skills),
+            "canonical_bootstrap_host_loaded_skill_digests": host_digests,
+            "canonical_bootstrap_actor_selected_skills": list(self.actor_selected_skills),
+            "canonical_bootstrap_actor_selected_skill_digests": actor_digests,
             "canonical_bootstrap_skill_catalog": dict(self.skill_catalog),
             "canonical_bootstrap_skill_catalog_sha256": self.skill_catalog_sha256,
             "canonical_bootstrap_source_files": {
@@ -215,12 +222,13 @@ def create_canonical_bootstrap(
     )
     if artifact_dir is None:
         return CanonicalBootstrap(
-            source_root,
-            source_sha256,
+            source_root=source_root,
+            source_sha256=source_sha256,
             selected_skills=selected,
             source_files=source_files,
             skill_catalog=skill_catalog,
             skill_catalog_sha256=skill_catalog_sha256,
+            host_loaded_skills=selected,
         )
     destination = artifact_dir.expanduser().resolve()
     destination.mkdir(parents=True, exist_ok=True)
@@ -231,17 +239,18 @@ def create_canonical_bootstrap(
         with os.fdopen(fd, "wb") as handle:
             handle.write(content)
         return CanonicalBootstrap(
-            source_root,
-            source_sha256,
-            path,
-            hashlib.sha256(content).hexdigest(),
-            "ephemeral-run-artifact",
-            selected,
-            source_files,
-            skill_catalog,
-            skill_catalog_sha256,
-            source_sha256,
-            source_files,
+            source_root=source_root,
+            source_sha256=source_sha256,
+            artifact_path=path,
+            artifact_sha256=hashlib.sha256(content).hexdigest(),
+            mechanism="ephemeral-run-artifact",
+            selected_skills=selected,
+            source_files=source_files,
+            skill_catalog=skill_catalog,
+            skill_catalog_sha256=skill_catalog_sha256,
+            artifact_source_sha256=source_sha256,
+            artifact_source_files=source_files,
+            host_loaded_skills=selected,
         )
     except BaseException:
         try:
@@ -258,20 +267,16 @@ def finalize_architect_bootstrap(
 ) -> CanonicalBootstrap:
     """Verify the Architect's reported skill set against canonical files."""
 
-    if not isinstance(selected_skills, list) or not selected_skills or any(
+    if not isinstance(selected_skills, list) or any(
         not isinstance(name, str) for name in selected_skills
     ):
-        raise ValueError("Architect plan must list the loaded canonical skills in 'skills_loaded'.")
-    names = _normalise_skill_names(selected_skills)
-    if len(names) != len(selected_skills):
+        raise ValueError("Architect plan must list actor-selected canonical skills in 'skills_loaded'.")
+    reported = _normalise_skill_names(selected_skills)
+    if len(reported) != len(selected_skills):
         raise ValueError("Architect plan 'skills_loaded' must not contain duplicate skill names.")
-    missing_mandatory = [name for name in _MANDATORY_ARCHITECT_SKILLS if name not in names]
-    if missing_mandatory:
-        raise ValueError(
-            "Architect plan 'skills_loaded' must include the mandatory baseline skills: "
-            + ", ".join(missing_mandatory)
-            + "."
-        )
+    baseline = _normalise_skill_names(_MANDATORY_ARCHITECT_SKILLS)
+    actor_selected = tuple(name for name in reported if name not in baseline)
+    names = _normalise_skill_names((*baseline, *actor_selected))
 
     catalog = dict(bootstrap.skill_catalog)
     missing_from_catalog = [name for name in names if name not in catalog]
@@ -307,6 +312,8 @@ def finalize_architect_bootstrap(
         skill_catalog_sha256=bootstrap.skill_catalog_sha256,
         artifact_source_sha256=bootstrap.artifact_source_sha256,
         artifact_source_files=bootstrap.artifact_source_files,
+        host_loaded_skills=baseline,
+        actor_selected_skills=actor_selected,
     )
 
 
@@ -333,17 +340,10 @@ def configured_actor_prompt(
     role: str,
     bootstrap: CanonicalBootstrap | None = None,
 ) -> tuple[str, CanonicalBootstrap]:
-    """Bind a phase prompt to the machine-wide bootstrap requirement.
-
-    The marker makes the operation idempotent when a provider adapter and the
-    control-plane seam both prepare the same prompt.  The role is generated by
-    trusted control-plane code, never parsed from model output.
-    """
+    """Bind a phase prompt to trusted, host-loaded canonical bootstrap state."""
 
     bootstrap = bootstrap or create_canonical_bootstrap(role=role)
     text = str(prompt)
-    if BOOTSTRAP_MARKER in text:
-        return text, bootstrap
     deferred_architect_skills = role == "architect"
     artifact = bootstrap.artifact_path
     if artifact is None:
@@ -373,8 +373,9 @@ def configured_actor_prompt(
                 "ask the user to choose or identify skills. If a required skill is unavailable, "
                 "stop without asking for clarification. Do not inspect repository files, plan, "
                 "edit, or run task commands until AGENTS.md and all selected skills are loaded. "
-                "In the final plan, list every fully loaded skill directory name in the required "
-                "top-level skills_loaded field so the control plane can verify its provenance. "
+                "In the final plan, list only the additional task-specific skills you loaded in "
+                "this turn in the required top-level skills_loaded field so the control plane "
+                "can verify their provenance. The host records mandatory baseline skills separately. "
             )
         else:
             source_description = (
@@ -404,7 +405,6 @@ def configured_actor_prompt(
             "canonical policy; do not attempt any bootstrap filesystem access."
         )
     prefix = (
-        f"{BOOTSTRAP_MARKER}\n"
         f"{transport}\n"
         f"Canonical source path: {bootstrap.source_root}; source_sha256={bootstrap.source_sha256}. "
         f"{skill_status}\n"

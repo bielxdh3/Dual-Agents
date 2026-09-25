@@ -23,6 +23,7 @@ from .git import ensure_git_repository, head_revision, status_and_diff, status_p
 from .live_events import LiveEventJournal, repository_identity
 from .paths import path_identity_key
 from .process import CommandError, CommandResult
+from .providers import provider_supports_role
 from .registry import login_status
 from .report import (
     EXECUTOR_REPORT_FIELDS,
@@ -548,18 +549,28 @@ class RepositoryLock:
                 return
             except FileExistsError:
                 try:
-                    existing = json.loads(self.path.read_text(encoding="utf-8"))
+                    existing_text = self.path.read_text(encoding="utf-8")
+                    existing = json.loads(existing_text)
                     pid = int(existing.get("pid", 0))
                 except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
                     raise DelegationError(
                         f"Repository lock exists and cannot be inspected: {self.path}"
                     ) from exc
-                if _pid_alive(pid):
+                stored_start = existing.get("process_start")
+                live_start = _safe_process_start_token(pid) if _pid_alive(pid) else None
+                if _pid_alive(pid) and (
+                    not isinstance(stored_start, str)
+                    or not stored_start
+                    or live_start is None
+                    or live_start == stored_start
+                ):
                     raise DelegationError(
-                        "Repository is already delegated; active request "
+                        "Repository is already delegated or in use; active request "
                         f"'{existing.get('request_id', 'unknown')}'."
                     )
                 try:
+                    if self.path.read_text(encoding="utf-8") != existing_text:
+                        continue
                     self.path.unlink()
                 except FileNotFoundError:
                     continue
@@ -572,7 +583,18 @@ class RepositoryLock:
             return
         try:
             existing = json.loads(self.path.read_text(encoding="utf-8"))
-            if existing.get("request_id") == self.request_id and int(existing.get("pid", 0)) == os.getpid():
+            current_start = _safe_process_start_token(os.getpid())
+            stored_start = existing.get("process_start")
+            same_process = (
+                current_start is None
+                or stored_start is None
+                or stored_start == current_start
+            )
+            if (
+                existing.get("request_id") == self.request_id
+                and int(existing.get("pid", 0)) == os.getpid()
+                and same_process
+            ):
                 self.path.unlink(missing_ok=True)
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             pass
@@ -646,6 +668,7 @@ def _result(
     diff_file: str = "",
     run_directory: str = "",
     executor_report_file: str = "",
+    executor_report_actor: str = "",
     stderr_file: str = "",
     terminal_session_id: str = "",
     terminal_turn_start: str = "",
@@ -707,6 +730,7 @@ def _result(
             "diff_file": diff_file,
             "run_directory": run_directory,
             "executor_report_file": executor_report_file,
+            "executor_report_actor": executor_report_actor,
             "stderr_file": stderr_file,
             "terminal_session_id": terminal_session_id,
             "terminal_turn_start": terminal_turn_start,
@@ -1362,16 +1386,6 @@ def delegate(
     run_id = ""
     try:
         _emit(output, started, "[1/5] Validating request")
-        ensure_git_repository(request.repository)
-        initial_git_status = status_porcelain(request.repository)
-        dirty = bool(initial_git_status.strip())
-        if dirty:
-            if config.require_clean_git and not allow_dirty:
-                raise DelegationError(
-                    "Target repository has uncommitted changes. Commit/stash them or use "
-                    "--allow-dirty / require_clean_git = false explicitly."
-                )
-            output("[warning] Target repository is dirty; continuing by explicit policy.")
         try:
             agent = config.agent_for_role("executor")
         except ConfigError as exc:
@@ -1391,7 +1405,9 @@ def delegate(
         executor_label = agent.label
         executor_sandbox = agent.sandbox
         _emit(output, started, f"[2/5] Resolving executor account: {executor_account}")
-        if agent.backend not in {"antigravity", "app_server"}:
+        from .providers import supported_roles_for_backend
+
+        if "executor" not in supported_roles_for_backend(agent.backend):
             return _failed_outcome(
                 result_file=result_file,
                 request_id=request_id,
@@ -1432,6 +1448,16 @@ def delegate(
         output(f"Target repository: {request.repository}")
         run_id = _run_id(config, request)
         with RepositoryLock(config.runs_dir, request.repository, request.request_id, run_id):
+            ensure_git_repository(request.repository)
+            initial_git_status = status_porcelain(request.repository)
+            dirty = bool(initial_git_status.strip())
+            if dirty:
+                if config.require_clean_git and not allow_dirty:
+                    raise DelegationError(
+                        "Target repository has uncommitted changes. Commit/stash them or use "
+                        "--allow-dirty / require_clean_git = false explicitly."
+                    )
+                output("[warning] Target repository is dirty; continuing by explicit policy.")
             run_dir = _run_directory(config, request, run_id)
             try:
                 run_journal = LiveEventJournal(
@@ -1468,15 +1494,16 @@ def delegate(
                 started,
                 f"[3/5] Starting executor: {executor_account} (sandbox={executor_sandbox})",
             )
-            report_path = run_dir / "executor-report.json"
-            def _run_executor_once(selected_config, selected_agent) -> CommandResult:
+            def _run_executor_once(selected_config, selected_agent, attempt: int) -> tuple[CommandResult, Path]:
+                attempt_report = run_dir / f"executor-report-attempt-{attempt}-{selected_agent.account_name}.json"
+                attempt_report.unlink(missing_ok=True)
                 try:
-                    return run_codex_exec(
+                    result = run_codex_exec(
                         config=selected_config,
                         agent=selected_agent,
                         repository=request.repository,
                         prompt=executor_prompt,
-                        output_path=report_path,
+                        output_path=attempt_report,
                         schema_path=config.project_root / "schemas" / "delegation-report.schema.json",
                         check=False,
                         task_artifact_path=task_artifact,
@@ -1489,15 +1516,17 @@ def delegate(
                         reuse_existing=reuse_existing,
                     )
                 except (OSError, CommandError) as exc:
-                    return CommandResult(
+                    result = CommandResult(
                         [selected_agent.backend],
                         1,
                         "",
                         sanitize_text(str(exc)),
                         {"availability_failure_class": "process_unavailable" if isinstance(exc, OSError) else "provider_runtime_unavailable"},
                     )
+                return result, attempt_report
 
-            command_result = _run_executor_once(config, agent)
+            command_result, report_path = _run_executor_once(config, agent, 1)
+            report_actor = agent.account_name
             primary_actor = agent.account_name
             fallback_enabled = bool(getattr(config, "fallback_enabled", False))
             fallback_used = False
@@ -1511,7 +1540,7 @@ def delegate(
                     if account_name != primary_actor
                     and config.accounts[account_name].enabled
                     and "executor" in config.accounts[account_name].fallback_roles
-                    and config.accounts[account_name].backend in {"antigravity", "app_server"}
+                    and provider_supports_role(config, config.accounts[account_name], "executor")
                 ]
                 if candidates:
                     failed_actor = primary_actor
@@ -1520,7 +1549,8 @@ def delegate(
                     fallback_name = candidates[0]
                     fallback_config = replace(config, roles={**config.roles, "executor": fallback_name})
                     fallback_agent = fallback_config.agent_for_role("executor")
-                    command_result = _run_executor_once(fallback_config, fallback_agent)
+                    command_result, report_path = _run_executor_once(fallback_config, fallback_agent, 2)
+                    report_actor = fallback_agent.account_name
                     fallback_used = True
                     agent = fallback_agent
                     executor_account = agent.account_name
@@ -1563,6 +1593,7 @@ def delegate(
             _write_text(stdout_path, command_result.stdout)
             _write_text(stderr_path, command_result.stderr)
             report, report_error = _read_report(report_path)
+            accepted_report_actor = report_actor if report is not None else ""
             _emit(output, started, "[4/5] Capturing diff and validation results")
             try:
                 git_status, diff_file, changed = _capture_git(request.repository, run_dir)
@@ -1613,6 +1644,7 @@ def delegate(
                 diff_file=diff_file,
                 run_directory=str(run_dir),
                 executor_report_file=str(report_path) if report_path.exists() else "",
+                executor_report_actor=accepted_report_actor,
                 stderr_file=str(stderr_path),
                 terminal_session_id=command_result.metadata.get("terminal_session_id", ""),
                 terminal_turn_start=command_result.metadata.get("terminal_turn_start", ""),

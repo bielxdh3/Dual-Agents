@@ -12,6 +12,7 @@ import time
 import unittest
 from urllib.request import Request, urlopen
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from dual_codex.config import load_config
 from dual_codex.claude_code import _save_session
@@ -29,6 +30,19 @@ from dual_codex.dashboard import (
 from dual_codex.live_events import LiveEventJournal
 from dual_codex.paths import same_path
 from dual_codex.providers import ProviderCapabilities, provider_default_label
+
+
+def _mutation_headers(server: DashboardServer, *, origin: str | None = None, content_type: str = "application/json") -> dict[str, str]:
+    with urlopen(server.url, timeout=3) as response:
+        cookies = [value.split(";", 1)[0] for value in response.headers.get_all("Set-Cookie", [])]
+    cookie_values = dict(value.split("=", 1) for value in cookies)
+    token = cookie_values["dual_codex_csrf"]
+    return {
+        "Content-Type": content_type,
+        "Origin": origin or server.url.rstrip("/"),
+        "Cookie": "; ".join(cookies),
+        "X-Dual-Codex-CSRF": token,
+    }
 
 
 class DashboardTests(unittest.TestCase):
@@ -55,7 +69,7 @@ label = "Secondary"
 codex_home = "profiles/secondary"
 model = ""
 reasoning_effort = "high"
-backend = "windows"
+backend = "app_server"
 
 [roles]
 orchestrator = "primary"
@@ -142,9 +156,9 @@ executor = "secondary"
     def test_primary_and_fallback_roles_persist_in_one_mutation(self) -> None:
         service = DashboardService(self.config)
         result = service.set_roles(
-            {"account": "primary", "roles": ["architect"], "fallback_roles": ["reviewer", "executor"]}
+            {"account": "primary", "roles": ["architect"], "fallback_roles": ["reviewer"]}
         )
-        self.assertEqual(result["fallback_roles"], ["reviewer", "executor"])
+        self.assertEqual(result["fallback_roles"], ["reviewer"])
         service.set_roles({"account": "primary", "roles": ["orchestrator", "architect"]})
         service.update_profile("primary", {"fallback_roles": ["reviewer"]})
         persisted = load_config(self.config_path)
@@ -310,9 +324,12 @@ console.log(JSON.stringify({
             DashboardService(self.config).save_settings("primary", {"scope": "current_thread"})
 
     def test_role_assignment_api_uses_registry_validation(self) -> None:
-        result = DashboardService(self.config).assign({"role": "executor", "account": "primary"})
-        self.assertEqual(result["account"], "primary")
-        self.assertEqual(load_config(self.config_path).roles["executor"], "primary")
+        service = DashboardService(self.config)
+        with self.assertRaisesRegex(ValueError, "does not support primary role"):
+            service.assign({"role": "executor", "account": "primary"})
+        self.assertEqual(load_config(self.config_path).roles["executor"], "secondary")
+        result = service.assign({"role": "executor", "account": "secondary"})
+        self.assertEqual(result["account"], "secondary")
 
     def test_role_set_updates_complete_map_and_transfers_roles(self) -> None:
         result = DashboardService(self.config).set_roles(
@@ -350,7 +367,7 @@ console.log(JSON.stringify({
             request = Request(
                 server.url + "api/roles/set",
                 data=json.dumps({"account": "primary", "roles": ["orchestrator", "architect", "reviewer"]}).encode(),
-                headers={"Content-Type": "application/json"},
+                headers=_mutation_headers(server),
                 method="POST",
             )
             with urlopen(request, timeout=3) as response:
@@ -556,8 +573,11 @@ console.log(JSON.stringify({
         try:
             with urlopen(server.url, timeout=3) as response:
                 html = response.read().decode("utf-8")
+                response_cookies = response.headers.get_all("Set-Cookie", [])
             self.assertEqual(response.status, 200)
             self.assertIn("Dual Agents", html)
+            self.assertTrue(any(value.startswith("dual_codex_csrf=") for value in response_cookies))
+            self.assertTrue(any(value.startswith("dual_codex_session=") for value in response_cookies))
             with urlopen(server.url + "api/status", timeout=3) as response:
                 status = json.loads(response.read())
             self.assertEqual(response.status, 200)
@@ -600,7 +620,7 @@ console.log(JSON.stringify({
                         "enabled": True,
                     }
                 ).encode(),
-                headers={"Content-Type": "application/json"},
+                headers=_mutation_headers(server),
                 method="POST",
             )
             with urlopen(request, timeout=3) as response:
@@ -617,7 +637,7 @@ console.log(JSON.stringify({
             request = Request(
                 server.url + "api/accounts/codex-b",
                 data=b'{"label":"Codex B renamed"}',
-                headers={"Content-Type": "application/json"},
+                headers=_mutation_headers(server),
                 method="PATCH",
             )
             with urlopen(request, timeout=3) as response:
@@ -628,7 +648,7 @@ console.log(JSON.stringify({
             request = Request(
                 server.url + "api/accounts/codex-b",
                 data=b'{"confirm":true}',
-                headers={"Content-Type": "application/json"},
+                headers=_mutation_headers(server),
                 method="DELETE",
             )
             with urlopen(request, timeout=3) as response:
@@ -648,7 +668,7 @@ console.log(JSON.stringify({
             request = Request(
                 server.url + "api/accounts/does-not-exist/settings",
                 data=b'{"model":"x"}',
-                headers={"Content-Type": "application/json"},
+                headers=_mutation_headers(server),
                 method="PATCH",
             )
             with self.assertRaises(Exception):
@@ -656,11 +676,76 @@ console.log(JSON.stringify({
             request = Request(
                 server.url + "api/accounts/primary/settings",
                 data=b'{"command":"dir"}',
-                headers={"Content-Type": "application/json"},
+                headers=_mutation_headers(server),
                 method="PATCH",
             )
             with self.assertRaises(Exception):
                 urlopen(request, timeout=3)
+        finally:
+            server.httpd.shutdown()
+            server.httpd.server_close()
+            thread.join(timeout=3)
+
+    def test_cross_origin_null_post_and_wrong_content_type_are_rejected(self) -> None:
+        server = DashboardServer(self.config)
+        thread = server.serve_in_thread()
+        try:
+            request = Request(
+                server.url + "api/fallback",
+                data=b'{"enabled":true}',
+                headers=_mutation_headers(server, origin="null"),
+                method="POST",
+            )
+            with self.assertRaises(HTTPError) as raised:
+                urlopen(request, timeout=3)
+            self.assertEqual(raised.exception.code, 403)
+            raised.exception.close()
+            self.assertFalse(load_config(self.config_path).fallback_enabled)
+
+            request = Request(
+                server.url + "api/fallback",
+                data=b'{"enabled":true}',
+                headers=_mutation_headers(server, content_type="text/plain"),
+                method="POST",
+            )
+            with self.assertRaises(HTTPError) as raised:
+                urlopen(request, timeout=3)
+            self.assertEqual(raised.exception.code, 403)
+            raised.exception.close()
+        finally:
+            server.httpd.shutdown()
+            server.httpd.server_close()
+            thread.join(timeout=3)
+
+    def test_csrf_token_is_bound_to_one_dashboard_session(self) -> None:
+        server = DashboardServer(self.config)
+        thread = server.serve_in_thread()
+        try:
+            first = _mutation_headers(server)
+            second = _mutation_headers(server)
+            first_cookies = dict(
+                cookie.strip().split("=", 1) for cookie in first["Cookie"].split(";")
+            )
+            second_cookies = dict(
+                cookie.strip().split("=", 1) for cookie in second["Cookie"].split(";")
+            )
+            self.assertNotEqual(first_cookies["dual_codex_session"], second_cookies["dual_codex_session"])
+            self.assertNotEqual(first_cookies["dual_codex_csrf"], second_cookies["dual_codex_csrf"])
+
+            first["Cookie"] = (
+                f"dual_codex_session={first_cookies['dual_codex_session']}; "
+                f"dual_codex_csrf={second_cookies['dual_codex_csrf']}"
+            )
+            request = Request(
+                server.url + "api/fallback",
+                data=b'{"enabled":true}',
+                headers=first,
+                method="POST",
+            )
+            with self.assertRaises(HTTPError) as raised:
+                urlopen(request, timeout=3)
+            self.assertEqual(raised.exception.code, 403)
+            raised.exception.close()
         finally:
             server.httpd.shutdown()
             server.httpd.server_close()

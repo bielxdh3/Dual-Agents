@@ -8,7 +8,6 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from .bootstrap import (
-    BOOTSTRAP_MARKER,
     bootstrap_artifact_dir,
     cleanup_canonical_bootstrap,
     configured_actor_prompt,
@@ -16,6 +15,7 @@ from .bootstrap import (
     finalize_architect_bootstrap,
     select_required_skills,
 )
+from .architect_plan import ArchitectPlanError, parse_architect_result
 from .config import AgentConfig, SUPPORTED_ROLES
 from .paths import path_identity_key, same_path
 from .process import CommandError, CommandResult, codex_environment, run_command
@@ -166,6 +166,7 @@ def run_codex_exec(
         env=codex_environment(agent),
         stdin=prompt,
         check=check,
+        timeout=None,
         progress=progress,
     )
 
@@ -274,7 +275,20 @@ def _annotate_provider_result(
     if role == "architect" and bootstrap is not None:
         if output_path is None:
             raise ValueError("Architect output path is required for canonical skill provenance.")
-        bootstrap = _finalize_architect_output(bootstrap, output_path)
+        try:
+            if result.stdout:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_text(result.stdout, encoding="utf-8")
+            bootstrap = _finalize_architect_output(bootstrap, output_path)
+        except ArchitectPlanError as exc:
+            metadata = dict(result.metadata)
+            metadata["architect_result_validation_error"] = str(exc)
+            return replace(
+                result,
+                returncode=1,
+                stderr=f"Architect plan validation failed: {exc}",
+                metadata=metadata,
+            )
     result.metadata.update(
         configured_actor_provenance(
             agent=agent,
@@ -294,35 +308,47 @@ def _annotate_provider_result(
 
 def _finalize_architect_output(bootstrap, output_path: Path):
     try:
-        architect_plan = json.loads(output_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ValueError("Architect result is unavailable for canonical skill provenance.") from exc
-    if not isinstance(architect_plan, dict):
-        raise ValueError("Architect result must be an object for canonical skill provenance.")
-    return finalize_architect_bootstrap(bootstrap, architect_plan.get("skills_loaded"))
+        raw = output_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ArchitectPlanError("Architect result is unavailable for local plan validation.") from exc
+    try:
+        architect_plan = parse_architect_result(raw)
+        finalized = finalize_architect_bootstrap(bootstrap, architect_plan["skills_loaded"])
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raw_path = output_path.with_suffix(output_path.suffix + ".raw.txt")
+        try:
+            raw_path.write_text(raw, encoding="utf-8")
+        except OSError:
+            raw_path = output_path
+        raise ArchitectPlanError(f"{exc} Completed output preserved at {raw_path}.") from exc
+    architect_plan["skills_loaded"] = list(finalized.actor_selected_skills)
+    output_path.write_text(json.dumps(architect_plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return finalized
 
 
 def _ensure_actor_supports_role(agent: AgentConfig, role: str) -> None:
     from .providers import supported_roles_for_backend
 
-    if agent.backend == "api" and role == "architect":
-        raise ValueError(
-            "OpenAI-compatible API profiles cannot serve the Architect role because they cannot read "
-            "the canonical task-specific skills required by the bootstrap. Configure a filesystem-capable backend."
-        )
-    if agent.backend == "claude_code" and role == "architect":
-        raise ValueError(
-            "Restricted Claude Code profiles cannot read the canonical task-specific skills required by the "
-            "Architect bootstrap. Configure an Architect backend with explicit canonical skill access."
-        )
-    if agent.backend == "api" and role == "executor":
-        raise ValueError("API profiles do not provide the workspace-write Executor role.")
-    if agent.backend == "antigravity" and role != "executor":
-        raise ValueError("Antigravity backend is reserved for the Executor role.")
     supported_roles = supported_roles_for_backend(agent.backend)
     if not supported_roles:
         raise ValueError(f"Unsupported Codex backend '{agent.backend}'; no fallback is permitted.")
     if role not in supported_roles:
+        if role == "architect" and agent.backend == "claude_code":
+            raise ValueError(
+                "Restricted Claude Code profiles cannot read the canonical task-specific skills required by "
+                "the Architect bootstrap. Configure an Architect backend with explicit canonical skill access."
+            )
+        if role == "architect" and agent.backend == "api":
+            raise ValueError(
+                "API profiles cannot serve the Architect role because they cannot read the canonical "
+                "task-specific skills required by the bootstrap."
+            )
+        if role == "executor" and agent.backend == "api":
+            raise ValueError("API profiles do not provide the workspace-write Executor role.")
+        if agent.backend == "antigravity":
+            raise ValueError("The Antigravity backend is reserved for the Executor role.")
+        if role == "executor" and agent.backend == "windows":
+            raise ValueError("The Windows backend cannot serve the Executor role in delegate mode; no fallback is permitted.")
         raise ValueError(
             f"Backend '{agent.backend}' cannot serve the configured '{role}' role."
         )
@@ -368,7 +394,7 @@ def _delegate_to_configured_actor(
         selected_skills=select_required_skills(role, task),
     )
     canonical_root = bootstrap.source_root
-    prepared_prompt, bootstrap = configured_actor_prompt(task, role=role, bootstrap=bootstrap)
+    prepared_prompt = task
     dispatch = runner
     primary_agent = agent
     actual_agent = agent
@@ -387,6 +413,7 @@ def _delegate_to_configured_actor(
             prompt=prepared_prompt,
             output_path=output_path,
             schema_path=schema_path,
+            bootstrap=bootstrap,
             request_id=request_id,
             run_id=run_id,
             progress=progress,
@@ -498,6 +525,7 @@ def run_codex_for_role(
     prompt: str,
     output_path: Path,
     schema_path: Path,
+    bootstrap=None,
     request_id: str = "",
     run_id: str = "",
     progress: Callable[[str], None] | None = None,
@@ -507,7 +535,6 @@ def run_codex_for_role(
         raise ValueError(f"Unsupported configured role '{role}'.")
     configured = False
     canonical_root = None
-    bootstrap = None
     configured_resolver = getattr(config, "agent_for_role", None)
     configured_agent = None
     if callable(configured_resolver):
@@ -524,18 +551,13 @@ def run_codex_for_role(
         raise ValueError(f"Required role '{role}' is unassigned.")
     _ensure_actor_supports_role(agent, role)
     if callable(configured_resolver):
-        if BOOTSTRAP_MARKER not in prompt:
+        if bootstrap is None:
             bootstrap = create_canonical_bootstrap(
                 role=role,
                 artifact_dir=bootstrap_artifact_dir(repository, output_path),
                 selected_skills=select_required_skills(role, prompt),
             )
-            prompt, bootstrap = configured_actor_prompt(prompt, role=role, bootstrap=bootstrap)
-        else:
-            bootstrap = create_canonical_bootstrap(
-                role=role,
-                selected_skills=select_required_skills(role, prompt),
-            )
+        prompt, bootstrap = configured_actor_prompt(prompt, role=role, bootstrap=bootstrap)
         canonical_root = bootstrap.source_root
     if agent.backend == "api":
         from .providers import api_adapter
@@ -626,6 +648,7 @@ def run_codex_for_role(
                 role=role,
                 configured_actor=configured,
                 require_workspace_ready=(role == "executor" and agent.sandbox == "workspace-write"),
+                canonical_bootstrap=bootstrap,
                 progress=progress,
             )
             _raise_dispatch_failure(result, role=role, agent=agent,
@@ -806,7 +829,12 @@ def run_codex_terminal(
             "agent": agent,
             "role": resolved_role,
             "repository": repository,
-            "approval_policy": "never" if agent.sandbox == "workspace-write" else "on-request",
+            # Configured Architects run unattended in a read-only sandbox. Do
+            # not let host-tool approvals turn bootstrap reads into a human
+            # interaction; sandbox denials still fail closed.
+            "approval_policy": "never"
+            if resolved_role == "architect" or agent.sandbox == "workspace-write"
+            else "on-request",
             "add_dirs": add_dirs,
             "reuse_existing": reuse_existing,
         }

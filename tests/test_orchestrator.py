@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from dual_codex.config import AccountConfig, AgentConfig, OrchestratorConfig
+from dual_codex.delegation import DelegationError, RepositoryLock
 from dual_codex.orchestrator import execute
 from dual_codex.process import CommandResult
 
@@ -35,6 +36,41 @@ class OrchestratorTests(unittest.TestCase):
         )
         self._bootstrap_patch.start()
         self.addCleanup(self._bootstrap_patch.stop)
+
+    def test_run_and_delegate_share_repository_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "disposable-mission"
+            repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+            account = AccountConfig(
+                name="biel3",
+                label="Architect",
+                codex_home=root / "architect-home",
+                model="",
+                reasoning_effort="high",
+                backend="windows",
+            )
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=0,
+                require_clean_git=False,
+                codex_command="codex",
+                accounts={"biel3": account},
+                roles={"architect": "biel3"},
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+            )
+            task = root / "brief.md"
+            task.write_text("This must never dispatch while delegate owns the lock.", encoding="utf-8")
+            delegate_lock = RepositoryLock(config.runs_dir, repository, "active-delegate")
+            delegate_lock.acquire()
+            try:
+                with self.assertRaisesRegex(DelegationError, "already delegated or in use"):
+                    execute(config, task)
+            finally:
+                delegate_lock.release()
 
     def test_mission_dispatches_architect_and_app_server_executor_by_config(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -92,12 +128,7 @@ class OrchestratorTests(unittest.TestCase):
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
-                        "skills_loaded": [
-                            "memory",
-                            "ponytail",
-                            "project-phase-review",
-                            "project-security-review",
-                        ],
+                        "skills_loaded": [],
                     }
                 elif role == "executor":
                     payload = {

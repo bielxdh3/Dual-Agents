@@ -95,10 +95,15 @@ class ProviderCapabilities:
 
 _BACKEND_SUPPORTED_ROLES = {
     "app_server": tuple(SUPPORTED_ROLES),
-    "windows": tuple(SUPPORTED_ROLES),
+    # The standalone delegate accepts Antigravity and App Server only. Keep
+    # Windows Executor out of assignable roles until both execution paths and
+    # the dashboard expose distinct, explicit modes.
+    "windows": tuple(role for role in SUPPORTED_ROLES if role != "executor"),
     "antigravity": ("executor",),
     "api": ("orchestrator", "reviewer"),
-    "claude_code": ("reviewer", "executor"),
+    # The delegate protocol currently authorizes workspace-write execution
+    # only through Antigravity or App Server; keep the UI and registry aligned.
+    "claude_code": ("reviewer",),
 }
 
 
@@ -562,11 +567,7 @@ def api_adapter() -> OpenAICompatibleAdapter:
 def provider_supports_role(config: OrchestratorConfig, account: AccountConfig, role: str) -> bool:
     """Return role support from the provider capability boundary."""
 
-    if role == "executor" and account.backend == "api":
-        return False
-    if role == "architect" and account.backend == "claude_code":
-        return False
-    if role in {"architect", "reviewer", "orchestrator"} and account.backend == "antigravity":
+    if role not in supported_roles_for_backend(account.backend):
         return False
     try:
         return provider_capabilities(config, account).supports_role(role)

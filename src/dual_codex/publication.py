@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from .delegation import MissionAuthorization, PUBLICATION_ACTIONS
 from .paths import same_path
+from .git import run_git
 from .process import CommandResult, run_command
 
 
@@ -248,8 +249,19 @@ def _run(
     stdin: str | None = None,
 ) -> CommandResult:
     env = _host_env() if network else None
+    timeout = 120.0 if network and "push" in command else 45.0 if network else 30.0
     try:
-        return runner(command, cwd=cwd, env=env, stdin=stdin, check=False)
+        if command and Path(command[0]).name.casefold() in {"git", "git.exe"}:
+            return run_git(
+                command,
+                cwd=cwd,
+                runner=runner,
+                env=env,
+                stdin=stdin,
+                check=False,
+                timeout=timeout,
+            )
+        return runner(command, cwd=cwd, env=env, stdin=stdin, check=False, timeout=timeout)
     except (OSError, ValueError):
         return CommandResult(command, 126, "", "")
 

@@ -12,7 +12,6 @@ import threading
 import time
 from typing import Any, Callable, Mapping
 
-from .bootstrap import BOOTSTRAP_MARKER, CANONICAL_INSTRUCTIONS_ROOT
 from .config import AgentConfig, OrchestratorConfig
 from .live_events import LiveEventJournal
 from .paths import path_identity_key
@@ -1111,6 +1110,7 @@ def run_codex_app_server(
     run_id: str = "",
     role: str = "executor",
     configured_actor: bool = False,
+    canonical_bootstrap=None,
     require_workspace_ready: bool = False,
     progress: Callable[[str], None] | None = None,
 ) -> CommandResult:
@@ -1129,9 +1129,9 @@ def run_codex_app_server(
         "reasoning_effort": agent.reasoning_effort or "provider-default",
         "delegation_transport": "app_server",
         "fallback_used": False,
-        "canonical_bootstrap_required": BOOTSTRAP_MARKER in prompt,
-        "canonical_instructions_root": str(CANONICAL_INSTRUCTIONS_ROOT) if BOOTSTRAP_MARKER in prompt else "",
-        "canonical_bootstrap_source": "machine-wide" if BOOTSTRAP_MARKER in prompt else "",
+        "canonical_bootstrap_required": canonical_bootstrap is not None,
+        "canonical_instructions_root": str(canonical_bootstrap.source_root) if canonical_bootstrap is not None else "",
+        "canonical_bootstrap_source": "machine-wide" if canonical_bootstrap is not None else "",
         "app_server_session_id": session_id,
         "task_transport": "app_server",
         "task_artifact": str(task_artifact_path.resolve()) if task_artifact_path else "",

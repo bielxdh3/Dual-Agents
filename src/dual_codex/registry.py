@@ -28,6 +28,9 @@ from .claude_code import claude_status
 from .process import codex_environment, run_command
 
 
+INTERACTIVE_AUTH_TIMEOUT = 300.0
+
+
 InputFn = Callable[[str], str]
 OutputFn = Callable[[str], None]
 _SECTION = re.compile(r"^\s*\[([^]]+)\]\s*(?:#.*)?$")
@@ -288,6 +291,7 @@ def _run_login(config: OrchestratorConfig, account: AccountConfig) -> None:
             [config.codex_command, "login"],
             cwd=config.project_root,
             env=codex_environment(_agent_for_status(account)),
+            timeout=INTERACTIVE_AUTH_TIMEOUT,
         )
     except Exception as exc:
         raise RuntimeError(f"Codex login failed for account '{account.name}'.") from exc
@@ -594,12 +598,13 @@ def update_account_settings(
         new_fallback_roles = account.fallback_roles
     else:
         new_fallback_roles = tuple(dict.fromkeys(validate_role_name(role) for role in fallback_roles))
-    _validate_supported_roles(
-        name,
-        new_backend,
-        new_fallback_roles,
-        role_kind="fallback role(s)",
-    )
+    if fallback_roles is not None or new_backend != account.backend:
+        _validate_supported_roles(
+            name,
+            new_backend,
+            new_fallback_roles,
+            role_kind="fallback role(s)",
+        )
     if new_backend != account.backend:
         _validate_supported_roles(
             name,

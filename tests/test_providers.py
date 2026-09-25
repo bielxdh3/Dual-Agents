@@ -17,6 +17,7 @@ from dual_codex.providers import (
     api_adapter,
     provider_capabilities,
     resolve_antigravity_agent,
+    supported_roles_for_backend,
 )
 
 
@@ -73,6 +74,12 @@ other-family-high\tOther Family (High)
             project_root=root,
             config_path=root / "config.toml",
         )
+
+    def test_backend_role_matrix_matches_delegate_execution_modes(self) -> None:
+        self.assertEqual(supported_roles_for_backend("antigravity"), ("executor",))
+        self.assertIn("executor", supported_roles_for_backend("app_server"))
+        self.assertNotIn("executor", supported_roles_for_backend("windows"))
+        self.assertNotIn("executor", supported_roles_for_backend("claude_code"))
 
     def test_antigravity_catalog_normalizes_logical_models_and_exact_variants(self) -> None:
         rows = _parse_antigravity_models(self._AGY_CATALOG)

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import hmac
 import json
+import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
@@ -1249,7 +1252,16 @@ function latestMutationCanApply(sequence, latestSequence) {
 if (typeof globalThis !== 'undefined') globalThis.dualCodexDashboardState = {responseIsCurrent, latestMutationCanApply};
 
 async function get(path, opts) {
-  const response = await fetch(path, opts);
+  const options = {...(opts || {})};
+  const method = String(options.method || 'GET').toUpperCase();
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const cookie = document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith('dual_codex_csrf='));
+    const token = cookie ? decodeURIComponent(cookie.slice('dual_codex_csrf='.length)) : '';
+    const headers = new Headers(options.headers || {});
+    headers.set('X-Dual-Codex-CSRF', token);
+    options.headers = headers;
+  }
+  const response = await fetch(path, options);
   const payload = await response.json();
   if (!response.ok) throw Error(payload.error || 'Request failed');
   return payload;
@@ -1775,17 +1787,72 @@ class _Handler(BaseHTTPRequestHandler):
             return False
         origin = self.headers.get("Origin")
         if origin:
+            if origin.strip().casefold() == "null":
+                return False
             parsed = urllib.parse.urlsplit(origin)
-            if parsed.hostname and parsed.hostname.casefold() not in _SAFE_HOSTS:
+            if not parsed.hostname or parsed.hostname.casefold() not in _SAFE_HOSTS:
                 return False
         return True
 
-    def _send(self, status: int, payload: Any, content_type: str = "application/json") -> None:
+    def _same_origin(self) -> bool:
+        origin = self.headers.get("Origin", "").strip()
+        host = self.headers.get("Host", "").strip()
+        if not origin or origin.casefold() == "null" or not host:
+            return False
+        parsed = urllib.parse.urlsplit(origin)
+        return (
+            parsed.scheme == "http"
+            and parsed.netloc.casefold() == host.casefold()
+            and parsed.path in {"", "/"}
+            and not parsed.query
+            and not parsed.fragment
+        )
+
+    def _cookie_value(self, name: str) -> str:
+        values = []
+        for item in self.headers.get("Cookie", "").split(";"):
+            cookie_name, separator, value = item.strip().partition("=")
+            if separator and cookie_name == name:
+                values.append(urllib.parse.unquote(value))
+        return values[0] if len(values) == 1 else ""
+
+    def _session_csrf_token(self, session_id: str) -> str:
+        return hmac.new(
+            self.server.csrf_secret,
+            session_id.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def _mutation_allowed(self) -> bool:
+        if not self._same_origin():
+            return False
+        if self.headers.get("Content-Type", "").split(";", 1)[0].strip().casefold() != "application/json":
+            return False
+        session_id = self._cookie_value("dual_codex_session")
+        cookie_token = self._cookie_value("dual_codex_csrf")
+        supplied = self.headers.get("X-Dual-Codex-CSRF", "")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{43}", session_id):
+            return False
+        expected = self._session_csrf_token(session_id)
+        return bool(
+            secrets.compare_digest(cookie_token, expected)
+            and secrets.compare_digest(supplied, expected)
+        )
+
+    def _send(
+        self,
+        status: int,
+        payload: Any,
+        content_type: str = "application/json",
+        headers: tuple[tuple[str, str], ...] = (),
+    ) -> None:
         data = payload.encode("utf-8") if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        for name, value in headers:
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(data)
 
@@ -1880,10 +1947,31 @@ class _Handler(BaseHTTPRequestHandler):
         if ".." in path or "\\" in path or "\x00" in path:
             self._send(400, {"error": "Unsafe path."})
             return
+        if method in {"POST", "PATCH", "DELETE", "PUT"} and not self._mutation_allowed():
+            self._send(403, {"error": "Same-origin JSON request with a valid dashboard CSRF token required."})
+            return
         service = self.server.service
         try:
             if method == "GET" and path == "/":
-                self._send(200, HTML, "text/html")
+                session_id = self._cookie_value("dual_codex_session")
+                new_session = not session_id
+                if new_session:
+                    session_id = secrets.token_urlsafe(32)
+                csrf_token = self._session_csrf_token(session_id)
+                cookie_headers = []
+                if new_session:
+                    cookie_headers.append(
+                        ("Set-Cookie", f"dual_codex_session={session_id}; Path=/; HttpOnly; SameSite=Strict")
+                    )
+                cookie_headers.append(
+                    ("Set-Cookie", f"dual_codex_csrf={csrf_token}; Path=/; SameSite=Strict")
+                )
+                self._send(
+                    200,
+                    HTML,
+                    "text/html",
+                    headers=tuple(cookie_headers),
+                )
                 return
             if method == "GET" and path == "/static/styles.css":
                 self._send(200, STYLES, "text/css")
@@ -1975,6 +2063,7 @@ class _HTTPServer(ThreadingHTTPServer):
 
     def __init__(self, address: tuple[str, int], service: DashboardService) -> None:
         self.service = service
+        self.csrf_secret = secrets.token_bytes(32)
         super().__init__(address, _Handler)
 
 

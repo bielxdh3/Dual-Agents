@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 from dual_codex.config import load_config
+from dual_codex.config import AccountConfig
 from dual_codex.delegation import (
     DelegationError,
     InvalidRequestError,
@@ -681,6 +682,7 @@ class DelegationTests(unittest.TestCase):
             self.assertEqual(result["executor_account"], "executor")
             self.assertEqual(result["executor_label"], "Hidden executor")
             self.assertEqual(result["executor_sandbox"], "workspace-write")
+            self.assertEqual(result["executor_report_actor"], "executor")
             self.assertEqual(result["exit_code"], 0)
             self.assertEqual(result["files_changed"], ["src/example.py"])
             artifact = Path(execute_mock.call_args.kwargs["task_artifact_path"])
@@ -721,6 +723,59 @@ class DelegationTests(unittest.TestCase):
             self.assertEqual([event.state for event in events[-2:]], ["started", "completed"])
             self.assertEqual(events[-1].method, "run/completed")
             self.assertLess(events[-2].sequence, events[-1].sequence)
+
+    def test_failed_fallback_cannot_reuse_primary_executor_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            base = _make_config(root, repository)
+            accounts = dict(base.accounts)
+            accounts["fallback"] = AccountConfig(
+                name="fallback",
+                label="Fallback executor",
+                codex_home=root / "profiles" / "fallback",
+                model="",
+                reasoning_effort="medium",
+                backend="app_server",
+                fallback_roles=("executor",),
+            )
+            config = replace(base, accounts=accounts, fallback_enabled=True)
+            request_file = root / "request.json"
+            result_file = root / "result.json"
+            request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
+
+            def run_executor(**kwargs):
+                if kwargs["agent"].account_name == "executor":
+                    kwargs["output_path"].write_text(
+                        json.dumps({
+                            "summary": "Primary report that must not be reused",
+                            "files_changed": [],
+                            "commands_run": [],
+                            "tests": [],
+                            "remaining_issues": [],
+                        }),
+                        encoding="utf-8",
+                    )
+                    return CommandResult(["primary"], 1, "", "provider unavailable")
+                self.assertEqual(kwargs["agent"].account_name, "fallback")
+                return CommandResult(["fallback"], 1, "", "fallback failed")
+
+            with patch("dual_codex.delegation.login_status", return_value="OK"), patch(
+                "dual_codex.delegation.run_codex_exec", side_effect=run_executor
+            ):
+                outcome = delegate(config, request_file=request_file, result_file=result_file)
+
+            result = json.loads(result_file.read_text(encoding="utf-8"))
+            self.assertEqual(outcome.status, "failed")
+            self.assertTrue(result["fallback_used"])
+            self.assertEqual(result["executor_account"], "fallback")
+            self.assertEqual(result["executor_report_file"], "")
+            self.assertEqual(result["executor_report_actor"], "")
+            run_dir = Path(result["run_directory"])
+            primary_report = run_dir / "executor-report-attempt-1-executor.json"
+            fallback_report = run_dir / "executor-report-attempt-2-fallback.json"
+            self.assertTrue(primary_report.exists())
+            self.assertFalse(fallback_report.exists())
 
     def test_explicit_request_workspace_beats_config_and_reaches_executor(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1110,6 +1165,58 @@ class DelegationTests(unittest.TestCase):
             with patch("dual_codex.delegation._pid_alive", return_value=False):
                 stale.acquire()
             stale.release()
+
+    def test_lock_recovers_live_pid_with_a_different_process_start_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            lock = RepositoryLock(root / "runs", repository, "new-request")
+            lock.path.parent.mkdir(parents=True)
+            lock.path.write_text(
+                json.dumps({
+                    "pid": os.getpid(),
+                    "process_start": "old-process-instance",
+                    "request_id": "stale-request",
+                }),
+                encoding="utf-8",
+            )
+            with patch("dual_codex.delegation._pid_alive", return_value=True), patch(
+                "dual_codex.delegation._safe_process_start_token", return_value="current-process-instance"
+            ):
+                lock.acquire()
+                self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "new-request")
+                lock.release()
+
+    def test_delegate_cli_emits_sanitized_result_on_internal_runtime_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            result_path = root / "result.json"
+            stdout = StringIO()
+            stderr = StringIO()
+            with patch("dual_codex.cli.load_config", side_effect=RuntimeError("TOKEN=secret-value")), redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main([
+                    "--config", str(root / "missing.toml"), "delegate", "--stdin",
+                    "--result-file", str(result_path),
+                ])
+            self.assertEqual(exit_code, 1)
+            self.assertIn("DUAL_CODEX_RESULT ", stdout.getvalue())
+            self.assertNotIn("secret-value", stdout.getvalue() + stderr.getvalue())
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("details were withheld", result["error"])
+
+    def test_delegate_cli_keeps_result_protocol_when_result_file_cannot_be_written(self) -> None:
+        stdout = StringIO()
+        stderr = StringIO()
+        with patch("dual_codex.cli.load_config", side_effect=RuntimeError("TOKEN=secret-value")), redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main([
+                "--config", "missing.toml", "delegate", "--stdin",
+                "--result-file", "\x00invalid",
+            ])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("DUAL_CODEX_RESULT ", stdout.getvalue())
+        self.assertIn('"result_file": "\\u0000invalid"', stdout.getvalue())
+        self.assertNotIn("secret-value", stdout.getvalue() + stderr.getvalue())
 
     def test_pid_liveness_recognizes_current_and_dead_processes(self) -> None:
         self.assertTrue(_pid_alive(os.getpid()))
