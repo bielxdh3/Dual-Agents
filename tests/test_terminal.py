@@ -26,12 +26,14 @@ from dual_codex.terminal import (
     TERMINAL_INLINE_MESSAGE_MAX,
     TERMINAL_TERM,
     TERMINAL_SUBMIT_DELAY_SECONDS,
+    WINDOWS_READ_ONLY_SANDBOX_MODE,
     TuiComposerAckDetector,
     TuiReadinessDetector,
     TuiTurnStartDetector,
     TerminalLifecyclePolicy,
     find_session_file,
     interactive_command_args,
+    windows_sandbox_mode_for,
     session_id_for,
     session_turn_started,
     session_turn_state,
@@ -222,6 +224,91 @@ class TerminalTests(unittest.TestCase):
         self.assertNotIn("exec", command)
         self.assertIn("--no-alt-screen", command)
         self.assertEqual(command[command.index("--cd") + 1], "C:\\Work Tree\\target")
+
+    def test_read_only_windows_tui_pins_unelevated_sandbox(self) -> None:
+        self.assertEqual(WINDOWS_READ_ONLY_SANDBOX_MODE, "unelevated")
+        self.assertEqual(windows_sandbox_mode_for("read-only"), "unelevated")
+        self.assertEqual(windows_sandbox_mode_for("workspace-write"), "")
+        command = interactive_command_args(
+            Path("C:/Work Tree/target"),
+            sandbox="read-only",
+            approval_policy="never",
+            windows_sandbox_mode=windows_sandbox_mode_for("read-only"),
+        )
+        self.assertIn('windows.sandbox="unelevated"', command)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is required for the ConPTY launch regression")
+    def test_pty_host_forwards_explicit_windows_sandbox_mode(self) -> None:
+        source = (Path(__file__).parents[1] / "scripts" / "pty-host.js").read_text(encoding="utf-8")
+        start = source.index("const launchArgs = [")
+        end = source.index("const launchLine =")
+        script = f"""
+const source = {json.dumps(source)};
+const codexCommand = "codex";
+const cwd = "C:\\\\repo";
+const sandbox = "read-only";
+const approvalPolicy = "never";
+const model = "";
+const reasoningEffort = "";
+const windowsSandboxMode = "unelevated";
+const addDir = "";
+eval(source.slice({start}, {end}) + "\\nglobalThis.__launchArgs = launchArgs;");
+console.log(JSON.stringify(globalThis.__launchArgs));
+"""
+        result = subprocess.run(
+            [shutil.which("node") or "node", "-"],
+            input=script,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        launch_args = json.loads(result.stdout)
+        self.assertIn("-c", launch_args)
+        self.assertIn('windows.sandbox="unelevated"', launch_args)
+
+    def test_existing_read_only_session_without_sandbox_provenance_is_not_reused(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            sessions = config.runs_dir / "terminal-sessions"
+            sessions.mkdir(parents=True)
+            session = TerminalSession(
+                session_id="biel3-old-session",
+                account="biel3",
+                label="Architect",
+                role="architect",
+                repository=repository,
+                codex_home=root / "profile",
+                pipe=r"\\.\pipe\dual-codex-biel3-old-session-aaaaaaaaaaaaaaaa",
+                pid=123,
+                started_at="now",
+                log_file=sessions / "biel3-old-session.pty.log",
+                session_file=str((sessions / "biel3-old-session.json").resolve()),
+                windows_sandbox_mode="",
+            )
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            agent = AgentConfig(
+                codex_home=session.codex_home,
+                model="",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="biel3",
+                backend="windows",
+            )
+            with patch.object(manager, "status", return_value={"state": "running"}), patch.object(
+                manager, "_load", return_value=session
+            ):
+                with self.assertRaisesRegex(TerminalError, "Windows sandbox mode identity mismatch"):
+                    manager.ensure(
+                        session_id=session.session_id,
+                        agent=agent,
+                        role="architect",
+                        repository=repository,
+                        add_dirs=(),
+                    )
 
     def test_session_id_rejects_path_traversal(self) -> None:
         with self.assertRaises(TerminalError):
