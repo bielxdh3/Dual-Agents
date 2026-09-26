@@ -4,12 +4,14 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
+import tomllib
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from dual_codex.codex import run_codex_exec, run_codex_for_role, run_codex_terminal
+from dual_codex.codex import _delegate_to_configured_actor, run_codex_exec, run_codex_for_role, run_codex_terminal
 from dual_codex.config import AgentConfig
 from dual_codex.process import CommandResult, _prepare_command
 from dual_codex.terminal import TERMINAL_INLINE_MESSAGE_MAX, TerminalError
@@ -31,6 +33,118 @@ def _agent(sandbox: str, *, backend: str = "windows") -> AgentConfig:
 
 
 class CodexCommandTests(unittest.TestCase):
+    def test_run_authorized_architect_trust_is_written_before_actor_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            subprocess.run(["git", "init", "-q", str(repository)], check=True, capture_output=True)
+            profile = root / "architect-profile"
+            profile.mkdir()
+            canonical_root = root / "CodexGlobal"
+            canonical_root.mkdir()
+            (canonical_root / "AGENTS.md").write_text("Follow global policy.\n", encoding="utf-8")
+            for name in ARCHITECT_BASELINE:
+                skill = canonical_root / "skills" / name / "SKILL.md"
+                skill.parent.mkdir(parents=True, exist_ok=True)
+                skill.write_text(f"# {name}\n", encoding="utf-8")
+            agent = AgentConfig(
+                codex_home=profile,
+                model="",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="architect-profile",
+                backend="windows",
+            )
+            config = SimpleNamespace(
+                agent_for_role=lambda _role: agent,
+                runs_dir=root / "runs",
+                project_root=root,
+                codex_command="codex",
+            )
+            events: list[str] = []
+
+            def launch_actor(**kwargs):
+                events.append("actor-dispatch")
+                parsed = tomllib.loads((profile / "config.toml").read_text(encoding="utf-8"))
+                self.assertEqual(parsed["projects"][str(repository.resolve())]["trust_level"], "trusted")
+                kwargs["output_path"].write_text(
+                    json.dumps({
+                        "summary": "Ready",
+                        "steps": [],
+                        "acceptance_criteria": [],
+                        "risks": [],
+                        "files_to_inspect": [],
+                        "skills_loaded": [],
+                    }),
+                    encoding="utf-8",
+                )
+                return CommandResult(["codex", "tui"], 0, "", "")
+
+            with patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", canonical_root):
+                result = _delegate_to_configured_actor(
+                    config=config,
+                    role="architect",
+                    task="Plan the task.",
+                    repository=repository,
+                    output_path=root / "plan.json",
+                    schema_path=root / "architect-plan.schema.json",
+                    repository_trust_authorized=True,
+                    runner=launch_actor,
+                )
+
+            events.append("run-complete")
+            self.assertEqual(events, ["actor-dispatch", "run-complete"])
+            self.assertTrue(result.metadata["codex_repository_trust"]["updated"])
+            self.assertEqual(result.metadata["codex_repository_trust"]["repository"], str(repository.resolve()))
+
+    def test_trust_is_not_provisioned_for_non_run_actor_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            subprocess.run(["git", "init", "-q", str(repository)], check=True, capture_output=True)
+            profile = root / "profile"
+            profile.mkdir()
+            canonical_root = root / "CodexGlobal"
+            canonical_root.mkdir()
+            (canonical_root / "AGENTS.md").write_text("Policy.\n", encoding="utf-8")
+            for name in ("memory", "ponytail"):
+                skill = canonical_root / "skills" / name / "SKILL.md"
+                skill.parent.mkdir(parents=True, exist_ok=True)
+                skill.write_text(f"# {name}\n", encoding="utf-8")
+            agent = AgentConfig(
+                codex_home=profile,
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor-profile",
+                backend="app_server",
+            )
+            config = SimpleNamespace(
+                agent_for_role=lambda _role: agent,
+                runs_dir=root / "runs",
+                project_root=root,
+                codex_command="codex",
+            )
+
+            with patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", canonical_root), patch(
+                "dual_codex.repo_trust.provision_repository_trust",
+                side_effect=AssertionError("non-run dispatch must not provision trust"),
+            ):
+                _delegate_to_configured_actor(
+                    config=config,
+                    role="executor",
+                    task="Implement the task.",
+                    repository=repository,
+                    output_path=root / "result.json",
+                    schema_path=root / "schema.json",
+                    repository_trust_authorized=False,
+                    runner=lambda **_kwargs: CommandResult(["codex", "tui"], 0, "", ""),
+                )
+
+            self.assertFalse((profile / "config.toml").exists())
+
     def test_windows_role_dispatch_uses_canonical_terminal_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

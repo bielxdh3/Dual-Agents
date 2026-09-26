@@ -48,9 +48,10 @@ class CliRunRepositoryTests(unittest.TestCase):
             config = self._config(root)
             observed = {}
 
-            def capture_run(actual_config, actual_task):
+            def capture_run(actual_config, actual_task, **kwargs):
                 observed["config"] = actual_config
                 observed["task"] = actual_task
+                observed.update(kwargs)
                 return type("Outcome", (), {"run_dir": root / "runs" / "run", "verdict": "approved", "correction_cycles": 0})()
 
             with patch("dual_codex.cli.load_config", return_value=config), patch(
@@ -71,6 +72,7 @@ class CliRunRepositoryTests(unittest.TestCase):
             self.assertEqual(observed["config"].repository, target.resolve())
             self.assertEqual(observed["config"].roles, config.roles)
             self.assertEqual(observed["task"], task)
+            self.assertTrue(observed["explicit_repository"])
 
     def test_run_keeps_configured_repository_when_no_override_is_given(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -80,8 +82,9 @@ class CliRunRepositoryTests(unittest.TestCase):
             task.write_text("Mission", encoding="utf-8")
             observed = {}
 
-            def capture_run(actual_config, actual_task):
+            def capture_run(actual_config, actual_task, **kwargs):
                 observed["config"] = actual_config
+                observed.update(kwargs)
                 return type("Outcome", (), {"run_dir": root / "runs" / "run", "verdict": "approved", "correction_cycles": 0})()
 
             with patch("dual_codex.cli.load_config", return_value=config), patch(
@@ -91,6 +94,7 @@ class CliRunRepositoryTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
             self.assertEqual(observed["config"].repository, config.repository)
+            self.assertFalse(observed["explicit_repository"])
 
 
 if __name__ == "__main__":

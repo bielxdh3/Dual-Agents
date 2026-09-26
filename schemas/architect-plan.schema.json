@@ -15,7 +15,7 @@
       "items": {
         "type": "string",
         "minLength": 1,
-        "description": "Canonical skill directory identifier from the pre-dispatch canonical skill catalog only (for example, \"dual-agents\"). A path to SKILL.md is never valid; invalid examples include \"C:\\CodexGlobal\\skills\\dual-agents\\SKILL.md\", \"skills/dual-agents/SKILL.md\", and \"dual-agents/SKILL.md\"."
+        "description": "Short skill directory identifier from the combined pre-dispatch machine-wide global and target-project .agents/skills catalogs (for example, \"bielos-core-identity-implementation\"). Report identifiers only; a path to SKILL.md is never valid."
       },
       "uniqueItems": true
     }

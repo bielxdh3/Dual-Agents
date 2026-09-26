@@ -221,6 +221,11 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             config = self._config(root)
             config.repository.mkdir()
             subprocess.run(["git", "init", "--quiet"], cwd=config.repository, check=True)
+            project_skill = config.repository / ".agents" / "skills" / "project-architect-policy" / "SKILL.md"
+            project_skill.parent.mkdir(parents=True)
+            project_skill.write_text("# project policy\n", encoding="utf-8")
+            config.accounts["secondary"].codex_home.mkdir(parents=True)
+            config = replace(config, require_clean_git=False)
             task = root / "task.md"
             task.write_text("route the configured actors", encoding="utf-8")
             seen: list[tuple[str, str, str, str]] = []
@@ -236,7 +241,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
-                        "skills_loaded": [],
+                        "skills_loaded": ["project-architect-policy"],
                     }
                 elif role == "executor":
                     payload = {
@@ -254,7 +259,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             with patch("dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner), patch(
                 "dual_codex.codex.run_codex_exec"
             ) as native_spawn:
-                outcome = execute(config, task)
+                outcome = execute(config, task, explicit_repository=True)
 
             self.assertEqual(
                 seen,
@@ -276,7 +281,10 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
             self.assertTrue(all(item["configured_actor"] for item in provenance["configured_actor_routing"]))
             architect_provenance = provenance["configured_actor_routing"][0]
-            self.assertEqual(architect_provenance["canonical_bootstrap_selected_skills"], ARCHITECT_BASELINE)
+            self.assertEqual(
+                architect_provenance["canonical_bootstrap_selected_skills"],
+                ["memory", "ponytail", "project-architect-policy", "project-phase-review", "project-security-review"],
+            )
             self.assertEqual(
                 architect_provenance["canonical_bootstrap_skill_digests"]["ponytail"],
                 hashlib.sha256(
@@ -289,6 +297,28 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             )
             self.assertTrue(architect_provenance["canonical_bootstrap_skill_catalog_sha256"])
             self.assertIn("skills/ponytail/SKILL.md", architect_provenance["canonical_bootstrap_source_files"])
+            self.assertEqual(
+                architect_provenance["canonical_bootstrap_actor_selected_skill_sources"],
+                [{
+                    "identifier": "project-architect-policy",
+                    "source_scope": "project",
+                    "source_path": str(project_skill),
+                    "repository_relative_path": ".agents/skills/project-architect-policy/SKILL.md",
+                    "sha256": hashlib.sha256(project_skill.read_bytes()).hexdigest(),
+                }],
+            )
+            self.assertEqual(
+                architect_provenance["codex_repository_trust"],
+                {
+                    "repository": str(config.repository.resolve()),
+                    "codex_home": str(config.accounts["secondary"].codex_home.resolve()),
+                    "updated": True,
+                },
+            )
+            self.assertEqual(
+                provenance["configured_actor_routing"][2]["codex_repository_trust"]["updated"],
+                False,
+            )
 
     def test_mission_dispatches_claude_roles_and_codex_executor_without_native_start(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

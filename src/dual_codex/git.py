@@ -195,6 +195,19 @@ def ensure_git_repository(repository: Path) -> None:
         raise RuntimeError(f"Not a Git work tree: {repository}")
 
 
+def git_top_level(repository: Path) -> Path:
+    """Resolve the actual worktree root without trusting repository metadata."""
+
+    path = Path(repository).expanduser().resolve(strict=True)
+    result = run_git(["git", "rev-parse", "--show-toplevel"], cwd=path, check=False)
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(f"Could not resolve Git top-level for repository: {path}")
+    try:
+        return Path(result.stdout.strip()).expanduser().resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeError(f"Git top-level is unavailable for repository: {path}") from exc
+
+
 def status_porcelain(repository: Path) -> str:
     return run_git(["git", "status", "--porcelain=v1"], cwd=repository).stdout
 

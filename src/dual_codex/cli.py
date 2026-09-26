@@ -795,7 +795,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "run":
             if args.repository:
                 config = replace(config, repository=Path(args.repository).expanduser().resolve())
-            outcome = execute(config, Path(args.task))
+            outcome = execute(
+                config,
+                Path(args.task),
+                explicit_repository=bool(args.repository),
+            )
             print(f"Run directory: {outcome.run_dir}")
             print(f"Verdict: {outcome.verdict}")
             print(f"Correction cycles: {outcome.correction_cycles}")

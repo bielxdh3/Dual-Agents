@@ -388,6 +388,7 @@ def _delegate_to_configured_actor(
     schema_path: Path | None = None,
     request_id: str = "",
     run_id: str = "",
+    repository_trust_authorized: bool = False,
     progress: Callable[[str], None] | None = None,
     runner: Callable[..., CommandResult],
 ) -> CommandResult:
@@ -415,6 +416,7 @@ def _delegate_to_configured_actor(
     bootstrap = create_canonical_bootstrap(
         role=role,
         artifact_dir=bootstrap_artifact_dir(repository, output_path),
+        repository=repository if role == "architect" else None,
         selected_skills=select_required_skills(role, task),
     )
     canonical_root = bootstrap.source_root
@@ -429,6 +431,15 @@ def _delegate_to_configured_actor(
     fallback_enabled = bool(getattr(config, "fallback_enabled", False))
 
     def invoke(dispatch_config, dispatch_agent):
+        trust_updated = None
+        if (
+            repository_trust_authorized
+            and dispatch_agent.provider_type == "codex"
+            and dispatch_agent.backend in {"windows", "app_server"}
+        ):
+            from .repo_trust import provision_repository_trust
+
+            trust_updated = provision_repository_trust(dispatch_agent.codex_home, repository)
         result = dispatch(
             config=dispatch_config,
             agent=dispatch_agent,
@@ -444,6 +455,12 @@ def _delegate_to_configured_actor(
         )
         if not isinstance(result, CommandResult):
             raise TypeError("Configured actor dispatch must return CommandResult.")
+        if trust_updated is not None:
+            result.metadata["codex_repository_trust"] = {
+                "repository": str(repository.expanduser().resolve()),
+                "codex_home": str(dispatch_agent.codex_home.expanduser().resolve()),
+                "updated": trust_updated,
+            }
         if result.returncode != 0:
             _raise_dispatch_failure(
                 result,
@@ -684,6 +701,7 @@ def run_codex_for_role(
             bootstrap = create_canonical_bootstrap(
                 role=role,
                 artifact_dir=bootstrap_artifact_dir(repository, output_path),
+                repository=repository if role == "architect" else None,
                 selected_skills=select_required_skills(role, prompt),
             )
             owns_bootstrap = True

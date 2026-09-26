@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -10,7 +10,8 @@ from .codex import _delegate_to_configured_actor
 from .codex import configured_actor_provenance, run_codex_for_role
 from .config import ConfigError, OrchestratorConfig
 from .delegation import RepositoryLock
-from .git import ensure_git_repository, status_and_diff, status_porcelain
+from .git import ensure_git_repository, git_top_level, status_and_diff, status_porcelain
+from .paths import same_path
 from .report import atomic_write_json, dump_json, load_json, render_markdown
 
 
@@ -111,10 +112,16 @@ def _dispatch_phase(
     run_dir: Path,
     phase_provenance: list[dict],
     role: str,
+    repository_trust_authorized: bool = False,
     **kwargs,
 ):
     try:
-        result = delegate_to_configured_actor(config=config, role=role, **kwargs)
+        result = delegate_to_configured_actor(
+            config=config,
+            role=role,
+            repository_trust_authorized=repository_trust_authorized,
+            **kwargs,
+        )
     except Exception as exc:
         try:
             actor = config.agent_for_role(role)
@@ -150,13 +157,32 @@ def _dispatch_phase(
     return result
 
 
-def execute(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
+def execute(
+    config: OrchestratorConfig,
+    task_file: Path,
+    *,
+    explicit_repository: bool = False,
+) -> RunOutcome:
+    try:
+        target_root = git_top_level(config.repository)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise RuntimeError(f"run requires a valid Git repository root: {config.repository}") from exc
+    if not same_path(target_root, config.repository):
+        raise RuntimeError(
+            f"run repository must be the exact Git top-level '{target_root}', not '{config.repository}'."
+        )
+    config = replace(config, repository=target_root)
     lock = RepositoryLock(config.runs_dir, config.repository, "run-" + uuid4().hex)
     with lock:
-        return _execute_locked(config, task_file)
+        return _execute_locked(config, task_file, repository_trust_authorized=explicit_repository)
 
 
-def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
+def _execute_locked(
+    config: OrchestratorConfig,
+    task_file: Path,
+    *,
+    repository_trust_authorized: bool = False,
+) -> RunOutcome:
     task_file = task_file.expanduser().resolve()
     task = _read(task_file).strip()
     if not task:
@@ -186,6 +212,7 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
         run_dir=run_dir,
         phase_provenance=phase_provenance,
         role="architect",
+        repository_trust_authorized=repository_trust_authorized,
         task=_prompt(config, "architect.txt", task=task),
         repository=config.repository,
         output_path=plan_path,
@@ -200,6 +227,7 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
         run_dir=run_dir,
         phase_provenance=phase_provenance,
         role="executor",
+        repository_trust_authorized=repository_trust_authorized,
         task=_prompt(config, "executor.txt", task=task, plan=dump_json(plan)),
         repository=config.repository,
         output_path=implementation_path,
@@ -218,6 +246,7 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
             run_dir=run_dir,
             phase_provenance=phase_provenance,
             role="reviewer",
+            repository_trust_authorized=repository_trust_authorized,
             task=_prompt(
                 config,
                 "reviewer.txt",
@@ -245,6 +274,7 @@ def _execute_locked(config: OrchestratorConfig, task_file: Path) -> RunOutcome:
             run_dir=run_dir,
             phase_provenance=phase_provenance,
             role="executor",
+            repository_trust_authorized=repository_trust_authorized,
             task=_prompt(
                 config,
                 "correction.txt",
