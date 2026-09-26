@@ -809,7 +809,7 @@ def _verified_legacy_bootstrap(path: Path, *, role: str, canonical_root: Path) -
         text = _read_regular_file_nofollow(path).decode("utf-8")
         lines = text.splitlines()
         expected_root = canonical_root.expanduser().resolve(strict=True)
-    except (OSError, UnicodeError):
+    except (OSError, UnicodeError, RuntimeError, ValueError):
         return False
     return (
         len(lines) >= 7
@@ -894,7 +894,6 @@ def reconcile_orphan_canonical_bootstrap(
         return {"removed": [], "retained": [{"name": "bootstrap", "reason": "directory_unavailable"}]}
 
     configured_backends = configured_backends or {}
-    canonical_root = canonical_root or canonical_instructions_root()
     for entry in os.scandir(bootstrap_dir):
         name = entry.name
         match = _CANONICAL_BOOTSTRAP_NAME.fullmatch(name)
@@ -995,6 +994,12 @@ def reconcile_orphan_canonical_bootstrap(
             if legacy_backend not in {"app_server", "windows", "antigravity", "api"}:
                 retained.append({"name": name, "reason": "legacy_backend_unknown"})
                 continue
+            if canonical_root is None:
+                try:
+                    canonical_root = canonical_instructions_root()
+                except (OSError, RuntimeError, ValueError):
+                    retained.append({"name": name, "reason": "legacy_ownership_unproven"})
+                    continue
             if not _verified_legacy_bootstrap(artifact, role=role, canonical_root=canonical_root):
                 retained.append({"name": name, "reason": "legacy_ownership_unproven"})
                 continue

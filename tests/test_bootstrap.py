@@ -275,10 +275,16 @@ class CanonicalBootstrapTests(unittest.TestCase):
             except (OSError, NotImplementedError) as exc:
                 self.skipTest(f"directory symlinks are unavailable: {exc}")
 
-            with self.assertRaisesRegex(ValueError, "symlink or reparse point"):
+            with self.assertRaises(ValueError) as error:
                 bootstrap.create_canonical_bootstrap(
                     role="architect", root=canonical_root, repository=repository
                 )
+            message = str(error.exception).casefold()
+            self.assertTrue(
+                "symlink or reparse point" in message
+                or "does not resolve under its expected skill root" in message,
+                msg=f"unexpected project-skill escape rejection: {error.exception}",
+            )
 
     def test_architect_reported_skill_names_resolve_case_insensitively_to_catalog_names(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

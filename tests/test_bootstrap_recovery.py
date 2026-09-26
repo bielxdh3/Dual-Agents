@@ -98,6 +98,42 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
         self.assertFalse(bootstrap.artifact_path.exists())
         self.assertFalse(bootstrap.artifact_owner_path.exists())
 
+    def test_sidecar_backed_orphan_recovery_does_not_resolve_canonical_root(self) -> None:
+        bootstrap = self._artifact()
+        self._mark_owner_dead(bootstrap.artifact_owner_path)
+
+        with patch(
+            "dual_codex.bootstrap.canonical_instructions_root",
+            side_effect=AssertionError("sidecar-backed recovery must not need canonical instructions"),
+        ):
+            result = reconcile_orphan_canonical_bootstrap(
+                self.repository,
+                repository_lock=self.lock,
+                run_id="current-run",
+            )
+
+        self.assertEqual([item["name"] for item in result["removed"]], [bootstrap.artifact_path.name])
+        self.assertFalse(bootstrap.artifact_path.exists())
+
+    def test_legacy_artifact_is_retained_when_canonical_root_is_unavailable(self) -> None:
+        bootstrap = self._artifact()
+        bootstrap.artifact_owner_path.unlink()
+
+        with patch(
+            "dual_codex.bootstrap.canonical_instructions_root",
+            side_effect=FileNotFoundError("canonical instructions are unavailable"),
+        ):
+            result = reconcile_orphan_canonical_bootstrap(
+                self.repository,
+                repository_lock=self.lock,
+                run_id="current-run",
+                configured_backends={"executor": "app_server"},
+            )
+
+        self.assertEqual(result["removed"], [])
+        self.assertTrue(bootstrap.artifact_path.exists())
+        self.assertEqual(result["retained"][0]["reason"], "legacy_ownership_unproven")
+
     def test_legacy_orphan_without_metadata_is_reaped_from_owned_name_under_lock(self) -> None:
         bootstrap = self._artifact()
         legacy = bootstrap.artifact_path
