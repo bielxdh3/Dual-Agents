@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import math
 from pathlib import Path
 import re
 from typing import Any
@@ -45,6 +46,7 @@ class AccountConfig:
     supported_reasoning_efforts: tuple[str, ...] = ()
     enabled: bool = True
     fallback_roles: tuple[str, ...] = ()
+    app_server_turn_timeouts: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,7 @@ class AgentConfig:
     available_models: tuple[str, ...] = ()
     supported_reasoning_efforts: tuple[str, ...] = ()
     enabled: bool = True
+    app_server_turn_timeout: float | None = None
 
 
 @dataclass(frozen=True)
@@ -146,6 +149,7 @@ class OrchestratorConfig:
             available_models=account.available_models,
             supported_reasoning_efforts=account.supported_reasoning_efforts,
             enabled=account.enabled,
+            app_server_turn_timeout=getattr(account, "app_server_turn_timeouts", {}).get(role),
         )
 
 
@@ -241,6 +245,22 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
         role = validate_role_name(item)
         if role not in fallback_roles:
             fallback_roles.append(role)
+    raw_turn_timeouts = raw.get("app_server_turn_timeouts", {})
+    if not isinstance(raw_turn_timeouts, dict):
+        raise ConfigError(f"Account '{name}' app_server_turn_timeouts must be a table keyed by role.")
+    app_server_turn_timeouts: dict[str, float] = {}
+    for raw_role, raw_timeout in raw_turn_timeouts.items():
+        role = validate_role_name(str(raw_role))
+        if role not in SUPPORTED_ROLES:
+            raise ConfigError(f"Account '{name}' app_server_turn_timeouts has unsupported role '{role}'.")
+        if backend != "app_server":
+            raise ConfigError(f"Account '{name}' app_server_turn_timeouts requires backend = 'app_server'.")
+        if isinstance(raw_timeout, bool) or not isinstance(raw_timeout, (int, float)):
+            raise ConfigError(f"Account '{name}' App Server turn timeout for role '{role}' must be numeric.")
+        timeout = float(raw_timeout)
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ConfigError(f"Account '{name}' App Server turn timeout for role '{role}' must be positive and finite.")
+        app_server_turn_timeouts[role] = timeout
     default_provider = (
         "gemini" if backend == "antigravity"
         else "api" if backend == "api"
@@ -311,6 +331,7 @@ def _account(name: str, raw: dict[str, Any], base: Path) -> AccountConfig:
         supported_reasoning_efforts=supported_reasoning_efforts,
         enabled=enabled,
         fallback_roles=tuple(fallback_roles),
+        app_server_turn_timeouts=app_server_turn_timeouts,
     )
 
 

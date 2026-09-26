@@ -12,8 +12,16 @@ from unittest.mock import patch
 from dual_codex.bootstrap import create_canonical_bootstrap
 from dual_codex.cli import main
 from dual_codex.config import AccountConfig, OrchestratorConfig
+from dual_codex.codex import ActorAvailabilityError
 from dual_codex.process import CommandResult
 from dual_codex.report import atomic_write_json
+
+
+def _structured_run_result(output: str) -> dict:
+    lines = [line.removeprefix("DUAL_CODEX_RUN_RESULT ") for line in output.splitlines() if line.startswith("DUAL_CODEX_RUN_RESULT ")]
+    if len(lines) != 1:
+        raise AssertionError(f"expected one structured run result, got {len(lines)}")
+    return json.loads(lines[0])
 
 
 class OfficialRunStateSmokeTests(unittest.TestCase):
@@ -75,7 +83,7 @@ class OfficialRunStateSmokeTests(unittest.TestCase):
                 config_path=root / "config.toml",
             )
             task = root / "mission.md"
-            task.write_text("Bounded fake provider mission.", encoding="utf-8")
+            task.write_text("PRIVATE_PROMPT_MUST_NOT_LEAK", encoding="utf-8")
             mode = {"fail_executor": True}
 
             def fake_provider(**kwargs):
@@ -86,7 +94,11 @@ class OfficialRunStateSmokeTests(unittest.TestCase):
                     if mode["fail_executor"]:
                         (repository / "created-by-run.txt").write_text("run-created file\n", encoding="utf-8")
                         kwargs["progress"]("app-server turn smoke-turn still running")
-                        raise TimeoutError("simulated provider interruption")
+                        raise ActorAvailabilityError(
+                            "simulated turn timed out",
+                            failure_class="transport_unavailable",
+                            actor="executor",
+                        )
                     payload = {"summary": "implementation", "files_changed": [], "commands_run": [], "tests": [], "remaining_issues": []}
                 else:
                     payload = {"verdict": "approved", "summary": "approved", "findings": []}
@@ -119,7 +131,26 @@ class OfficialRunStateSmokeTests(unittest.TestCase):
 
             self.assertEqual(first_exit, 1)
             self.assertIn('"phase":"executor","actor":"executor","backend":"app_server","state":"running"', output.getvalue())
-            first_run = next(path for path in config.runs_dir.iterdir() if (path / "run_state.json").is_file())
+            first_result = _structured_run_result(output.getvalue())
+            first_run = Path(first_result["run_directory"])
+            self.assertEqual(first_result["status"], "failed")
+            self.assertEqual(first_result["last_phase"], "executor")
+            self.assertEqual(first_result["last_actor"], "executor")
+            self.assertEqual(first_result["last_backend"], "app_server")
+            self.assertEqual(first_result["provider_status"], "failed")
+            self.assertEqual(first_result["failure_type"], "ActorAvailabilityError")
+            self.assertEqual(first_result["failure_class"], "transport_unavailable")
+            self.assertEqual(first_result["correction_cycles"], 0)
+            self.assertEqual(first_result["run_state_path"], str(first_run / "run_state.json"))
+            self.assertEqual(first_result["provenance_path"], str(first_run / "provenance.json"))
+            self.assertEqual(first_result["initial_git_baseline_path"], str(first_run / "initial_git_baseline.json"))
+            self.assertEqual(first_result["mutation_attribution_path"], str(first_run / "mutation-attribution.json"))
+            self.assertTrue(first_run.is_dir())
+            self.assertTrue((first_run / "plan.json").is_file())
+            self.assertFalse((first_run / "REPORT.md").exists())
+            self.assertNotIn("PRIVATE_PROMPT_MUST_NOT_LEAK", next(
+                line for line in output.getvalue().splitlines() if line.startswith("DUAL_CODEX_RUN_RESULT ")
+            ))
             first_baseline = json.loads((first_run / "initial_git_baseline.json").read_text(encoding="utf-8"))
             first_mutation = json.loads((first_run / "mutation-attribution.json").read_text(encoding="utf-8"))
             self.assertIn("tracked.txt", [entry["path"] for entry in first_baseline["status_entries"]])
@@ -167,6 +198,13 @@ class OfficialRunStateSmokeTests(unittest.TestCase):
                 second_exit = main(argv)
 
             self.assertEqual(second_exit, 0)
+            second_result = _structured_run_result(output.getvalue())
+            second_run = Path(second_result["run_directory"])
+            self.assertEqual(second_result["status"], "completed")
+            self.assertEqual(second_result["verdict"], "approved")
+            self.assertEqual(second_result["correction_cycles"], 0)
+            self.assertTrue(second_run.is_dir())
+            self.assertIn(stale.artifact_path.name, [item["name"] for item in second_result["bootstrap_cleanup"]["removed"]])
             self.assertFalse(stale.artifact_path.exists())
             self.assertFalse(stale.artifact_owner_path.exists())
             self.assertEqual(user_file.read_text(encoding="utf-8"), "user-owned bootstrap directory note\n")

@@ -221,7 +221,14 @@ class AppServerTests(unittest.TestCase):
             process.close()
         _PROCESSES.clear()
 
-    def _turn_process(self, repository: Path, *, timeout: float, progress: list[str]):
+    def _turn_process(
+        self,
+        repository: Path,
+        *,
+        timeout: float,
+        progress: list[str],
+        agent_timeout: float | None = None,
+    ):
         from dual_codex.app_server import _AppServerProcess
 
         process = object.__new__(_AppServerProcess)
@@ -231,6 +238,7 @@ class AppServerTests(unittest.TestCase):
             reasoning_effort="",
             service_tier="",
             network_access=False,
+            app_server_turn_timeout=agent_timeout,
         )
         process.config = SimpleNamespace(app_server_turn_start_timeout=5, app_server_turn_timeout=timeout)
         process.repository = repository
@@ -287,6 +295,37 @@ class AppServerTests(unittest.TestCase):
                     process._turn_unlocked("thread-1", "private", repository)
             process._read_event.assert_not_called()
             self.assertEqual(events, [])
+
+    def test_app_server_account_role_timeout_overrides_only_turn_completion(self) -> None:
+        from dual_codex.app_server import _save_thread_mapping
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            process = self._turn_process(repository, timeout=5, agent_timeout=3600, progress=[])
+            clock = iter([0.0, 0.0, 6.0, 6.0, 7.0, 7.0])
+            with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock)), patch(
+                "dual_codex.app_server._save_thread_mapping"
+            ):
+                result = process._turn_unlocked("thread-1", "private", repository)
+
+            self.assertEqual(result["turn_status"], "completed")
+            self.assertEqual(process.config.app_server_turn_start_timeout, 5)
+            self.assertEqual(process.config.app_server_turn_timeout, 5)
+
+    def test_app_server_heartbeat_does_not_extend_hard_turn_deadline(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            events: list[str] = []
+            process = self._turn_process(repository, timeout=16, progress=events)
+            clock = iter([0.0, 0.0, 15.0, 15.0, 17.0])
+            with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock, 17.0)):
+                with self.assertRaisesRegex(AppServerError, "Timed out waiting for turn/completed"):
+                    process._turn_unlocked("thread-1", "private", repository)
+
+            process._read_event.assert_called_once()
+            self.assertEqual(events, ["app-server turn turn-1 still running"])
 
     def test_structured_turns_reuse_thread_and_clear_api_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

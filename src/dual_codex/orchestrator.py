@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -19,7 +19,7 @@ from .bootstrap import (
 )
 from .codex import _delegate_to_configured_actor
 from .codex import configured_actor_provenance, run_codex_for_role
-from .config import ConfigError, OrchestratorConfig
+from .config import ConfigError, OrchestratorConfig, SUPPORTED_ROLES
 from .delegation import RepositoryLock
 from .git import (
     attribute_git_mutations,
@@ -38,6 +38,7 @@ class RunOutcome:
     verdict: str
     correction_cycles: int
     phase_provenance: tuple[dict, ...] = ()
+    run_result: dict = field(default_factory=dict)
 
 
 def delegate_to_configured_actor(**kwargs):
@@ -206,6 +207,87 @@ def _phase_failure_state(exc: BaseException) -> str:
     ):
         return "timeout"
     return "failed"
+
+
+def _failure_reason(exc: BaseException) -> str:
+    detail = " ".join(str(exc).split())
+    if detail:
+        return f"{type(exc).__name__}: {detail[:240]}"
+    return type(exc).__name__
+
+
+def _run_result_record(run_dir: Path, run_state: dict) -> dict:
+    def evidence_path(name: str) -> str | None:
+        path = run_dir / name
+        try:
+            return str(path.resolve(strict=False)) if path.is_file() else None
+        except OSError:
+            return None
+
+    failure = run_state.get("failure")
+    failure = failure if isinstance(failure, dict) else {}
+    attribution = run_state.get("mutation_attribution")
+    attribution = attribution if isinstance(attribution, dict) else {}
+    cleanup = run_state.get("bootstrap_cleanup")
+    if isinstance(cleanup, dict):
+        removed_items = cleanup.get("removed", [])
+        retained_items = cleanup.get("retained", [])
+        if not isinstance(removed_items, list):
+            removed_items = []
+        if not isinstance(retained_items, list):
+            retained_items = []
+        allowed_name = re.compile(
+            rf"^\.canonical-bootstrap-(?:{'|'.join(re.escape(role) for role in SUPPORTED_ROLES)})-[A-Za-z0-9_]{{8}}\.md$"
+        )
+        removed = []
+        for item in removed_items[:50]:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            run_id = item.get("run_id")
+            record = {}
+            if isinstance(name, str) and allowed_name.fullmatch(name):
+                record["name"] = name
+            if isinstance(run_id, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id):
+                record["run_id"] = run_id
+            if record:
+                removed.append(record)
+        cleanup_result = {
+            "removed": removed,
+            "retained_count": len(retained_items),
+        }
+    else:
+        cleanup_result = None
+    status = run_state.get("status")
+    if status not in ("completed", "failed", "blocked", "interrupted"):
+        status = "failed"
+    try:
+        run_directory = str(run_dir.resolve(strict=False))
+    except OSError:
+        run_directory = str(run_dir)
+    return {
+        "status": status,
+        "run_directory": run_directory,
+        "run_state_path": evidence_path("run_state.json"),
+        "provenance_path": evidence_path("provenance.json"),
+        "initial_git_baseline_path": evidence_path("initial_git_baseline.json"),
+        "mutation_attribution_path": evidence_path("mutation-attribution.json"),
+        "last_phase": run_state.get("last_phase"),
+        "last_actor": run_state.get("last_actor"),
+        "last_backend": run_state.get("last_backend"),
+        "provider_status": run_state.get("provider_status"),
+        "failure_type": failure.get("failure_type"),
+        "failure_class": failure.get("failure_class"),
+        "verdict": run_state.get("verdict") if run_state.get("verdict") in ("approved", "changes_requested") else None,
+        "correction_cycles": run_state.get("correction_cycles", 0),
+        "mutation_attribution_status": attribution.get("status"),
+        "mutation_attribution_reason": attribution.get("reason"),
+        "bootstrap_cleanup": cleanup_result,
+    }
+
+
+def _attach_run_result(exc: BaseException, run_dir: Path, run_state: dict) -> None:
+    setattr(exc, "dual_codex_run_result", _run_result_record(run_dir, run_state))
 
 
 def _run_owner_process_start() -> str | None:
@@ -605,14 +687,12 @@ def _execute_locked(
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_dir = config.runs_dir / f"{timestamp}-{run_id[:8]}"
     run_dir.mkdir(parents=True, exist_ok=False)
-    _atomic_write_text(run_dir / "task.md", task + "\n")
     baseline_path = run_dir / "initial_git_baseline.json"
-    atomic_write_json(baseline_path, baseline)
     phase_provenance: list[dict] = []
     state_lock = threading.RLock()
-    baseline_sha256 = hashlib.sha256(baseline_path.read_bytes()).hexdigest()
-    initial_bootstrap_artifacts = canonical_bootstrap_artifacts(config.repository)
-    initial_bootstrap_control_paths = canonical_bootstrap_control_paths(config.repository)
+    correction_cycles = 0
+    initial_bootstrap_artifacts: list[str] = []
+    initial_bootstrap_control_paths: list[str] = []
     run_state: dict = {
         "schema_version": 1,
         "run_id": run_id,
@@ -633,7 +713,6 @@ def _execute_locked(
         "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest(),
         "initial_git_baseline": {
             "path": baseline_path.name,
-            "sha256": baseline_sha256,
             "head": baseline.get("head"),
             "branch": baseline.get("branch"),
             "detached": baseline.get("detached"),
@@ -642,10 +721,32 @@ def _execute_locked(
         "mutation_attribution": {"status": "pending", "path": "mutation-attribution.json"},
         "bootstrap_cleanup": bootstrap_cleanup,
         "dual_agents_bootstrap_artifacts": initial_bootstrap_artifacts,
+        "correction_cycles": correction_cycles,
         "verdict": None,
         "failure": None,
     }
-    _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state, required=True)
+    try:
+        initial_bootstrap_artifacts = canonical_bootstrap_artifacts(config.repository)
+        initial_bootstrap_control_paths = canonical_bootstrap_control_paths(config.repository)
+        run_state["dual_agents_bootstrap_artifacts"] = initial_bootstrap_artifacts
+        _atomic_write_text(run_dir / "task.md", task + "\n")
+        atomic_write_json(baseline_path, baseline)
+        run_state["initial_git_baseline"]["sha256"] = hashlib.sha256(baseline_path.read_bytes()).hexdigest()
+        _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state, required=True)
+    except BaseException as exc:
+        run_state["status"] = "interrupted" if isinstance(exc, KeyboardInterrupt) else "failed"
+        run_state["provider_status"] = "unknown_after_interruption" if isinstance(exc, KeyboardInterrupt) else "failed"
+        run_state["failure"] = {
+            "failure_type": type(exc).__name__,
+            "failure_class": str(getattr(exc, "failure_class", "")),
+            "failed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
+        except Exception:
+            pass
+        _attach_run_result(exc, run_dir, run_state)
+        raise
 
     def mutation_summary() -> dict:
         final_bootstrap_control_paths = canonical_bootstrap_control_paths(config.repository)
@@ -711,7 +812,6 @@ def _execute_locked(
         )
         implementation = load_json(implementation_path)
 
-        correction_cycles = 0
         while True:
             diff_text = status_and_diff(config.repository)
             (run_dir / f"diff-{correction_cycles}.md").write_text(diff_text, encoding="utf-8")
@@ -746,6 +846,7 @@ def _execute_locked(
                 break
 
             correction_cycles += 1
+            run_state["correction_cycles"] = correction_cycles
             implementation_path = run_dir / f"correction-{correction_cycles}.json"
             _dispatch_phase(
                 config=config,
@@ -777,6 +878,7 @@ def _execute_locked(
         run_state["provider_status"] = "completed"
         run_state["current_phase"] = None
         run_state["verdict"] = review["verdict"]
+        run_state["correction_cycles"] = correction_cycles
         run_state["completed_at"] = datetime.now(timezone.utc).isoformat()
         _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
         report = render_markdown(
@@ -795,9 +897,10 @@ def _execute_locked(
             verdict=review["verdict"],
             correction_cycles=correction_cycles,
             phase_provenance=tuple(phase_provenance),
+            run_result=_run_result_record(run_dir, run_state),
         )
     except BaseException as exc:
-        if run_state.get("status") not in {"blocked", "completed"}:
+        if run_state.get("status") != "blocked":
             if isinstance(exc, KeyboardInterrupt):
                 run_state["status"] = "interrupted"
                 if run_state.get("current_phase"):
@@ -831,7 +934,7 @@ def _execute_locked(
                     mutation = mutation_summary()
                     atomic_write_json(run_dir / "mutation-attribution.json", mutation)
                 except Exception as attribution_error:
-                    mutation = {"status": "unknown", "reason": type(attribution_error).__name__}
+                    mutation = {"status": "unknown", "reason": _failure_reason(attribution_error)}
             run_state["mutation_attribution"] = mutation
             run_state["dual_agents_bootstrap_artifacts"] = canonical_bootstrap_artifacts(config.repository)
             try:
@@ -848,4 +951,6 @@ def _execute_locked(
                     state="interrupted",
                     failure_type="KeyboardInterrupt",
                 )
+        run_state["correction_cycles"] = correction_cycles
+        _attach_run_result(exc, run_dir, run_state)
         raise

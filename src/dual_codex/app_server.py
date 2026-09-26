@@ -802,7 +802,10 @@ class _AppServerProcess:
             elif item_type == "custom_tool_call_output" and call_id:
                 raw_custom_outputs[call_id] = evidence
 
-        deadline = time.monotonic() + self.config.app_server_turn_timeout
+        turn_timeout = getattr(self.agent, "app_server_turn_timeout", None)
+        if turn_timeout is None:
+            turn_timeout = self.config.app_server_turn_timeout
+        deadline = time.monotonic() + float(turn_timeout)
         last_progress = time.monotonic()
         while completed is None:
             remaining = deadline - time.monotonic()

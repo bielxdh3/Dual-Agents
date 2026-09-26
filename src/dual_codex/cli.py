@@ -808,19 +808,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Run directory: {outcome.run_dir}")
             print(f"Verdict: {outcome.verdict}")
             print(f"Correction cycles: {outcome.correction_cycles}")
+            _emit_run_result(getattr(outcome, "run_result", None))
             return 0 if outcome.verdict == "approved" else 2
         raise ValueError(f"Unsupported command '{args.command}'.")
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as exc:
+        if args.command == "run":
+            _emit_run_result(getattr(exc, "dual_codex_run_result", None))
         print("Interrupted", file=sys.stderr)
         return 130
     except (ConfigError, RuntimeError, TerminalError, OSError, ValueError) as exc:
         if args.command == "delegate":
             return _emit_delegate_internal_failure(args, exc)
+        if args.command == "run":
+            _emit_run_result(getattr(exc, "dual_codex_run_result", None))
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     except Exception as exc:
         if args.command == "delegate":
             return _emit_delegate_internal_failure(args, exc)
+        if args.command == "run":
+            _emit_run_result(getattr(exc, "dual_codex_run_result", None))
         print(f"ERROR: Internal failure ({type(exc).__name__}).", file=sys.stderr)
         return 1
 
@@ -873,6 +880,15 @@ def _emit_delegate_internal_failure(args, exc: Exception | None = None) -> int:
         file=sys.stderr,
     )
     return 1
+
+
+def _emit_run_result(result: object) -> None:
+    if isinstance(result, dict):
+        print(
+            "DUAL_CODEX_RUN_RESULT "
+            + json.dumps(result, ensure_ascii=False, separators=(",", ":")),
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
