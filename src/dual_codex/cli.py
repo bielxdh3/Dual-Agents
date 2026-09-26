@@ -795,10 +795,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "run":
             if args.repository:
                 config = replace(config, repository=Path(args.repository).expanduser().resolve())
+
+            def show_progress(message: str) -> None:
+                print(message, flush=True)
+
             outcome = execute(
                 config,
                 Path(args.task),
                 explicit_repository=bool(args.repository),
+                progress=show_progress,
             )
             print(f"Run directory: {outcome.run_dir}")
             print(f"Verdict: {outcome.verdict}")

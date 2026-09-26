@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 import re
+import stat
 import tempfile
 from typing import Callable, Iterable
 
@@ -214,6 +218,242 @@ def status_porcelain(repository: Path) -> str:
 
 def head_revision(repository: Path) -> str:
     return run_git(["git", "rev-parse", "HEAD"], cwd=repository).stdout.strip()
+
+
+def _porcelain_entries(raw: str) -> list[dict[str, str]]:
+    fields = raw.split("\0")
+    entries: list[dict[str, str]] = []
+    index = 0
+    while index < len(fields):
+        record = fields[index]
+        index += 1
+        if not record:
+            continue
+        if len(record) < 4 or record[2] != " ":
+            raise RuntimeError("Could not safely parse Git's NUL-delimited status output.")
+        entry = {"index": record[0], "worktree": record[1], "path": record[3:]}
+        if "R" in record[:2] or "C" in record[:2]:
+            if index >= len(fields) or not fields[index]:
+                raise RuntimeError("Could not safely parse a Git rename/copy status entry.")
+            entry["source_path"] = fields[index]
+            index += 1
+        entries.append(entry)
+    if any("\ufffd" in entry["path"] for entry in entries):
+        raise RuntimeError("Git status contains a path that is not valid UTF-8.")
+    return entries
+
+
+def _index_entries(repository: Path) -> dict[str, list[dict[str, str]]]:
+    result = run_git(["git", "ls-files", "--stage", "-z"], cwd=repository)
+    entries: dict[str, list[dict[str, str]]] = {}
+    for record in result.stdout.split("\0"):
+        if not record:
+            continue
+        metadata, separator, path = record.partition("\t")
+        fields = metadata.split()
+        if not separator or len(fields) != 3 or "\ufffd" in path:
+            raise RuntimeError("Could not safely parse Git's index entries.")
+        mode, object_id, stage = fields
+        entries.setdefault(path, []).append({"mode": mode, "object_id": object_id, "stage": stage})
+    return entries
+
+
+def _worktree_snapshot(repository: Path, relative_path: str) -> dict[str, object]:
+    """Hash raw worktree bytes without following symlinks or running Git filters."""
+
+    parts = relative_path.split("/")
+    if not relative_path or relative_path.startswith("/") or any(part in {"", ".", ".."} for part in parts):
+        return {"kind": "unknown", "reason": "invalid_repository_relative_path"}
+    path = repository
+    try:
+        for part in parts[:-1]:
+            path = path / part
+            info = path.lstat()
+            if stat.S_ISLNK(info.st_mode) or _is_reparse_point(info) or not stat.S_ISDIR(info.st_mode):
+                return {"kind": "unknown", "reason": "unsafe_parent_path"}
+        path = path / parts[-1]
+        before = path.lstat()
+    except FileNotFoundError:
+        return {"kind": "missing"}
+    except OSError:
+        return {"kind": "unknown", "reason": "lstat_failed"}
+
+    if stat.S_ISLNK(before.st_mode):
+        try:
+            target = os.readlink(path)
+            after = path.lstat()
+            if (before.st_dev, before.st_ino, before.st_mtime_ns) != (after.st_dev, after.st_ino, after.st_mtime_ns):
+                return {"kind": "unknown", "reason": "path_changed_during_snapshot"}
+            digest = hashlib.sha256(os.fsencode(target)).hexdigest()
+            return {"kind": "symlink", "mode": stat.S_IMODE(before.st_mode), "sha256": digest}
+        except OSError:
+            return {"kind": "unknown", "reason": "symlink_read_failed"}
+    if _is_reparse_point(before):
+        return {"kind": "unknown", "reason": "reparse_point"}
+    if stat.S_ISDIR(before.st_mode):
+        return {"kind": "directory", "mode": stat.S_IMODE(before.st_mode)}
+    if not stat.S_ISREG(before.st_mode):
+        return {"kind": "unknown", "reason": "unsupported_file_type"}
+
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if not stat.S_ISREG(opened.st_mode) or _is_reparse_point(opened):
+                return {"kind": "unknown", "reason": "unsafe_opened_file"}
+            digest = hashlib.sha256()
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+            after = path.lstat()
+            if (
+                (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+                != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+            ):
+                return {"kind": "unknown", "reason": "path_changed_during_snapshot"}
+            return {"kind": "file", "mode": stat.S_IMODE(after.st_mode), "sha256": digest.hexdigest()}
+    except OSError:
+        return {"kind": "unknown", "reason": "file_read_failed"}
+
+
+def _is_reparse_point(info: os.stat_result) -> bool:
+    return bool(getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+
+
+def capture_git_baseline(repository: Path) -> dict[str, object]:
+    """Capture a hook/filter-safe, hash-only Git/worktree baseline."""
+
+    repository = git_top_level(repository)
+    status = run_git(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=repository,
+    ).stdout
+    status_entries = _porcelain_entries(status)
+    index_raw = run_git(["git", "ls-files", "--stage", "-z"], cwd=repository).stdout
+    index = _index_entries(repository)
+    tracked_paths = sorted(index)
+    untracked_paths = sorted(entry["path"] for entry in status_entries if entry["index"] == "?" and entry["worktree"] == "?")
+    paths_to_hash = sorted(set(tracked_paths).union(untracked_paths))
+    snapshots = {path: _worktree_snapshot(repository, path) for path in paths_to_hash}
+    staged_paths = {
+        entry["path"]
+        for entry in status_entries
+        if entry["index"] not in {" ", "?"}
+    }
+    branch = run_git(["git", "symbolic-ref", "--short", "-q", "HEAD"], cwd=repository, check=False)
+    if branch.returncode not in {0, 1}:
+        raise RuntimeError("Could not safely determine the current Git branch state.")
+    head_result = run_git(["git", "rev-parse", "--verify", "HEAD"], cwd=repository, check=False)
+    if head_result.returncode == 0:
+        head = head_result.stdout.strip()
+    elif branch.returncode == 0 and (
+        "unknown revision" in head_result.stderr.casefold()
+        or "needed a single revision" in head_result.stderr.casefold()
+    ):
+        head = ""
+    else:
+        raise RuntimeError("Could not safely determine the current Git HEAD.")
+    return {
+        "schema_version": 1,
+        "repository": str(repository),
+        "git_dir": run_git(["git", "rev-parse", "--absolute-git-dir"], cwd=repository).stdout.strip(),
+        "head": head,
+        "branch": branch.stdout.strip() if branch.returncode == 0 else "",
+        "detached": branch.returncode == 1,
+        "status_entries": status_entries,
+        "staged_status": {entry["path"]: entry["index"] for entry in status_entries if entry["index"] not in {" ", "?"}},
+        "unstaged_status": {entry["path"]: entry["worktree"] for entry in status_entries if entry["worktree"] not in {" ", "?"}},
+        "untracked_paths": untracked_paths,
+        "index_fingerprint": hashlib.sha256(index_raw.encode("utf-8")).hexdigest(),
+        "staged_index_entries": {path: index[path] for path in sorted(staged_paths) if path in index},
+        "worktree_snapshots": snapshots,
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "complete": all(snapshot.get("kind") != "unknown" for snapshot in snapshots.values()),
+    }
+
+
+def attribute_git_mutations(
+    repository: Path,
+    baseline: dict[str, object],
+    *,
+    excluded_paths: Iterable[str] = (),
+) -> dict[str, object]:
+    """Compare final status and raw file hashes with a captured run baseline."""
+
+    repository = git_top_level(repository)
+    if str(baseline.get("repository", "")) != str(repository):
+        raise RuntimeError("Git baseline belongs to a different repository root.")
+    final = capture_git_baseline(repository)
+    excluded = tuple(path.replace("\\", "/").strip("/") for path in excluded_paths if path)
+
+    def is_excluded(path: str) -> bool:
+        return any(path == prefix or path.startswith(prefix + "/") for prefix in excluded)
+
+    old_entries = {entry["path"]: entry for entry in baseline.get("status_entries", []) if isinstance(entry, dict)}
+    new_entries = {entry["path"]: entry for entry in final.get("status_entries", []) if isinstance(entry, dict)}
+    old_snapshots = baseline.get("worktree_snapshots", {})
+    new_snapshots = final.get("worktree_snapshots", {})
+    old_index = baseline.get("staged_index_entries", {})
+    new_index = final.get("staged_index_entries", {})
+    old_head = str(baseline.get("head", ""))
+    new_head = str(final.get("head", ""))
+    user_paths = {
+        path for path in set(old_snapshots) | set(new_snapshots) | set(old_entries) | set(new_entries)
+        if not is_excluded(path)
+    }
+    unchanged: list[str] = []
+    touched: list[str] = []
+    created: list[str] = []
+    removed: list[str] = []
+    unknown: list[str] = []
+    for path in sorted(user_paths):
+        old_exists = path in old_snapshots
+        new_exists = path in new_snapshots
+        before = old_snapshots.get(path, {}) if isinstance(old_snapshots, dict) else {}
+        after = new_snapshots.get(path, {}) if isinstance(new_snapshots, dict) else {}
+        old_status = old_entries.get(path)
+        new_status = new_entries.get(path)
+        old_staged = old_index.get(path) if isinstance(old_index, dict) else None
+        new_staged = new_index.get(path) if isinstance(new_index, dict) else None
+        if old_exists and not new_exists or (isinstance(after, dict) and after.get("kind") == "missing"):
+            removed.append(path)
+            continue
+        if not old_exists and new_exists:
+            created.append(path)
+            continue
+        if before.get("kind") == "unknown" or after.get("kind") == "unknown":
+            unknown.append(path)
+            continue
+        if old_status == new_status and before == after and old_staged == new_staged:
+            if old_status is not None:
+                unchanged.append(path)
+            continue
+        if old_status is None and new_status is not None:
+            created.append(path)
+        elif old_status is not None and new_status is None:
+            touched.append(path)
+        elif old_status is not None or new_status is not None or before != after or old_staged != new_staged:
+            touched.append(path)
+
+    return {
+        "schema_version": 1,
+        "status": "complete" if baseline.get("complete") and final.get("complete") and not unknown else "unknown",
+        "repository": str(repository),
+        "initial_head": old_head,
+        "final_head": new_head,
+        "head_changed": old_head != new_head,
+        "initial_branch": baseline.get("branch", ""),
+        "final_branch": final.get("branch", ""),
+        "branch_changed": baseline.get("branch", "") != final.get("branch", "") or baseline.get("detached") != final.get("detached"),
+        "staged_state_changed": baseline.get("index_fingerprint") != final.get("index_fingerprint"),
+        "unchanged_preexisting_paths": unchanged,
+        "run_touched_paths": touched,
+        "run_created_paths": created,
+        "run_removed_paths": removed,
+        "unknown_paths": unknown,
+        "excluded_control_paths": list(excluded),
+        "observed_at": final.get("captured_at", ""),
+    }
 
 
 def status_and_diff(repository: Path) -> str:

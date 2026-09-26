@@ -8,13 +8,18 @@ replacement path.
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import hashlib
+import json
 import os
 from pathlib import Path
+import re
 import stat
 import tempfile
 from typing import Iterable
 
+from .config import SUPPORTED_ROLES
+from .report import atomic_write_json
 
 CANONICAL_INSTRUCTIONS_ROOT = Path(r"C:\CodexGlobal")
 _DEFAULT_SELECTED_SKILLS = (
@@ -24,6 +29,9 @@ _DEFAULT_SELECTED_SKILLS = (
     "project-security-review",
 )
 _MANDATORY_ARCHITECT_SKILLS = _DEFAULT_SELECTED_SKILLS
+_CANONICAL_BOOTSTRAP_NAME = re.compile(
+    rf"^\.canonical-bootstrap-(?P<role>{'|'.join(re.escape(role) for role in SUPPORTED_ROLES)})-[A-Za-z0-9_]{{8}}\.md$"
+)
 
 
 @dataclass(frozen=True)
@@ -64,6 +72,7 @@ class CanonicalBootstrap:
     artifact_source_files: tuple[tuple[str, str], ...] = ()
     host_loaded_skills: tuple[str, ...] = ()
     actor_selected_skills: tuple[str, ...] = ()
+    artifact_owner_path: Path | None = None
 
     def metadata(self) -> dict[str, object]:
         artifact_source_files = dict(self.artifact_source_files)
@@ -105,6 +114,7 @@ class CanonicalBootstrap:
             "canonical_bootstrap_source_sha256": self.source_sha256,
             "canonical_bootstrap_mechanism": self.mechanism,
             "canonical_bootstrap_artifact": str(self.artifact_path or ""),
+            "canonical_bootstrap_owner_metadata": str(self.artifact_owner_path or ""),
             "canonical_bootstrap_artifact_sha256": self.artifact_sha256,
             "canonical_bootstrap_artifact_source_sha256": self.artifact_source_sha256,
             "canonical_bootstrap_artifact_ephemeral": self.artifact_path is not None,
@@ -438,6 +448,9 @@ def create_canonical_bootstrap(
     root: Path | None = None,
     repository: Path | None = None,
     selected_skills: Iterable[str] | None = None,
+    artifact_repository: Path | None = None,
+    run_id: str = "",
+    provider_backend: str = "",
 ) -> CanonicalBootstrap:
     """Validate canonical policy and optionally materialize one ephemeral snapshot."""
 
@@ -475,10 +488,39 @@ def create_canonical_bootstrap(
     destination.mkdir(parents=True, exist_ok=True)
     fd, raw_path = tempfile.mkstemp(prefix=f".canonical-bootstrap-{role}-", suffix=".md", dir=destination)
     path = Path(raw_path)
+    owner_path = path.with_suffix(".owner.json")
     try:
         content = _artifact_text(source_root, role, files, source_sha256).encode("utf-8")
         with os.fdopen(fd, "wb") as handle:
             handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        owner_root = artifact_repository.expanduser().resolve(strict=True) if artifact_repository is not None else None
+        if owner_root is not None:
+            try:
+                from .delegation import _safe_process_start_token
+
+                process_start = _safe_process_start_token(os.getpid())
+            except Exception:
+                process_start = None
+            atomic_write_json(
+                owner_path,
+                {
+                    "schema_version": 1,
+                    "repository": str(owner_root),
+                    "artifact": path.name,
+                    "artifact_sha256": hashlib.sha256(content).hexdigest(),
+                    "role": role,
+                    "backend": provider_backend,
+                    "provider_state": "not_started",
+                    "provider_pid": None,
+                    "provider_process_start": None,
+                    "run_id": run_id,
+                    "pid": os.getpid(),
+                    "process_start": process_start,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
         return CanonicalBootstrap(
             source_root=source_root,
             source_sha256=source_sha256,
@@ -495,6 +537,7 @@ def create_canonical_bootstrap(
             artifact_source_sha256=source_sha256,
             artifact_source_files=source_files,
             host_loaded_skills=selected,
+            artifact_owner_path=owner_path if owner_root is not None else None,
         )
     except BaseException:
         try:
@@ -502,6 +545,7 @@ def create_canonical_bootstrap(
         except OSError:
             pass
         path.unlink(missing_ok=True)
+        owner_path.unlink(missing_ok=True)
         raise
 
 
@@ -558,6 +602,7 @@ def finalize_architect_bootstrap(
         artifact_source_files=bootstrap.artifact_source_files,
         host_loaded_skills=baseline,
         actor_selected_skills=actor_selected,
+        artifact_owner_path=bootstrap.artifact_owner_path,
     )
 
 
@@ -575,7 +620,430 @@ def bootstrap_artifact_dir(repository: Path, output_path: Path) -> Path:
 
 def cleanup_canonical_bootstrap(bootstrap: CanonicalBootstrap | None) -> None:
     if bootstrap is not None and bootstrap.artifact_path is not None:
-        bootstrap.artifact_path.unlink(missing_ok=True)
+        artifact = bootstrap.artifact_path
+        owner_path = bootstrap.artifact_owner_path
+        try:
+            owner_info = None
+            owner_bytes = None
+            if owner_path is not None:
+                owner_info = owner_path.lstat()
+                owner_bytes = _read_regular_file_nofollow(owner_path, max_bytes=256 * 1024)
+                if not _same_file_identity(owner_info, owner_path.lstat()):
+                    return
+                owner = json.loads(owner_bytes.decode("utf-8"))
+                if (
+                    not isinstance(owner, dict)
+                    or owner.get("schema_version") != 1
+                    or not isinstance(owner.get("repository"), str)
+                    or not owner.get("repository")
+                    or owner.get("artifact") != artifact.name
+                    or owner.get("artifact_sha256") != bootstrap.artifact_sha256
+                ):
+                    return
+                expected_repository = Path(str(owner.get("repository", ""))).resolve(strict=True)
+                if not artifact.resolve(strict=True).is_relative_to(expected_repository):
+                    return
+                provider_state = owner.get("provider_state")
+                if provider_state == "starting":
+                    return
+                if provider_state == "running":
+                    try:
+                        provider_pid = int(owner.get("provider_pid", 0))
+                    except (TypeError, ValueError):
+                        provider_pid = 0
+                    if provider_pid <= 0:
+                        return
+                    active, ambiguous = _active_process(provider_pid, owner.get("provider_process_start"))
+                    if active or ambiguous:
+                        return
+                elif provider_state not in {"not_started", "completed", "exited"}:
+                    return
+            artifact_info = artifact.lstat()
+            artifact_bytes = _read_regular_file_nofollow(artifact)
+            if not _same_file_identity(artifact_info, artifact.lstat()):
+                return
+            if hashlib.sha256(artifact_bytes).hexdigest() != bootstrap.artifact_sha256:
+                return
+            if not _same_file_identity(artifact_info, artifact.lstat()):
+                return
+            artifact.unlink()
+            if owner_path is not None:
+                try:
+                    current_owner_info = owner_path.lstat()
+                    current_owner_bytes = _read_regular_file_nofollow(owner_path, max_bytes=256 * 1024)
+                    if _same_file_identity(owner_info, current_owner_info) and current_owner_bytes == owner_bytes:
+                        if not _same_file_identity(current_owner_info, owner_path.lstat()):
+                            return
+                        owner_path.unlink()
+                except (OSError, UnicodeError, json.JSONDecodeError):
+                    pass
+        except FileNotFoundError:
+            return
+        except OSError:
+            return
+        except (UnicodeError, json.JSONDecodeError, ValueError):
+            return
+
+
+def update_canonical_bootstrap_provider(
+    bootstrap: CanonicalBootstrap | None,
+    *,
+    backend: str,
+    state: str,
+    pid: int | None = None,
+) -> None:
+    """Record whether a file-path-dependent provider may still read an artifact."""
+
+    if bootstrap is None or bootstrap.artifact_owner_path is None:
+        return
+    owner_path = bootstrap.artifact_owner_path
+    if not _regular_file(owner_path):
+        raise RuntimeError("Canonical bootstrap ownership metadata is unavailable.")
+    try:
+        owner = json.loads(owner_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Canonical bootstrap ownership metadata is unreadable.") from exc
+    if (
+        not isinstance(owner, dict)
+        or owner.get("artifact") != bootstrap.artifact_path.name
+        or owner.get("artifact_sha256") != bootstrap.artifact_sha256
+    ):
+        raise RuntimeError("Canonical bootstrap ownership metadata does not match its artifact.")
+    owner["backend"] = backend
+    owner["provider_state"] = state
+    owner["provider_pid"] = pid
+    if pid is not None:
+        try:
+            from .delegation import _safe_process_start_token
+
+            owner["provider_process_start"] = _safe_process_start_token(pid)
+        except Exception:
+            owner["provider_process_start"] = None
+    else:
+        owner["provider_process_start"] = None
+    atomic_write_json(owner_path, owner)
+
+
+def _is_reparse_point(info: os.stat_result) -> bool:
+    return bool(getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+
+
+def _regular_file(path: Path) -> bool:
+    try:
+        info = path.lstat()
+    except OSError:
+        return False
+    return stat.S_ISREG(info.st_mode) and not stat.S_ISLNK(info.st_mode) and not _is_reparse_point(info)
+
+
+def _same_file_identity(left: os.stat_result, right: os.stat_result) -> bool:
+    return (
+        left.st_dev,
+        left.st_ino,
+        left.st_size,
+        left.st_mtime_ns,
+        left.st_mode,
+        getattr(left, "st_file_attributes", 0),
+    ) == (
+        right.st_dev,
+        right.st_ino,
+        right.st_size,
+        right.st_mtime_ns,
+        right.st_mode,
+        getattr(right, "st_file_attributes", 0),
+    )
+
+
+def _read_regular_file_nofollow(path: Path, *, max_bytes: int = 16 * 1024 * 1024) -> bytes:
+    """Read a stable regular file without accepting a link or reparse target."""
+
+    before = path.lstat()
+    if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode) or _is_reparse_point(before):
+        raise OSError("Refusing to read a non-regular or reparse file.")
+    if before.st_size > max_bytes:
+        raise OSError("File exceeds the safe read size.")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, "rb") as handle:
+        opened = os.fstat(handle.fileno())
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or stat.S_ISLNK(opened.st_mode)
+            or _is_reparse_point(opened)
+            or not _same_file_identity(before, opened)
+        ):
+            raise OSError("File changed or resolved through a reparse point while opening.")
+        content = handle.read(max_bytes + 1)
+        after_open = os.fstat(handle.fileno())
+        after_path = path.lstat()
+        if (
+            len(content) > max_bytes
+            or not _same_file_identity(opened, after_open)
+            or not _same_file_identity(opened, after_path)
+        ):
+            raise OSError("File changed while being read.")
+        return content
+
+
+def _active_process(pid: int, recorded_start: object) -> tuple[bool, bool]:
+    """Return (active, ambiguous) while treating unknown process state as live."""
+
+    try:
+        from .delegation import _pid_alive, _safe_process_start_token
+
+        alive = _pid_alive(pid)
+        if not alive:
+            return False, False
+        current_start = _safe_process_start_token(pid)
+    except Exception:
+        return True, True
+    if not isinstance(recorded_start, str) or not recorded_start or not current_start:
+        return True, True
+    return current_start == recorded_start, current_start != recorded_start
+
+
+def _verified_legacy_bootstrap(path: Path, *, role: str, canonical_root: Path) -> bool:
+    """Recognize the old generated format when no ownership sidecar exists."""
+
+    try:
+        text = _read_regular_file_nofollow(path).decode("utf-8")
+        lines = text.splitlines()
+        expected_root = canonical_root.expanduser().resolve(strict=True)
+    except (OSError, UnicodeError):
+        return False
+    return (
+        len(lines) >= 7
+        and lines[0] == "# Dual Codex canonical bootstrap transport"
+        and lines[1] == ""
+        and lines[2] == "This is an ephemeral, read-only transport snapshot. The canonical source remains machine-owned."
+        and lines[3] == f"canonical_source_path: {expected_root}"
+        and re.fullmatch(r"canonical_source_sha256: [0-9a-f]{64}", lines[4]) is not None
+        and lines[5] == f"trusted_configured_phase_role: {role}"
+        and lines[6]
+        == "trusted_role_dispatch_boundary: already inside this configured phase; follow its task and schema without recursively dispatching"
+    )
+
+
+def canonical_bootstrap_artifacts(repository: Path) -> list[str]:
+    """List matching regular bootstrap artifacts without traversing reparse points."""
+
+    repository = repository.expanduser().resolve(strict=True)
+    metadata_dir = repository / ".dual_codex"
+    bootstrap_dir = metadata_dir / "bootstrap"
+    try:
+        metadata_info = metadata_dir.lstat()
+        if not stat.S_ISDIR(metadata_info.st_mode) or stat.S_ISLNK(metadata_info.st_mode) or _is_reparse_point(metadata_info):
+            return []
+        bootstrap_info = bootstrap_dir.lstat()
+        if not stat.S_ISDIR(bootstrap_info.st_mode) or stat.S_ISLNK(bootstrap_info.st_mode) or _is_reparse_point(bootstrap_info):
+            return []
+        return sorted(
+            entry.name
+            for entry in os.scandir(bootstrap_dir)
+            if _CANONICAL_BOOTSTRAP_NAME.fullmatch(entry.name)
+            and entry.is_file(follow_symlinks=False)
+            and _regular_file(bootstrap_dir / entry.name)
+        )
+    except FileNotFoundError:
+        return []
+    except OSError:
+        return []
+
+
+def canonical_bootstrap_control_paths(repository: Path) -> list[str]:
+    """Return repository-relative paths for recognized bootstrap files and sidecars."""
+
+    repository = repository.expanduser().resolve(strict=True)
+    bootstrap_dir = repository / ".dual_codex" / "bootstrap"
+    paths: list[str] = []
+    for name in canonical_bootstrap_artifacts(repository):
+        paths.append(f".dual_codex/bootstrap/{name}")
+        owner_path = (bootstrap_dir / name).with_suffix(".owner.json")
+        if _regular_file(owner_path):
+            paths.append(f".dual_codex/bootstrap/{owner_path.name}")
+    return sorted(paths)
+
+
+def reconcile_orphan_canonical_bootstrap(
+    repository: Path,
+    *,
+    repository_lock,
+    run_id: str,
+    configured_backends: dict[str, str] | None = None,
+    canonical_root: Path | None = None,
+) -> dict[str, list[dict[str, str]]]:
+    """Remove only verified stale canonical artifacts while holding the repo run lock."""
+
+    repository = repository.expanduser().resolve(strict=True)
+    if not repository_lock.is_held_for_repository(repository):
+        raise RuntimeError("Canonical bootstrap reconciliation requires this run's active repository lock.")
+    metadata_dir = repository / ".dual_codex"
+    bootstrap_dir = metadata_dir / "bootstrap"
+    removed: list[dict[str, str]] = []
+    retained: list[dict[str, str]] = []
+    try:
+        metadata_info = metadata_dir.lstat()
+        if not stat.S_ISDIR(metadata_info.st_mode) or stat.S_ISLNK(metadata_info.st_mode) or _is_reparse_point(metadata_info):
+            return {"removed": [], "retained": [{"name": ".dual_codex", "reason": "unsafe_directory"}]}
+        bootstrap_info = bootstrap_dir.lstat()
+        if not stat.S_ISDIR(bootstrap_info.st_mode) or stat.S_ISLNK(bootstrap_info.st_mode) or _is_reparse_point(bootstrap_info):
+            return {"removed": [], "retained": [{"name": "bootstrap", "reason": "unsafe_directory"}]}
+    except FileNotFoundError:
+        return {"removed": [], "retained": []}
+    except OSError:
+        return {"removed": [], "retained": [{"name": "bootstrap", "reason": "directory_unavailable"}]}
+
+    configured_backends = configured_backends or {}
+    canonical_root = canonical_root or canonical_instructions_root()
+    for entry in os.scandir(bootstrap_dir):
+        name = entry.name
+        match = _CANONICAL_BOOTSTRAP_NAME.fullmatch(name)
+        if match is None:
+            continue
+        role = match.group("role")
+        artifact = bootstrap_dir / name
+        if not entry.is_file(follow_symlinks=False) or not _regular_file(artifact):
+            retained.append({"name": name, "reason": "not_regular_file"})
+            continue
+        try:
+            resolved = artifact.resolve(strict=True)
+            if resolved.parent != bootstrap_dir.resolve(strict=True) or not resolved.is_relative_to(repository):
+                retained.append({"name": name, "reason": "outside_repository_bootstrap_root"})
+                continue
+            artifact_info = artifact.lstat()
+            artifact_bytes = _read_regular_file_nofollow(artifact)
+            if not _same_file_identity(artifact_info, artifact.lstat()):
+                retained.append({"name": name, "reason": "changed_during_read"})
+                continue
+            artifact_digest = hashlib.sha256(artifact_bytes).hexdigest()
+        except OSError:
+            retained.append({"name": name, "reason": "artifact_unreadable"})
+            continue
+
+        owner_path = artifact.with_suffix(".owner.json")
+        owner = None
+        owner_bytes = None
+        try:
+            owner_info = owner_path.lstat()
+        except FileNotFoundError:
+            owner_info = None
+        except OSError:
+            retained.append({"name": name, "reason": "owner_metadata_unreadable"})
+            continue
+        if owner_info is not None:
+            if not stat.S_ISREG(owner_info.st_mode) or stat.S_ISLNK(owner_info.st_mode) or _is_reparse_point(owner_info):
+                retained.append({"name": name, "reason": "unsafe_owner_metadata"})
+                continue
+            try:
+                owner_bytes = _read_regular_file_nofollow(owner_path, max_bytes=256 * 1024)
+                if not _same_file_identity(owner_info, owner_path.lstat()):
+                    retained.append({"name": name, "reason": "changed_during_owner_read"})
+                    continue
+                owner = json.loads(owner_bytes.decode("utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                retained.append({"name": name, "reason": "invalid_owner_metadata"})
+                continue
+            if (
+                not isinstance(owner, dict)
+                or owner.get("schema_version") != 1
+                or owner.get("repository") != str(repository)
+                or owner.get("artifact") != name
+                or owner.get("artifact_sha256") != artifact_digest
+                or not isinstance(owner.get("pid"), int)
+            ):
+                retained.append({"name": name, "reason": "ambiguous_owner_metadata"})
+                continue
+            if owner.get("run_id") == run_id:
+                retained.append({"name": name, "reason": "current_run_artifact"})
+                continue
+            active, ambiguous = _active_process(owner["pid"], owner.get("process_start"))
+            if active or ambiguous:
+                retained.append({"name": name, "reason": "active_or_ambiguous_owner"})
+                continue
+            backend = str(owner.get("backend") or configured_backends.get(role, ""))
+            provider_state = owner.get("provider_state")
+            if provider_state == "starting":
+                retained.append({"name": name, "reason": "provider_start_state_ambiguous"})
+                continue
+            if provider_state == "running":
+                try:
+                    provider_pid = int(owner.get("provider_pid", 0))
+                except (TypeError, ValueError):
+                    provider_pid = 0
+                if provider_pid <= 0:
+                    retained.append({"name": name, "reason": "active_or_ambiguous_provider"})
+                    continue
+                provider_active, provider_ambiguous = _active_process(
+                    provider_pid,
+                    owner.get("provider_process_start"),
+                )
+                if provider_active or provider_ambiguous:
+                    retained.append({"name": name, "reason": "active_or_ambiguous_provider"})
+                    continue
+            elif provider_state not in {"not_started", "completed", "exited"}:
+                retained.append({"name": name, "reason": "provider_state_ambiguous"})
+                continue
+
+        # Older versions did not write a sidecar. Require both the strict
+        # generated name and the exact host-owned document header; a generic
+        # Markdown file with a similar name is not enough to establish ownership.
+        if owner_info is None:
+            legacy_backend = configured_backends.get(role)
+            if legacy_backend == "claude_code":
+                retained.append({"name": name, "reason": "legacy_provider_ownership_ambiguous"})
+                continue
+            if legacy_backend not in {"app_server", "windows", "antigravity", "api"}:
+                retained.append({"name": name, "reason": "legacy_backend_unknown"})
+                continue
+            if not _verified_legacy_bootstrap(artifact, role=role, canonical_root=canonical_root):
+                retained.append({"name": name, "reason": "legacy_ownership_unproven"})
+                continue
+        try:
+            current_metadata_info = metadata_dir.lstat()
+            current_bootstrap_info = bootstrap_dir.lstat()
+            if (
+                not stat.S_ISDIR(current_metadata_info.st_mode)
+                or stat.S_ISLNK(current_metadata_info.st_mode)
+                or _is_reparse_point(current_metadata_info)
+                or not stat.S_ISDIR(current_bootstrap_info.st_mode)
+                or stat.S_ISLNK(current_bootstrap_info.st_mode)
+                or _is_reparse_point(current_bootstrap_info)
+            ):
+                retained.append({"name": name, "reason": "changed_before_unlink"})
+                continue
+            resolved_root = bootstrap_dir.resolve(strict=True)
+            resolved_artifact = artifact.resolve(strict=True)
+            if resolved_root != bootstrap_dir or resolved_artifact.parent != resolved_root or not resolved_artifact.is_relative_to(repository):
+                retained.append({"name": name, "reason": "outside_repository_bootstrap_root"})
+                continue
+            current_info = artifact.lstat()
+            if (
+                not stat.S_ISREG(current_info.st_mode)
+                or stat.S_ISLNK(current_info.st_mode)
+                or _is_reparse_point(current_info)
+                or not _same_file_identity(artifact_info, current_info)
+            ):
+                retained.append({"name": name, "reason": "changed_before_unlink"})
+                continue
+            if hashlib.sha256(_read_regular_file_nofollow(artifact)).hexdigest() != artifact_digest:
+                retained.append({"name": name, "reason": "changed_before_unlink"})
+                continue
+            artifact.unlink()
+            if owner_info is not None:
+                try:
+                    current_owner_info = owner_path.lstat()
+                    current_owner_bytes = _read_regular_file_nofollow(owner_path, max_bytes=256 * 1024)
+                    if (
+                        _same_file_identity(owner_info, current_owner_info)
+                        and current_owner_bytes == owner_bytes
+                    ):
+                        owner_path.unlink()
+                except OSError:
+                    pass
+            removed.append({"name": name, "run_id": str(owner.get("run_id", "")) if owner else "legacy"})
+        except OSError:
+            retained.append({"name": name, "reason": "unlink_failed"})
+    return {"removed": removed, "retained": retained}
 
 
 def configured_actor_prompt(

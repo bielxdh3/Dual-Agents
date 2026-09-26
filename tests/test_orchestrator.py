@@ -469,6 +469,162 @@ class OrchestratorTests(unittest.TestCase):
             ):
                 self.assertEqual(architect_provenance[key], error.metadata[key], key)
 
+    def test_run_progress_propagates_safe_heartbeats_without_creating_corrections(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            subprocess.run(["git", "init", "-q"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.name", "Run Test"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.email", "run@example.invalid"], cwd=repository, check=True)
+            tracked = repository / "tracked.txt"
+            tracked.write_text("committed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=repository, check=True)
+            subprocess.run(["git", "commit", "-qm", "initial"], cwd=repository, check=True)
+            tracked.write_text("pre-existing user edit\n", encoding="utf-8")
+            accounts = {
+                name: AccountConfig(
+                    name=name,
+                    label=name,
+                    codex_home=root / f"{name}-home",
+                    model="",
+                    reasoning_effort="high",
+                    backend="app_server",
+                )
+                for name in ("architect", "executor", "reviewer")
+            }
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=1,
+                require_clean_git=False,
+                codex_command="codex",
+                accounts=accounts,
+                roles={"architect": "architect", "executor": "executor", "reviewer": "reviewer", "orchestrator": "architect"},
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+            )
+            task = root / "brief.md"
+            task.write_text("A bounded fake mission.", encoding="utf-8")
+            events: list[str] = []
+
+            def fake_runner(**kwargs):
+                role = kwargs["role"]
+                run_dir = kwargs["output_path"].parent
+                self.assertTrue((run_dir / "task.md").is_file())
+                self.assertTrue((run_dir / "initial_git_baseline.json").is_file())
+                self.assertEqual(json.loads((run_dir / "run_state.json").read_text(encoding="utf-8"))["status"], "running")
+                if role == "architect":
+                    self.assertTrue(
+                        any(
+                            (event := json.loads(item.removeprefix("DUAL_CODEX_PROGRESS "))).get("phase") == "architect"
+                            and event.get("state") == "started"
+                            for item in events
+                        )
+                    )
+                    payload = {"summary": "plan", "steps": [], "acceptance_criteria": [], "risks": [], "files_to_inspect": [], "skills_loaded": []}
+                elif role == "executor":
+                    (repository / "created-by-run.txt").write_text("run output\n", encoding="utf-8")
+                    kwargs["progress"]("app-server turn turn-safe-1 still running")
+                    kwargs["progress"]("app-server turn turn-safe-1 still running")
+                    kwargs["progress"]("PRIVATE_PROMPT and model reasoning must not be printed")
+                    payload = {"summary": "implemented", "files_changed": ["created-by-run.txt"], "commands_run": [], "tests": [], "remaining_issues": []}
+                else:
+                    payload = {"verdict": "approved", "summary": "approved", "findings": []}
+                kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
+                agent = kwargs["agent"]
+                return CommandResult(
+                    ["fake"], 0, "", "", {
+                        "phase": role,
+                        "role": role,
+                        "actor_id": agent.account_name,
+                        "actual_actor": agent.account_name,
+                        "provider": agent.provider_type,
+                        "backend": agent.backend,
+                        "repository": str(repository.resolve()),
+                        "fallback_used": False,
+                    },
+                )
+
+            with patch("dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner):
+                outcome = execute(config, task, progress=events.append)
+
+            decoded = [json.loads(event.removeprefix("DUAL_CODEX_PROGRESS ")) for event in events]
+            executor_running = [event for event in decoded if event.get("phase") == "executor" and event.get("state") == "running"]
+            self.assertEqual(len(executor_running), 3)
+            self.assertTrue(all(event.get("detail") == "app-server turn turn-safe-1 still running" for event in executor_running[:2]))
+            self.assertNotIn("detail", executor_running[2])
+            self.assertNotIn("PRIVATE_PROMPT", "\n".join(events))
+            self.assertNotIn("reasoning", "\n".join(events))
+            self.assertTrue(any(event.get("phase") == "architect" and event.get("state") == "started" for event in decoded))
+            self.assertTrue(any(event.get("phase") == "executor" and event.get("state") == "completed" for event in decoded))
+            self.assertTrue(any(event.get("phase") == "reviewer" and event.get("state") == "completed" for event in decoded))
+            self.assertEqual(outcome.correction_cycles, 0)
+            self.assertEqual(outcome.verdict, "approved")
+            state = json.loads((outcome.run_dir / "run_state.json").read_text(encoding="utf-8"))
+            mutation = json.loads((outcome.run_dir / "mutation-attribution.json").read_text(encoding="utf-8"))
+            self.assertTrue(state["last_progress_at"])
+            self.assertEqual(mutation["unchanged_preexisting_paths"], ["tracked.txt"])
+            self.assertEqual(mutation["run_created_paths"], ["created-by-run.txt"])
+
+    def test_phase_timeout_is_visible_and_baseline_survives_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            subprocess.run(["git", "init", "-q"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.name", "Run Test"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.email", "run@example.invalid"], cwd=repository, check=True)
+            tracked = repository / "tracked.txt"
+            tracked.write_text("committed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=repository, check=True)
+            subprocess.run(["git", "commit", "-qm", "initial"], cwd=repository, check=True)
+            tracked.write_text("pre-existing user edit\n", encoding="utf-8")
+            account = AccountConfig(
+                name="actor",
+                label="Actor",
+                codex_home=root / "actor-home",
+                model="",
+                reasoning_effort="high",
+                backend="app_server",
+            )
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=0,
+                require_clean_git=False,
+                codex_command="codex",
+                accounts={"actor": account},
+                roles={"architect": "actor", "executor": "actor", "reviewer": "actor", "orchestrator": "actor"},
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+            )
+            task = root / "brief.md"
+            task.write_text("Timeout fixture.", encoding="utf-8")
+            events: list[str] = []
+
+            def timeout_runner(**kwargs):
+                kwargs["progress"]("app-server turn turn-timeout still running")
+                raise TimeoutError("simulated provider timeout")
+
+            with patch("dual_codex.orchestrator.run_codex_for_role", side_effect=timeout_runner):
+                with self.assertRaisesRegex(TimeoutError, "simulated provider timeout"):
+                    execute(config, task, progress=events.append)
+
+            run_dir = next(path for path in config.runs_dir.iterdir() if (path / "run_state.json").is_file())
+            baseline = json.loads((run_dir / "initial_git_baseline.json").read_text(encoding="utf-8"))
+            state = json.loads((run_dir / "run_state.json").read_text(encoding="utf-8"))
+            provenance = json.loads((run_dir / "provenance.json").read_text(encoding="utf-8"))
+            mutation = json.loads((run_dir / "mutation-attribution.json").read_text(encoding="utf-8"))
+            decoded = [json.loads(event.removeprefix("DUAL_CODEX_PROGRESS ")) for event in events]
+            self.assertTrue(baseline["head"])
+            self.assertEqual(state["status"], "failed")
+            self.assertEqual(state["initial_git_baseline"]["path"], "initial_git_baseline.json")
+            self.assertEqual(provenance["configured_actor_routing"][-1]["phase_state"], "timeout")
+            self.assertTrue(any(event.get("state") == "timeout" for event in decoded))
+            self.assertEqual(mutation["unchanged_preexisting_paths"], ["tracked.txt"])
+            self.assertEqual(mutation["run_touched_paths"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

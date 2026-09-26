@@ -195,6 +195,8 @@ def render_markdown(
     review: dict[str, Any],
     correction_cycles: int,
     phase_provenance: list[dict[str, Any]] | None = None,
+    mutation_attribution: Mapping[str, Any] | None = None,
+    initial_git_baseline: Mapping[str, Any] | None = None,
 ) -> str:
     lines = [
         "# Dual Codex Run Report",
@@ -239,5 +241,34 @@ def render_markdown(
                     configured=str(bool(item.get("configured_actor", False))).lower(),
                 )
             )
+        lines.append("")
+    if initial_git_baseline or mutation_attribution:
+        lines.extend(["## Git mutation attribution", ""])
+        if initial_git_baseline:
+            lines.append(
+                "- Initial baseline: `{path}` (HEAD `{head}`, SHA-256 `{sha256}`)".format(
+                    path=initial_git_baseline.get("path", "initial_git_baseline.json"),
+                    head=initial_git_baseline.get("head", "unknown"),
+                    sha256=initial_git_baseline.get("sha256", "unknown"),
+                )
+            )
+        if mutation_attribution:
+            lines.append(f"- Attribution status: **{mutation_attribution.get('status', 'unknown')}**")
+            for field, label in (
+                ("unchanged_preexisting_paths", "Unchanged pre-existing paths"),
+                ("run_touched_paths", "Changed further during run"),
+                ("run_created_paths", "Created during run"),
+                ("run_removed_paths", "Removed during run"),
+                ("unknown_paths", "Unknown attribution"),
+            ):
+                paths = mutation_attribution.get(field, [])
+                lines.append(f"- {label}: " + (", ".join(f"`{path}`" for path in paths) if paths else "none"))
+            ephemeral = mutation_attribution.get("dual_agents_ephemeral_artifacts", {})
+            if isinstance(ephemeral, Mapping):
+                final_artifacts = ephemeral.get("final", [])
+                lines.append(
+                    "- Dual Agents bootstrap artifacts remaining: "
+                    + (", ".join(f"`{path}`" for path in final_artifacts) if final_artifacts else "none")
+                )
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"

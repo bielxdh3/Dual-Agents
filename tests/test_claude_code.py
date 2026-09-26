@@ -32,6 +32,25 @@ HELP = """
 """
 
 
+class _FakeProviderProcess:
+    def __init__(self, stdout: str, stderr: str = "", returncode: int = 0) -> None:
+        self.pid = 1234567
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+        self.input = None
+
+    def communicate(self, *, input=None, timeout=None):
+        self.input = input
+        return self.stdout, self.stderr
+
+    def poll(self):
+        return self.returncode
+
+    def kill(self):
+        self.returncode = -9
+
+
 class ClaudeCodeTests(unittest.TestCase):
     def _config(self, root: Path) -> OrchestratorConfig:
         return OrchestratorConfig(
@@ -443,23 +462,24 @@ class ClaudeCodeTests(unittest.TestCase):
                 {"subtype": "success", "is_error": False, "session_id": "session-b", "result": "ok", "structured_output": {"ok": True}},
             ]
             first_prompt = "review " + ("x" * 40000)
+            processes = [
+                _FakeProviderProcess(json.dumps(payloads[0])),
+                _FakeProviderProcess(json.dumps(payloads[1])),
+            ]
             with patch("dual_codex.claude_code.capability_snapshot", side_effect=lambda *args, **kwargs: self._snapshot(agent)), patch(
                 "dual_codex.claude_code.claude_environment", return_value={}
-            ), patch("dual_codex.claude_code.claude_status", return_value="OK"), patch("dual_codex.claude_code.subprocess.run") as run:
-                run.side_effect = [
-                    type("Completed", (), {"returncode": 0, "stdout": json.dumps(payloads[0]), "stderr": ""})(),
-                    type("Completed", (), {"returncode": 0, "stdout": json.dumps(payloads[1]), "stderr": ""})(),
-                ]
+            ), patch("dual_codex.claude_code.claude_status", return_value="OK"), patch("dual_codex.claude_code.subprocess.Popen") as process_runner:
+                process_runner.side_effect = processes
                 first = run_claude_code(command="claude", agent=agent, role="reviewer", repository=repo, prompt=first_prompt, output_path=root / "out.json", schema_path=schema, config=config)
                 second = run_claude_code(command="claude", agent=agent, role="reviewer", repository=repo, prompt="continue", output_path=root / "out2.json", schema_path=schema, config=config)
             self.assertEqual(first.returncode, 0)
             self.assertEqual(first.metadata["claude_session_id"], "session-a")
             self.assertEqual(json.loads((root / "out.json").read_text(encoding="utf-8")), {"ok": True})
             self.assertEqual(second.returncode, 0)
-            second_command = run.call_args_list[1].args[0]
-            self.assertEqual(run.call_args_list[0].kwargs["cwd"], repo)
-            first_command = run.call_args_list[0].args[0]
-            self.assertEqual(run.call_args_list[0].kwargs["input"], first_prompt)
+            second_command = process_runner.call_args_list[1].args[0]
+            self.assertEqual(process_runner.call_args_list[0].kwargs["cwd"], repo)
+            first_command = process_runner.call_args_list[0].args[0]
+            self.assertEqual(processes[0].input, first_prompt)
             self.assertNotIn(first_prompt, first_command)
             self.assertNotIn("secret-value", json.dumps(first.metadata))
             self.assertIn("--resume", second_command)
@@ -477,8 +497,7 @@ class ClaudeCodeTests(unittest.TestCase):
             agent = self._agent(root)
             with patch("dual_codex.claude_code.capability_snapshot", return_value=self._snapshot(agent)), patch(
                 "dual_codex.claude_code.claude_environment", return_value={}
-            ), patch("dual_codex.claude_code.claude_status", return_value="OK"), patch("dual_codex.claude_code.subprocess.run") as run:
-                run.return_value = type("Completed", (), {"returncode": 0, "stdout": "{}", "stderr": ""})()
+            ), patch("dual_codex.claude_code.claude_status", return_value="OK"), patch("dual_codex.claude_code.subprocess.Popen", return_value=_FakeProviderProcess("{}")):
                 result = run_claude_code(command="claude", agent=agent, role="reviewer", repository=repo, prompt="inspect", output_path=root / "out.json", schema_path=schema, config=config)
             self.assertEqual(result.returncode, 1)
             self.assertEqual(result.metadata["availability_failure_class"], "unusable_runtime")
@@ -551,14 +570,18 @@ class ClaudeCodeTests(unittest.TestCase):
             config = OrchestratorConfig(**{**self._config(root).__dict__, "accounts": {"claude": type("Account", (), {**agent.__dict__, "name": "claude", "label": "Claude", "enabled": True, "fallback_roles": ()})()}, "roles": {"reviewer": "claude"}})
             with patch("dual_codex.claude_code.capability_snapshot", return_value=self._snapshot(agent)), patch(
                 "dual_codex.claude_code.claude_environment", return_value={}
-            ), patch("dual_codex.claude_code.claude_status", return_value="OK"), patch("dual_codex.claude_code.subprocess.run") as run, patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", root):
+            ), patch("dual_codex.claude_code.claude_status", return_value="OK"), patch("dual_codex.claude_code.subprocess.Popen") as process_runner, patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", root):
+                fake_processes = []
+
                 def complete_with_verified_system_prompt(command, **_kwargs):
                     prompt_path = Path(command[command.index("--append-system-prompt-file") + 1])
                     self.assertTrue(prompt_path.is_file())
                     self.assertIn("## AGENTS.md", prompt_path.read_text(encoding="utf-8"))
-                    return type("Completed", (), {"returncode": 0, "stdout": json.dumps({"session_id": "session-c", "structured_output": {"ok": True}}), "stderr": ""})()
+                    process = _FakeProviderProcess(json.dumps({"session_id": "session-c", "structured_output": {"ok": True}}))
+                    fake_processes.append(process)
+                    return process
 
-                run.side_effect = complete_with_verified_system_prompt
+                process_runner.side_effect = complete_with_verified_system_prompt
                 result = run_codex_for_role(config=config, role="reviewer", repository=repo, prompt="inspect", output_path=root / "out.json", schema_path=schema)
             self.assertEqual(result.metadata["provider"], "anthropic")
             self.assertEqual(result.metadata["adapter"], "claude_code")
@@ -567,10 +590,11 @@ class ClaudeCodeTests(unittest.TestCase):
             self.assertTrue(result.metadata["claude_safe_mode"])
             self.assertTrue(result.metadata["claude_restricted"])
             self.assertEqual(result.metadata["claude_tools"], "Read,Glob,Grep")
-            launch = run.call_args.args[0]
-            self.assertIn("authoritative policy, not as user task content", run.call_args.kwargs["input"])
-            self.assertNotIn("BEGIN CANONICAL BOOTSTRAP SNAPSHOT", run.call_args.kwargs["input"])
-            self.assertNotIn(run.call_args.kwargs["input"], launch)
+            launch = process_runner.call_args.args[0]
+            input_text = fake_processes[0].input
+            self.assertIn("authoritative policy, not as user task content", input_text)
+            self.assertNotIn("BEGIN CANONICAL BOOTSTRAP SNAPSHOT", input_text)
+            self.assertNotIn(input_text, launch)
             self.assertIn("--append-system-prompt-file", launch)
             system_prompt_path = Path(launch[launch.index("--append-system-prompt-file") + 1])
             self.assertFalse(system_prompt_path.exists())

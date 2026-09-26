@@ -14,6 +14,7 @@ from .bootstrap import (
     create_canonical_bootstrap,
     finalize_architect_bootstrap,
     select_required_skills,
+    update_canonical_bootstrap_provider,
 )
 from .architect_plan import ArchitectPlanError, parse_architect_result
 from .config import AgentConfig, SUPPORTED_ROLES
@@ -418,6 +419,9 @@ def _delegate_to_configured_actor(
         artifact_dir=bootstrap_artifact_dir(repository, output_path),
         repository=repository if role == "architect" else None,
         selected_skills=select_required_skills(role, task),
+        artifact_repository=repository,
+        run_id=run_id,
+        provider_backend=agent.backend,
     )
     canonical_root = bootstrap.source_root
     prepared_prompt = task
@@ -432,6 +436,11 @@ def _delegate_to_configured_actor(
 
     def invoke(dispatch_config, dispatch_agent):
         trust_updated = None
+        update_canonical_bootstrap_provider(
+            bootstrap,
+            backend=dispatch_agent.backend,
+            state="starting",
+        )
         if (
             repository_trust_authorized
             and dispatch_agent.provider_type == "codex"
@@ -455,6 +464,11 @@ def _delegate_to_configured_actor(
         )
         if not isinstance(result, CommandResult):
             raise TypeError("Configured actor dispatch must return CommandResult.")
+        update_canonical_bootstrap_provider(
+            bootstrap,
+            backend=dispatch_agent.backend,
+            state="exited",
+        )
         if trust_updated is not None:
             result.metadata["codex_repository_trust"] = {
                 "repository": str(repository.expanduser().resolve()),
@@ -703,6 +717,9 @@ def run_codex_for_role(
                 artifact_dir=bootstrap_artifact_dir(repository, output_path),
                 repository=repository if role == "architect" else None,
                 selected_skills=select_required_skills(role, prompt),
+                artifact_repository=repository,
+                run_id=run_id,
+                provider_backend=agent.backend,
             )
             owns_bootstrap = True
         prompt, bootstrap = configured_actor_prompt(
@@ -738,6 +755,11 @@ def run_codex_for_role(
                 output_path=output_path,
                 config=config,
             )
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="exited",
+            )
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
                 bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
@@ -747,6 +769,11 @@ def run_codex_for_role(
         from .claude_code import run_claude_code
 
         try:
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="starting",
+            )
             result = run_claude_code(
                 command=getattr(config, "claude_command", "claude"),
                 agent=agent,
@@ -758,6 +785,17 @@ def run_codex_for_role(
                 system_prompt_file=bootstrap.artifact_path if bootstrap is not None else None,
                 config=config,
                 progress=progress,
+                process_started=lambda pid: update_canonical_bootstrap_provider(
+                    bootstrap,
+                    backend=agent.backend,
+                    state="running",
+                    pid=pid,
+                ),
+            )
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="exited",
             )
             _raise_dispatch_failure(
                 result,
@@ -795,6 +833,17 @@ def run_codex_for_role(
                 schema_path=schema_path,
                 config=config,
                 progress=progress,
+                process_started=lambda pid: update_canonical_bootstrap_provider(
+                    bootstrap,
+                    backend=agent.backend,
+                    state="running",
+                    pid=pid,
+                ),
+            )
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="exited",
             )
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
@@ -819,6 +868,17 @@ def run_codex_for_role(
                 require_workspace_ready=(role == "executor" and agent.sandbox == "workspace-write"),
                 canonical_bootstrap=bootstrap,
                 progress=progress,
+                process_started=lambda pid: update_canonical_bootstrap_provider(
+                    bootstrap,
+                    backend=agent.backend,
+                    state="running",
+                    pid=pid,
+                ),
+            )
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="exited",
             )
             _raise_dispatch_failure(result, role=role, agent=agent,
                 message=f"Codex {role} failed through the configured App Server backend: {result.stderr}")
@@ -850,6 +910,17 @@ def run_codex_for_role(
             session_id=session_id_for(agent.account_name, repository),
             role=role,
             progress=progress,
+            process_started=lambda pid: update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="running",
+                pid=pid,
+            ),
+        )
+        update_canonical_bootstrap_provider(
+            bootstrap,
+            backend=agent.backend,
+            state="exited",
         )
     finally:
         cleanup_owned_bootstrap()
@@ -880,6 +951,7 @@ def run_codex_terminal(
     task_sha256: str = "",
     reuse_existing: bool = False,
     progress: Callable[[str], None] | None = None,
+    process_started: Callable[[int], None] | None = None,
 ) -> CommandResult:
     from .terminal import (
         TERMINAL_INLINE_MESSAGE_MAX,
@@ -1015,6 +1087,10 @@ def run_codex_terminal(
         session = manager.ensure(
             **ensure_kwargs,
         )
+        if process_started is not None:
+            session_pid = int(getattr(session, "pid", 0) or 0)
+            if session_pid > 0:
+                process_started(session_pid)
         cursor = manager.turn_cursor(session.session_id)
         lease_owner = manager.begin_automation_turn(session.session_id)
         try:

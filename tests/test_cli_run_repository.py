@@ -73,6 +73,13 @@ class CliRunRepositoryTests(unittest.TestCase):
             self.assertEqual(observed["config"].roles, config.roles)
             self.assertEqual(observed["task"], task)
             self.assertTrue(observed["explicit_repository"])
+            self.assertTrue(callable(observed["progress"]))
+            with patch("builtins.print") as printer:
+                observed["progress"]("DUAL_CODEX_PROGRESS {\"phase\":\"executor\",\"state\":\"running\"}")
+            printer.assert_called_once_with(
+                'DUAL_CODEX_PROGRESS {"phase":"executor","state":"running"}',
+                flush=True,
+            )
 
     def test_run_keeps_configured_repository_when_no_override_is_given(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

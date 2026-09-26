@@ -577,6 +577,7 @@ def run_claude_code(
     system_prompt_file: Path | None = None,
     config: Any,
     progress: Callable[[str], None] | None = None,
+    process_started: Callable[[int], None] | None = None,
 ) -> CommandResult:
     repository = repository.expanduser().resolve()
     managed_tools = "Edit,Write,Read,Glob,Grep" if role == "executor" else "Read,Glob,Grep"
@@ -686,35 +687,44 @@ def run_claude_code(
         progress("Claude Code turn started")
     timeout = max(float(getattr(config, "claude_turn_timeout", getattr(config, "app_server_turn_timeout", 600.0))), 1.0)
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             _prepare_command(command_argv),
             cwd=repository,
             env=env,
-            input=prompt,
             text=True,
             encoding="utf-8",
             errors="replace",
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=timeout,
             shell=False,
-            check=False,
         )
-    except subprocess.TimeoutExpired as exc:
-        metadata["availability_failure_class"] = "timeout"
-        return CommandResult(command_argv, 124, "", "Claude Code turn timed out.", metadata)
     except OSError as exc:
         metadata["availability_failure_class"] = "process_unavailable"
         return CommandResult(command_argv, 127, "", _safe_error(exc), metadata)
-    stderr = _safe_error(completed.stderr)
-    payload = _result_payload(completed.stdout)
-    if completed.returncode != 0:
+    try:
+        if process_started:
+            process_started(process.pid)
+        stdout, stderr_output = process.communicate(input=prompt, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+        metadata["availability_failure_class"] = "timeout"
+        return CommandResult(command_argv, 124, "", "Claude Code turn timed out.", metadata)
+    except BaseException:
+        if process.poll() is None:
+            process.kill()
+        process.communicate()
+        raise
+    stderr = _safe_error(stderr_output)
+    payload = _result_payload(stdout)
+    if process.returncode != 0:
         text = _safe_error((payload or {}).get("result", "") if isinstance(payload, dict) else stderr)
-        text = text or stderr or f"Claude Code exited with {completed.returncode}."
+        text = text or stderr or f"Claude Code exited with {process.returncode}."
         failure = _failure_class(text)
         if failure:
             metadata["availability_failure_class"] = failure
-        return CommandResult(command_argv, completed.returncode, "", text, metadata)
+        return CommandResult(command_argv, process.returncode, "", text, metadata)
     if not isinstance(payload, dict):
         metadata["availability_failure_class"] = "unusable_runtime"
         return CommandResult(command_argv, 1, "", "Claude Code returned malformed JSON output.", metadata)

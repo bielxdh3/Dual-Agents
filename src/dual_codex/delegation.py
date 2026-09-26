@@ -629,6 +629,25 @@ class RepositoryLock:
                     _release_recovery_claim(claim)
         raise DelegationError(f"Repository lock acquisition raced: {self.path}")
 
+    def is_held_for_repository(self, repository: Path) -> bool:
+        """Verify this process still owns the lock for the exact repository."""
+
+        if not self._held or repository_identity(repository) != repository_identity(self.repository):
+            return False
+        try:
+            existing = json.loads(self.path.read_text(encoding="utf-8"))
+            current_start = _safe_process_start_token(os.getpid())
+            stored_start = existing.get("process_start")
+            return (
+                existing.get("request_id") == self.request_id
+                and existing.get("run_id", "") == self.run_id
+                and int(existing.get("pid", 0)) == os.getpid()
+                and existing.get("repository_key") == repository_identity(repository)
+                and (not stored_start or not current_start or stored_start == current_start)
+            )
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return False
+
     def release(self) -> None:
         if not self._held:
             return

@@ -1113,6 +1113,7 @@ def run_codex_app_server(
     canonical_bootstrap=None,
     require_workspace_ready: bool = False,
     progress: Callable[[str], None] | None = None,
+    process_started: Callable[[int], None] | None = None,
 ) -> CommandResult:
     command = _app_server_command(config)
     metadata: dict[str, Any] = {
@@ -1182,6 +1183,12 @@ def run_codex_app_server(
             role=role,
             require_workspace_ready=require_workspace_ready,
         )
+        if process_started:
+            try:
+                process_started(process.pid)
+            except BaseException:
+                _discard_process(process)
+                raise
         run_with_context = getattr(process, "run_turn_with_context", None)
         if callable(run_with_context):
             turn = run_with_context(
