@@ -385,8 +385,10 @@ The control plane owns **who is assigned**, **what that actor is allowed to do**
 
 ## License
 
-Dual Agents is released under the [BSD Zero Clause License (0BSD)](LICENSE).
+Dual Agents is released under the [Apache License 2.0](LICENSE).
 
-You may use, copy, modify, redistribute, embed, relicense as part of a larger work, or sell the software for any purpose, including commercial and closed-source use. The license does not require attribution or redistribution of source code.
+You may use, modify, redistribute, embed, and sell the software, including in commercial or closed-source products, subject to the Apache-2.0 terms. Redistributions must preserve the applicable license, copyright, and attribution notices, including the project's [NOTICE](NOTICE) attribution where required.
+
+**Copyright 2026 bielxdh3.**
 
 The software is provided without warranty.
