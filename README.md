@@ -10,7 +10,7 @@
 [![Status](https://img.shields.io/badge/status-active%20development-orange)](#project-status)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB)](#requirements)
-[![Providers](https://img.shields.io/badge/providers-Codex%20%C2%B7%20Gemini%20%C2%B7%20Claude%20%C2%B7%20API-6f42c1)](#providers-and-roles)
+[![Providers](https://img.shields.io/badge/providers-Codex%20%C2%B7%20Gemini%20%C2%B7%20Claude%20%C2%B7%20API-6f42c1)](#providers-and-roles)\n[![License](https://img.shields.io/badge/license-0BSD-green)](LICENSE)
 
 Dual Agents is a local control plane for assigning independently configured AI providers to specialized coding roles, with explicit routing, bounded fallback, structured provenance, and provider-owned authentication.
 
@@ -381,3 +381,12 @@ Deep runtime details, schemas, migration behavior, terminal internals, and failu
 Dual Agents does not assume that one model should plan, implement, review, authenticate, and publish everything by itself.
 
 The control plane owns **who is assigned**, **what that actor is allowed to do**, **how the runtime is bound**, and **what evidence is preserved**. Providers remain replaceable; the routing and trust boundary stay explicit.
+
+
+## License
+
+Dual Agents is released under the [BSD Zero Clause License (0BSD)](LICENSE).
+
+You may use, copy, modify, redistribute, embed, relicense as part of a larger work, or sell the software for any purpose, including commercial and closed-source use. The license does not require attribution or redistribution of source code.
+
+The software is provided without warranty.
