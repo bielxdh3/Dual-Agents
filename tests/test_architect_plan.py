@@ -24,6 +24,30 @@ def _plan(*, skills: list[str] | None = None) -> dict[str, object]:
 
 
 class ArchitectPlanTests(unittest.TestCase):
+    def test_schema_documents_canonical_additional_skill_identifiers(self) -> None:
+        schema_path = (
+            Path(__file__).resolve().parents[1] / "schemas" / "architect-plan.schema.json"
+        )
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        skills_loaded = schema["properties"]["skills_loaded"]
+        field_description = skills_loaded["description"]
+        item_description = skills_loaded["items"]["description"]
+
+        self.assertIn("Additional task-specific skills", field_description)
+        self.assertIn("actually loaded/read in this turn", field_description)
+        self.assertIn("host-loaded mandatory Architect baseline", field_description)
+        self.assertIn("Canonical skill directory identifier", item_description)
+        self.assertIn("pre-dispatch canonical skill catalog", item_description)
+        self.assertIn('"dual-agents"', item_description)
+        self.assertIn("A path to SKILL.md is never valid", item_description)
+        for path in (
+            r"C:\CodexGlobal\skills\dual-agents\SKILL.md",
+            "skills/dual-agents/SKILL.md",
+            "dual-agents/SKILL.md",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(path, item_description)
+
     def test_extracts_one_fenced_object_from_normal_assistant_output(self) -> None:
         raw = "Here is the plan:\n```json\n" + json.dumps(_plan()) + "\n```\n"
         self.assertEqual(parse_architect_result(raw), _plan())

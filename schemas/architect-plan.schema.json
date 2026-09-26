@@ -10,8 +10,13 @@
     "risks": {"type": "array", "items": {"type": "string"}},
     "files_to_inspect": {"type": "array", "items": {"type": "string"}},
     "skills_loaded": {
+      "description": "Additional task-specific skills the Architect actually loaded/read in this turn. Do not report the host-loaded mandatory Architect baseline merely because it was injected.",
       "type": "array",
-      "items": {"type": "string", "minLength": 1},
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Canonical skill directory identifier from the pre-dispatch canonical skill catalog only (for example, \"dual-agents\"). A path to SKILL.md is never valid; invalid examples include \"C:\\CodexGlobal\\skills\\dual-agents\\SKILL.md\", \"skills/dual-agents/SKILL.md\", and \"dual-agents/SKILL.md\"."
+      },
       "uniqueItems": true
     }
   }

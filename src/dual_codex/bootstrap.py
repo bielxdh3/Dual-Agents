@@ -426,9 +426,14 @@ def configured_actor_prompt(
                 "ask the user to choose or identify skills. If a required skill is unavailable, "
                 "stop without asking for clarification. Do not inspect repository files, plan, "
                 "edit, or run task commands until AGENTS.md and all selected skills are loaded. "
-                "In the final plan, list only the additional task-specific skills you loaded in "
-                "this turn in the required top-level skills_loaded field so the control plane "
-                "can verify their provenance. The host records mandatory baseline skills separately. "
+                "In the final plan, list only additional task-specific skills you actually loaded "
+                "and read in this turn in the required top-level skills_loaded field so the "
+                "control plane can verify their provenance. The host records "
+                "mandatory baseline skills separately; do not report them just because they were injected. "
+                "skills_loaded accepts canonical skill directory identifiers from the pre-dispatch "
+                "canonical skill catalog only, for example `dual-agents`. A path to `SKILL.md` is "
+                "never valid; `C:\\CodexGlobal\\skills\\dual-agents\\SKILL.md`, "
+                "`skills/dual-agents/SKILL.md`, and `dual-agents/SKILL.md` are invalid. "
             )
         else:
             source_description = (

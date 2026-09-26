@@ -159,6 +159,14 @@ class CanonicalBootstrapTests(unittest.TestCase):
                 )
             with self.assertRaisesRegex(ValueError, "Invalid canonical skill name"):
                 bootstrap.finalize_architect_bootstrap(snapshot, ["../task-specific"])
+            for path in (
+                r"C:\CodexGlobal\skills\dual-agents\SKILL.md",
+                "skills/dual-agents/SKILL.md",
+                "dual-agents/SKILL.md",
+            ):
+                with self.subTest(path=path):
+                    with self.assertRaisesRegex(ValueError, "Invalid canonical skill name"):
+                        bootstrap.finalize_architect_bootstrap(snapshot, [path])
 
     def test_canonical_skill_catalog_casefold_collisions_fail_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "collide after case folding"):
@@ -253,6 +261,17 @@ class CanonicalBootstrapTests(unittest.TestCase):
             self.assertIn("Do not ask the user to choose or identify skills", prompt)
             self.assertIn("until AGENTS.md and all selected skills are loaded", prompt)
             self.assertIn("host records mandatory baseline skills separately", prompt)
+            self.assertIn("actually loaded and read in this turn", prompt)
+            self.assertIn("do not report them just because they were injected", prompt)
+            self.assertIn(
+                "canonical skill directory identifiers from the pre-dispatch canonical skill catalog",
+                prompt,
+            )
+            self.assertIn("for example `dual-agents`", prompt)
+            self.assertIn("A path to `SKILL.md` is never valid", prompt)
+            self.assertIn(r"`C:\CodexGlobal\skills\dual-agents\SKILL.md`", prompt)
+            self.assertIn("`skills/dual-agents/SKILL.md`", prompt)
+            self.assertIn("`dual-agents/SKILL.md`", prompt)
             self.assertIn("already inside that role's control-plane dispatch", prompt)
             self.assertIn("do not invoke the global Dual Agents entrypoint recursively", prompt)
             snapshot_text = snapshot.artifact_path.read_text(encoding="utf-8")
