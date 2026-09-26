@@ -5,15 +5,18 @@ import json
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
+from uuid import uuid4
 
 from .bootstrap import (
-    BOOTSTRAP_MARKER,
     bootstrap_artifact_dir,
     cleanup_canonical_bootstrap,
     configured_actor_prompt,
     create_canonical_bootstrap,
+    finalize_architect_bootstrap,
     select_required_skills,
+    update_canonical_bootstrap_provider,
 )
+from .architect_plan import ArchitectPlanError, parse_architect_result
 from .config import AgentConfig, SUPPORTED_ROLES
 from .paths import path_identity_key, same_path
 from .process import CommandError, CommandResult, codex_environment, run_command
@@ -25,6 +28,15 @@ class ActorAvailabilityError(CommandError):
     def __init__(self, message: str, *, failure_class: str, actor: str, metadata: dict[str, Any] | None = None):
         super().__init__(message)
         self.failure_class = failure_class
+        self.actor = actor
+        self.metadata = dict(metadata or {})
+
+
+class ActorResultError(CommandError):
+    """A completed actor turn produced an invalid result; it is not fallback eligible."""
+
+    def __init__(self, message: str, *, actor: str, metadata: dict[str, Any] | None = None):
+        super().__init__(message)
         self.actor = actor
         self.metadata = dict(metadata or {})
 
@@ -49,6 +61,8 @@ _AVAILABILITY_MARKERS = {
 
 
 def classify_actor_failure(result: CommandResult, *, backend: str = "") -> str | None:
+    if result.metadata.get("architect_result_validation_error"):
+        return None
     text = f"{result.stderr}\n{result.stdout}".casefold()
     if any(
         marker in text
@@ -85,6 +99,9 @@ def classify_actor_failure(result: CommandResult, *, backend: str = "") -> str |
 def _raise_dispatch_failure(result: CommandResult, *, role: str, agent: AgentConfig, message: str) -> None:
     if result.returncode == 0:
         return
+    if result.metadata.get("architect_result_validation_error"):
+        actor = str(result.metadata.get("actual_actor") or result.metadata.get("actor_id") or agent.account_name)
+        raise ActorResultError(message, actor=actor, metadata=result.metadata)
     failure_class = classify_actor_failure(result, backend=agent.backend)
     if failure_class:
         raise ActorAvailabilityError(
@@ -93,7 +110,7 @@ def _raise_dispatch_failure(result: CommandResult, *, role: str, agent: AgentCon
             actor=agent.account_name,
             metadata=result.metadata,
         )
-    raise CommandError(message)
+    raise CommandError(message, metadata=result.metadata)
 
 
 def run_codex_app_server(**kwargs) -> CommandResult:
@@ -164,6 +181,7 @@ def run_codex_exec(
         env=codex_environment(agent),
         stdin=prompt,
         check=check,
+        timeout=None,
         progress=progress,
     )
 
@@ -266,8 +284,36 @@ def _annotate_provider_result(
     repository: Path | None = None,
     canonical_root: Path | None = None,
     bootstrap=None,
+    output_path: Path | None = None,
     configured_actor: bool = True,
 ) -> CommandResult:
+    if role == "architect" and bootstrap is not None:
+        if output_path is None:
+            raise ValueError("Architect output path is required for canonical skill provenance.")
+        try:
+            if result.stdout:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_text(result.stdout, encoding="utf-8")
+            bootstrap = _finalize_architect_output(bootstrap, output_path)
+        except ArchitectPlanError as exc:
+            metadata = dict(result.metadata)
+            metadata.update(
+                configured_actor_provenance(
+                    agent=agent,
+                    role=role,
+                    repository=repository or Path("."),
+                    canonical_root=canonical_root,
+                    bootstrap=bootstrap,
+                    configured_actor=configured_actor,
+                )
+            )
+            metadata["architect_result_validation_error"] = str(exc)
+            return replace(
+                result,
+                returncode=1,
+                stderr=f"Architect plan validation failed: {exc}",
+                metadata=metadata,
+            )
     result.metadata.update(
         configured_actor_provenance(
             agent=agent,
@@ -285,6 +331,54 @@ def _annotate_provider_result(
     return result
 
 
+def _finalize_architect_output(bootstrap, output_path: Path):
+    try:
+        raw = output_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ArchitectPlanError("Architect result is unavailable for local plan validation.") from exc
+    try:
+        architect_plan = parse_architect_result(raw)
+        finalized = finalize_architect_bootstrap(bootstrap, architect_plan["skills_loaded"])
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raw_path = output_path.with_suffix(output_path.suffix + ".raw.txt")
+        try:
+            raw_path.write_text(raw, encoding="utf-8")
+        except OSError:
+            raw_path = output_path
+        raise ArchitectPlanError(f"{exc} Completed output preserved at {raw_path}.") from exc
+    architect_plan["skills_loaded"] = list(finalized.actor_selected_skills)
+    output_path.write_text(json.dumps(architect_plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return finalized
+
+
+def _ensure_actor_supports_role(agent: AgentConfig, role: str) -> None:
+    from .providers import supported_roles_for_backend
+
+    supported_roles = supported_roles_for_backend(agent.backend)
+    if not supported_roles:
+        raise ValueError(f"Unsupported Codex backend '{agent.backend}'; no fallback is permitted.")
+    if role not in supported_roles:
+        if role == "architect" and agent.backend == "claude_code":
+            raise ValueError(
+                "Restricted Claude Code profiles cannot read the canonical task-specific skills required by "
+                "the Architect bootstrap. Configure an Architect backend with explicit canonical skill access."
+            )
+        if role == "architect" and agent.backend == "api":
+            raise ValueError(
+                "API profiles cannot serve the Architect role because they cannot read the canonical "
+                "task-specific skills required by the bootstrap."
+            )
+        if role == "executor" and agent.backend == "api":
+            raise ValueError("API profiles do not provide the workspace-write Executor role.")
+        if agent.backend == "antigravity":
+            raise ValueError("The Antigravity backend is reserved for the Executor role.")
+        if role == "executor" and agent.backend == "windows":
+            raise ValueError("The Windows backend cannot serve the Executor role in delegate mode; no fallback is permitted.")
+        raise ValueError(
+            f"Backend '{agent.backend}' cannot serve the configured '{role}' role."
+        )
+
+
 def _delegate_to_configured_actor(
     *,
     config,
@@ -295,6 +389,7 @@ def _delegate_to_configured_actor(
     schema_path: Path | None = None,
     request_id: str = "",
     run_id: str = "",
+    repository_trust_authorized: bool = False,
     progress: Callable[[str], None] | None = None,
     runner: Callable[..., CommandResult],
 ) -> CommandResult:
@@ -308,11 +403,12 @@ def _delegate_to_configured_actor(
     if role not in SUPPORTED_ROLES:
         raise ValueError(f"Unsupported configured role '{role}'.")
     agent = config.agent_for_role(role)
+    _ensure_actor_supports_role(agent, role)
     if output_path is None:
         output_path = config.runs_dir / f".configured-{role}.json"
     if schema_path is None:
         schema_name = {
-            "architect": "plan.schema.json",
+            "architect": "architect-plan.schema.json",
             "executor": "delegation-report.schema.json",
             "reviewer": "review.schema.json",
             "orchestrator": "plan.schema.json",
@@ -321,10 +417,14 @@ def _delegate_to_configured_actor(
     bootstrap = create_canonical_bootstrap(
         role=role,
         artifact_dir=bootstrap_artifact_dir(repository, output_path),
+        repository=repository if role == "architect" else None,
         selected_skills=select_required_skills(role, task),
+        artifact_repository=repository,
+        run_id=run_id,
+        provider_backend=agent.backend,
     )
     canonical_root = bootstrap.source_root
-    prepared_prompt, bootstrap = configured_actor_prompt(task, role=role, bootstrap=bootstrap)
+    prepared_prompt = task
     dispatch = runner
     primary_agent = agent
     actual_agent = agent
@@ -335,6 +435,20 @@ def _delegate_to_configured_actor(
     fallback_enabled = bool(getattr(config, "fallback_enabled", False))
 
     def invoke(dispatch_config, dispatch_agent):
+        trust_updated = None
+        update_canonical_bootstrap_provider(
+            bootstrap,
+            backend=dispatch_agent.backend,
+            state="starting",
+        )
+        if (
+            repository_trust_authorized
+            and dispatch_agent.provider_type == "codex"
+            and dispatch_agent.backend in {"windows", "app_server"}
+        ):
+            from .repo_trust import provision_repository_trust
+
+            trust_updated = provision_repository_trust(dispatch_agent.codex_home, repository)
         result = dispatch(
             config=dispatch_config,
             agent=dispatch_agent,
@@ -343,12 +457,24 @@ def _delegate_to_configured_actor(
             prompt=prepared_prompt,
             output_path=output_path,
             schema_path=schema_path,
+            bootstrap=bootstrap,
             request_id=request_id,
             run_id=run_id,
             progress=progress,
         )
         if not isinstance(result, CommandResult):
             raise TypeError("Configured actor dispatch must return CommandResult.")
+        update_canonical_bootstrap_provider(
+            bootstrap,
+            backend=dispatch_agent.backend,
+            state="exited",
+        )
+        if trust_updated is not None:
+            result.metadata["codex_repository_trust"] = {
+                "repository": str(repository.expanduser().resolve()),
+                "codex_home": str(dispatch_agent.codex_home.expanduser().resolve()),
+                "updated": trust_updated,
+            }
         if result.returncode != 0:
             _raise_dispatch_failure(
                 result,
@@ -361,7 +487,42 @@ def _delegate_to_configured_actor(
     try:
         try:
             result = invoke(config, primary_agent)
+        except ActorResultError as exc:
+            exc.metadata.update({
+                "primary_actor": primary_agent.account_name,
+                "actual_actor": exc.actor,
+                "fallback_enabled": fallback_enabled,
+                "fallback_used": False,
+                "failed_actor": "",
+                "fallback_actor": "",
+                "fallback_reason": "",
+                "fallback_failure_class": "",
+            })
+            raise
         except ActorAvailabilityError as exc:
+            metadata = configured_actor_provenance(
+                agent=primary_agent,
+                role=role,
+                repository=repository,
+                canonical_root=canonical_root,
+                bootstrap=bootstrap,
+            )
+            metadata.update(exc.metadata)
+            metadata.update({
+                "phase": role,
+                "role": role,
+                "repository": str(repository.expanduser().resolve()),
+                "primary_actor": primary_agent.account_name,
+                "actual_actor": primary_agent.account_name,
+                "actor_id": primary_agent.account_name,
+                "profile_id": primary_agent.account_name,
+                "provider": primary_agent.provider_type,
+                "backend": primary_agent.backend,
+                "fallback_enabled": fallback_enabled,
+                "fallback_used": False,
+                "failed_actor": primary_agent.account_name,
+            })
+            exc.metadata = metadata
             if not fallback_enabled:
                 raise
             failed_actor = exc.actor
@@ -387,9 +548,81 @@ def _delegate_to_configured_actor(
             fallback_name = candidates[0]
             fallback_config = replace(config, roles={**config.roles, role: fallback_name})
             fallback_agent = fallback_config.agent_for_role(role)
-            result = invoke(fallback_config, fallback_agent)
+            try:
+                result = invoke(fallback_config, fallback_agent)
+            except ActorResultError as fallback_error:
+                fallback_error.metadata.update({
+                    "primary_actor": primary_agent.account_name,
+                    "actual_actor": fallback_agent.account_name,
+                    "fallback_enabled": fallback_enabled,
+                    "fallback_used": True,
+                    "failed_actor": failed_actor,
+                    "fallback_actor": fallback_agent.account_name,
+                    "fallback_reason": fallback_reason,
+                    "fallback_failure_class": fallback_failure_class,
+                    "fallback_attempt_failed": True,
+                    "fallback_error_type": type(fallback_error).__name__,
+                })
+                raise
+            except CommandError as fallback_error:
+                metadata = configured_actor_provenance(
+                    agent=fallback_agent,
+                    role=role,
+                    repository=repository,
+                    canonical_root=canonical_root,
+                    bootstrap=bootstrap,
+                )
+                metadata.update(getattr(fallback_error, "metadata", {}))
+                metadata.update({
+                    "phase": role,
+                    "role": role,
+                    "repository": str(repository.expanduser().resolve()),
+                    "primary_actor": primary_agent.account_name,
+                    "actual_actor": fallback_agent.account_name,
+                    "actor_id": fallback_agent.account_name,
+                    "profile_id": fallback_agent.account_name,
+                    "provider": fallback_agent.provider_type,
+                    "backend": fallback_agent.backend,
+                    "fallback_enabled": fallback_enabled,
+                    "fallback_used": True,
+                    "failed_actor": failed_actor,
+                    "fallback_actor": fallback_agent.account_name,
+                    "fallback_reason": fallback_reason,
+                    "fallback_failure_class": fallback_failure_class,
+                    "fallback_attempt_failed": True,
+                    "fallback_error_type": type(fallback_error).__name__,
+                })
+                fallback_error.metadata = metadata
+                raise
             actual_agent = fallback_agent
             fallback_used = True
+        except CommandError as exc:
+            metadata = configured_actor_provenance(
+                agent=primary_agent,
+                role=role,
+                repository=repository,
+                canonical_root=canonical_root,
+                bootstrap=bootstrap,
+            )
+            metadata.update(exc.metadata)
+            metadata.update({
+                "phase": role,
+                "role": role,
+                "repository": str(repository.expanduser().resolve()),
+                "primary_actor": primary_agent.account_name,
+                "actual_actor": primary_agent.account_name,
+                "actor_id": primary_agent.account_name,
+                "profile_id": primary_agent.account_name,
+                "provider": primary_agent.provider_type,
+                "backend": primary_agent.backend,
+                "fallback_enabled": fallback_enabled,
+                "fallback_used": False,
+            })
+            exc.metadata = metadata
+            raise
+        if role == "architect":
+            bootstrap = _finalize_architect_output(bootstrap, output_path)
+            result.metadata.update(bootstrap.metadata())
         provenance = configured_actor_provenance(
             agent=actual_agent,
             role=role,
@@ -451,6 +684,7 @@ def run_codex_for_role(
     prompt: str,
     output_path: Path,
     schema_path: Path,
+    bootstrap=None,
     request_id: str = "",
     run_id: str = "",
     progress: Callable[[str], None] | None = None,
@@ -460,8 +694,9 @@ def run_codex_for_role(
         raise ValueError(f"Unsupported configured role '{role}'.")
     configured = False
     canonical_root = None
-    bootstrap = None
+    owns_bootstrap = False
     configured_resolver = getattr(config, "agent_for_role", None)
+    configured_agent = None
     if callable(configured_resolver):
         configured_agent = configured_resolver(role)
         if agent is None:
@@ -472,26 +707,44 @@ def run_codex_for_role(
                 "caller-supplied actor identity is not authoritative."
             )
         configured = True
-        if BOOTSTRAP_MARKER not in prompt:
+    if agent is None:
+        raise ValueError(f"Required role '{role}' is unassigned.")
+    _ensure_actor_supports_role(agent, role)
+    if callable(configured_resolver):
+        if bootstrap is None:
             bootstrap = create_canonical_bootstrap(
                 role=role,
                 artifact_dir=bootstrap_artifact_dir(repository, output_path),
+                repository=repository if role == "architect" else None,
                 selected_skills=select_required_skills(role, prompt),
+                artifact_repository=repository,
+                run_id=run_id,
+                provider_backend=agent.backend,
             )
-            prompt, bootstrap = configured_actor_prompt(prompt, role=role, bootstrap=bootstrap)
-        else:
-            bootstrap = create_canonical_bootstrap(
-                role=role,
-                selected_skills=select_required_skills(role, prompt),
-            )
+            owns_bootstrap = True
+        prompt, bootstrap = configured_actor_prompt(
+            prompt,
+            role=role,
+            bootstrap=bootstrap,
+            system_prompt_file=agent.backend == "claude_code",
+        )
         canonical_root = bootstrap.source_root
-    if agent is None:
-        raise ValueError(f"Required role '{role}' is unassigned.")
+
+    if agent.backend in {"windows", "app_server"}:
+        schema_text = schema_path.read_text(encoding="utf-8")
+        prompt = (
+            f"{prompt.rstrip()}\n\n"
+            "The control plane validates this turn against the exact JSON schema below. "
+            "Return exactly one JSON object that matches it. Do not add properties, prose, "
+            "or Markdown fences.\nOUTPUT JSON SCHEMA:\n"
+            f"{schema_text}"
+        )
+
+    def cleanup_owned_bootstrap() -> None:
+        if owns_bootstrap:
+            cleanup_canonical_bootstrap(bootstrap)
+
     if agent.backend == "api":
-        if role == "executor":
-            raise ValueError(
-                "API profiles do not provide the workspace-write Executor role."
-            )
         from .providers import api_adapter
 
         try:
@@ -502,15 +755,25 @@ def run_codex_for_role(
                 output_path=output_path,
                 config=config,
             )
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="exited",
+            )
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
-                bootstrap=bootstrap, configured_actor=configured)
+                bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
         finally:
-            cleanup_canonical_bootstrap(bootstrap)
+            cleanup_owned_bootstrap()
     if agent.backend == "claude_code":
         from .claude_code import run_claude_code
 
         try:
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="starting",
+            )
             result = run_claude_code(
                 command=getattr(config, "claude_command", "claude"),
                 agent=agent,
@@ -519,8 +782,20 @@ def run_codex_for_role(
                 prompt=prompt,
                 output_path=output_path,
                 schema_path=schema_path,
+                system_prompt_file=bootstrap.artifact_path if bootstrap is not None else None,
                 config=config,
                 progress=progress,
+                process_started=lambda pid: update_canonical_bootstrap_provider(
+                    bootstrap,
+                    backend=agent.backend,
+                    state="running",
+                    pid=pid,
+                ),
+            )
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="exited",
             )
             _raise_dispatch_failure(
                 result,
@@ -535,10 +810,11 @@ def run_codex_for_role(
                 repository=repository,
                 canonical_root=canonical_root,
                 bootstrap=bootstrap,
+                output_path=output_path,
                 configured_actor=configured,
             )
         finally:
-            cleanup_canonical_bootstrap(bootstrap)
+            cleanup_owned_bootstrap()
     if agent.backend == "antigravity":
         if role != "executor":
             raise ValueError("Antigravity backend is reserved for the Executor role.")
@@ -557,12 +833,23 @@ def run_codex_for_role(
                 schema_path=schema_path,
                 config=config,
                 progress=progress,
+                process_started=lambda pid: update_canonical_bootstrap_provider(
+                    bootstrap,
+                    backend=agent.backend,
+                    state="running",
+                    pid=pid,
+                ),
+            )
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="exited",
             )
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
-                bootstrap=bootstrap, configured_actor=configured)
+                bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
         finally:
-            cleanup_canonical_bootstrap(bootstrap)
+            cleanup_owned_bootstrap()
     if agent.backend == "app_server":
         from .terminal import session_id_for
 
@@ -579,7 +866,19 @@ def run_codex_for_role(
                 role=role,
                 configured_actor=configured,
                 require_workspace_ready=(role == "executor" and agent.sandbox == "workspace-write"),
+                canonical_bootstrap=bootstrap,
                 progress=progress,
+                process_started=lambda pid: update_canonical_bootstrap_provider(
+                    bootstrap,
+                    backend=agent.backend,
+                    state="running",
+                    pid=pid,
+                ),
+            )
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="exited",
             )
             _raise_dispatch_failure(result, role=role, agent=agent,
                 message=f"Codex {role} failed through the configured App Server backend: {result.stderr}")
@@ -590,10 +889,11 @@ def run_codex_for_role(
                 repository=repository,
                 canonical_root=canonical_root,
                 bootstrap=bootstrap,
+                output_path=output_path,
                 configured_actor=configured,
             )
         finally:
-            cleanup_canonical_bootstrap(bootstrap)
+            cleanup_owned_bootstrap()
     if agent.backend != "windows":
         raise ValueError(f"Unsupported Codex backend '{agent.backend}'; no fallback is permitted.")
     if role == "executor" and not hasattr(config, "runs_dir"):
@@ -610,9 +910,20 @@ def run_codex_for_role(
             session_id=session_id_for(agent.account_name, repository),
             role=role,
             progress=progress,
+            process_started=lambda pid: update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=agent.backend,
+                state="running",
+                pid=pid,
+            ),
+        )
+        update_canonical_bootstrap_provider(
+            bootstrap,
+            backend=agent.backend,
+            state="exited",
         )
     finally:
-        cleanup_canonical_bootstrap(bootstrap)
+        cleanup_owned_bootstrap()
     _raise_dispatch_failure(result, role=role, agent=agent,
         message=f"Codex {role} failed through the configured Windows terminal backend: {result.stderr}")
     return _annotate_provider_result(
@@ -621,6 +932,8 @@ def run_codex_for_role(
         role,
         repository=repository,
         canonical_root=canonical_root,
+        bootstrap=bootstrap,
+        output_path=output_path,
         configured_actor=configured,
     )
 
@@ -638,9 +951,24 @@ def run_codex_terminal(
     task_sha256: str = "",
     reuse_existing: bool = False,
     progress: Callable[[str], None] | None = None,
+    process_started: Callable[[int], None] | None = None,
 ) -> CommandResult:
-    from .terminal import TerminalError, TerminalManager, TerminalSetupRequiredError
+    from .terminal import (
+        TERMINAL_INLINE_MESSAGE_MAX,
+        TerminalError,
+        TerminalManager,
+        TerminalSetupRequiredError,
+        executor_task_artifact_dir,
+    )
 
+    resolved_role = role or ("executor" if agent.sandbox == "workspace-write" else "architect")
+    temporary_task_artifact_path: Path | None = None
+    temporary_task_artifact_content = ""
+    task_input_attempted = False
+    task_turn_completed = False
+    manager = None
+    session = None
+    cursor: tuple[Path | None, int] | None = None
     transport = "file" if task_artifact_path is not None else "inline"
     artifact = str(task_artifact_path.resolve()) if task_artifact_path is not None else ""
     metadata = {
@@ -658,8 +986,56 @@ def run_codex_terminal(
             f"Task artifact does not exist: {task_artifact_path}",
             metadata,
         )
-    manager = TerminalManager(config)
     try:
+        manager = TerminalManager(config)
+        if task_artifact_path is None and len(prompt) > TERMINAL_INLINE_MESSAGE_MAX:
+            temporary_task_artifact_content = f"# Dual Codex {resolved_role} instructions\n\n{prompt.rstrip()}\n"
+            if agent.sandbox == "read-only":
+                # Read-only Codex rejects extra roots; stage the prompt under cwd and remove it after the turn.
+                repository_root = Path(repository).expanduser().resolve()
+                if not repository_root.is_dir():
+                    raise TerminalError(f"Task repository does not exist: {repository_root}")
+                for _attempt in range(3):
+                    candidate = repository_root / f".dual-codex-task-{uuid4().hex}.md"
+                    try:
+                        with candidate.open("x", encoding="utf-8", newline="\n") as stream:
+                            stream.write(temporary_task_artifact_content)
+                        task_artifact_path = candidate
+                        break
+                    except FileExistsError:
+                        continue
+                if task_artifact_path is None:
+                    raise TerminalError("Could not allocate a unique read-only task artifact.")
+                temporary_task_artifact_path = task_artifact_path
+            else:
+                if resolved_role != "executor":
+                    raise TerminalError("Only the configured Executor may use writable terminal task transport.")
+                artifact_dir = executor_task_artifact_dir(config, create=True)
+                task_artifact_path = artifact_dir / f"{resolved_role}-{uuid4().hex}.md"
+                task_artifact_path.write_text(temporary_task_artifact_content, encoding="utf-8", newline="\n")
+            content = temporary_task_artifact_content
+            task_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            prompt = (
+                f'Read the complete {resolved_role} instructions from "{task_artifact_path}" '
+                "and return the requested result."
+            )
+            transport = "file"
+            artifact = str(task_artifact_path.resolve())
+            metadata.update(
+                {
+                    "task_transport": transport,
+                    "task_artifact": artifact,
+                    "task_sha256": task_sha256,
+                }
+            )
+        if task_artifact_path is not None and not task_artifact_path.is_file():
+            return CommandResult(
+                ["codex", "--no-alt-screen", "--sandbox", agent.sandbox],
+                1,
+                "",
+                f"Task artifact does not exist: {task_artifact_path}",
+                metadata,
+            )
         if reuse_existing:
             try:
                 manager._load(session_id)
@@ -686,13 +1062,23 @@ def run_codex_terminal(
             # artifact captured by the orchestrator.
             add_dirs = ()
         else:
-            add_dirs = (task_artifact_path.parent.resolve(),) if task_artifact_path is not None else ()
+            artifact_parent = task_artifact_path.parent.resolve() if task_artifact_path is not None else None
+            add_dirs = (
+                (artifact_parent,)
+                if artifact_parent is not None and not same_path(artifact_parent, repository)
+                else ()
+            )
         ensure_kwargs = {
             "session_id": session_id,
             "agent": agent,
-            "role": role or ("executor" if agent.sandbox == "workspace-write" else "architect"),
+            "role": resolved_role,
             "repository": repository,
-            "approval_policy": "never" if agent.sandbox == "workspace-write" else "on-request",
+            # Configured Architects run unattended in a read-only sandbox. Do
+            # not let host-tool approvals turn bootstrap reads into a human
+            # interaction; sandbox denials still fail closed.
+            "approval_policy": "never"
+            if resolved_role == "architect" or agent.sandbox == "workspace-write"
+            else "on-request",
             "add_dirs": add_dirs,
             "reuse_existing": reuse_existing,
         }
@@ -701,11 +1087,17 @@ def run_codex_terminal(
         session = manager.ensure(
             **ensure_kwargs,
         )
+        if process_started is not None:
+            session_pid = int(getattr(session, "pid", 0) or 0)
+            if session_pid > 0:
+                process_started(session_pid)
         cursor = manager.turn_cursor(session.session_id)
         lease_owner = manager.begin_automation_turn(session.session_id)
         try:
+            task_input_attempted = True
             turn_start = manager.send(session.session_id, prompt, lease_owner=lease_owner)
             result = manager.wait_for_turn(session.session_id, cursor=cursor, progress=progress)
+            task_turn_completed = True
         finally:
             manager.release_input_lease(session.session_id, lease_owner)
         assistant = result.get("assistant", "")
@@ -716,7 +1108,27 @@ def run_codex_terminal(
             readiness = {}
         terminal_pid = int(status_snapshot.get("pid") or session.pid)
         host_pid = int(status_snapshot.get("host_pid") or session.pid)
+        windows_sandbox_mode = str(getattr(session, "windows_sandbox_mode", "") or "")
+        metadata["windows_sandbox_mode"] = windows_sandbox_mode
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        if temporary_task_artifact_path is not None:
+            archived_task_artifact = output_path.with_name(f"{output_path.stem}-{uuid4().hex}.task.md")
+            archived_task_artifact.write_text(temporary_task_artifact_content, encoding="utf-8", newline="\n")
+            artifact = str(archived_task_artifact.resolve())
+            metadata.update(
+                {
+                    "task_transport": "file",
+                    "task_artifact": artifact,
+                    "task_sha256": task_sha256,
+                }
+            )
+            turn_start.update(
+                {
+                    "task_transport": "file",
+                    "task_artifact": artifact,
+                    "task_sha256": task_sha256,
+                }
+            )
         output_path.write_text(
             json.dumps(report, ensure_ascii=False) if report is not None else assistant,
             encoding="utf-8",
@@ -746,6 +1158,7 @@ def run_codex_terminal(
                     "role": session.role,
                     "repository_identity": getattr(session, "repository_identity", "") or str(session.repository),
                     "codex_home_identity": getattr(session, "codex_home_identity", "") or str(session.codex_home),
+                    "windows_sandbox_mode": windows_sandbox_mode,
                     "codex_session_id": result.get("session_id", ""),
                     "repository": str(session.repository),
                     "codex_home": str(session.codex_home),
@@ -772,7 +1185,7 @@ def run_codex_terminal(
                 },
             },
         )
-    except TerminalError as exc:
+    except (TerminalError, OSError) as exc:
         metadata["terminal_error_type"] = type(exc).__name__
         if isinstance(exc, TerminalSetupRequiredError):
             metadata["terminal_setup_required"] = True
@@ -783,3 +1196,22 @@ def run_codex_terminal(
             str(exc),
             metadata,
         )
+    finally:
+        if temporary_task_artifact_path is not None:
+            if task_input_attempted and not task_turn_completed:
+                metadata["task_artifact_cleanup_pending"] = str(temporary_task_artifact_path)
+                if manager is not None and session is not None:
+                    try:
+                        manager.defer_task_artifact_cleanup(
+                            session.session_id,
+                            temporary_task_artifact_path,
+                            task_sha256,
+                            cursor=cursor,
+                        )
+                    except (TerminalError, OSError, ValueError) as exc:
+                        metadata["task_artifact_cleanup_error"] = type(exc).__name__
+            else:
+                try:
+                    temporary_task_artifact_path.unlink(missing_ok=True)
+                except OSError as exc:
+                    metadata["task_artifact_cleanup_error"] = str(exc)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from contextlib import nullcontext
 from io import BytesIO
@@ -16,7 +17,7 @@ from unittest.mock import patch
 
 from dual_codex.config import AgentConfig, OrchestratorConfig
 from dual_codex.cli import _VtKeyBuffer, _WindowsConsoleModes, _interactive_attach, _windows_vt_console, _write_terminal_output
-from dual_codex.paths import same_path
+from dual_codex.paths import path_identity_key, same_path
 from dual_codex.terminal import (
     TerminalError,
     TerminalSetupRequiredError,
@@ -25,15 +26,18 @@ from dual_codex.terminal import (
     TERMINAL_INLINE_MESSAGE_MAX,
     TERMINAL_TERM,
     TERMINAL_SUBMIT_DELAY_SECONDS,
+    WINDOWS_READ_ONLY_SANDBOX_MODE,
     TuiComposerAckDetector,
     TuiReadinessDetector,
     TuiTurnStartDetector,
     TerminalLifecyclePolicy,
     find_session_file,
     interactive_command_args,
+    windows_sandbox_mode_for,
     session_id_for,
     session_turn_started,
     session_turn_state,
+    reconcile_deferred_task_artifact_cleanup,
     _rollout_snapshot,
     _terminal_environment,
     executor_task_artifact_dir,
@@ -102,6 +106,18 @@ def _normal_screen(prompt: str = "Improve documentation in @filename") -> str:
 
 
 class TerminalTests(unittest.TestCase):
+    def test_deferred_task_artifact_reconciliation_skips_non_windows_hosts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            with patch("dual_codex.terminal.os.name", "posix"), patch(
+                "dual_codex.terminal.TerminalManager"
+            ) as manager_type:
+                reconcile_deferred_task_artifact_cleanup(config, repository)
+            manager_type.assert_not_called()
+
     def test_trust_prompt_is_a_typed_actionable_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -208,6 +224,131 @@ class TerminalTests(unittest.TestCase):
         self.assertNotIn("exec", command)
         self.assertIn("--no-alt-screen", command)
         self.assertEqual(command[command.index("--cd") + 1], "C:\\Work Tree\\target")
+
+    def test_read_only_windows_tui_pins_unelevated_sandbox(self) -> None:
+        self.assertEqual(WINDOWS_READ_ONLY_SANDBOX_MODE, "unelevated")
+        self.assertEqual(windows_sandbox_mode_for("read-only"), "unelevated")
+        self.assertEqual(windows_sandbox_mode_for("workspace-write"), "")
+        command = interactive_command_args(
+            Path("C:/Work Tree/target"),
+            sandbox="read-only",
+            approval_policy="never",
+            windows_sandbox_mode=windows_sandbox_mode_for("read-only"),
+        )
+        self.assertIn('windows.sandbox="unelevated"', command)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is required for the ConPTY launch regression")
+    def test_pty_host_forwards_explicit_windows_sandbox_mode(self) -> None:
+        source = (Path(__file__).parents[1] / "scripts" / "pty-host.js").read_text(encoding="utf-8")
+        start = source.index("const launchArgs = [")
+        end = source.index("const launchLine =")
+        script = f"""
+const source = {json.dumps(source)};
+const codexCommand = "codex";
+const cwd = "C:\\\\repo";
+const sandbox = "read-only";
+const approvalPolicy = "never";
+const model = "";
+const reasoningEffort = "";
+const windowsSandboxMode = "unelevated";
+const addDir = "";
+eval(source.slice({start}, {end}) + "\\nglobalThis.__launchArgs = launchArgs;");
+console.log(JSON.stringify(globalThis.__launchArgs));
+"""
+        result = subprocess.run(
+            [shutil.which("node") or "node", "-"],
+            input=script,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        launch_args = json.loads(result.stdout)
+        self.assertIn("-c", launch_args)
+        self.assertIn('windows.sandbox="unelevated"', launch_args)
+
+    def test_existing_read_only_session_without_sandbox_provenance_is_not_reused(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            sessions = config.runs_dir / "terminal-sessions"
+            sessions.mkdir(parents=True)
+            record = sessions / "biel3-old-session.json"
+            session = TerminalSession(
+                session_id="biel3-old-session",
+                account="biel3",
+                label="Architect",
+                role="architect",
+                repository=repository,
+                codex_home=root / "profile",
+                pipe=r"\\.\pipe\dual-codex-biel3-old-session-aaaaaaaaaaaaaaaa",
+                pid=123,
+                started_at="now",
+                log_file=sessions / "biel3-old-session.pty.log",
+                session_file=str(record.resolve()),
+                windows_sandbox_mode="",
+            )
+            record.write_text(json.dumps(session.as_dict()), encoding="utf-8")
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            agent = AgentConfig(
+                codex_home=session.codex_home,
+                model="",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="biel3",
+                backend="windows",
+            )
+            with patch.object(manager, "status", return_value={"state": "running"}), patch.object(
+                manager, "_load", return_value=session
+            ):
+                with self.assertRaisesRegex(TerminalError, "Windows sandbox mode identity mismatch"):
+                    manager.ensure(
+                        session_id=session.session_id,
+                        agent=agent,
+                        role="architect",
+                        repository=repository,
+                        add_dirs=(),
+                    )
+
+    def test_terminal_start_passes_read_only_windows_sandbox_mode_to_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="biel3",
+                label="Architect",
+                backend="windows",
+            )
+            fake_process = SimpleNamespace(pid=321, poll=lambda: None, terminate=lambda: None)
+            with patch("dual_codex.terminal._node_path", return_value="node"), patch(
+                "dual_codex.terminal._helper_path", return_value=config.project_root / "scripts" / "pty-host.js"
+            ), patch("dual_codex.terminal.subprocess.Popen", return_value=fake_process) as popen, patch(
+                "dual_codex.terminal._pipe_request", return_value={"ok": True}
+            ), patch("dual_codex.terminal._process_start_identity", return_value="start"), patch.object(
+                manager, "wait_until_ready"
+            ), patch("dual_codex.terminal.atomic_write_json"):
+                session = manager.start(
+                    session_id="biel3-read-only",
+                    agent=agent,
+                    role="architect",
+                    repository=repository,
+                    approval_policy="never",
+                )
+
+            command = [str(value) for value in popen.call_args.args[0]]
+            mode_index = command.index("--windows-sandbox-mode")
+            self.assertEqual(command[mode_index + 1], "unelevated")
+            self.assertEqual(session.windows_sandbox_mode, "unelevated")
 
     def test_session_id_rejects_path_traversal(self) -> None:
         with self.assertRaises(TerminalError):
@@ -1630,6 +1771,120 @@ function idleScreen(model) {{
                 self.assertEqual(manager.list(), [])
             self.assertFalse(identity_record.exists())
 
+    def test_pending_task_artifact_is_removed_after_terminal_turn_becomes_idle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, record = _write_terminal_session(config, "biel3", repository, role="architect")
+            artifact = repository / ".dual-codex-task-0123456789abcdef0123456789abcdef.md"
+            content = "# Dual Codex architect instructions\n\nRead the brief.\n"
+            artifact.write_text(content, encoding="utf-8", newline="\n")
+            cursor_path = session.codex_home / "sessions" / "rollout.jsonl"
+            cursor_path.parent.mkdir(parents=True)
+            cursor_path.write_text("", encoding="utf-8")
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            manager.defer_task_artifact_cleanup(
+                session.session_id,
+                artifact,
+                hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                cursor=(cursor_path, 0),
+            )
+
+            host_state = {
+                "session_id": session.session_id,
+                "pipe": session.pipe,
+                "host_pid": session.pid,
+                "host_started_at": session.process_started_at,
+                "process_start_identity": session.process_start_identity,
+                "process_epoch": session.process_epoch,
+                "alive": False,
+            }
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                return_value={"ok": True, "state": host_state},
+            ), patch.object(manager, "_codex_turn_activity", return_value={"active": True}):
+                manager.reconcile_pending_task_artifact_cleanup(repository)
+                self.assertTrue(artifact.exists(), "active Architect turn must keep its input artifact available")
+                self.assertTrue(manager.has_pending_task_artifact_cleanup(session.session_id))
+                with self.assertRaisesRegex(TerminalError, "previous Architect turn is still active"):
+                    manager.ensure(
+                        session_id=session.session_id,
+                        agent=object(),
+                        repository=repository,
+                        role="architect",
+                    )
+
+            cursor_path.write_text('{"payload":{"type":"turn_completed"}}\n', encoding="utf-8")
+            with patch(
+                "dual_codex.terminal._pipe_request",
+                return_value={"ok": True, "state": host_state},
+            ), patch.object(manager, "_codex_turn_activity", return_value={"active": False}) as turn_activity, patch.object(
+                manager,
+                "_cleanup_pending_task_artifacts",
+                wraps=manager._cleanup_pending_task_artifacts,
+            ) as cleanup_pending:
+                manager.reconcile_pending_task_artifact_cleanup(repository)
+            cleanup_pending.assert_called_once()
+            turn_activity.assert_not_called()
+            self.assertFalse(artifact.exists())
+            self.assertFalse(record.exists())
+
+    def test_expired_task_artifact_is_reaped_after_terminal_exit_without_rollout_end_event(self) -> None:
+        for terminal_state in ("exited", "identity_invalid"):
+            with self.subTest(terminal_state=terminal_state), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                repository = root / "repo"
+                repository.mkdir()
+                config = _config(root, repository)
+                session, record = _write_terminal_session(config, "biel3", repository, role="architect")
+                session = replace(
+                    session,
+                    repository_identity=path_identity_key(repository),
+                    codex_home_identity=path_identity_key(session.codex_home),
+                )
+                record.write_text(json.dumps(session.as_dict()), encoding="utf-8")
+                artifact = repository / ".dual-codex-task-0123456789abcdef0123456789abcdef.md"
+                content = "# Dual Codex architect instructions\n\nRead the brief.\n"
+                artifact.write_text(content, encoding="utf-8", newline="\n")
+                cursor_path = session.codex_home / "sessions" / "rollout.jsonl"
+                cursor_path.parent.mkdir(parents=True)
+                cursor_path.write_text('{"payload":{"type":"turn_started"}}\n', encoding="utf-8")
+                manager = TerminalManager.__new__(TerminalManager)
+                manager.config = config
+                manager.defer_task_artifact_cleanup(
+                    session.session_id,
+                    artifact,
+                    hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                    cursor=(cursor_path, 0),
+                )
+                raw_record = json.loads(record.read_text(encoding="utf-8"))
+                raw_record["pending_task_artifact_cleanup"][0][2] = 0
+                record.write_text(json.dumps(raw_record), encoding="utf-8")
+
+                host_state = {
+                    "session_id": session.session_id,
+                    "pipe": session.pipe,
+                    "host_pid": session.pid,
+                    "host_started_at": session.process_started_at,
+                    "process_start_identity": session.process_start_identity,
+                    "process_epoch": session.process_epoch,
+                    "alive": terminal_state != "exited",
+                }
+                if terminal_state == "identity_invalid":
+                    host_state["process_epoch"] = "different-epoch"
+                with patch(
+                    "dual_codex.terminal._pipe_request",
+                    return_value={"ok": True, "state": host_state},
+                ), patch.object(manager, "_codex_turn_activity", return_value={"active": True}) as activity:
+                    manager.reconcile_pending_task_artifact_cleanup(repository)
+
+                activity.assert_not_called()
+                self.assertFalse(artifact.exists())
+                self.assertFalse(record.exists())
+
     def test_list_removes_unreachable_record_when_host_pid_is_dead_and_pipe_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1991,8 +2246,8 @@ function idleScreen(model) {{
             artifact_dir = config.runs_dir / "executor-task-artifacts"
             agent = AgentConfig(
                 codex_home=root / "executor profile",
-                model="",
-                reasoning_effort="high",
+                model="gpt-6-luna",
+                reasoning_effort="max",
                 sandbox="workspace-write",
                 account_name="biel4",
                 label="Executor",
@@ -2049,11 +2304,18 @@ function idleScreen(model) {{
                 self.assertEqual(session.task_artifact_dir, artifact_dir.resolve())
                 command = [str(item) for item in popen.call_args.args[0]]
                 self.assertEqual(command[command.index("--add-dir") + 1], str(artifact_dir.resolve()))
+                self.assertEqual(command[command.index("--cwd") + 1], str(repository.resolve()))
+                self.assertEqual(command[command.index("--model") + 1], agent.model)
+                self.assertEqual(command[command.index("--reasoning-effort") + 1], agent.reasoning_effort)
+                self.assertEqual(command[command.index("--process-epoch") + 1], session.process_epoch)
                 record = json.loads(Path(session.session_file).read_text(encoding="utf-8"))
                 self.assertEqual(record["task_artifact_dir"], str(artifact_dir.resolve()))
+                self.assertEqual(record["target_model"], agent.model)
+                self.assertEqual(record["target_reasoning"], agent.reasoning_effort)
                 listed = manager.list()
                 self.assertEqual(listed[0]["task_artifact_dir"], str(artifact_dir.resolve()))
                 self.assertEqual(popen.call_args.kwargs["env"]["CODEX_HOME"], str(agent.codex_home))
+                self.assertEqual(popen.call_args.kwargs["env"]["TERM"], TERMINAL_TERM)
                 self.assertNotIn("OPENAI_API_KEY", popen.call_args.kwargs["env"])
                 self.assertNotIn("exec", [str(item) for item in popen.call_args.args[0]])
                 with self.assertRaises(TerminalError):
@@ -2063,6 +2325,58 @@ function idleScreen(model) {{
                         role="executor",
                         repository=repository,
                     )
+
+    def test_start_reports_missing_node_pty_when_host_exits_before_pipe_readiness(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repository"
+            repository.mkdir()
+            config = _config(root, repository)
+            agent = AgentConfig(
+                codex_home=root / "biel3-profile",
+                model="gpt-6-luna",
+                reasoning_effort="max",
+                sandbox="read-only",
+                account_name="biel3",
+                backend="windows",
+            )
+
+            class ExitedProcess:
+                pid = 1234
+
+                def poll(self):
+                    return 1
+
+                def terminate(self):
+                    raise AssertionError("an exited host must not be terminated")
+
+            def spawn_host(_command, **kwargs):
+                kwargs["stdout"].write("Error: Cannot find module 'node-pty'\n")
+                kwargs["stdout"].flush()
+                return ExitedProcess()
+
+            with patch("dual_codex.terminal.os.name", "nt"), patch(
+                "dual_codex.terminal.shutil.which", return_value="node"
+            ), patch(
+                "dual_codex.terminal.subprocess.CREATE_NEW_PROCESS_GROUP", 0, create=True
+            ), patch(
+                "dual_codex.terminal.subprocess.DETACHED_PROCESS", 0, create=True
+            ), patch(
+                "dual_codex.terminal.subprocess.Popen", side_effect=spawn_host
+            ), patch(
+                "dual_codex.terminal._pipe_request"
+            ) as pipe_request, patch(
+                "dual_codex.terminal.time.sleep", side_effect=AssertionError("startup should fail immediately")
+            ):
+                manager = TerminalManager(config)
+                with self.assertRaisesRegex(TerminalError, "node-pty.*npm ci"):
+                    manager.start(
+                        session_id="biel3-missing-node-pty",
+                        agent=agent,
+                        role="architect",
+                        repository=repository,
+                    )
+                pipe_request.assert_not_called()
 
 
 if __name__ == "__main__":

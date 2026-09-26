@@ -21,9 +21,19 @@ estado atual deve ser preservado.
 ## Lock ativo
 
 Somente uma delegacao por repositorio e permitida. O lock fica em
-`<runs_dir>/.locks` e informa request e PID. Um lock vivo e recusado; um lock
-stale so e recuperado quando o PID nao existe. Lock invalido ou inacessivel nao
-e apagado automaticamente.
+`<runs_dir>/.locks` e informa request, PID e identidade de inicio do processo.
+Um lock vivo e recusado; um PID inexistente ou reutilizado pode ser recuperado
+sob uma claim exclusiva do sistema operacional. Lock invalido, inacessivel ou
+com identidade de processo impossivel de verificar nao e apagado.
+
+## Git LFS ou content filters
+
+O Git confiavel do host recusa operacoes quando um caminho rastreado usa um
+content filter, incluindo Git LFS. Essa recusa evita executar filtros
+`clean`, `smudge` ou `process` definidos pelo repositorio ou pelo ambiente.
+Assim, `status`, `diff`, preflight ou publicacao podem parar nesse repositorio.
+Nao desative essa protecao para fazer LFS funcionar; suporte seguro a filtros
+precisa de um projeto separado de seguranca.
 
 ## CLI nao encontrado
 

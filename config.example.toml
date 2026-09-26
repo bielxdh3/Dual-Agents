@@ -79,7 +79,8 @@ fallback_roles = ["executor"]
 # codex_home = "C:/Users/USER/ClaudeProfiles/default"
 # model = "sonnet"
 # reasoning_effort = "high"
-# fallback_roles = ["architect", "reviewer"]
+# Restricted Claude profiles can review, but cannot read the canonical skills required by Architect.
+# fallback_roles = ["reviewer"]
 
 [roles]
 orchestrator = "primary"

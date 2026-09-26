@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import hmac
 import json
+import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
@@ -47,6 +50,7 @@ from .providers import (
     provider_default_label,
     provider_for_backend,
     provider_label,
+    supported_roles_for_backend,
 )
 
 
@@ -56,6 +60,7 @@ class DashboardError(ValueError):
 
 _ACCOUNT_PATH = re.compile(r"^/api/accounts/([A-Za-z0-9][A-Za-z0-9_-]*)(?:/(models|usage|settings|auth))?$")
 _SAFE_HOSTS = {"127.0.0.1", "localhost"}
+_SESSION_ID = re.compile(r"[A-Za-z0-9_-]{43}")
 LIVE_RECONCILIATION_SECONDS = 10.0
 _AUTH_STATUS_LABELS = {
     "OK": "Authenticated",
@@ -420,6 +425,7 @@ class DashboardService:
             "last_error": None,
             "refreshed_at": _now(),
         }
+        base["capabilities"]["supported_roles"] = list(supported_roles_for_backend(account.backend))
         if not account.enabled:
             base["login"] = "DISABLED"
             base["auth_status"] = "Disabled"
@@ -562,6 +568,7 @@ class DashboardService:
             "profile_isolation": True,
             "isolation_note": "Codex profile state is isolated by the account CODEX_HOME.",
             "credential_status": "provider-managed",
+            "supported_roles": list(supported_roles_for_backend(account.backend)),
         }
         base["profile"] = {
             **base["profile"],
@@ -1214,8 +1221,9 @@ function latestMutationCanApply(sequence,latestSequence){return sequence===lates
 function setDraftSectionDirty(draft,section,dirty){if(!draft)return false;const key=section==='settings'?'dirtySettings':'dirtyRoles';draft[key]=Boolean(dirty);draft.dirty=Boolean(draft.dirtySettings||draft.dirtyRoles);return draft.dirty}
 function shouldPreserveDashboardDraft(draft){return Boolean(draft&&(draft.dirty||draft.dirtySettings||draft.dirtyRoles))}
 function shouldReplaceDashboardCard(draft){return !shouldPreserveDashboardDraft(draft)}
+function dashboardRoleOptions(roleNames,assignedRoles,supportedRoles){const assigned=new Set(Array.isArray(assignedRoles)?assignedRoles:[]);const supported=new Set(Array.isArray(supportedRoles)?supportedRoles:[]);return [...new Set(Array.isArray(roleNames)?roleNames:[])].filter(role=>supported.has(role)||assigned.has(role)).map(role=>({role,supported:supported.has(role),assigned:assigned.has(role)}))}
 if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardState={responseIsCurrent,snapshotIsCurrent,latestMutationCanApply,setDraftSectionDirty,shouldPreserveDashboardDraft,shouldReplaceDashboardCard};
-if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardCapabilities={modelCapabilities,reconcileCapabilitySelection};
+if(typeof globalThis!=='undefined')globalThis.dualCodexDashboardCapabilities={modelCapabilities,reconcileCapabilitySelection,dashboardRoleOptions};
 """
 
 SCRIPT = CAPABILITY_SCRIPT + """
@@ -1246,7 +1254,16 @@ function latestMutationCanApply(sequence, latestSequence) {
 if (typeof globalThis !== 'undefined') globalThis.dualCodexDashboardState = {responseIsCurrent, latestMutationCanApply};
 
 async function get(path, opts) {
-  const response = await fetch(path, opts);
+  const options = {...(opts || {})};
+  const method = String(options.method || 'GET').toUpperCase();
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const cookie = document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith('dual_codex_csrf='));
+    const token = cookie ? decodeURIComponent(cookie.slice('dual_codex_csrf='.length)) : '';
+    const headers = new Headers(options.headers || {});
+    headers.set('X-Dual-Codex-CSRF', token);
+    options.headers = headers;
+  }
+  const response = await fetch(path, options);
   const payload = await response.json();
   if (!response.ok) throw Error(payload.error || 'Request failed');
   return payload;
@@ -1348,11 +1365,12 @@ function draftFor(account, reset) {
   }
   return existing;
 }
-function roleEditor(account, draft) {
+function roleEditor(draft, capabilities) {
   const assigned = new Set(draft.roles || []);
   const fallback = new Set(draft.fallback_roles || []);
-  const primary = ROLE_NAMES.map(role => '<label class="check"><input type="checkbox" data-primary-role value="' + role + '"' + (assigned.has(role) ? ' checked' : '') + '>' + role + '</label>').join('');
-  const fallbackRows = ROLE_NAMES.filter(role => role !== 'orchestrator').map(role => '<label class="check"><input type="checkbox" data-fallback-role value="' + role + '"' + (fallback.has(role) ? ' checked' : '') + '>' + role + '</label>').join('');
+  const supportedRoles = capabilities && Array.isArray(capabilities.supported_roles) ? capabilities.supported_roles : [];
+  const primary = dashboardRoleOptions(ROLE_NAMES, [...assigned], supportedRoles).map(option => '<label class="check"><input type="checkbox" data-primary-role data-role-supported="' + option.supported + '" value="' + option.role + '"' + (option.assigned ? ' checked' : '') + '>' + option.role + (option.supported ? '' : ' <span class="sub">unsupported by provider</span>') + '</label>').join('');
+  const fallbackRows = dashboardRoleOptions(ROLE_NAMES.filter(role => role !== 'orchestrator'), [...fallback], supportedRoles).map(option => '<label class="check"><input type="checkbox" data-fallback-role data-role-supported="' + option.supported + '" value="' + option.role + '"' + (option.assigned ? ' checked' : '') + '>' + option.role + (option.supported ? '' : ' <span class="sub">unsupported by provider</span>') + '</label>').join('');
   return '<fieldset class="role-editor"><legend>Primary roles</legend><div class="role-options">' + primary + '</div><details class="fallback-details"><summary>Fallback eligibility</summary><div class="role-options">' + fallbackRows + '</div></details></fieldset>';
 }
 function card(account, draft) {
@@ -1375,7 +1393,7 @@ function card(account, draft) {
   const error = account.last_error ? '<div class="error" data-runtime-error>' + esc(String(account.last_error).split(';')[0]) + '</div>' : '';
   return '<article class="card" data-account="' + esc(account.name) + '" data-provider="' + esc(provider) + '">' +
     '<div class="card-head"><div><h3>' + esc(account.label || account.name) + '</h3><div class="sub" data-provider-line>' + esc(providerLabel) + ' · ' + esc(account.name) + '</div></div><div data-runtime-pill>' + pill(account.runtime_state) + '</div></div>' +
-    '<div class="control">' + roleEditor(account, draft) + '<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite"></span><button class="button secondary" data-roles-save data-mutation>Save roles</button></div></div>' +
+    '<div class="control">' + roleEditor(draft, capabilities) + '<div class="save-row"><span class="feedback" data-role-feedback aria-live="polite"></span><button class="button secondary" data-roles-save data-mutation>Save roles</button></div></div>' +
     '<div class="grid"><div class="field"><label>Model</label><select data-model>' + options(models, draft.model, draft.model ? false : (account.configured.model_label || 'Provider default')) + '</select></div><div class="field"><label>Effort</label><select data-effort ' + (state.reasoning_disabled ? 'disabled' : '') + '>' + rendered.efforts + '</select></div></div>' +
     '<div class="save-row"><span class="feedback" data-feedback aria-live="polite"></span><button class="button" data-save data-mutation>Save</button></div>' +
     '<details class="advanced"><summary>Details</summary><div class="grid"><div class="field"><label>Effective model</label><output>' + esc(account.effective && account.effective.model || 'Unknown') + '</output></div><div class="field"><label>Effective reasoning</label><output>' + esc(account.effective && account.effective.reasoning_effort || 'Unknown') + '</output></div><div class="field"><label>Service tier</label><select data-tier ' + (state.service_tier_disabled ? 'disabled' : '') + '>' + rendered.tiers + '</select></div><div class="field"><label>Backend</label><select data-backend ' + (executor ? 'disabled' : '') + '>' + backendOptions + '</select></div></div><div class="feedback" data-capability-feedback aria-live="polite">' + esc(state.message || 'Capabilities match the selected provider.') + '</div><div class="sub">Availability: ' + esc(availabilityLabel(account)) + '</div><div class="detail-grid"><div><span class="metric-label">State root</span><div class="value">' + esc(account.codex_home) + '</div></div><div><span class="metric-label">Usage</span><div class="value">Lifetime tokens: ' + fmtTokens(usage) + '</div></div></div>' + (thread ? '<div class="thread"><div class="metric-label">Persistent thread</div><div class="value">' + esc(thread.name || thread.id || 'Unknown') + '</div><div class="sub">' + esc(thread.status || 'Unknown') + ' · token usage ' + (account.token_usage ? 'available' : 'not available') + '</div></div>' : '') + error + '</details></article>';
@@ -1573,6 +1591,8 @@ async function loadProviderCatalog(cardNode, backend) {
     draft.providerModels = cardNode._providerModels;
     draft.providerCapabilities = cardNode._providerCapabilities;
     dashboardState.drafts.set(name, draft);
+    const roleEditorNode = cardNode.querySelector('.role-editor');
+    if (roleEditorNode) roleEditorNode.outerHTML = roleEditor(draft, cardNode._providerCapabilities);
     const model = cardNode.querySelector('[data-model]');
     if (model) {
       model.innerHTML = options(cardNode._providerModels, '', payload.provider_label ? payload.provider_label + ' default' : 'Provider default');
@@ -1699,6 +1719,10 @@ document.addEventListener('change', event => {
   const cardNode = target && target.closest && target.closest('.card[data-account]');
   if (!cardNode) return;
   if (target.matches('[data-primary-role], [data-fallback-role]')) {
+    if (target.dataset.roleSupported === 'false') {
+      target.checked = false;
+      target.disabled = true;
+    }
     markDraft(cardNode, 'roles');
     return;
   }
@@ -1765,17 +1789,72 @@ class _Handler(BaseHTTPRequestHandler):
             return False
         origin = self.headers.get("Origin")
         if origin:
+            if origin.strip().casefold() == "null":
+                return False
             parsed = urllib.parse.urlsplit(origin)
-            if parsed.hostname and parsed.hostname.casefold() not in _SAFE_HOSTS:
+            if not parsed.hostname or parsed.hostname.casefold() not in _SAFE_HOSTS:
                 return False
         return True
 
-    def _send(self, status: int, payload: Any, content_type: str = "application/json") -> None:
+    def _same_origin(self) -> bool:
+        origin = self.headers.get("Origin", "").strip()
+        host = self.headers.get("Host", "").strip()
+        if not origin or origin.casefold() == "null" or not host:
+            return False
+        parsed = urllib.parse.urlsplit(origin)
+        return (
+            parsed.scheme == "http"
+            and parsed.netloc.casefold() == host.casefold()
+            and parsed.path in {"", "/"}
+            and not parsed.query
+            and not parsed.fragment
+        )
+
+    def _cookie_value(self, name: str) -> str:
+        values = []
+        for item in self.headers.get("Cookie", "").split(";"):
+            cookie_name, separator, value = item.strip().partition("=")
+            if separator and cookie_name == name:
+                values.append(urllib.parse.unquote(value))
+        return values[0] if len(values) == 1 else ""
+
+    def _session_csrf_token(self, session_id: str) -> str:
+        return hmac.new(
+            self.server.csrf_secret,
+            session_id.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def _mutation_allowed(self) -> bool:
+        if not self._same_origin():
+            return False
+        if self.headers.get("Content-Type", "").split(";", 1)[0].strip().casefold() != "application/json":
+            return False
+        session_id = self._cookie_value("dual_codex_session")
+        cookie_token = self._cookie_value("dual_codex_csrf")
+        supplied = self.headers.get("X-Dual-Codex-CSRF", "")
+        if not _SESSION_ID.fullmatch(session_id):
+            return False
+        expected = self._session_csrf_token(session_id)
+        return bool(
+            secrets.compare_digest(cookie_token, expected)
+            and secrets.compare_digest(supplied, expected)
+        )
+
+    def _send(
+        self,
+        status: int,
+        payload: Any,
+        content_type: str = "application/json",
+        headers: tuple[tuple[str, str], ...] = (),
+    ) -> None:
         data = payload.encode("utf-8") if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        for name, value in headers:
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(data)
 
@@ -1870,10 +1949,31 @@ class _Handler(BaseHTTPRequestHandler):
         if ".." in path or "\\" in path or "\x00" in path:
             self._send(400, {"error": "Unsafe path."})
             return
+        if method in {"POST", "PATCH", "DELETE", "PUT"} and not self._mutation_allowed():
+            self._send(403, {"error": "Same-origin JSON request with a valid dashboard CSRF token required."})
+            return
         service = self.server.service
         try:
             if method == "GET" and path == "/":
-                self._send(200, HTML, "text/html")
+                session_id = self._cookie_value("dual_codex_session")
+                new_session = not _SESSION_ID.fullmatch(session_id)
+                if new_session:
+                    session_id = secrets.token_urlsafe(32)
+                csrf_token = self._session_csrf_token(session_id)
+                cookie_headers = []
+                if new_session:
+                    cookie_headers.append(
+                        ("Set-Cookie", f"dual_codex_session={session_id}; Path=/; HttpOnly; SameSite=Strict")
+                    )
+                cookie_headers.append(
+                    ("Set-Cookie", f"dual_codex_csrf={csrf_token}; Path=/; SameSite=Strict")
+                )
+                self._send(
+                    200,
+                    HTML,
+                    "text/html",
+                    headers=tuple(cookie_headers),
+                )
                 return
             if method == "GET" and path == "/static/styles.css":
                 self._send(200, STYLES, "text/css")
@@ -1965,6 +2065,7 @@ class _HTTPServer(ThreadingHTTPServer):
 
     def __init__(self, address: tuple[str, int], service: DashboardService) -> None:
         self.service = service
+        self.csrf_secret = secrets.token_bytes(32)
         super().__init__(address, _Handler)
 
 

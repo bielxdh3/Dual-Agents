@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 from contextlib import AbstractContextManager
+from dataclasses import replace
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -180,6 +182,10 @@ def _parser() -> argparse.ArgumentParser:
     status.add_argument("--json", action="store_true", dest="json_output")
     run = sub.add_parser("run", help="Run architect -> executor -> reviewer")
     run.add_argument("task", help="Markdown task file")
+    run.add_argument(
+        "--repository",
+        help="Explicit target repository (defaults to the repository in the config)",
+    )
 
     dashboard = sub.add_parser("dashboard", help="Open the local account control dashboard")
     dashboard.add_argument("--port", type=int, default=0, help="Loopback port (0 chooses a safe free port)")
@@ -787,7 +793,18 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "run":
-            outcome = execute(config, Path(args.task))
+            if args.repository:
+                config = replace(config, repository=Path(args.repository).expanduser().resolve())
+
+            def show_progress(message: str) -> None:
+                print(message, flush=True)
+
+            outcome = execute(
+                config,
+                Path(args.task),
+                explicit_repository=bool(args.repository),
+                progress=show_progress,
+            )
             print(f"Run directory: {outcome.run_dir}")
             print(f"Verdict: {outcome.verdict}")
             print(f"Correction cycles: {outcome.correction_cycles}")
@@ -797,8 +814,65 @@ def main(argv: list[str] | None = None) -> int:
         print("Interrupted", file=sys.stderr)
         return 130
     except (ConfigError, RuntimeError, TerminalError, OSError, ValueError) as exc:
+        if args.command == "delegate":
+            return _emit_delegate_internal_failure(args, exc)
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+    except Exception as exc:
+        if args.command == "delegate":
+            return _emit_delegate_internal_failure(args, exc)
+        print(f"ERROR: Internal failure ({type(exc).__name__}).", file=sys.stderr)
+        return 1
+
+
+def _emit_delegate_internal_failure(args, exc: Exception | None = None) -> int:
+    request_id = "internal-" + uuid4().hex[:12]
+    now = datetime.now(timezone.utc).isoformat()
+    raw_result_path = getattr(args, "result_file", "")
+    try:
+        result_path = Path(raw_result_path).expanduser() if raw_result_path else None
+    except (TypeError, ValueError, OSError):
+        result_path = None
+    payload = {
+        "schema_version": 1,
+        "request_id": request_id,
+        "parent_request_id": None,
+        "status": "failed",
+        "executor_account": "",
+        "executor_label": "",
+        "executor_sandbox": "",
+        "exit_code": 1,
+        "started_at": now,
+        "finished_at": now,
+        "summary": "Unexpected internal failure while processing delegation.",
+        "repository": "",
+        "files_changed": [],
+        "commands_run": [],
+        "tests": [],
+        "remaining_issues": [],
+        "git_status": "unavailable",
+        "diff_file": "",
+        "run_directory": "",
+        "error": f"Internal failure ({type(exc).__name__ if exc else 'unknown'}); exception details were withheld.",
+    }
+    if result_path is not None:
+        try:
+            atomic_write_json(result_path, payload)
+        except Exception:
+            pass
+    protocol = {
+        "status": "failed",
+        "request_id": request_id,
+        "result_file": str(result_path) if result_path is not None else str(raw_result_path),
+        "run_directory": "",
+        "elapsed_seconds": 0.0,
+    }
+    print("DUAL_CODEX_RESULT " + json.dumps(protocol, ensure_ascii=False), flush=True)
+    print(
+        f"ERROR: Internal failure ({type(exc).__name__ if exc else 'unknown'}); details were withheld.",
+        file=sys.stderr,
+    )
+    return 1
 
 
 if __name__ == "__main__":

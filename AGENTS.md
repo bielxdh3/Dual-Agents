@@ -1,47 +1,29 @@
 # Dual Agents App integration
 
-The Codex App is the visible Codex Architect, reviewer, and user interface.
-Google Antigravity/Gemini is the only active `executor` backend for delegated
-implementation work. Do not substitute a Codex Executor or another backend.
+The Codex App is the user-facing entrypoint. When a request or attached
+mission asks for Dual Agents/Dual Codex, independent Architect/Executor/
+Reviewer roles, the Dual Agents lifecycle, or includes a blocker that depends
+on another role's availability, route the mission to the Dual Agents control
+plane. Do not require a fixed phrase or decide role availability from the
+visible thread's tools.
 
-When the user says “Use Dual Agents to implement this task.”:
+This intake routing applies only before the first handoff. If a trusted
+bootstrap marks the current turn as a configured role phase, follow its
+phase-specific task and output schema without re-entering the control plane.
 
-1. Inspect and understand the target repository in the visible App.
-2. Prepare a precise version-1 JSON request with `action: "implement"` and an
-   explicit `repository` path.
-3. Run the repository-local launcher:
+For a complete multi-phase mission, invoke `dual-codex run` (or the installed
+global launcher) from the target repository and pass its explicit repository
+path. The control plane resolves every role from config, the provider
+capability matrix, and live runtime checks. Read the resulting report,
+`provenance.json`, and target diff. Keep configured blockers intact; never
+replace a missing or unavailable role with the visible Codex.
 
-   ```powershell
-   .\scripts\dual-codex.ps1 --config <config> delegate --request-file <request> --result-file <result>
-   ```
+Use `delegate` only for a bounded single Executor implementation/correction
+request with its versioned JSON request and result file. Do not use `terminal
+list` or `terminal start` to launch configured mission actors. Those commands
+only manage native Windows Codex TUI sessions. Do not print or read
+authentication files.
 
-   Standard input is also supported with `delegate --stdin --result-file`.
-4. Wait for the final `DUAL_CODEX_RESULT` line, then read the result JSON,
-   executor report, Git status, and diff named by that result.
-5. Review the real implementation in the visible App. Create a version-1
-   `correct` request only for concrete blocking or important findings. A
-   correction must include the original task, `parent_request_id`, and
-   actionable `review_findings`.
-6. Respect `max_correction_cycles` from configuration and present the final
-   evidence to the user. Never claim success without reading the result and
-   diff.
-
-For a mission that runs the configured Architect, Executor, and Reviewer
-roles, use the provider-aware `run` command:
-
-```powershell
-.\scripts\dual-codex.ps1 --config <config> run <task-file>
-```
-
-Do not use `terminal list` or `terminal start` to launch or validate configured
-mission actors. Those commands only inspect or start native Windows Codex
-sessions. `run` resolves each role through its configured profile and backend;
-review `provenance.json` to verify the selected actor, runtime, and fallback
-state. Unsupported role/provider combinations fail closed.
-
-Before delegating, use `status --json` when useful to verify the executor role,
-executor label, Antigravity/Gemini backend and `agy` status, the active
-repository, Git state, and CLI versions. Delegation refuses an unassigned,
-non-Antigravity, or unavailable Executor; it never falls back silently. Do not
-invoke the visible Architect account through `codex exec` for the same
-delegation, and do not print or read authentication files.
+When changing the Dual Agents orchestration, work directly in a Codex session;
+do not use the orchestration system under repair to implement or validate
+itself.

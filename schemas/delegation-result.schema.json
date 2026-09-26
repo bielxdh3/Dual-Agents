@@ -68,6 +68,7 @@
     "diff_file": {"type": "string"},
     "run_directory": {"type": "string"},
     "executor_report_file": {"type": "string"},
+    "executor_report_actor": {"type": "string"},
     "stderr_file": {"type": "string"},
     "terminal_session_id": {"type": "string"},
     "terminal_turn_start": {"type": "string"},

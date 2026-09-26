@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -10,13 +11,26 @@ import unittest
 from dataclasses import replace
 from unittest.mock import patch
 
-from dual_codex.bootstrap import BOOTSTRAP_MARKER
 from dual_codex.cli import main as cli_main
-from dual_codex.codex import ActorAvailabilityError, classify_actor_failure, delegate_to_configured_actor, run_codex_for_role
+from dual_codex.codex import ActorAvailabilityError, ActorResultError, classify_actor_failure, create_canonical_bootstrap, delegate_to_configured_actor, run_codex_for_role
 from dual_codex.config import AccountConfig, ConfigError, OrchestratorConfig
 from dual_codex.delegation import DelegationError, run_codex_exec as delegation_adapter
 from dual_codex.orchestrator import execute
 from dual_codex.process import CommandError, CommandResult
+
+
+ARCHITECT_BASELINE = ["memory", "ponytail", "project-phase-review", "project-security-review"]
+
+
+def _architect_plan() -> dict[str, object]:
+    return {
+        "summary": "Plan summary",
+        "steps": [],
+        "acceptance_criteria": [],
+        "risks": [],
+        "files_to_inspect": [],
+        "skills_loaded": [],
+    }
 
 
 class ConfiguredActorRoutingTests(unittest.TestCase):
@@ -35,6 +49,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
         self.addCleanup(self._bootstrap_patch.stop)
 
     def _config(self, root: Path, *, executor: str = "executor-b") -> OrchestratorConfig:
+        (root / "schema.json").write_text('{"type":"object"}', encoding="utf-8")
         accounts = {
             "orchestrator": AccountConfig(
                 name="orchestrator",
@@ -92,12 +107,125 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             config_path=root / "config.toml",
         )
 
+    def test_api_architect_is_rejected_before_bootstrap_or_provider_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["api-architect"] = AccountConfig(
+                name="api-architect",
+                label="OpenAI-compatible API",
+                codex_home=root / "api-home",
+                model="model-a",
+                reasoning_effort="high",
+                backend="api",
+                provider_type="api",
+                adapter_type="openai_compatible",
+                auth_mode="environment",
+                auth_reference="env:TEST_API_KEY",
+                base_url="https://api.example.test/v1",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "architect": "api-architect"},
+            )
+
+            with patch("dual_codex.codex.create_canonical_bootstrap") as create_bootstrap, patch(
+                "dual_codex.providers.api_adapter"
+            ) as api_adapter:
+                with self.assertRaisesRegex(ValueError, "cannot serve the Architect role"):
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="architect",
+                        task="Read the supplied task artifact and implement it.",
+                        repository=config.repository,
+                    )
+
+            create_bootstrap.assert_not_called()
+            api_adapter.assert_not_called()
+
+    def test_restricted_claude_architect_is_rejected_before_bootstrap_or_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["claude"] = AccountConfig(
+                name="claude",
+                label="Restricted Claude Code",
+                codex_home=root / "claude-home",
+                model="claude-sonnet",
+                reasoning_effort="high",
+                backend="claude_code",
+                provider_type="anthropic",
+                adapter_type="claude_code",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "architect": "claude"},
+            )
+
+            with patch("dual_codex.codex.create_canonical_bootstrap") as create_bootstrap, patch(
+                "dual_codex.claude_code.run_claude_code"
+            ) as run_claude:
+                with self.assertRaisesRegex(ValueError, "Restricted Claude Code profiles cannot read"):
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="architect",
+                        task="Read the supplied task artifact and implement it.",
+                        repository=config.repository,
+                    )
+
+            create_bootstrap.assert_not_called()
+            run_claude.assert_not_called()
+
+    def test_unsupported_claude_orchestrator_assignment_is_rejected_before_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["claude"] = AccountConfig(
+                name="claude",
+                label="Restricted Claude Code",
+                codex_home=root / "claude-home",
+                model="claude-sonnet",
+                reasoning_effort="high",
+                backend="claude_code",
+                provider_type="anthropic",
+                adapter_type="claude_code",
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "orchestrator": "claude"},
+            )
+
+            with patch("dual_codex.codex.create_canonical_bootstrap") as create_bootstrap, patch(
+                "dual_codex.claude_code.run_claude_code"
+            ) as run_claude:
+                with self.assertRaisesRegex(ValueError, "cannot serve the configured 'orchestrator' role"):
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="orchestrator",
+                        task="Prepare a plan.",
+                        repository=config.repository,
+                    )
+
+            create_bootstrap.assert_not_called()
+            run_claude.assert_not_called()
+
     def test_full_topology_uses_configured_provider_backend_and_zero_native_spawn(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             config = self._config(root)
             config.repository.mkdir()
             subprocess.run(["git", "init", "--quiet"], cwd=config.repository, check=True)
+            project_skill = config.repository / ".agents" / "skills" / "project-architect-policy" / "SKILL.md"
+            project_skill.parent.mkdir(parents=True)
+            project_skill.write_text("# project policy\n", encoding="utf-8")
+            config.accounts["secondary"].codex_home.mkdir(parents=True)
+            config = replace(config, require_clean_git=False)
             task = root / "task.md"
             task.write_text("route the configured actors", encoding="utf-8")
             seen: list[tuple[str, str, str, str]] = []
@@ -113,6 +241,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
+                        "skills_loaded": ["project-architect-policy"],
                     }
                 elif role == "executor":
                     payload = {
@@ -130,7 +259,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             with patch("dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner), patch(
                 "dual_codex.codex.run_codex_exec"
             ) as native_spawn:
-                outcome = execute(config, task)
+                outcome = execute(config, task, explicit_repository=True)
 
             self.assertEqual(
                 seen,
@@ -151,6 +280,45 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             )
             provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
             self.assertTrue(all(item["configured_actor"] for item in provenance["configured_actor_routing"]))
+            architect_provenance = provenance["configured_actor_routing"][0]
+            self.assertEqual(
+                architect_provenance["canonical_bootstrap_selected_skills"],
+                ["memory", "ponytail", "project-architect-policy", "project-phase-review", "project-security-review"],
+            )
+            self.assertEqual(
+                architect_provenance["canonical_bootstrap_skill_digests"]["ponytail"],
+                hashlib.sha256(
+                    (Path(self._instructions.name) / "skills" / "ponytail" / "SKILL.md").read_bytes()
+                ).hexdigest(),
+            )
+            self.assertEqual(
+                architect_provenance["canonical_bootstrap_skill_catalog"]["ponytail"],
+                architect_provenance["canonical_bootstrap_skill_digests"]["ponytail"],
+            )
+            self.assertTrue(architect_provenance["canonical_bootstrap_skill_catalog_sha256"])
+            self.assertIn("skills/ponytail/SKILL.md", architect_provenance["canonical_bootstrap_source_files"])
+            self.assertEqual(
+                architect_provenance["canonical_bootstrap_actor_selected_skill_sources"],
+                [{
+                    "identifier": "project-architect-policy",
+                    "source_scope": "project",
+                    "source_path": str(project_skill),
+                    "repository_relative_path": ".agents/skills/project-architect-policy/SKILL.md",
+                    "sha256": hashlib.sha256(project_skill.read_bytes()).hexdigest(),
+                }],
+            )
+            self.assertEqual(
+                architect_provenance["codex_repository_trust"],
+                {
+                    "repository": str(config.repository.resolve()),
+                    "codex_home": str(config.accounts["secondary"].codex_home.resolve()),
+                    "updated": True,
+                },
+            )
+            self.assertEqual(
+                provenance["configured_actor_routing"][2]["codex_repository_trust"]["updated"],
+                False,
+            )
 
     def test_mission_dispatches_claude_roles_and_codex_executor_without_native_start(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -182,7 +350,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 accounts=accounts,
                 roles={
                     "orchestrator": "orchestrator",
-                    "architect": "claude",
+                    "architect": "codex-secundario",
                     "reviewer": "claude",
                     "executor": "codex-secundario",
                 },
@@ -201,6 +369,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     "acceptance_criteria": [],
                     "risks": [],
                     "files_to_inspect": [],
+                    "skills_loaded": [],
                 },
                 "executor": {
                     "summary": "implementation",
@@ -239,11 +408,14 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertEqual(outcome.verdict, "approved")
             self.assertEqual(
                 claude_roles,
-                [("architect", "claude", "claude_code"), ("reviewer", "claude", "claude_code")],
+                [("reviewer", "claude", "claude_code")],
             )
-            self.assertEqual(claude.call_count, 2)
-            self.assertEqual(codex_roles, [("executor", "codex-secundario", "app_server")])
-            self.assertEqual(codex.call_count, 1)
+            self.assertEqual(claude.call_count, 1)
+            self.assertEqual(
+                codex_roles,
+                [("architect", "codex-secundario", "app_server"), ("executor", "codex-secundario", "app_server")],
+            )
+            self.assertEqual(codex.call_count, 2)
             terminal.assert_not_called()
             native_start.assert_not_called()
             observed_provenance = [
@@ -253,7 +425,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertEqual(
                 observed_provenance,
                 [
-                    ("architect", "claude", "claude_code", False),
+                    ("architect", "codex-secundario", "app_server", False),
                     ("executor", "codex-secundario", "app_server", False),
                     ("reviewer", "claude", "claude_code", False),
                 ],
@@ -316,6 +488,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     "acceptance_criteria": [],
                     "risks": [],
                     "files_to_inspect": [],
+                    "skills_loaded": [],
                 },
                 "executor": {
                     "summary": "implementation",
@@ -387,7 +560,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             terminal_manager.return_value.list.assert_not_called()
             native_terminal_start.assert_not_called()
             native_terminal_list.assert_not_called()
-            run_dirs = [path for path in config.runs_dir.iterdir() if path.is_dir()]
+            run_dirs = [path for path in config.runs_dir.iterdir() if (path / "provenance.json").is_file()]
             self.assertEqual(len(run_dirs), 1)
             provenance = json.loads((run_dirs[0] / "provenance.json").read_text(encoding="utf-8"))
             self.assertEqual(
@@ -493,6 +666,7 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             repository.mkdir()
 
             def fake_runner(**kwargs):
+                kwargs["output_path"].write_text(json.dumps(_architect_plan()), encoding="utf-8")
                 return CommandResult(
                     ["fake"],
                     0,
@@ -515,6 +689,34 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertEqual(result.metadata["runtime_version"], "provider-runtime")
             self.assertEqual(result.metadata["actual_actor"], "secondary")
             self.assertFalse(result.metadata["fallback_used"])
+
+    def test_default_plan_schemas_keep_architect_skill_provenance_role_scoped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = self._config(root)
+            repository = root / "repository"
+            repository.mkdir()
+            seen_schemas = {}
+
+            def fake_runner(**kwargs):
+                seen_schemas[kwargs["role"]] = kwargs["schema_path"]
+                payload = _architect_plan() if kwargs["role"] == "architect" else {}
+                kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
+                return CommandResult(["fake"], 0, "", "")
+
+            with patch("dual_codex.codex.run_codex_for_role", side_effect=fake_runner):
+                for role in ("architect", "orchestrator"):
+                    delegate_to_configured_actor(
+                        config=config,
+                        role=role,
+                        task="return a plan",
+                        repository=repository,
+                        output_path=root / f"{role}.json",
+                    )
+
+            schema_root = config.project_root / "schemas"
+            self.assertEqual(seen_schemas["architect"], schema_root / "architect-plan.schema.json")
+            self.assertEqual(seen_schemas["orchestrator"], schema_root / "plan.schema.json")
 
     def test_one_role_scoped_fallback_is_selected_and_provenanced(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -541,6 +743,112 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             self.assertTrue(result.metadata["fallback_used"])
             self.assertEqual(result.metadata["failed_actor"], "executor-b")
             self.assertEqual(result.metadata["fallback_failure_class"], "provider_unavailable")
+
+    def test_failed_fallback_preserves_primary_and_fallback_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["orchestrator"] = replace(
+                accounts["orchestrator"], fallback_roles=("reviewer",)
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "reviewer": "secondary"},
+                fallback_enabled=True,
+            )
+            repository = root / "repository"
+            repository.mkdir()
+
+            def fail_primary_and_fallback(**kwargs):
+                if kwargs["agent"].account_name == "secondary":
+                    raise ActorAvailabilityError(
+                        "primary reviewer unavailable",
+                        failure_class="provider_unavailable",
+                        actor="secondary",
+                    )
+                raise CommandError(
+                    "Existing terminal session role identity mismatch",
+                    metadata={"terminal_session_id": "fallback-session"},
+                )
+
+            with patch("dual_codex.codex.run_codex_for_role", side_effect=fail_primary_and_fallback):
+                with self.assertRaises(CommandError) as raised:
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="reviewer",
+                        task="Review the changed README.",
+                        repository=repository,
+                        output_path=root / "review.json",
+                        schema_path=root / "review.schema.json",
+                    )
+
+            metadata = raised.exception.metadata
+            self.assertEqual(metadata["primary_actor"], "secondary")
+            self.assertEqual(metadata["actual_actor"], "orchestrator")
+            self.assertEqual(metadata["actor_id"], "orchestrator")
+            self.assertEqual(metadata["backend"], "windows")
+            self.assertTrue(metadata["fallback_enabled"])
+            self.assertTrue(metadata["fallback_used"])
+            self.assertTrue(metadata["fallback_attempt_failed"])
+            self.assertEqual(metadata["failed_actor"], "secondary")
+            self.assertEqual(metadata["fallback_actor"], "orchestrator")
+            self.assertEqual(metadata["fallback_failure_class"], "provider_unavailable")
+            self.assertEqual(metadata["fallback_error_type"], "CommandError")
+            self.assertEqual(metadata["terminal_session_id"], "fallback-session")
+
+    def test_architect_fallback_keeps_shared_bootstrap_artifact_until_dispatch_finishes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["orchestrator"] = replace(accounts["orchestrator"], fallback_roles=("architect",))
+            config = replace(
+                base,
+                accounts=accounts,
+                roles={**base.roles, "architect": "secondary"},
+                fallback_enabled=True,
+            )
+            repository = root / "repository"
+            repository.mkdir()
+            schema_path = root / "architect-plan.schema.json"
+            schema_path.write_text("{}", encoding="utf-8")
+            captured_bootstraps = []
+            create_bootstrap = create_canonical_bootstrap
+
+            def capture_bootstrap(**kwargs):
+                bootstrap = create_bootstrap(**kwargs)
+                captured_bootstraps.append(bootstrap)
+                return bootstrap
+
+            def primary_app_server(**_kwargs):
+                return CommandResult(["codex", "app-server"], 1, "", "provider unavailable")
+
+            def fallback_windows(**kwargs):
+                bootstrap = captured_bootstraps[0]
+                self.assertTrue(bootstrap.artifact_path.is_file())
+                plan = _architect_plan()
+                kwargs["output_path"].write_text(json.dumps(plan), encoding="utf-8")
+                return CommandResult(["codex", "windows"], 0, json.dumps(plan), "")
+
+            with patch("dual_codex.codex.create_canonical_bootstrap", side_effect=capture_bootstrap), patch(
+                "dual_codex.providers.provider_supports_role", return_value=True
+            ), patch("dual_codex.codex.run_codex_app_server", side_effect=primary_app_server), patch(
+                "dual_codex.codex.run_codex_terminal", side_effect=fallback_windows
+            ):
+                result = delegate_to_configured_actor(
+                    config=config,
+                    role="architect",
+                    task="Read the brief and return an Architect plan.",
+                    repository=repository,
+                    output_path=root / "architect-plan.json",
+                    schema_path=schema_path,
+                )
+
+            self.assertTrue(result.metadata["fallback_used"])
+            self.assertEqual(result.metadata["actual_actor"], "orchestrator")
+            self.assertFalse(captured_bootstraps[0].artifact_path.exists())
 
     def test_fallback_candidate_order_is_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -646,6 +954,67 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     )
             self.assertEqual(app_server.call_count, 1)
 
+    def test_invalid_architect_plan_is_semantic_failure_and_never_falls_back(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["orchestrator"] = replace(
+                accounts["orchestrator"], fallback_roles=("architect",)
+            )
+            config = replace(
+                base,
+                accounts=accounts,
+                fallback_enabled=True,
+            )
+            repository = root / "repository"
+            repository.mkdir()
+            invalid = CommandResult(
+                ["codex", "app-server"],
+                0,
+                '{"summary":"Completed, but missing required fields."}',
+                "",
+            )
+
+            with patch("dual_codex.providers.provider_supports_role", return_value=True), patch(
+                "dual_codex.codex.run_codex_app_server", return_value=invalid
+            ) as primary, patch("dual_codex.codex.run_codex_terminal") as fallback:
+                with self.assertRaises(ActorResultError) as raised:
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="architect",
+                        task="Plan the requested change.",
+                        repository=repository,
+                        output_path=root / "architect-plan.json",
+                    )
+
+            self.assertEqual(primary.call_count, 1)
+            fallback.assert_not_called()
+            error = raised.exception
+            self.assertIn("Architect plan validation failed", str(error))
+            self.assertEqual(error.actor, "secondary")
+            self.assertEqual(error.metadata["actual_actor"], "secondary")
+            self.assertEqual(error.metadata["primary_actor"], "secondary")
+            self.assertEqual(error.metadata["actor_id"], "secondary")
+            self.assertTrue(error.metadata["canonical_bootstrap_required"])
+            self.assertIn("memory", error.metadata["canonical_bootstrap_host_loaded_skills"])
+            self.assertTrue(error.metadata["fallback_enabled"])
+            self.assertFalse(error.metadata["fallback_used"])
+            self.assertEqual(error.metadata["failed_actor"], "")
+            self.assertIn("missing required field", error.metadata["architect_result_validation_error"])
+            self.assertIsNone(
+                classify_actor_failure(
+                    CommandResult(
+                        ["codex", "app-server"],
+                        1,
+                        "",
+                        "Architect plan validation failed; provider runtime unavailable",
+                        {"architect_result_validation_error": "missing field"},
+                    ),
+                    backend="app_server",
+                )
+            )
+
     def test_role_reassignment_is_consumed_on_next_dispatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -710,6 +1079,10 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
 
             def fake_runner(**kwargs):
                 observed.append((kwargs["role"], kwargs["agent"].account_name, kwargs["agent"].backend))
+                if kwargs["role"] == "architect":
+                    kwargs["output_path"].write_text(
+                        json.dumps(_architect_plan()), encoding="utf-8"
+                    )
                 return CommandResult(["fake"], 0, "", "")
 
             with patch("dual_codex.codex.run_codex_for_role", side_effect=fake_runner):
@@ -798,13 +1171,19 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
             def fake_app_server(**kwargs):
                 observed.update(kwargs)
                 self.assertIn("BEGIN CANONICAL BOOTSTRAP SNAPSHOT", kwargs["prompt"])
-                self.assertIn("authoritative canonical bootstrap", kwargs["prompt"])
+                self.assertIn("inline AGENTS.md and mandatory Architect baseline skills below are", kwargs["prompt"])
                 self.assertNotIn("Read C:\\CodexGlobal", kwargs["prompt"])
                 self.assertNotIn("Read the complete ephemeral bootstrap artifact", kwargs["prompt"])
                 self.assertNotIn("Get-Content", kwargs["prompt"])
                 self.assertIn("canonical_source_path:", kwargs["prompt"])
+                self.assertIn("first read only the supplied task/architect artifact", kwargs["prompt"])
+                self.assertIn("Do not ask the user to choose or identify skills", kwargs["prompt"])
+                self.assertIn("Mandatory Architect baseline skills already loaded", kwargs["prompt"])
                 self.assertIn("# memory", kwargs["prompt"])
                 self.assertIn("# project-security-review", kwargs["prompt"])
+                kwargs["output_path"].write_text(
+                    json.dumps(_architect_plan()), encoding="utf-8"
+                )
                 return expected
 
             with patch("dual_codex.codex.run_codex_app_server", side_effect=fake_app_server) as app_server:
@@ -817,7 +1196,8 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                     schema_path=root / "schema.json",
                 )
             prompt = observed["prompt"]
-            self.assertIn(BOOTSTRAP_MARKER, prompt)
+            self.assertNotIn("[DUAL_CODEX_CANONICAL_BOOTSTRAP]", prompt)
+            self.assertIn("Begin inline bootstrap", prompt)
             self.assertIn("AGENTS.md", prompt)
             self.assertIn("skills", prompt)
             self.assertTrue(result.metadata["configured_actor"])
@@ -833,9 +1213,14 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 result.metadata["canonical_bootstrap_delivery"],
                 "trusted_inline",
             )
+            self.assertIn("skills/ponytail/SKILL.md", result.metadata["canonical_bootstrap_source_files"])
+            self.assertIn(
+                "skills/ponytail/SKILL.md",
+                result.metadata["canonical_bootstrap_artifact_source_files"],
+            )
             self.assertEqual(
                 result.metadata["canonical_bootstrap_selected_skills"],
-                ["memory", "ponytail", "project-phase-review", "project-security-review"],
+                ARCHITECT_BASELINE,
             )
             self.assertNotIn(r"C:\CodexGlobal", result.command)
             self.assertFalse(Path(result.metadata["canonical_bootstrap_artifact"]).exists())

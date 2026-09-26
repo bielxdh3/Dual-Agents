@@ -26,12 +26,14 @@ from .report import atomic_write_json
 _SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{1,96}$")
 _PIPE_NAME = re.compile(r"^\\\\\.\\pipe\\dual-codex-([A-Za-z0-9_-]{1,96})-([0-9a-f]{16,64})$")
 _LEASE_OWNER = re.compile(r"^[A-Za-z0-9_.:-]{1,96}$")
+_TEMP_TASK_ARTIFACT = re.compile(r"^\.dual-codex-task-[0-9a-f]{32}\.md$")
 TERMINAL_INLINE_MESSAGE_MAX = 500
 TERMINAL_INPUT_MAX_BYTES = 8192
 TERMINAL_LIVE_READ_MAX_BYTES = 65536
 TERMINAL_SUBMIT_DELAY_SECONDS = 0.1
 TERMINAL_COMPOSER_ACK_TIMEOUT_SECONDS = 5.0
 TERMINAL_TERM = "xterm-256color"
+WINDOWS_READ_ONLY_SANDBOX_MODE = "unelevated"
 _COMPLETED_EVENTS = {"turn_completed", "turn_complete", "task_completed", "task_complete"}
 _ABORTED_EVENTS = {"turn_aborted", "task_aborted"}
 _TURN_START_EVENTS = {"task_started", "turn_started", "turn_start"}
@@ -503,6 +505,8 @@ class TerminalSession:
     visible_required: bool = False
     target_model: str = ""
     target_reasoning: str = ""
+    windows_sandbox_mode: str = ""
+    pending_task_artifact_cleanup: tuple[tuple[str, str, float, str, int], ...] = ()
 
     @classmethod
     def from_record(cls, raw: dict[str, Any]) -> "TerminalSession":
@@ -538,10 +542,22 @@ class TerminalSession:
             visible_required=bool(raw.get("visible_required", False)),
             target_model=str(raw.get("target_model", "")),
             target_reasoning=str(raw.get("target_reasoning", "")),
+            windows_sandbox_mode=str(raw.get("windows_sandbox_mode", "")),
+            pending_task_artifact_cleanup=tuple(
+                (
+                    str(item[0]),
+                    str(item[1]),
+                    float(item[2]),
+                    str(item[3]) if len(item) >= 5 else "",
+                    int(item[4]) if len(item) >= 5 else 0,
+                )
+                for item in raw.get("pending_task_artifact_cleanup", [])
+                if isinstance(item, (list, tuple)) and len(item) in {3, 5}
+            ),
         )
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "session_id": self.session_id,
             "account": self.account,
             "label": self.label,
@@ -571,7 +587,13 @@ class TerminalSession:
             "visible_required": self.visible_required,
             "target_model": self.target_model,
             "target_reasoning": self.target_reasoning,
+            "windows_sandbox_mode": self.windows_sandbox_mode,
         }
+        if self.pending_task_artifact_cleanup:
+            result["pending_task_artifact_cleanup"] = [
+                list(item) for item in self.pending_task_artifact_cleanup
+            ]
+        return result
 
 
 def validate_session_id(value: str) -> str:
@@ -585,6 +607,16 @@ def session_id_for(account: str, repository: Path) -> str:
     return validate_session_id(f"{account}-{digest}")
 
 
+def windows_sandbox_mode_for(sandbox: str) -> str:
+    """Return the explicit native Windows sandbox implementation for a TUI sandbox."""
+
+    if sandbox == "read-only":
+        return WINDOWS_READ_ONLY_SANDBOX_MODE
+    if sandbox == "workspace-write":
+        return ""
+    raise TerminalError(f"Unsupported sandbox '{sandbox}'.")
+
+
 def interactive_command_args(
     repository: Path,
     *,
@@ -592,12 +624,17 @@ def interactive_command_args(
     approval_policy: str,
     model: str = "",
     reasoning_effort: str = "",
+    windows_sandbox_mode: str = "",
 ) -> list[str]:
     if sandbox not in {"read-only", "workspace-write"}:
         raise TerminalError(f"Unsupported sandbox '{sandbox}'.")
     if approval_policy not in {"on-request", "never"}:
         raise TerminalError(f"Unsupported approval policy '{approval_policy}'.")
+    if windows_sandbox_mode not in {"", "unelevated", "elevated"}:
+        raise TerminalError(f"Unsupported Windows sandbox mode '{windows_sandbox_mode}'.")
     args = ["--no-alt-screen", "--cd", str(repository), "--sandbox", sandbox, "-a", approval_policy]
+    if windows_sandbox_mode:
+        args.extend(["-c", f'windows.sandbox="{windows_sandbox_mode}"'])
     if model:
         args.extend(["--model", model])
     if reasoning_effort:
@@ -625,6 +662,22 @@ def _helper_path(config: OrchestratorConfig) -> Path:
     if not helper.is_file():
         raise TerminalError(f"ConPTY host is missing: {helper}")
     return helper
+
+
+def _host_exit_error(log_file: Path, project_root: Path, exit_code: int) -> str:
+    try:
+        output = log_file.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        output = ""
+    if "Cannot find module 'node-pty'" in output or 'Cannot find module "node-pty"' in output:
+        return (
+            "ConPTY host exited before readiness because Node could not load 'node-pty'. "
+            f"Install the locked host dependency with 'npm ci' in {project_root}."
+        )
+    return (
+        "ConPTY host exited before its control pipe became ready "
+        f"(exit code {exit_code}); inspect {log_file}."
+    )
 
 
 def _terminal_environment(agent: AgentConfig) -> dict[str, str]:
@@ -822,6 +875,133 @@ class TerminalManager:
         except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             raise TerminalError(f"Unknown terminal session '{session_id}'.") from exc
 
+    def defer_task_artifact_cleanup(
+        self,
+        session_id: str,
+        artifact_path: Path,
+        sha256: str,
+        *,
+        cursor: tuple[Path | None, int] | None = None,
+    ) -> None:
+        session = self._load(session_id)
+        artifact_path = Path(artifact_path)
+        if (
+            artifact_path.is_symlink()
+            or not _TEMP_TASK_ARTIFACT.fullmatch(artifact_path.name)
+            or not same_path(artifact_path.parent, session.repository)
+            or not re.fullmatch(r"[0-9a-f]{64}", sha256)
+            or not artifact_path.is_file()
+        ):
+            raise TerminalError("Refusing to defer cleanup for an unverified temporary task artifact.")
+        cursor_path, cursor_offset = cursor or (None, 0)
+        cursor_text = ""
+        if cursor_path is not None:
+            cursor_path = Path(cursor_path).resolve()
+            try:
+                cursor_path.relative_to(session.codex_home.resolve())
+            except ValueError as exc:
+                raise TerminalError("Refusing to defer cleanup with an unverified Codex session cursor.") from exc
+            cursor_text = str(cursor_path)
+        entry = (str(artifact_path.resolve()), sha256, time.time() + 60.0, cursor_text, int(cursor_offset))
+        pending = tuple(item for item in session.pending_task_artifact_cleanup if item[0] != entry[0]) + (entry,)
+        updated = replace(session, pending_task_artifact_cleanup=pending)
+        try:
+            atomic_write_json(_record_path(self.config, session_id), updated.as_dict())
+        except OSError as exc:
+            raise TerminalError("Could not persist deferred task artifact cleanup.") from exc
+
+    def has_pending_task_artifact_cleanup(self, session_id: str) -> bool:
+        return bool(self._load(session_id).pending_task_artifact_cleanup)
+
+    def reconcile_pending_task_artifact_cleanup(self, repository: Path) -> None:
+        """Reap completed Architect task files before a mission checks Git cleanliness."""
+        repository = Path(repository).expanduser().resolve()
+        directory = _session_dir(self.config)
+        if not directory.is_dir():
+            return
+        for record_path in sorted(directory.glob("*.json")):
+            try:
+                raw = json.loads(record_path.read_text(encoding="utf-8"))
+                session = TerminalSession.from_record(raw)
+                if not session.pending_task_artifact_cleanup or not same_path(session.repository, repository):
+                    continue
+                self.status(session.session_id)
+            except (
+                OSError,
+                UnicodeError,
+                json.JSONDecodeError,
+                IndexError,
+                KeyError,
+                OverflowError,
+                TypeError,
+                ValueError,
+                TerminalError,
+            ):
+                # Unreadable or unreachable state cannot authorize deleting an artifact.
+                continue
+
+    def _cleanup_pending_task_artifacts(
+        self,
+        session: TerminalSession,
+        *,
+        lifecycle: str,
+    ) -> TerminalSession:
+        pending = session.pending_task_artifact_cleanup
+        if not pending:
+            return session
+        now = time.time()
+        activity: dict[str, Any] | None = None
+        remaining: list[tuple[str, str, float, str, int]] = []
+        for artifact_text, expected_sha256, not_before, cursor_text, cursor_offset in pending:
+            turn_state = "unknown"
+            if cursor_text:
+                try:
+                    cursor_path = Path(cursor_text).resolve()
+                    cursor_path.relative_to(session.codex_home.resolve())
+                except (OSError, RuntimeError, ValueError):
+                    remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+                    continue
+                turn_state, _assistant = session_turn_state(cursor_path, cursor_offset)
+            if turn_state not in {"completed", "aborted"}:
+                if now < not_before:
+                    remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+                    continue
+                if lifecycle not in {"exited", "identity_invalid"}:
+                    if activity is None:
+                        try:
+                            activity = self._codex_turn_activity(session)
+                        except (OSError, ValueError, TypeError):
+                            activity = {"active": None}
+                    if activity.get("active") is not False:
+                        remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+                        continue
+            artifact_path = Path(artifact_text)
+            if (
+                artifact_path.is_symlink()
+                or not _TEMP_TASK_ARTIFACT.fullmatch(artifact_path.name)
+                or not same_path(artifact_path.parent, session.repository)
+                or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256)
+            ):
+                remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+                continue
+            try:
+                if not artifact_path.exists():
+                    continue
+                if not artifact_path.is_file() or hashlib.sha256(artifact_path.read_bytes()).hexdigest() != expected_sha256:
+                    remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+                    continue
+                artifact_path.unlink()
+            except OSError:
+                remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+
+        updated = replace(session, pending_task_artifact_cleanup=tuple(remaining))
+        if updated != session:
+            try:
+                atomic_write_json(_record_path(self.config, session.session_id), updated.as_dict())
+            except OSError:
+                return session
+        return updated
+
     def status(self, session_id: str) -> dict[str, Any]:
         session = self._load(session_id)
         try:
@@ -914,13 +1094,14 @@ class TerminalManager:
         except (KeyError, TerminalError, AttributeError, TypeError, ValueError):
             current = {**session.as_dict(), "identity_match": False, "state": "unreachable"}
 
-        if current["state"] in {"exited", "identity_invalid"}:
-            self._remove_record(session_id)
-        elif current["state"] == "unreachable":
+        if current["state"] == "unreachable":
             stale_reason = self._stale_session_reason(session)
             if stale_reason:
-                self._remove_record(session_id)
                 current = {**current, "state": "exited", "stale_reason": stale_reason}
+        session = self._cleanup_pending_task_artifacts(session, lifecycle=current["state"])
+        current.pop("pending_task_artifact_cleanup", None)
+        if current["state"] in {"exited", "identity_invalid"} and not session.pending_task_artifact_cleanup:
+            self._remove_record(session_id)
         return current
 
     @staticmethod
@@ -1533,6 +1714,7 @@ class TerminalManager:
         node = _node_path(self.config)
         helper = _helper_path(self.config)
         process_epoch = uuid4().hex
+        windows_sandbox_mode = windows_sandbox_mode_for(agent.sandbox)
         command = [
             node, str(helper), "--session-id", session_id, "--pipe", pipe,
             "--cwd", str(repository), "--codex-command", self.config.codex_command,
@@ -1540,6 +1722,7 @@ class TerminalManager:
             "--model", agent.model,
             "--reasoning-effort", agent.reasoning_effort,
             "--process-epoch", process_epoch,
+            "--windows-sandbox-mode", windows_sandbox_mode,
         ]
         if resolved_add_dirs:
             command.extend(["--add-dir", str(resolved_add_dirs[0])])
@@ -1556,19 +1739,25 @@ class TerminalManager:
         process_started_at = time.time()
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
+            exit_code = process.poll()
+            if exit_code is not None:
+                raise TerminalError(_host_exit_error(log_file, self.config.project_root, exit_code))
             try:
                 _pipe_request(pipe, {"op": "status"})
                 break
             except TerminalError:
                 time.sleep(0.1)
         else:
-            if process.poll() is None:
-                process.terminate()
+            exit_code = process.poll()
+            if exit_code is not None:
+                raise TerminalError(_host_exit_error(log_file, self.config.project_root, exit_code))
+            process.terminate()
             raise TerminalError("ConPTY host did not become ready within 10 seconds.")
         session = TerminalSession(
             session_id=session_id, account=agent.account_name, label=agent.label,
             role=role, repository=repository, codex_home=agent.codex_home,
             target_model=agent.model, target_reasoning=agent.reasoning_effort,
+            windows_sandbox_mode=windows_sandbox_mode,
             pipe=pipe, pid=process.pid, started_at=datetime.now(timezone.utc).isoformat(),
             log_file=log_file, session_file=str(record_path.resolve()), add_dirs=resolved_add_dirs,
             process_started_at=process_started_at,
@@ -1614,6 +1803,14 @@ class TerminalManager:
         session_id = str(kwargs["session_id"])
         if _record_path(self.config, session_id).exists():
             current = self.status(session_id)
+            try:
+                previous = self._load(session_id)
+            except TerminalError:
+                previous = None
+            if previous and previous.pending_task_artifact_cleanup:
+                raise TerminalError(
+                    "A previous Architect turn is still active; its temporary task artifact will be removed when the turn ends."
+                )
             if current.get("state") == "running":
                 session = self._load(session_id)
                 requested_repository = Path(kwargs["repository"]).expanduser().resolve()
@@ -1634,6 +1831,12 @@ class TerminalManager:
                     raise TerminalError(
                         f"Existing terminal session '{session_id}' account or CODEX_HOME identity mismatch."
                     )
+                if agent is not None:
+                    expected_windows_sandbox_mode = windows_sandbox_mode_for(agent.sandbox)
+                    if str(getattr(session, "windows_sandbox_mode", "") or "") != expected_windows_sandbox_mode:
+                        raise TerminalError(
+                            f"Existing terminal session '{session_id}' Windows sandbox mode identity mismatch."
+                        )
                 if agent is not None and session.target_model and session.target_model != agent.model:
                     raise TerminalError(f"Existing terminal session '{session_id}' model identity mismatch.")
                 if agent is not None and session.target_reasoning and session.target_reasoning != agent.reasoning_effort:
@@ -1683,6 +1886,8 @@ class TerminalManager:
             raise TerminalError("Strict reuse-existing refused: repository identity mismatch.")
         if not same_path(session.codex_home, agent.codex_home):
             raise TerminalError("Strict reuse-existing refused: CODEX_HOME identity mismatch.")
+        if str(getattr(session, "windows_sandbox_mode", "") or "") != windows_sandbox_mode_for(agent.sandbox):
+            raise TerminalError("Strict reuse-existing refused: Windows sandbox mode identity mismatch.")
         if getattr(session, "target_model", "") and session.target_model != agent.model:
             raise TerminalError("Strict reuse-existing refused: model identity mismatch.")
         if getattr(session, "target_reasoning", "") and session.target_reasoning != agent.reasoning_effort:
@@ -2103,3 +2308,10 @@ class TerminalManager:
             except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError):
                 continue
         return rows
+
+
+def reconcile_deferred_task_artifact_cleanup(config: OrchestratorConfig, repository: Path) -> None:
+    """Reconcile native ConPTY task files on hosts that support that transport."""
+    if os.name != "nt":
+        return
+    TerminalManager(config).reconcile_pending_task_artifact_cleanup(repository)

@@ -6,6 +6,7 @@ import queue
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -219,6 +220,73 @@ class AppServerTests(unittest.TestCase):
         for process in list(_PROCESSES.values()):
             process.close()
         _PROCESSES.clear()
+
+    def _turn_process(self, repository: Path, *, timeout: float, progress: list[str]):
+        from dual_codex.app_server import _AppServerProcess
+
+        process = object.__new__(_AppServerProcess)
+        process.agent = SimpleNamespace(
+            sandbox="read-only",
+            model="",
+            reasoning_effort="",
+            service_tier="",
+            network_access=False,
+        )
+        process.config = SimpleNamespace(app_server_turn_start_timeout=5, app_server_turn_timeout=timeout)
+        process.repository = repository
+        process.progress = progress.append
+        process.role = "executor"
+        process.windows_sandbox = ""
+        process._events = []
+        process.request_methods = []
+        process.last_thread_request = {}
+        process.last_thread_binding = {}
+        process.request = Mock(return_value={"result": {"turn": {"id": "turn-1"}}})
+        process._record_notification = Mock()
+        process._read_event = Mock(
+            side_effect=[
+                {"jsonrpc": "2.0", "method": "turn/started", "params": {"turn": {"id": "turn-1"}}},
+                {
+                    "jsonrpc": "2.0",
+                    "method": "turn/completed",
+                    "params": {"turn": {"id": "turn-1", "status": "completed", "items": [{"type": "agentMessage", "text": "PRIVATE_REASONING"}]}},
+                },
+            ]
+        )
+        return process
+
+    def test_app_server_heartbeat_uses_existing_progress_callback_without_content(self) -> None:
+        from dual_codex.app_server import _save_thread_mapping
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            events: list[str] = []
+            process = self._turn_process(repository, timeout=30, progress=events)
+            clock = iter([0.0, 0.0, 1.0, 16.0, 16.0, 16.0])
+            with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock, 16.0)), patch(
+                "dual_codex.app_server._save_thread_mapping"
+            ) as save_mapping:
+                result = process._turn_unlocked("thread-1", "PRIVATE_PROMPT", repository)
+
+            self.assertEqual(result["turn_status"], "completed")
+            self.assertEqual(events, ["app-server turn turn-1 still running"])
+            self.assertNotIn("PRIVATE_PROMPT", "\n".join(events))
+            self.assertNotIn("PRIVATE_REASONING", "\n".join(events))
+            save_mapping.assert_called_once()
+
+    def test_app_server_turn_timeout_remains_hard_and_does_not_wait_past_deadline(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            events: list[str] = []
+            process = self._turn_process(repository, timeout=5, progress=events)
+            clock = iter([0.0, 0.0, 6.0])
+            with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock)):
+                with self.assertRaisesRegex(AppServerError, "Timed out waiting for turn/completed"):
+                    process._turn_unlocked("thread-1", "private", repository)
+            process._read_event.assert_not_called()
+            self.assertEqual(events, [])
 
     def test_structured_turns_reuse_thread_and_clear_api_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

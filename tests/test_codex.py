@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-import os
+import hashlib
 import json
+import os
 from pathlib import Path
+import subprocess
 import tempfile
+import tomllib
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from dual_codex.codex import run_codex_exec, run_codex_for_role, run_codex_terminal
+from dual_codex.codex import _delegate_to_configured_actor, run_codex_exec, run_codex_for_role, run_codex_terminal
 from dual_codex.config import AgentConfig
 from dual_codex.process import CommandResult, _prepare_command
-from dual_codex.terminal import TerminalError
+from dual_codex.terminal import TERMINAL_INLINE_MESSAGE_MAX, TerminalError
+
+
+ARCHITECT_BASELINE = ["memory", "ponytail", "project-phase-review", "project-security-review"]
 
 
 def _agent(sandbox: str, *, backend: str = "windows") -> AgentConfig:
@@ -27,12 +33,126 @@ def _agent(sandbox: str, *, backend: str = "windows") -> AgentConfig:
 
 
 class CodexCommandTests(unittest.TestCase):
+    def test_run_authorized_architect_trust_is_written_before_actor_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            subprocess.run(["git", "init", "-q", str(repository)], check=True, capture_output=True)
+            profile = root / "architect-profile"
+            profile.mkdir()
+            canonical_root = root / "CodexGlobal"
+            canonical_root.mkdir()
+            (canonical_root / "AGENTS.md").write_text("Follow global policy.\n", encoding="utf-8")
+            for name in ARCHITECT_BASELINE:
+                skill = canonical_root / "skills" / name / "SKILL.md"
+                skill.parent.mkdir(parents=True, exist_ok=True)
+                skill.write_text(f"# {name}\n", encoding="utf-8")
+            agent = AgentConfig(
+                codex_home=profile,
+                model="",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="architect-profile",
+                backend="windows",
+            )
+            config = SimpleNamespace(
+                agent_for_role=lambda _role: agent,
+                runs_dir=root / "runs",
+                project_root=root,
+                codex_command="codex",
+            )
+            events: list[str] = []
+
+            def launch_actor(**kwargs):
+                events.append("actor-dispatch")
+                parsed = tomllib.loads((profile / "config.toml").read_text(encoding="utf-8"))
+                self.assertEqual(parsed["projects"][str(repository.resolve())]["trust_level"], "trusted")
+                kwargs["output_path"].write_text(
+                    json.dumps({
+                        "summary": "Ready",
+                        "steps": [],
+                        "acceptance_criteria": [],
+                        "risks": [],
+                        "files_to_inspect": [],
+                        "skills_loaded": [],
+                    }),
+                    encoding="utf-8",
+                )
+                return CommandResult(["codex", "tui"], 0, "", "")
+
+            with patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", canonical_root):
+                result = _delegate_to_configured_actor(
+                    config=config,
+                    role="architect",
+                    task="Plan the task.",
+                    repository=repository,
+                    output_path=root / "plan.json",
+                    schema_path=root / "architect-plan.schema.json",
+                    repository_trust_authorized=True,
+                    runner=launch_actor,
+                )
+
+            events.append("run-complete")
+            self.assertEqual(events, ["actor-dispatch", "run-complete"])
+            self.assertTrue(result.metadata["codex_repository_trust"]["updated"])
+            self.assertEqual(result.metadata["codex_repository_trust"]["repository"], str(repository.resolve()))
+
+    def test_trust_is_not_provisioned_for_non_run_actor_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            subprocess.run(["git", "init", "-q", str(repository)], check=True, capture_output=True)
+            profile = root / "profile"
+            profile.mkdir()
+            canonical_root = root / "CodexGlobal"
+            canonical_root.mkdir()
+            (canonical_root / "AGENTS.md").write_text("Policy.\n", encoding="utf-8")
+            for name in ("memory", "ponytail"):
+                skill = canonical_root / "skills" / name / "SKILL.md"
+                skill.parent.mkdir(parents=True, exist_ok=True)
+                skill.write_text(f"# {name}\n", encoding="utf-8")
+            agent = AgentConfig(
+                codex_home=profile,
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor-profile",
+                backend="app_server",
+            )
+            config = SimpleNamespace(
+                agent_for_role=lambda _role: agent,
+                runs_dir=root / "runs",
+                project_root=root,
+                codex_command="codex",
+            )
+
+            with patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", canonical_root), patch(
+                "dual_codex.repo_trust.provision_repository_trust",
+                side_effect=AssertionError("non-run dispatch must not provision trust"),
+            ):
+                _delegate_to_configured_actor(
+                    config=config,
+                    role="executor",
+                    task="Implement the task.",
+                    repository=repository,
+                    output_path=root / "result.json",
+                    schema_path=root / "schema.json",
+                    repository_trust_authorized=False,
+                    runner=lambda **_kwargs: CommandResult(["codex", "tui"], 0, "", ""),
+                )
+
+            self.assertFalse((profile / "config.toml").exists())
+
     def test_windows_role_dispatch_uses_canonical_terminal_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             repository = root / "target"
             repository.mkdir()
             expected = CommandResult(["codex", "terminal"], 0, "", "")
+            schema_path = root / "schema.json"
+            schema_path.write_text('{"type":"object","required":["summary"]}', encoding="utf-8")
             config = type("Config", (), {"codex_command": "codex"})()
             with patch("dual_codex.codex.run_codex_terminal", return_value=expected) as terminal, patch(
                 "dual_codex.codex.run_codex_exec"
@@ -44,13 +164,83 @@ class CodexCommandTests(unittest.TestCase):
                     repository=repository,
                     prompt="Read the harmless brief.",
                     output_path=root / "plan.json",
-                    schema_path=root / "schema.json",
+                    schema_path=schema_path,
                 )
 
             self.assertIs(result, expected)
             self.assertTrue(terminal.call_args.kwargs["session_id"].startswith("test-account-"))
             self.assertEqual(terminal.call_args.kwargs["agent"].backend, "windows")
+            self.assertIn('"required":["summary"]', terminal.call_args.kwargs["prompt"])
+            self.assertIn("Do not add properties, prose, or Markdown fences.", terminal.call_args.kwargs["prompt"])
             direct.assert_not_called()
+
+    def test_configured_windows_architect_result_is_validated_and_annotated(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            canonical_root = root / "canonical"
+            canonical_root.mkdir()
+            skill_path = canonical_root / "skills" / "ponytail" / "SKILL.md"
+            (canonical_root / "AGENTS.md").write_text("Follow global policy.\n", encoding="utf-8")
+            for name in (*ARCHITECT_BASELINE, "task-specific"):
+                skill = canonical_root / "skills" / name / "SKILL.md"
+                skill.parent.mkdir(parents=True, exist_ok=True)
+                skill.write_text(f"# {name}\n", encoding="utf-8")
+            output_path = root / "plan.json"
+            schema_path = root / "architect-plan.schema.json"
+            schema_path.write_text(
+                '{"type":"object","required":["summary","steps","acceptance_criteria",'
+                '"risks","files_to_inspect","skills_loaded"]}',
+                encoding="utf-8",
+            )
+            expected = CommandResult(["codex", "terminal"], 0, "", "")
+            agent = _agent("read-only", backend="windows")
+            config = SimpleNamespace(
+                codex_command="codex",
+                agent_for_role=lambda role: agent,
+            )
+
+            def dispatch_architect_plan(skills_loaded):
+                def write_architect_plan(**kwargs):
+                    kwargs["output_path"].write_text(
+                        json.dumps(
+                            {
+                                "summary": "Plan summary",
+                                "steps": [],
+                                "acceptance_criteria": [],
+                                "risks": [],
+                                "files_to_inspect": [],
+                                "skills_loaded": skills_loaded,
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    return expected
+
+                with patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", canonical_root), patch(
+                    "dual_codex.codex.run_codex_terminal", side_effect=write_architect_plan
+                ):
+                    return run_codex_for_role(
+                        config=config,
+                        agent=agent,
+                        role="architect",
+                        repository=repository,
+                        prompt="Read the supplied task artifact, then load ponytail.",
+                        output_path=output_path,
+                        schema_path=schema_path,
+                    )
+
+            result = dispatch_architect_plan(["task-specific"])
+
+            self.assertIs(result, expected)
+            self.assertEqual(result.metadata["canonical_bootstrap_host_loaded_skills"], ARCHITECT_BASELINE)
+            self.assertEqual(result.metadata["canonical_bootstrap_actor_selected_skills"], ["task-specific"])
+            self.assertEqual(
+                result.metadata["canonical_bootstrap_skill_digests"]["ponytail"],
+                hashlib.sha256(skill_path.read_bytes()).hexdigest(),
+            )
+            self.assertTrue(result.metadata["canonical_bootstrap_skill_catalog_sha256"])
 
     def test_role_dispatch_uses_app_server_without_terminal_handshake(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -58,6 +248,8 @@ class CodexCommandTests(unittest.TestCase):
             repository = root / "target"
             repository.mkdir()
             output_path = root / "report.json"
+            schema_path = root / "implementation.schema.json"
+            schema_path.write_text('{"type":"object","required":["summary"]}', encoding="utf-8")
             expected = CommandResult(["codex", "app-server", "--stdio"], 0, "", "")
             config = type("Config", (), {"codex_command": "codex"})()
             with patch("dual_codex.codex.run_codex_app_server", return_value=expected) as app_server, patch(
@@ -70,13 +262,14 @@ class CodexCommandTests(unittest.TestCase):
                     repository=repository,
                     prompt="Read the harmless brief.",
                     output_path=output_path,
-                    schema_path=root / "schema.json",
+                    schema_path=schema_path,
                 )
 
             self.assertIs(result, expected)
             self.assertEqual(app_server.call_args.kwargs["role"], "reviewer")
             self.assertEqual(app_server.call_args.kwargs["agent"].backend, "app_server")
             self.assertEqual(app_server.call_args.kwargs["repository"], repository)
+            self.assertIn('"required":["summary"]', app_server.call_args.kwargs["prompt"])
             terminal.assert_not_called()
 
     def test_role_dispatch_uses_api_adapter_without_native_terminal(self) -> None:
@@ -408,6 +601,130 @@ class CodexCommandTests(unittest.TestCase):
             self.assertIn(str(missing), result.stderr)
             self.assertEqual(result.metadata["task_transport"], "file")
             self.assertEqual(result.metadata["task_artifact"], str(missing.resolve()))
+
+    def test_oversized_architect_prompt_uses_repo_local_read_only_file_transport(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            runs_dir = root / "runs"
+            output_path = runs_dir / "run-1" / "plan.json"
+            config = SimpleNamespace(runs_dir=runs_dir)
+            session = SimpleNamespace(
+                session_id="biel3-test",
+                account="test-account",
+                label="Test account",
+                role="architect",
+                repository=repository,
+                codex_home=root / "profile",
+                pid=123,
+                process_started_at=1.0,
+                process_epoch="process-epoch",
+                process_start_identity="process-start",
+                session_file=str(root / "session.json"),
+                repository_identity="repository-identity",
+                codex_home_identity="codex-home-identity",
+                pipe=r"\\.\pipe\dual-codex-biel3-test-aaaaaaaaaaaaaaaa",
+                viewer_pid=0,
+                viewer_epoch="",
+            )
+            prompt = "Follow the read-only architect contract. " + ("x" * TERMINAL_INLINE_MESSAGE_MAX)
+
+            with patch("dual_codex.terminal.TerminalManager") as manager_type:
+                manager = manager_type.return_value
+                manager.ensure.return_value = session
+                manager.status.return_value = {"state": "running", "pid": 123, "host_pid": 123}
+                manager.turn_cursor.return_value = (None, 0)
+                manager.begin_automation_turn.return_value = "automation:probe"
+                manager.send.return_value = {"state": "turn_started"}
+                manager.wait_for_turn.return_value = {
+                    "assistant": "Architect turn completed.",
+                    "session_id": "codex-turn",
+                }
+
+                result = run_codex_terminal(
+                    config=config,
+                    agent=_agent("read-only"),
+                    repository=repository,
+                    prompt=prompt,
+                    output_path=output_path,
+                    session_id="biel3-test",
+                    role="architect",
+                )
+
+            artifact = Path(result.metadata["task_artifact"])
+            content = artifact.read_text(encoding="utf-8")
+            control_message = manager.send.call_args.args[1]
+            transport_path = Path(control_message.split('"')[1])
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.metadata["task_transport"], "file")
+            self.assertEqual(
+                result.metadata["task_sha256"],
+                hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            )
+            self.assertIn(prompt, content)
+            self.assertEqual(transport_path.parent.resolve(), repository.resolve())
+            self.assertFalse(transport_path.exists())
+            self.assertLessEqual(len(control_message), TERMINAL_INLINE_MESSAGE_MAX)
+            self.assertEqual(manager.ensure.call_args.kwargs["role"], "architect")
+            self.assertEqual(manager.ensure.call_args.kwargs["approval_policy"], "never")
+            self.assertEqual(manager.ensure.call_args.kwargs["add_dirs"], ())
+            self.assertTrue(artifact.is_relative_to(output_path.parent.resolve()))
+            self.assertEqual(list(repository.glob(".dual-codex-task-*.md")), [])
+
+    def test_failed_oversized_architect_turn_defers_artifact_cleanup_until_turn_ends(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "target"
+            repository.mkdir()
+            session = SimpleNamespace(
+                session_id="biel3-test",
+                account="test-account",
+                label="Test account",
+                role="architect",
+                repository=repository,
+                codex_home=root / "profile",
+                pid=123,
+                process_started_at=1.0,
+                process_epoch="process-epoch",
+                process_start_identity="process-start",
+                session_file=str(root / "session.json"),
+                repository_identity="repository-identity",
+                codex_home_identity="codex-home-identity",
+                pipe=r"\\.\pipe\dual-codex-biel3-test-aaaaaaaaaaaaaaaa",
+                viewer_pid=0,
+                viewer_epoch="",
+            )
+            prompt = "Follow the read-only architect contract. " + ("x" * TERMINAL_INLINE_MESSAGE_MAX)
+
+            with patch("dual_codex.terminal.TerminalManager") as manager_type:
+                manager = manager_type.return_value
+                manager.ensure.return_value = session
+                manager.turn_cursor.return_value = (None, 0)
+                manager.begin_automation_turn.return_value = "automation:probe"
+                manager.send.return_value = {"state": "turn_started"}
+                manager.wait_for_turn.side_effect = TerminalError("Timed out waiting for the Architect turn.")
+
+                result = run_codex_terminal(
+                    config=SimpleNamespace(runs_dir=root / "runs"),
+                    agent=_agent("read-only"),
+                    repository=repository,
+                    prompt=prompt,
+                    output_path=root / "runs" / "run-1" / "plan.json",
+                    session_id="biel3-test",
+                    role="architect",
+                )
+
+            artifact = Path(result.metadata["task_artifact"])
+            self.assertEqual(result.returncode, 1)
+            self.assertTrue(artifact.is_file())
+            self.assertEqual(result.metadata["task_artifact_cleanup_pending"], str(artifact))
+            manager.defer_task_artifact_cleanup.assert_called_once_with(
+                "biel3-test",
+                artifact,
+                result.metadata["task_sha256"],
+                cursor=(None, 0),
+            )
 
     def test_strict_reuse_refuses_to_start_a_missing_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

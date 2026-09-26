@@ -14,7 +14,12 @@ from .config import AgentConfig
 
 
 class CommandError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, metadata: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.metadata = dict(metadata or {})
+
+
+DEFAULT_HOST_COMMAND_TIMEOUT = 30.0
 
 
 @dataclass(frozen=True)
@@ -63,34 +68,40 @@ def run_command(
     env: dict[str, str] | None = None,
     stdin: str | None = None,
     check: bool = True,
+    timeout: float | None = DEFAULT_HOST_COMMAND_TIMEOUT,
     progress: Callable[[str], None] | None = None,
     progress_interval: float = 15.0,
 ) -> CommandResult:
     display_args = [str(part) for part in command]
     process_args = _prepare_command(display_args.copy())
 
-    if progress is None:
-        completed = subprocess.run(
-            process_args,
-            cwd=cwd,
-            env=env,
-            input=stdin,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=False,
-        )
-    else:
-        completed = _run_with_progress(
-            process_args,
-            cwd=cwd,
-            env=env,
-            stdin=stdin,
-            progress=progress,
-            progress_interval=progress_interval,
-        )
+    try:
+        if progress is None:
+            completed = subprocess.run(
+                process_args,
+                cwd=cwd,
+                env=env,
+                input=stdin,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=False,
+                timeout=timeout,
+            )
+        else:
+            completed = _run_with_progress(
+                process_args,
+                cwd=cwd,
+                env=env,
+                stdin=stdin,
+                progress=progress,
+                progress_interval=progress_interval,
+                timeout=timeout,
+            )
+    except subprocess.TimeoutExpired:
+        completed = subprocess.CompletedProcess(process_args, 124, "", "Command timed out.")
     result = CommandResult(
         display_args,
         completed.returncode,
@@ -113,6 +124,7 @@ def _run_with_progress(
     stdin: str | None,
     progress: Callable[[str], None],
     progress_interval: float,
+    timeout: float | None,
 ) -> subprocess.CompletedProcess[str]:
     process = subprocess.Popen(
         process_args,
@@ -136,7 +148,15 @@ def _run_with_progress(
     watcher = threading.Thread(target=heartbeat, name="dual-codex-progress", daemon=True)
     watcher.start()
     try:
-        stdout, stderr = process.communicate(input=stdin)
+        stdout, stderr = process.communicate(input=stdin, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        process.kill()
+        stdout, stderr = process.communicate()
+        if exc.stdout and not stdout:
+            stdout = exc.stdout.decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else exc.stdout
+        if exc.stderr and not stderr:
+            stderr = exc.stderr.decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr
+        return subprocess.CompletedProcess(process.args, 124, stdout, stderr)
     except KeyboardInterrupt:
         process.terminate()
         try:

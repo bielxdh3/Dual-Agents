@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import redirect_stdout
+from dataclasses import replace
 from io import StringIO
 import os
 from pathlib import Path
@@ -13,12 +14,16 @@ from dual_codex.config import ConfigError, load_config
 from dual_codex.registry import (
     AccountConfig,
     add_account,
+    assign_role,
     ensure_codex_profile,
     logout_account,
     migrate_legacy_config,
     remove_account,
     rename_account,
+    _run_login,
+    set_roles_for_account,
     swap_roles,
+    update_account_settings,
     unassign_role,
     write_registry_config,
 )
@@ -31,7 +36,27 @@ def _write_registry(path: Path, *, command: str = "missing-codex") -> None:
     )
 
 
+def _use_assignable_backends(config):
+    accounts = {
+        name: replace(account, backend="app_server")
+        for name, account in config.accounts.items()
+    }
+    write_registry_config(config.config_path, accounts, config.roles)
+    return load_config(config.config_path)
+
+
 class RegistryTests(unittest.TestCase):
+    def test_interactive_login_has_a_long_bounded_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.toml"
+            _write_registry(path)
+            config = load_config(path)
+            with patch("dual_codex.registry.run_command") as runner, patch(
+                "dual_codex.registry._verify_login"
+            ):
+                _run_login(config, config.accounts["primary"])
+            self.assertEqual(runner.call_args.kwargs["timeout"], 300.0)
+
     def test_logout_uses_selected_codex_home_without_exposing_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "config.toml"
@@ -74,7 +99,7 @@ class RegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "config.toml"
             _write_registry(path)
-            config = load_config(path)
+            config = _use_assignable_backends(load_config(path))
             swap_roles(config, "architect", "executor")
             config = load_config(path)
             self.assertEqual(config.roles["architect"], "secondary")
@@ -84,10 +109,77 @@ class RegistryTests(unittest.TestCase):
 
                 assign_role(config, "executor", "missing")
 
+    def test_provider_role_support_is_enforced_for_assignments_and_backend_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.toml"
+            _write_registry(path)
+            config = load_config(path)
+            api_account = replace(
+                config.accounts["spare"],
+                name="api",
+                codex_home=Path(temp) / "profiles" / "api",
+                backend="api",
+                provider_type="api",
+                adapter_type="openai_compatible",
+                auth_mode="environment",
+                auth_reference="env:TEST_API_KEY",
+                base_url="https://api.example.test/v1",
+            )
+            config = replace(config, accounts={**config.accounts, "api": api_account})
+            original = path.read_bytes()
+
+            with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+                assign_role(config, "architect", "api")
+            with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+                set_roles_for_account(config, "api", ["architect"])
+            with self.assertRaisesRegex(ConfigError, "does not support fallback role\\(s\\): architect"):
+                set_roles_for_account(config, "api", [], fallback_roles=["architect"])
+
+            invalid_swap = replace(config, roles={**config.roles, "reviewer": "api"})
+            with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+                swap_roles(invalid_swap, "architect", "reviewer")
+
+            with self.assertRaisesRegex(ConfigError, "does not support primary role\\(s\\): architect"):
+                update_account_settings(
+                    config,
+                    "primary",
+                    backend="api",
+                    auth_mode="environment",
+                    auth_reference="env:TEST_API_KEY",
+                    base_url="https://api.example.test/v1",
+                )
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_stale_claude_roles_do_not_block_unrelated_edits_and_can_be_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.toml"
+            _write_registry(path)
+            config = load_config(path)
+            legacy_claude = replace(
+                config.accounts["spare"],
+                backend="claude_code",
+                provider_type="anthropic",
+                adapter_type="claude_code",
+                fallback_roles=("architect", "reviewer"),
+            )
+            config = replace(config, accounts={**config.accounts, "spare": legacy_claude})
+
+            updated = update_account_settings(config, "spare", model="claude-sonnet")
+            self.assertEqual(updated.model, "claude-sonnet")
+            self.assertEqual(updated.fallback_roles, ("architect", "reviewer"))
+            disabled = update_account_settings(load_config(path), "spare", enabled=False)
+            self.assertFalse(disabled.enabled)
+            self.assertEqual(disabled.fallback_roles, ("architect", "reviewer"))
+
+            set_roles_for_account(load_config(path), "spare", [], fallback_roles=[])
+            cleared = load_config(path).accounts["spare"]
+            self.assertEqual(cleared.fallback_roles, ())
+
     def test_role_swap_output_keeps_requested_role_order(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "config.toml"
             _write_registry(path)
+            _use_assignable_backends(load_config(path))
             output = StringIO()
             with redirect_stdout(output):
                 self.assertEqual(
