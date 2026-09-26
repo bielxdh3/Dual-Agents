@@ -10,7 +10,7 @@
 [![Status](https://img.shields.io/badge/status-active%20development-orange)](#project-status)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB)](#requirements)
-[![Providers](https://img.shields.io/badge/providers-Codex%20%C2%B7%20Gemini%20%C2%B7%20Claude%20%C2%B7%20API-6f42c1)](#providers-and-roles)\n[![License](https://img.shields.io/badge/license-0BSD-green)](LICENSE)
+[![Providers](https://img.shields.io/badge/providers-Codex%20%C2%B7%20Gemini%20%C2%B7%20Claude%20%C2%B7%20API-6f42c1)](#providers-and-roles)\n[![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
 Dual Agents is a local control plane for assigning independently configured AI providers to specialized coding roles, with explicit routing, bounded fallback, structured provenance, and provider-owned authentication.
 
