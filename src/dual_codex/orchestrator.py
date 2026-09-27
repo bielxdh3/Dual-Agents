@@ -98,7 +98,7 @@ def _safe_atomic_write_control_json(path: Path, data: dict) -> None:
 
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{uuid4().hex}")
     flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(temporary, flags, 0o666)
+    descriptor = os.open(temporary, flags, 0o600)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
             stream.write(dump_json(data) + "\n")
