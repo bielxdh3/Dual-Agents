@@ -22,6 +22,7 @@ from dual_codex.orchestrator import (
     _architect_security_gate_policy,
     _executor_security_gate_policy,
     _ensure_security_gate_fresh,
+    _max_security_generations,
     _prepare_security_scan,
     _record_security_scan_result,
     _security_scan_request,
@@ -166,6 +167,20 @@ def _disposable_repo(testcase: unittest.TestCase) -> Path:
     repository = Path(temporary.name)
     subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
     return repository
+
+
+def _commit_test_file(repository: Path, relative_path: str = "tracked.txt") -> Path:
+    path = repository / relative_path
+    path.write_text("initial content\n", encoding="utf-8")
+    subprocess.run(["git", "add", relative_path], cwd=repository, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "initial"],
+        cwd=repository,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return path
 
 
 class SecurityScanArbitrationTests(unittest.TestCase):
@@ -788,18 +803,47 @@ class SecurityScanArbitrationTests(unittest.TestCase):
 
             stale_generation2 = {**generation2, "currentSnapshotDigest": "snapshot-after-second-mutation"}
             provider.scans = [stale_generation1, stale_generation2]
+            _, generation3_decision, _ = _prepare_security_scan(
+                **common,
+                checkpoint="before_reviewer_1",
+                authorize_executor_dispatch=True,
+            )
+            self.assertEqual(generation3_decision.action, "start")
+            self.assertEqual(run_state["security_scan_authority"]["generation"], 3)
+            generation3 = _scan(repository, "generation-3", "standard", "complete")
+            generation3["targetSnapshotDigest"] = "snapshot-after-second-mutation"
+            generation3["currentSnapshotDigest"] = "snapshot-after-second-mutation"
+            provider.scans.append(generation3)
+            phase_provenance.append(_fake_executor_phase(actor))
+            _record_security_scan_result(
+                provider=provider,
+                decision=generation3_decision,
+                checkpoint="before_reviewer_1",
+                implementation={"security_scan_provenance": _evidence(repository, "generation-3")},
+                run_state=run_state,
+                phase_provenance=phase_provenance,
+                config=config,
+                canonical_root=repository,
+                run_dir=repository,
+            )
+            self.assertEqual(run_state["security_scan_authority"]["authority_state"], "completed_fresh")
+            self.assertEqual(run_state["security_scan_authority"]["selected_scan_id"], "generation-3")
+
+            stale_generation3 = {**generation3, "currentSnapshotDigest": "snapshot-after-third-mutation"}
+            provider.scans = [stale_generation1, stale_generation2, stale_generation3]
             with self.assertRaises(SecurityScanError) as raised:
-                _prepare_security_scan(**common, checkpoint="before_reviewer_1")
+                _prepare_security_scan(**common, checkpoint="before_reviewer_2")
 
         self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_RESCAN_LIMIT")
-        self.assertEqual(run_state["security_scan_authority"]["generation"], 2)
+        self.assertEqual(run_state["security_scan_authority"]["generation"], 3)
         self.assertEqual(run_state["security_scan_authority"]["authority_state"], "completed_stale")
         events = [event.get("event") for event in run_state["security_scan_authority_history"]]
-        self.assertEqual(events.count("generation_authorized"), 1)
+        self.assertEqual(events.count("generation_authorized"), 2)
         self.assertEqual(events.count("rescan_limit"), 1)
         serialized = json.dumps(run_state)
         self.assertNotIn("snapshot-after-mutation", serialized)
         self.assertNotIn("snapshot-after-second-mutation", serialized)
+        self.assertNotIn("snapshot-after-third-mutation", serialized)
 
     def test_external_competitor_after_replacement_authorization_blocks_ownership(self) -> None:
         from types import SimpleNamespace
@@ -897,10 +941,12 @@ class SecurityScanArbitrationTests(unittest.TestCase):
             agent_for_role=lambda _role: actor,
         )
         authority = _completed_authority(repository, first)
-        authority.update({"generation": 1, "max_generations": 2, "ownership_state": "run_owned"})
+        authority.update({"generation": 1, "max_generations": 3, "ownership_state": "run_owned"})
         run_state = {"security_scan_authority": authority, "security_scan_authority_history": []}
         phase_provenance = []
         dispatched: list[str] = []
+        run_dir = repository / ".dual_codex" / "runs" / "scan-only"
+        run_dir.mkdir(parents=True, exist_ok=True)
 
         def fake_dispatch(**kwargs):
             dispatched.append(kwargs["role"])
@@ -932,7 +978,7 @@ class SecurityScanArbitrationTests(unittest.TestCase):
                 target_revision="rev-1",
                 run_state=run_state,
                 canonical_root=repository,
-                run_dir=repository,
+                run_dir=run_dir,
                 phase_provenance=phase_provenance,
                 state_lock=threading.RLock(),
                 checkpoint="before_reviewer",
@@ -943,6 +989,587 @@ class SecurityScanArbitrationTests(unittest.TestCase):
         self.assertEqual(run_state["security_scan_authority"]["authority_state"], "completed_fresh")
         self.assertEqual(run_state["security_scan_authority"]["generation"], 2)
         self.assertEqual(run_state["security_scan_authority"]["selected_scan_id"], "replacement-generation")
+
+    def _run_scan_only_turn(
+        self,
+        mutation=None,
+        *,
+        unknown_attribution: bool = False,
+        capture_error: bool = False,
+        attribution_error: bool = False,
+        dispatch_error: bool = False,
+        external_run_dir: bool = False,
+        external_symlink: bool = False,
+        write_report: bool = True,
+    ) -> dict:
+        from types import SimpleNamespace
+        import threading
+
+        import dual_codex.git as git_module
+        import dual_codex.orchestrator as orchestrator
+
+        repository = _disposable_repo(self)
+        tracked = _commit_test_file(repository)
+        ignored_file = repository / "pre-existing-ignored.txt"
+        ignored_nested_file = repository / "pre-existing-ignored-dir" / "nested" / "baseline.py"
+        exclude_file = repository / ".git" / "info" / "exclude"
+        with exclude_file.open("a", encoding="utf-8") as stream:
+            stream.write("\npre-existing-ignored.txt\npre-existing-ignored-dir/\n")
+        ignored_file.write_text("ignored baseline\n", encoding="utf-8")
+        ignored_nested_file.parent.mkdir(parents=True)
+        ignored_nested_file.write_text("nested ignored baseline\n", encoding="utf-8")
+        external_target = None
+        if external_symlink:
+            external_target = repository.parent / "external-symlink-target.txt"
+            external_target.write_text("external baseline\n", encoding="utf-8")
+            try:
+                (repository / "external-link.txt").symlink_to(external_target)
+            except (OSError, NotImplementedError) as exc:
+                raise unittest.SkipTest(f"symlink creation is unavailable: {type(exc).__name__}") from exc
+        if external_run_dir:
+            temporary_run = tempfile.TemporaryDirectory()
+            self.addCleanup(temporary_run.cleanup)
+            run_dir = Path(temporary_run.name)
+        else:
+            run_dir = repository / ".dual_codex" / "runs" / "scan-only"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        orchestrator._safe_atomic_write_control_json(run_dir / "run_state.json", {"host": "initial state"})
+        orchestrator._safe_atomic_write_control_json(run_dir / "provenance.json", {"host": "initial provenance"})
+        actor = _fake_executor_actor()
+        first = _scan(repository, "prior-generation", "standard", "complete")
+        stale = {**first, "currentSnapshotDigest": "workspace-before-rescan"}
+        replacement = _scan(repository, "replacement-generation", "standard", "complete")
+        provider = _FakeProvider([stale])
+        config = SimpleNamespace(
+            repository=repository,
+            project_root=Path.cwd(),
+            max_correction_cycles=1,
+            agent_for_role=lambda _role: actor,
+        )
+        authority = _completed_authority(repository, first)
+        authority.update({"generation": 1, "max_generations": 2, "ownership_state": "run_owned"})
+        run_state = {"security_scan_authority": authority, "security_scan_authority_history": []}
+        phase_provenance = []
+        events: list[str] = []
+        dispatched_roles: list[str] = []
+        git_commands: list[list[str]] = []
+        original_capture = orchestrator.capture_git_baseline
+        original_attribute = orchestrator.attribute_git_mutations
+        original_run_git = git_module.run_git
+        original_validate = orchestrator.validate_scan_provenance
+
+        def capture(*args, **kwargs):
+            events.append("baseline")
+            if capture_error:
+                raise OSError("baseline unavailable")
+            return original_capture(*args, **kwargs)
+
+        def attribute(*args, **kwargs):
+            events.append("attribution")
+            if attribution_error:
+                raise OSError("attribution unavailable")
+            if unknown_attribution:
+                return {
+                    "status": "unknown",
+                    "unknown_paths": ["tracked.txt"],
+                    "observed_at": "2026-09-27T00:00:00Z",
+                }
+            return original_attribute(*args, **kwargs)
+
+        def logged_run_git(args, *call_args, **kwargs):
+            git_commands.append([str(item) for item in args])
+            return original_run_git(args, *call_args, **kwargs)
+
+        def validate(*args, **kwargs):
+            events.append("security_provenance")
+            return original_validate(*args, **kwargs)
+
+        def fake_dispatch(**kwargs):
+            events.append("dispatch")
+            dispatched_roles.append(kwargs["role"])
+            provider.scans = [stale, replacement]
+            phase_provenance.append(_fake_executor_phase(actor))
+            self.assertIsNone(orchestrator._relative_repository_path_lexical(kwargs["output_path"], repository))
+            if mutation is not None:
+                mutation(repository, tracked, run_dir, kwargs["output_path"])
+            for control_path, control_data in (
+                (run_dir / "run_state.json", {"host": "state update"}),
+                (run_dir / "provenance.json", {"host": "provenance update"}),
+            ):
+                try:
+                    orchestrator._safe_atomic_write_control_json(control_path, control_data)
+                except OSError:
+                    pass
+            if write_report and not kwargs["output_path"].is_dir() and not kwargs["output_path"].is_symlink():
+                kwargs["output_path"].write_text(
+                    json.dumps(
+                        {
+                            "summary": "scan-only continuation complete",
+                            "files_changed": [],
+                            "commands_run": [],
+                            "tests": [],
+                            "remaining_issues": [],
+                            "security_scan_provenance": _evidence(repository, "replacement-generation"),
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+            if dispatch_error:
+                raise RuntimeError("executor dispatch failed after the test mutation")
+
+        with patch("dual_codex.orchestrator.CodexSecurityProvider", return_value=provider), patch(
+            "dual_codex.orchestrator.capture_git_baseline", side_effect=capture
+        ), patch("dual_codex.orchestrator.attribute_git_mutations", side_effect=attribute), patch(
+            "dual_codex.git.run_git", side_effect=logged_run_git
+        ), patch("dual_codex.orchestrator.validate_scan_provenance", side_effect=validate), patch(
+            "dual_codex.orchestrator._write_provenance"
+        ), patch("dual_codex.orchestrator._dispatch_phase", side_effect=fake_dispatch):
+            failure = None
+            try:
+                _ensure_security_gate_fresh(
+                    config=config,
+                    requirement=(True, "standard", "."),
+                    target_revision="rev-1",
+                    run_state=run_state,
+                    canonical_root=repository,
+                    run_dir=run_dir,
+                    phase_provenance=phase_provenance,
+                    state_lock=threading.RLock(),
+                    checkpoint="before_reviewer",
+                )
+            except SecurityScanError as exc:
+                failure = exc
+
+        try:
+            persisted = json.loads((run_dir / "run_state.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            persisted = {}
+        return {
+            "repository": repository,
+            "tracked": tracked,
+            "ignored": ignored_file,
+            "external_target": external_target,
+            "run_dir": run_dir,
+            "run_state": run_state,
+            "persisted": persisted,
+            "failure": failure,
+            "events": events,
+            "dispatched_roles": dispatched_roles,
+            "git_commands": git_commands,
+        }
+
+    def test_scan_only_turn_host_detects_mutations_before_security_provenance(self) -> None:
+        def modify_ignored_file(repository, _tracked, _run, _output):
+            (repository / "pre-existing-ignored.txt").write_text("ignored changed\n", encoding="utf-8")
+
+        def add_and_hide_untracked_file(repository, _tracked, _run, _output):
+            (repository / "hidden-source.py").write_text("malicious source\n", encoding="utf-8")
+            with (repository / ".git" / "info" / "exclude").open("a", encoding="utf-8") as stream:
+                stream.write("\nhidden-source.py\n")
+
+        mutations = {
+            "tracked modification": lambda _repo, tracked, _run, _output: tracked.write_text("changed secret content\n", encoding="utf-8"),
+            "untracked addition": lambda repo, _tracked, _run, _output: (repo / "added.txt").write_text("new file\n", encoding="utf-8"),
+            "pre-existing ignored modification": modify_ignored_file,
+            "nested pre-existing ignored modification": lambda repo, _tracked, _run, _output: (
+                (repo / "pre-existing-ignored-dir" / "nested" / "baseline.py").write_text(
+                    "nested ignored changed\n", encoding="utf-8"
+                )
+            ),
+            "nested ignored file addition": lambda repo, _tracked, _run, _output: (
+                (repo / "pre-existing-ignored-dir" / "nested" / "added.py").write_text(
+                    "nested ignored addition\n", encoding="utf-8"
+                )
+            ),
+            "new source hidden by git info exclude": add_and_hide_untracked_file,
+            "git info exclude edit": lambda repo, _tracked, _run, _output: (repo / ".git" / "info" / "exclude").write_text(
+                "pre-existing-ignored.txt\nnew-pattern\n", encoding="utf-8"
+            ),
+            "deletion": lambda _repo, tracked, _run, _output: tracked.unlink(),
+            "rename": lambda repo, tracked, _run, _output: tracked.rename(repo / "renamed.txt"),
+            "index change": lambda repo, tracked, _run, _output: (
+                tracked.write_text("staged change\n", encoding="utf-8"),
+                subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True),
+            ),
+            "unrelated run artifact": lambda _repo, _tracked, run, _output: (run / "executor-added.txt").write_text("not host state\n", encoding="utf-8"),
+        }
+        for name, mutation in mutations.items():
+            with self.subTest(name=name):
+                result = self._run_scan_only_turn(mutation)
+                self.assertIsNotNone(result["failure"])
+                self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_MUTATION")
+                self.assertEqual(result["events"][:3], ["baseline", "dispatch", "attribution"])
+                self.assertNotIn("security_provenance", result["events"])
+                self.assertEqual(result["dispatched_roles"], ["executor"])
+                authority = result["run_state"]["security_scan_authority"]
+                self.assertEqual(authority["authority_state"], "failed")
+                self.assertEqual(authority.get("selected_scan_id", ""), "")
+                self.assertNotIn("security_scan_provenance", result["run_state"])
+                diagnostic = result["persisted"]["security_scan_only_mutation_history"][-1]
+                self.assertEqual(diagnostic["failure_class"], "SECURITY_SCAN_ONLY_MUTATION")
+                self.assertTrue(diagnostic["mutation_categories"])
+                self.assertNotIn("changed secret content", json.dumps(diagnostic))
+                if name == "tracked modification":
+                    self.assertEqual(result["tracked"].read_text(encoding="utf-8"), "changed secret content\n")
+                elif name == "deletion":
+                    self.assertFalse(result["tracked"].exists())
+                elif name == "rename":
+                    self.assertTrue((result["repository"] / "renamed.txt").is_file())
+                elif name == "untracked addition":
+                    self.assertTrue((result["repository"] / "added.txt").is_file())
+                elif name == "pre-existing ignored modification":
+                    self.assertEqual(result["ignored"].read_text(encoding="utf-8"), "ignored changed\n")
+                    self.assertIn("pre-existing-ignored.txt", diagnostic["mutated_paths"]["modified"])
+                elif name == "nested pre-existing ignored modification":
+                    self.assertIn(
+                        "pre-existing-ignored-dir/nested/baseline.py",
+                        diagnostic["mutated_paths"]["modified"],
+                    )
+                elif name == "nested ignored file addition":
+                    self.assertIn(
+                        "pre-existing-ignored-dir/nested/added.py",
+                        diagnostic["mutated_paths"]["added"],
+                    )
+                elif name == "new source hidden by git info exclude":
+                    self.assertIn("hidden-source.py", diagnostic["mutated_paths"]["added"])
+                    self.assertTrue((result["repository"] / "hidden-source.py").is_file())
+                elif name == "git info exclude edit":
+                    self.assertIn("git_metadata_changed", diagnostic["mutation_categories"])
+                elif name == "unrelated run artifact":
+                    self.assertTrue((result["repository"] / ".dual_codex" / "runs" / "scan-only" / "executor-added.txt").is_file())
+                self.assertFalse(
+                    any(command and command[0] == "git" and command[1] in {"reset", "stash", "clean", "revert"}
+                        for command in result["git_commands"])
+                )
+
+    def test_exact_file_exclusion_does_not_exempt_new_descendant(self) -> None:
+        from dual_codex.git import attribute_git_mutations, capture_git_baseline
+
+        repository = _disposable_repo(self)
+        excluded_file = repository / "run_state.json"
+        excluded_file.write_text("host state", encoding="utf-8")
+        baseline = capture_git_baseline(repository)
+        excluded_file.unlink()
+        excluded_file.mkdir()
+        (excluded_file / "evil.txt").write_text("executor file", encoding="utf-8")
+
+        attribution = attribute_git_mutations(
+            repository,
+            baseline,
+            exact_excluded_paths=["run_state.json"],
+        )
+        self.assertEqual(attribution["status"], "complete")
+        self.assertEqual(attribution["run_created_paths"], ["run_state.json/evil.txt"])
+
+    def test_ignored_directory_tree_is_snapshotted_recursively(self) -> None:
+        from dual_codex.git import attribute_git_mutations, capture_git_baseline
+
+        repository = _disposable_repo(self)
+        ignored_dir = repository / "ignored-dir"
+        nested_file = ignored_dir / "nested" / "baseline.py"
+        nested_file.parent.mkdir(parents=True)
+        nested_file.write_text("baseline\n", encoding="utf-8")
+        with (repository / ".git" / "info" / "exclude").open("a", encoding="utf-8") as stream:
+            stream.write("\nignored-dir/\n")
+
+        baseline = capture_git_baseline(repository, include_ignored=True)
+        self.assertTrue(baseline["complete"], baseline["worktree_snapshots"])
+        self.assertIn("ignored-dir/nested/baseline.py", baseline["worktree_snapshots"])
+
+        nested_file.write_text("changed\n", encoding="utf-8")
+        added_file = ignored_dir / "nested" / "added.py"
+        added_file.write_text("added\n", encoding="utf-8")
+        attribution = attribute_git_mutations(repository, baseline, include_ignored=True)
+        self.assertEqual(attribution["status"], "complete", attribution)
+        self.assertIn("ignored-dir/nested/baseline.py", attribution["run_touched_paths"])
+        self.assertIn("ignored-dir/nested/added.py", attribution["run_created_paths"])
+
+    def test_scan_only_capture_and_attribution_errors_fail_closed(self) -> None:
+        for options, expected_events in (
+            ({"capture_error": True}, ["baseline"]),
+            ({"attribution_error": True}, ["baseline", "dispatch", "attribution"]),
+        ):
+            with self.subTest(options=options):
+                result = self._run_scan_only_turn(**options)
+                self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN")
+                self.assertEqual(result["events"], expected_events)
+                self.assertNotIn("security_provenance", result["events"])
+                self.assertNotIn("security_scan_provenance", result["run_state"])
+                self.assertEqual(result["dispatched_roles"], [] if options.get("capture_error") else ["executor"])
+
+    def test_scan_only_dispatch_error_is_attributed_before_bubbling(self) -> None:
+        result = self._run_scan_only_turn(
+            lambda _repo, tracked, _run, _output: tracked.write_text("changed before failure\n", encoding="utf-8"),
+            dispatch_error=True,
+        )
+        self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_MUTATION")
+        self.assertEqual(result["events"][:3], ["baseline", "dispatch", "attribution"])
+        self.assertNotIn("security_provenance", result["events"])
+        self.assertEqual(result["tracked"].read_text(encoding="utf-8"), "changed before failure\n")
+
+    def test_scan_only_state_symlink_never_overwrites_target_and_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            protected_target = Path(temporary) / "protected.txt"
+            protected_target.write_text("do not overwrite\n", encoding="utf-8")
+            probe = Path(temporary) / "symlink-probe"
+            try:
+                probe.symlink_to(protected_target)
+            except (OSError, NotImplementedError) as exc:
+                raise unittest.SkipTest(f"symlink creation is unavailable: {type(exc).__name__}") from exc
+            probe.unlink()
+
+            def link_run_state_to_external_target(_repo, _tracked, run, _output):
+                state_path = run / "run_state.json"
+                state_path.unlink()
+                state_path.symlink_to(protected_target)
+
+            result = self._run_scan_only_turn(
+                link_run_state_to_external_target,
+                external_run_dir=False,
+            )
+            self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_MUTATION")
+            self.assertEqual(result["events"][:3], ["baseline", "dispatch", "attribution"])
+            self.assertNotIn("security_provenance", result["events"])
+            self.assertNotIn("security_scan_provenance", result["run_state"])
+            self.assertEqual(protected_target.read_text(encoding="utf-8"), "do not overwrite\n")
+            diagnostic_files = list(result["run_dir"].glob("security-scan-only-mutation-*.json"))
+            self.assertEqual(len(diagnostic_files), 1)
+            diagnostic = json.loads(diagnostic_files[0].read_text(encoding="utf-8"))
+            self.assertEqual(diagnostic["failure_class"], "SECURITY_SCAN_ONLY_MUTATION")
+            self.assertTrue(
+                any(
+                    path.endswith("run_state.json")
+                    for paths in diagnostic["mutated_paths"].values()
+                    for path in paths
+                ),
+                diagnostic["mutated_paths"],
+            )
+
+    def test_scan_only_output_symlink_is_rejected_without_reading_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            protected_target = Path(temporary) / "protected-report.txt"
+            protected_target.write_text("do not overwrite or adopt\n", encoding="utf-8")
+            probe = Path(temporary) / "symlink-probe"
+            try:
+                probe.symlink_to(protected_target)
+            except (OSError, NotImplementedError) as exc:
+                raise unittest.SkipTest(f"symlink creation is unavailable: {type(exc).__name__}") from exc
+            probe.unlink()
+
+            def link_output_to_external_target(_repo, _tracked, _run, output):
+                output.symlink_to(protected_target)
+
+            result = self._run_scan_only_turn(
+                link_output_to_external_target,
+                write_report=False,
+            )
+            self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_OUTPUT_INVALID")
+            self.assertEqual(result["events"][:3], ["baseline", "dispatch", "attribution"])
+            self.assertNotIn("security_provenance", result["events"])
+            self.assertNotIn("security_scan_provenance", result["run_state"])
+            self.assertEqual(protected_target.read_text(encoding="utf-8"), "do not overwrite or adopt\n")
+
+    def test_scan_only_unknown_attribution_fails_closed_without_provenance_validation(self) -> None:
+        result = self._run_scan_only_turn(unknown_attribution=True)
+        self.assertIsNotNone(result["failure"])
+        self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN")
+        self.assertEqual(result["events"][:3], ["baseline", "dispatch", "attribution"])
+        self.assertNotIn("security_provenance", result["events"])
+        diagnostic = result["persisted"]["security_scan_only_mutation_history"][-1]
+        self.assertEqual(diagnostic["attribution_status"], "unknown")
+        self.assertEqual(diagnostic["mutated_paths"]["unknown"], ["tracked.txt"])
+        self.assertEqual(diagnostic["failure_class"], "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN")
+
+    def test_clean_scan_only_turn_ignores_exact_host_control_files(self) -> None:
+        result = self._run_scan_only_turn()
+        self.assertIsNone(result["failure"])
+        self.assertEqual(
+            result["events"],
+            ["baseline", "dispatch", "attribution", "security_provenance"],
+        )
+        self.assertEqual(result["dispatched_roles"], ["executor"])
+        self.assertEqual(result["run_state"]["security_scan_authority"]["authority_state"], "completed_fresh")
+        diagnostic = result["persisted"]["security_scan_only_mutation_history"][-1]
+        self.assertEqual(diagnostic["attribution_status"], "complete")
+        self.assertIsNone(diagnostic["failure_class"])
+        self.assertEqual(diagnostic["mutation_categories"], [])
+
+    def test_scan_only_baseline_fails_closed_on_repository_symlink_targets(self) -> None:
+        result = self._run_scan_only_turn(external_symlink=True)
+        self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN")
+        self.assertEqual(result["events"], ["baseline"])
+        self.assertEqual(result["dispatched_roles"], [])
+        self.assertNotIn("security_provenance", result["events"])
+        self.assertEqual(result["external_target"].read_text(encoding="utf-8"), "external baseline\n")
+
+    def test_security_generation_budget_matches_correction_cycles_and_bounds_rescans(self) -> None:
+        from types import SimpleNamespace
+
+        self.assertEqual(
+            [_max_security_generations(SimpleNamespace(max_correction_cycles=count)) for count in (0, 1, 2)],
+            [2, 3, 4],
+        )
+        for correction_cycles, expected in ((0, 2), (1, 3), (2, 4)):
+            with self.subTest(initial_authority_correction_cycles=correction_cycles):
+                initial_repository = _disposable_repo(self)
+                initial_provider = _FakeProvider()
+                initial_state = {}
+                initial_config = SimpleNamespace(
+                    repository=initial_repository,
+                    max_correction_cycles=correction_cycles,
+                    agent_for_role=lambda _role: _fake_executor_actor(),
+                )
+                with patch("dual_codex.orchestrator.CodexSecurityProvider", return_value=initial_provider), patch(
+                    "dual_codex.orchestrator._persist_run_state"
+                ):
+                    _prepare_security_scan(
+                        config=initial_config,
+                        requirement=(True, "standard", "."),
+                        target_revision="rev-1",
+                        run_state=initial_state,
+                        canonical_root=initial_repository,
+                        run_dir=initial_repository,
+                        phase_provenance=[],
+                        checkpoint="before_executor",
+                        authorize_executor_dispatch=True,
+                    )
+                self.assertEqual(initial_state["security_scan_authority"]["max_generations"], expected)
+
+        repository = _disposable_repo(self)
+        actor = _fake_executor_actor()
+        provider = _FakeProvider()
+        config = SimpleNamespace(repository=repository, max_correction_cycles=2, agent_for_role=lambda _role: actor)
+        run_state = {}
+        phase_provenance = []
+        common = {
+            "config": config,
+            "requirement": (True, "standard", "."),
+            "target_revision": "rev-1",
+            "run_state": run_state,
+            "canonical_root": repository,
+            "run_dir": repository,
+            "phase_provenance": phase_provenance,
+        }
+        with patch("dual_codex.orchestrator.CodexSecurityProvider", return_value=provider), patch(
+            "dual_codex.orchestrator._persist_run_state"
+        ):
+            _, decision, _ = _prepare_security_scan(
+                **common,
+                checkpoint="before_executor",
+                authorize_executor_dispatch=True,
+            )
+            self.assertEqual(decision.action, "start")
+            self.assertEqual(run_state["security_scan_authority"]["max_generations"], 4)
+            for generation in range(1, 5):
+                scan = _scan(repository, f"generation-{generation}", "standard", "complete")
+                provider.scans.append(scan)
+                phase_provenance.append(_fake_executor_phase(actor))
+                _record_security_scan_result(
+                    provider=provider,
+                    decision=decision,
+                    checkpoint=f"generation_{generation}",
+                    implementation={
+                        "security_scan_provenance": _evidence(repository, f"generation-{generation}")
+                    },
+                    run_state=run_state,
+                    phase_provenance=phase_provenance,
+                    config=config,
+                    canonical_root=repository,
+                    run_dir=repository,
+                )
+                self.assertEqual(run_state["security_scan_authority"]["generation"], generation)
+                self.assertEqual(run_state["security_scan_authority"]["max_generations"], 4)
+                stale = {**scan, "currentSnapshotDigest": f"workspace-after-generation-{generation}"}
+                provider.scans[-1] = stale
+                if generation < 4:
+                    _, decision, _ = _prepare_security_scan(
+                        **common,
+                        checkpoint=f"before_generation_{generation + 1}",
+                        authorize_executor_dispatch=True,
+                    )
+                    self.assertEqual(decision.action, "start")
+                    self.assertEqual(run_state["security_scan_authority"]["generation"], generation + 1)
+                else:
+                    with self.assertRaises(SecurityScanError) as raised:
+                        _prepare_security_scan(**common, checkpoint="beyond_generation_budget")
+
+        self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_RESCAN_LIMIT")
+        self.assertEqual(run_state["security_scan_authority"]["generation"], 4)
+        self.assertEqual(run_state["security_scan_authority"]["authority_state"], "completed_stale")
+        events = [event.get("event") for event in run_state["security_scan_authority_history"]]
+        self.assertEqual(events.count("generation_authorized"), 3)
+        self.assertEqual(events.count("rescan_limit"), 1)
+
+    def test_security_freshness_loop_uses_bounded_generation_helper(self) -> None:
+        from types import SimpleNamespace
+        import threading
+
+        repository = _disposable_repo(self)
+        run_dir = repository / "runs"
+        run_dir.mkdir()
+        config = SimpleNamespace(repository=repository, project_root=Path.cwd(), max_correction_cycles=0)
+        provider = object()
+        decision = SimpleNamespace(action="start")
+
+        def fake_dispatch(**kwargs):
+            kwargs["output_path"].write_text("{}", encoding="utf-8")
+
+        with patch("dual_codex.orchestrator._max_security_generations", wraps=_max_security_generations) as budget, patch(
+            "dual_codex.orchestrator._prepare_security_scan", return_value=(provider, decision, "")
+        ) as prepare, patch("dual_codex.orchestrator._persist_run_state"), patch(
+            "dual_codex.orchestrator._dispatch_phase", side_effect=fake_dispatch
+        ), patch("dual_codex.orchestrator._record_security_scan_result") as record:
+            with self.assertRaises(SecurityScanError) as raised:
+                _ensure_security_gate_fresh(
+                    config=config,
+                    requirement=(True, "standard", "."),
+                    target_revision="rev-1",
+                    run_state={},
+                    canonical_root=repository,
+                    run_dir=run_dir,
+                    phase_provenance=[],
+                    state_lock=threading.RLock(),
+                    checkpoint="before_reviewer",
+                )
+
+        self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_RESCAN_LIMIT")
+        self.assertEqual(budget.call_count, 1)
+        self.assertEqual(prepare.call_count, 3)
+        self.assertEqual(record.call_count, 2)
+
+    def test_security_freshness_loop_accepts_fresh_last_generation(self) -> None:
+        from types import SimpleNamespace
+        import threading
+
+        repository = _disposable_repo(self)
+        run_dir = repository / "runs"
+        run_dir.mkdir()
+        config = SimpleNamespace(repository=repository, project_root=Path.cwd(), max_correction_cycles=0)
+        provider = object()
+        decisions = iter((SimpleNamespace(action="start"), SimpleNamespace(action="start"), SimpleNamespace(action="reused")))
+
+        def fake_dispatch(**kwargs):
+            kwargs["output_path"].write_text("{}", encoding="utf-8")
+
+        with patch("dual_codex.orchestrator._prepare_security_scan", side_effect=lambda **_kwargs: (provider, next(decisions), "")), patch(
+            "dual_codex.orchestrator._persist_run_state"
+        ), patch("dual_codex.orchestrator._dispatch_phase", side_effect=fake_dispatch), patch(
+            "dual_codex.orchestrator._record_security_scan_result"
+        ) as record:
+            dispatched = _ensure_security_gate_fresh(
+                config=config,
+                requirement=(True, "standard", "."),
+                target_revision="rev-1",
+                run_state={},
+                canonical_root=repository,
+                run_dir=run_dir,
+                phase_provenance=[],
+                state_lock=threading.RLock(),
+                checkpoint="before_reviewer",
+            )
+
+        self.assertTrue(dispatched)
+        self.assertEqual(record.call_count, 2)
 
     def test_preselected_scan_completes_fresh_then_mutation_authorizes_replacement(self) -> None:
         from types import SimpleNamespace

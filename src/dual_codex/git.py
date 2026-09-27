@@ -320,12 +320,75 @@ def _is_reparse_point(info: os.stat_result) -> bool:
     return bool(getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
 
 
-def capture_git_baseline(repository: Path) -> dict[str, object]:
+def _ignored_tree_snapshots(repository: Path, ignored_paths: Iterable[str]) -> dict[str, dict[str, object]]:
+    """Snapshot ignored entries, recursively enumerating directories without following links."""
+
+    snapshots: dict[str, dict[str, object]] = {}
+    enumerated: set[str] = set()
+    pending = [path.rstrip("/") for path in ignored_paths]
+    while pending:
+        relative_path = pending.pop()
+        if relative_path in enumerated:
+            continue
+        enumerated.add(relative_path)
+        snapshot = snapshots.get(relative_path)
+        if snapshot is None:
+            snapshot = _worktree_snapshot(repository, relative_path)
+            snapshots[relative_path] = snapshot
+        if snapshot.get("kind") != "directory":
+            continue
+
+        directory = repository / Path(*relative_path.split("/"))
+        try:
+            before = directory.lstat()
+            if stat.S_ISLNK(before.st_mode) or _is_reparse_point(before) or not stat.S_ISDIR(before.st_mode):
+                snapshots[relative_path] = {"kind": "unknown", "reason": "unsafe_ignored_directory"}
+                continue
+            with os.scandir(directory) as entries:
+                children = list(entries)
+            after = directory.lstat()
+            if (
+                stat.S_ISLNK(after.st_mode)
+                or _is_reparse_point(after)
+                or not stat.S_ISDIR(after.st_mode)
+                or (before.st_dev, before.st_ino, before.st_mtime_ns)
+                != (after.st_dev, after.st_ino, after.st_mtime_ns)
+            ):
+                snapshots[relative_path] = {"kind": "unknown", "reason": "directory_changed_during_snapshot"}
+                continue
+        except OSError:
+            snapshots[relative_path] = {"kind": "unknown", "reason": "directory_enumeration_failed"}
+            continue
+
+        for entry in children:
+            child_path = f"{relative_path}/{entry.name}"
+            child_snapshot = _worktree_snapshot(repository, child_path)
+            snapshots[child_path] = child_snapshot
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except OSError:
+                snapshots[child_path] = {"kind": "unknown", "reason": "directory_entry_stat_failed"}
+                continue
+            if (
+                stat.S_ISDIR(info.st_mode)
+                and not stat.S_ISLNK(info.st_mode)
+                and not _is_reparse_point(info)
+            ):
+                pending.append(child_path)
+    return snapshots
+
+
+def capture_git_baseline(repository: Path, *, include_ignored: bool = False) -> dict[str, object]:
     """Capture a hook/filter-safe, hash-only Git/worktree baseline."""
 
     repository = git_top_level(repository)
+    status_args = ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"]
+    if include_ignored:
+        # matching lists files inside ignored directories as well, so a scan-only
+        # turn cannot hide newly written source by adding an ignore rule.
+        status_args.append("--ignored=matching")
     status = run_git(
-        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        status_args,
         cwd=repository,
     ).stdout
     status_entries = _porcelain_entries(status)
@@ -333,8 +396,21 @@ def capture_git_baseline(repository: Path) -> dict[str, object]:
     index = _index_entries(repository)
     tracked_paths = sorted(index)
     untracked_paths = sorted(entry["path"] for entry in status_entries if entry["index"] == "?" and entry["worktree"] == "?")
+    ignored_paths = sorted(
+        entry["path"]
+        for entry in status_entries
+        if entry["index"] == "!" and entry["worktree"] == "!"
+    ) if include_ignored else []
     paths_to_hash = sorted(set(tracked_paths).union(untracked_paths))
     snapshots = {path: _worktree_snapshot(repository, path) for path in paths_to_hash}
+    if include_ignored:
+        snapshots.update(_ignored_tree_snapshots(repository, ignored_paths))
+        # A scan-only Executor could write through a pre-existing repository
+        # symlink to data that the repository snapshot does not cover. Fail
+        # closed instead of treating link-text stability as target stability.
+        for path, snapshot in tuple(snapshots.items()):
+            if snapshot.get("kind") == "symlink":
+                snapshots[path] = {"kind": "unknown", "reason": "symlink_target_unverified"}
     staged_paths = {
         entry["path"]
         for entry in status_entries
@@ -353,10 +429,18 @@ def capture_git_baseline(repository: Path) -> dict[str, object]:
         head = ""
     else:
         raise RuntimeError("Could not safely determine the current Git HEAD.")
+    git_dir = run_git(["git", "rev-parse", "--absolute-git-dir"], cwd=repository).stdout.strip()
+    git_metadata_snapshots = (
+        {"info/exclude": _worktree_snapshot(Path(git_dir), "info/exclude")}
+        if include_ignored
+        else {}
+    )
+    if include_ignored and git_metadata_snapshots.get("info/exclude", {}).get("kind") == "symlink":
+        git_metadata_snapshots["info/exclude"] = {"kind": "unknown", "reason": "symlink_target_unverified"}
     return {
         "schema_version": 1,
         "repository": str(repository),
-        "git_dir": run_git(["git", "rev-parse", "--absolute-git-dir"], cwd=repository).stdout.strip(),
+        "git_dir": git_dir,
         "head": head,
         "branch": branch.stdout.strip() if branch.returncode == 0 else "",
         "detached": branch.returncode == 1,
@@ -364,11 +448,17 @@ def capture_git_baseline(repository: Path) -> dict[str, object]:
         "staged_status": {entry["path"]: entry["index"] for entry in status_entries if entry["index"] not in {" ", "?"}},
         "unstaged_status": {entry["path"]: entry["worktree"] for entry in status_entries if entry["worktree"] not in {" ", "?"}},
         "untracked_paths": untracked_paths,
+        "ignored_paths": ignored_paths,
+        "include_ignored": include_ignored,
+        "git_metadata_snapshots": git_metadata_snapshots,
         "index_fingerprint": hashlib.sha256(index_raw.encode("utf-8")).hexdigest(),
         "staged_index_entries": {path: index[path] for path in sorted(staged_paths) if path in index},
         "worktree_snapshots": snapshots,
         "captured_at": datetime.now(timezone.utc).isoformat(),
-        "complete": all(snapshot.get("kind") != "unknown" for snapshot in snapshots.values()),
+        "complete": (
+            all(snapshot.get("kind") != "unknown" for snapshot in snapshots.values())
+            and all(snapshot.get("kind") != "unknown" for snapshot in git_metadata_snapshots.values())
+        ),
     }
 
 
@@ -377,17 +467,28 @@ def attribute_git_mutations(
     baseline: dict[str, object],
     *,
     excluded_paths: Iterable[str] = (),
+    exact_excluded_paths: Iterable[str] = (),
+    include_ignored: bool = False,
 ) -> dict[str, object]:
-    """Compare final status and raw file hashes with a captured run baseline."""
+    """Compare final status and raw file hashes with a captured run baseline.
+
+    ``excluded_paths`` names recursive control roots; ``exact_excluded_paths``
+    exempts only the named files so descendants remain attributable.
+    """
 
     repository = git_top_level(repository)
     if str(baseline.get("repository", "")) != str(repository):
         raise RuntimeError("Git baseline belongs to a different repository root.")
-    final = capture_git_baseline(repository)
+    if include_ignored and baseline.get("include_ignored") is not True:
+        raise RuntimeError("Mutation attribution requires a baseline that included ignored files.")
+    final = capture_git_baseline(repository, include_ignored=include_ignored)
     excluded = tuple(path.replace("\\", "/").strip("/") for path in excluded_paths if path)
+    exact_excluded = tuple(path.replace("\\", "/").strip("/") for path in exact_excluded_paths if path)
 
     def is_excluded(path: str) -> bool:
-        return any(path == prefix or path.startswith(prefix + "/") for prefix in excluded)
+        return path in exact_excluded or any(
+            path == prefix or path.startswith(prefix + "/") for prefix in excluded
+        )
 
     old_entries = {entry["path"]: entry for entry in baseline.get("status_entries", []) if isinstance(entry, dict)}
     new_entries = {entry["path"]: entry for entry in final.get("status_entries", []) if isinstance(entry, dict)}
@@ -395,6 +496,13 @@ def attribute_git_mutations(
     new_snapshots = final.get("worktree_snapshots", {})
     old_index = baseline.get("staged_index_entries", {})
     new_index = final.get("staged_index_entries", {})
+    old_metadata = baseline.get("git_metadata_snapshots", {})
+    new_metadata = final.get("git_metadata_snapshots", {})
+    metadata_changed = old_metadata != new_metadata
+    metadata_unknown = any(
+        isinstance(snapshot, dict) and snapshot.get("kind") == "unknown"
+        for snapshot in (*old_metadata.values(), *new_metadata.values())
+    ) if isinstance(old_metadata, dict) and isinstance(new_metadata, dict) else True
     old_head = str(baseline.get("head", ""))
     new_head = str(final.get("head", ""))
     user_paths = {
@@ -437,7 +545,7 @@ def attribute_git_mutations(
 
     return {
         "schema_version": 1,
-        "status": "complete" if baseline.get("complete") and final.get("complete") and not unknown else "unknown",
+        "status": "complete" if baseline.get("complete") and final.get("complete") and not unknown and not metadata_unknown else "unknown",
         "repository": str(repository),
         "initial_head": old_head,
         "final_head": new_head,
@@ -446,6 +554,7 @@ def attribute_git_mutations(
         "final_branch": final.get("branch", ""),
         "branch_changed": baseline.get("branch", "") != final.get("branch", "") or baseline.get("detached") != final.get("detached"),
         "staged_state_changed": baseline.get("index_fingerprint") != final.get("index_fingerprint"),
+        "repository_metadata_changed": metadata_changed,
         "unchanged_preexisting_paths": unchanged,
         "run_touched_paths": touched,
         "run_created_paths": created,

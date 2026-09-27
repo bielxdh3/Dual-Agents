@@ -211,6 +211,104 @@ class OrchestratorTests(unittest.TestCase):
                 ],
             )
 
+    def test_security_scan_only_mutation_failure_prevents_reviewer_dispatch(self) -> None:
+        from types import SimpleNamespace
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "disposable-mission"
+            repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.name", "Run Test"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.email", "run@example.invalid"], cwd=repository, check=True)
+            (repository / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=repository, check=True)
+            subprocess.run(["git", "commit", "-qm", "initial"], cwd=repository, check=True)
+            actor = AccountConfig(
+                name="actor",
+                label="Actor",
+                codex_home=root / "actor-home",
+                model="",
+                reasoning_effort="high",
+                backend="app_server",
+            )
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=0,
+                require_clean_git=True,
+                codex_command="codex",
+                accounts={"actor": actor},
+                roles={"architect": "actor", "executor": "actor", "reviewer": "actor"},
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+            )
+            task = root / "brief.md"
+            task.write_text("Run a Codex Security standard scan for this repository.", encoding="utf-8")
+            decision = SimpleNamespace(
+                action="start",
+                architect_summary=lambda: "host declarative Security requirement",
+            )
+            dispatched_roles: list[str] = []
+
+            def fake_runner(**kwargs):
+                role = kwargs["role"]
+                dispatched_roles.append(role)
+                payload = (
+                    {
+                        "summary": "plan",
+                        "steps": [],
+                        "acceptance_criteria": [],
+                        "risks": [],
+                        "files_to_inspect": [],
+                        "skills_loaded": [],
+                    }
+                    if role == "architect"
+                    else {
+                        "summary": "implementation",
+                        "files_changed": [],
+                        "commands_run": [],
+                        "tests": [],
+                        "remaining_issues": [],
+                    }
+                )
+                kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
+                return CommandResult(
+                    ["fake"],
+                    0,
+                    "",
+                    "",
+                    {
+                        "role": role,
+                        "primary_actor": "actor",
+                        "actual_actor": "actor",
+                        "provider": "codex",
+                        "backend": "app_server",
+                        "fallback_enabled": False,
+                        "fallback_used": False,
+                        "repository": str(repository.resolve()),
+                    },
+                )
+
+            def fail_freshness_gate(**kwargs):
+                self.assertEqual(kwargs["checkpoint"], "before_reviewer_0")
+                raise SecurityScanError(
+                    "SECURITY_SCAN_ONLY_MUTATION: scan-only Executor changed the repository.",
+                    failure_class="SECURITY_SCAN_ONLY_MUTATION",
+                )
+
+            with patch(
+                "dual_codex.orchestrator._prepare_security_scan",
+                return_value=(object(), decision, "host Executor Security policy"),
+            ), patch("dual_codex.orchestrator._record_security_scan_result"), patch(
+                "dual_codex.orchestrator._ensure_security_gate_fresh", side_effect=fail_freshness_gate
+            ), patch("dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner):
+                with self.assertRaises(SecurityScanError) as raised:
+                    execute(config, task)
+
+            self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_ONLY_MUTATION")
+            self.assertEqual(dispatched_roles, ["architect", "executor"])
+
     def test_failed_reviewer_dispatch_persists_prior_phase_and_failure_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -655,6 +753,110 @@ class OrchestratorTests(unittest.TestCase):
             self.assertTrue(any(event.get("state") == "timeout" for event in decoded))
             self.assertEqual(mutation["unchanged_preexisting_paths"], ["tracked.txt"])
             self.assertEqual(mutation["run_touched_paths"], [])
+
+    def test_mutation_attribution_symlink_cannot_overwrite_external_target(self) -> None:
+        for fail_reviewer in (False, True):
+            with self.subTest(fail_reviewer=fail_reviewer), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                repository = root / "repository"
+                repository.mkdir()
+                subprocess.run(["git", "init", "-q"], cwd=repository, check=True)
+                subprocess.run(["git", "config", "user.name", "Run Test"], cwd=repository, check=True)
+                subprocess.run(["git", "config", "user.email", "run@example.invalid"], cwd=repository, check=True)
+                (repository / "tracked.txt").write_text("committed\n", encoding="utf-8")
+                subprocess.run(["git", "add", "tracked.txt"], cwd=repository, check=True)
+                subprocess.run(["git", "commit", "-qm", "initial"], cwd=repository, check=True)
+
+                protected = root / "protected.json"
+                protected.write_text("preserve external target\n", encoding="utf-8")
+                probe = root / "symlink-probe"
+                try:
+                    probe.symlink_to(protected)
+                except (OSError, NotImplementedError) as exc:
+                    raise unittest.SkipTest(f"symlink creation is unavailable: {type(exc).__name__}") from exc
+                probe.unlink()
+
+                accounts = {
+                    name: AccountConfig(
+                        name=name,
+                        label=name,
+                        codex_home=root / f"{name}-home",
+                        model="",
+                        reasoning_effort="high",
+                        backend="app_server",
+                    )
+                    for name in ("architect", "executor", "reviewer")
+                }
+                config = OrchestratorConfig(
+                    repository=repository,
+                    runs_dir=repository / ".dual_codex" / "runs",
+                    max_correction_cycles=0,
+                    require_clean_git=False,
+                    codex_command="codex",
+                    accounts=accounts,
+                    roles={"architect": "architect", "executor": "executor", "reviewer": "reviewer", "orchestrator": "architect"},
+                    project_root=Path.cwd(),
+                    config_path=root / "config.toml",
+                )
+                task = root / "brief.md"
+                task.write_text("A bounded fake mission.", encoding="utf-8")
+                run_dirs: list[Path] = []
+                dispatched: list[str] = []
+
+                def fake_runner(**kwargs):
+                    role = kwargs["role"]
+                    dispatched.append(role)
+                    run_dir = kwargs["output_path"].parent
+                    run_dirs.append(run_dir)
+                    if role == "architect":
+                        payload = {
+                            "summary": "plan",
+                            "steps": [],
+                            "acceptance_criteria": [],
+                            "risks": [],
+                            "files_to_inspect": [],
+                            "skills_loaded": [],
+                        }
+                    elif role == "executor":
+                        (run_dir / "mutation-attribution.json").symlink_to(protected)
+                        payload = {
+                            "summary": "implemented",
+                            "files_changed": [],
+                            "commands_run": [],
+                            "tests": [],
+                            "remaining_issues": [],
+                        }
+                    elif fail_reviewer:
+                        raise TimeoutError("simulated Reviewer timeout")
+                    else:
+                        payload = {"verdict": "approved", "summary": "approved", "findings": []}
+                    kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
+                    agent = kwargs["agent"]
+                    return CommandResult(
+                        ["fake"],
+                        0,
+                        "",
+                        "",
+                        {
+                            "phase": role,
+                            "role": role,
+                            "actor_id": agent.account_name,
+                            "actual_actor": agent.account_name,
+                            "provider": agent.provider_type,
+                            "backend": agent.backend,
+                            "repository": str(repository.resolve()),
+                            "fallback_used": False,
+                        },
+                    )
+
+                with patch("dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner):
+                    expected_exception = TimeoutError if fail_reviewer else OSError
+                    with self.assertRaises(expected_exception):
+                        execute(config, task)
+
+                self.assertEqual(dispatched, ["architect", "executor", "reviewer"])
+                self.assertEqual(protected.read_text(encoding="utf-8"), "preserve external target\n")
+                self.assertTrue(run_dirs and (run_dirs[-1] / "mutation-attribution.json").is_symlink())
 
     def test_security_scan_conflict_keeps_git_mutation_attribution_complete(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

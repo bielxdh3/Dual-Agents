@@ -8,6 +8,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import tempfile
 import threading
 from typing import Mapping
 from uuid import uuid4
@@ -48,6 +49,72 @@ class RunOutcome:
     correction_cycles: int
     phase_provenance: tuple[dict, ...] = ()
     run_result: dict = field(default_factory=dict)
+
+
+def _control_parent_is_safe(path: Path) -> bool:
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    for parent in reversed(path.parents):
+        try:
+            info = parent.lstat()
+        except OSError:
+            return False
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or stat.S_ISLNK(info.st_mode)
+            or getattr(info, "st_file_attributes", 0) & reparse_flag
+        ):
+            return False
+    return True
+
+
+def _safe_regular_control_file(path: Path) -> bool:
+    path = Path(os.path.abspath(path.expanduser()))
+    if not _control_parent_is_safe(path):
+        return False
+    try:
+        info = path.lstat()
+    except OSError:
+        return False
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return (
+        stat.S_ISREG(info.st_mode)
+        and not stat.S_ISLNK(info.st_mode)
+        and not (getattr(info, "st_file_attributes", 0) & reparse_flag)
+    )
+
+
+def _safe_atomic_write_control_json(path: Path, data: dict) -> None:
+    """Atomically write host state without resolving or following the target path."""
+
+    path = Path(os.path.abspath(path.expanduser()))
+    if not _control_parent_is_safe(path):
+        raise OSError("control artifact parent is not a regular directory")
+    try:
+        existing = path.lstat()
+    except FileNotFoundError:
+        existing = None
+    if existing is not None and not _safe_regular_control_file(path):
+        raise OSError("control artifact is not a regular non-reparse file")
+
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{uuid4().hex}")
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(temporary, flags, 0o666)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(dump_json(data) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        if not _control_parent_is_safe(path):
+            raise OSError("control artifact parent changed during write")
+        try:
+            current = path.lstat()
+        except FileNotFoundError:
+            current = None
+        if current is not None and not _safe_regular_control_file(path):
+            raise OSError("control artifact changed to a link or non-file during write")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def delegate_to_configured_actor(**kwargs):
@@ -188,12 +255,13 @@ def _write_provenance(
                 "security_scan_authority": run_state.get("security_scan_authority"),
                 "security_scan_authority_history": run_state.get("security_scan_authority_history", []),
                 "security_scan_provenance": run_state.get("security_scan_provenance", []),
+                "security_scan_only_mutation_history": run_state.get("security_scan_only_mutation_history", []),
                 "app_server_dispatch_provenance": run_state.get("app_server_dispatch_provenance", []),
                 "dual_agents_bootstrap_artifacts": run_state.get("dual_agents_bootstrap_artifacts", []),
                 "failure": run_state.get("failure"),
             }
         )
-    atomic_write_json(run_dir / "provenance.json", payload)
+    _safe_atomic_write_control_json(run_dir / "provenance.json", payload)
 
 
 _APP_SERVER_PROGRESS = re.compile(r"^app-server turn [A-Za-z0-9._:-]{1,100} still running$")
@@ -242,7 +310,7 @@ def _persist_run_state(
 ) -> None:
     run_state["updated_at"] = datetime.now(timezone.utc).isoformat()
     try:
-        atomic_write_json(run_dir / "run_state.json", run_state)
+        _safe_atomic_write_control_json(run_dir / "run_state.json", run_state)
         _write_provenance(config, canonical_root, run_dir, phase_provenance, run_state)
         return
     except OSError as exc:
@@ -360,6 +428,75 @@ def _executor_security_gate_policy(policy: str) -> str:
     )
 
 
+def _max_security_generations(config: OrchestratorConfig) -> int:
+    """Allow an initial scan, its implementation replacement, and one per correction."""
+
+    correction_cycles = int(getattr(config, "max_correction_cycles", 1))
+    return max(2, correction_cycles + 2)
+
+
+def _load_security_scan_only_output(path: Path):
+    """Read the Executor report only from a stable, regular file, without following links."""
+
+    def regular_file(info) -> bool:
+        reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        return (
+            stat.S_ISREG(info.st_mode)
+            and not stat.S_ISLNK(info.st_mode)
+            and not (getattr(info, "st_file_attributes", 0) & reparse_flag)
+        )
+
+    def identity(info) -> tuple[int, int, int, int, int]:
+        return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_mode)
+
+    def safe_parent_chain() -> bool:
+        reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        for parent in reversed(Path(os.path.abspath(path)).parents):
+            try:
+                info = parent.lstat()
+            except OSError:
+                return False
+            if (
+                not stat.S_ISDIR(info.st_mode)
+                or stat.S_ISLNK(info.st_mode)
+                or getattr(info, "st_file_attributes", 0) & reparse_flag
+            ):
+                return False
+        return True
+
+    try:
+        if not safe_parent_chain():
+            raise OSError("scan-only output has an unsafe parent directory")
+        before = path.lstat()
+        if not regular_file(before):
+            raise OSError("scan-only output is not a regular non-reparse file")
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if not regular_file(opened) or identity(opened) != identity(before):
+                raise OSError("scan-only output changed before it was opened")
+            payload = stream.read()
+            after = os.fstat(stream.fileno())
+            current = path.lstat()
+            if (
+                not safe_parent_chain()
+                or not regular_file(after)
+                or identity(after) != identity(opened)
+                or not regular_file(current)
+                or identity(current) != identity(opened)
+            ):
+                raise OSError("scan-only output changed while it was read")
+        return json.loads(payload.decode("utf-8"))
+    except SecurityScanError:
+        raise
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise SecurityScanError(
+            "SECURITY_SCAN_ONLY_OUTPUT_INVALID: scan-only Executor output is missing, linked, unstable, or invalid JSON.",
+            failure_class="SECURITY_SCAN_ONLY_OUTPUT_INVALID",
+        ) from exc
+
+
 def _prepare_security_scan(
     *,
     config: OrchestratorConfig,
@@ -396,7 +533,7 @@ def _prepare_security_scan(
                     "required_mode": decision.required_mode,
                     "required_scope": decision.required_scope,
                     "generation": 1,
-                    "max_generations": max(2, int(getattr(config, "max_correction_cycles", 1)) + 1),
+                    "max_generations": _max_security_generations(config),
                     "authority_state": (
                         "start_authorized_unclaimed" if decision.action == "start" else "existing_authority"
                     ),
@@ -472,7 +609,8 @@ def _prepare_security_scan(
                 stale_authority["authority_state"] = "completed_stale"
                 run_state["security_scan_authority"] = stale_authority
 
-                max_generations = int(stale_authority.get("max_generations", 2))
+                max_generations = _max_security_generations(config)
+                stale_authority["max_generations"] = max_generations
                 if generation >= max_generations:
                     limit_event = {
                         "checkpoint": checkpoint,
@@ -892,6 +1030,175 @@ def _record_security_scan_result(**kwargs) -> None:
         raise
 
 
+def _run_security_scan_only_continuation(
+    *,
+    config: OrchestratorConfig,
+    provider: CodexSecurityProvider,
+    decision: ScanDecision,
+    policy: str,
+    requirement: tuple[bool, str, str],
+    target_revision: str,
+    scan_task: str,
+    run_state: dict,
+    canonical_root: Path,
+    run_dir: Path,
+    phase_provenance: list[dict],
+    state_lock,
+    progress,
+    repository_trust_authorized: bool,
+    checkpoint: str,
+    generation: int,
+    output_path: Path,
+) -> None:
+    control_paths = (run_dir / "run_state.json", run_dir / "provenance.json")
+    initial_control_exclusions = {
+        relative
+        for path in control_paths
+        if _safe_regular_control_file(path)
+        and (relative := _relative_repository_path_lexical(path, config.repository)) is not None
+    }
+    try:
+        mutation_baseline = capture_git_baseline(config.repository, include_ignored=True)
+    except BaseException as exc:
+        _record_security_scan_only_mutation(
+            config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            run_state=run_state,
+            phase_provenance=phase_provenance,
+            checkpoint=checkpoint,
+            generation=generation,
+            attribution=None,
+            attribution_status="baseline_capture_failed",
+            failure_class="SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        )
+        raise SecurityScanError(
+            "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN: repository state could not be captured before the scan-only Executor turn.",
+            failure_class="SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        ) from exc
+    if not isinstance(mutation_baseline, Mapping) or mutation_baseline.get("complete") is not True:
+        _record_security_scan_only_mutation(
+            config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            run_state=run_state,
+            phase_provenance=phase_provenance,
+            checkpoint=checkpoint,
+            generation=generation,
+            attribution=None,
+            attribution_status="baseline_incomplete",
+            failure_class="SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        )
+        raise SecurityScanError(
+            "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN: repository state was incomplete before the scan-only Executor turn.",
+            failure_class="SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        )
+    dispatch_error = None
+    try:
+        _dispatch_phase(
+            config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            phase_provenance=phase_provenance,
+            run_state=run_state,
+            state_lock=state_lock,
+            progress=progress,
+            role="executor",
+            repository_trust_authorized=repository_trust_authorized,
+            task=_prompt(
+                config,
+                "security-rescan.txt",
+                task=scan_task,
+                security_scan_policy=_executor_security_gate_policy(policy),
+            ),
+            repository=config.repository,
+            output_path=output_path,
+            schema_path=_schema(config, "implementation.schema.json"),
+        )
+    except BaseException as exc:
+        dispatch_error = exc
+
+    exact_excluded_paths = {
+        relative
+        for path in control_paths
+        if _safe_regular_control_file(path)
+        and (relative := _relative_repository_path_lexical(path, config.repository)) is not None
+    }
+    exact_excluded_paths.intersection_update(initial_control_exclusions)
+    try:
+        mutation_attribution = attribute_git_mutations(
+            config.repository,
+            mutation_baseline,
+            exact_excluded_paths=exact_excluded_paths,
+            include_ignored=True,
+        )
+    except BaseException as exc:
+        _record_security_scan_only_mutation(
+            config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            run_state=run_state,
+            phase_provenance=phase_provenance,
+            checkpoint=checkpoint,
+            generation=generation,
+            attribution=None,
+            attribution_status="attribution_failed",
+            failure_class="SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        )
+        raise SecurityScanError(
+            "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN: repository mutation attribution failed after the scan-only Executor turn.",
+            failure_class="SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        ) from exc
+    if not isinstance(mutation_attribution, Mapping):
+        _record_security_scan_only_mutation(
+            config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            run_state=run_state,
+            phase_provenance=phase_provenance,
+            checkpoint=checkpoint,
+            generation=generation,
+            attribution=None,
+            attribution_status="attribution_invalid",
+            failure_class="SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        )
+        raise SecurityScanError(
+            "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN: repository mutation attribution returned invalid state after the scan-only Executor turn.",
+            failure_class="SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        ) from dispatch_error
+    attribution_failure = _security_scan_only_failure_class(mutation_attribution)
+    _record_security_scan_only_mutation(
+        config=config,
+        canonical_root=canonical_root,
+        run_dir=run_dir,
+        run_state=run_state,
+        phase_provenance=phase_provenance,
+        checkpoint=checkpoint,
+        generation=generation,
+        attribution=mutation_attribution,
+        failure_class=attribution_failure,
+    )
+    if attribution_failure:
+        raise SecurityScanError(
+            f"{attribution_failure}: scan-only Executor turn did not establish a mutation-free repository state.",
+            failure_class=attribution_failure,
+        ) from dispatch_error
+    if dispatch_error is not None:
+        raise dispatch_error
+    implementation = _load_security_scan_only_output(output_path)
+    _record_security_scan_result(
+        provider=provider,
+        decision=decision,
+        checkpoint=checkpoint,
+        implementation=implementation,
+        run_state=run_state,
+        phase_provenance=phase_provenance,
+        config=config,
+        canonical_root=canonical_root,
+        run_dir=run_dir,
+    )
+
+
 def _ensure_security_gate_fresh(
     *,
     config: OrchestratorConfig,
@@ -914,8 +1221,9 @@ def _ensure_security_gate_fresh(
     if not requirement[0]:
         return False
     dispatched = False
-    max_generations = max(2, int(getattr(config, "max_correction_cycles", 1)) + 1)
-    for attempt in range(max_generations):
+    max_generations = _max_security_generations(config)
+    # The extra bounded pass re-reads the ledger after the final allowed scan.
+    for attempt in range(max_generations + 1):
         generation = int(
             (run_state.get("security_scan_authority") or {}).get("generation", 1)
         )
@@ -929,7 +1237,7 @@ def _ensure_security_gate_fresh(
             run_dir=run_dir,
             phase_provenance=phase_provenance,
             checkpoint=check_name,
-            authorize_executor_dispatch=True,
+            authorize_executor_dispatch=attempt < max_generations,
         )
         if provider is None or decision is None:
             return dispatched
@@ -940,50 +1248,203 @@ def _ensure_security_gate_fresh(
                 "SECURITY_SCAN_AUTHORITY_INVALID: final Reviewer gate has no completed fresh Security scan.",
                 failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
             )
+        if attempt >= max_generations:
+            raise SecurityScanError(
+                f"SECURITY_SCAN_RESCAN_LIMIT: no fresh Security coverage was established after {max_generations} bounded scan generations.",
+                failure_class="SECURITY_SCAN_RESCAN_LIMIT",
+            )
         scan_task = (
             f"Complete one host-authorized Codex Security {requirement[1]} scan for scope "
             f"{requirement[2]!r} at revision {target_revision}. This is a scan-only continuation; "
             "do not modify repository source or create any additional scan."
         )
-        output_name = re.sub(r"[^A-Za-z0-9_-]", "_", check_name)
-        output_path = run_dir / f"security-rescan-{generation}-{output_name}.json"
-        _dispatch_phase(
-            config=config,
-            canonical_root=canonical_root,
-            run_dir=run_dir,
-            phase_provenance=phase_provenance,
-            run_state=run_state,
-            state_lock=state_lock,
-            progress=progress,
-            role="executor",
-            repository_trust_authorized=repository_trust_authorized,
-            task=_prompt(
-                config,
-                "security-rescan.txt",
-                task=scan_task,
-                security_scan_policy=_executor_security_gate_policy(policy),
-            ),
-            repository=config.repository,
-            output_path=output_path,
-            schema_path=_schema(config, "implementation.schema.json"),
-        )
-        implementation = load_json(output_path)
-        _record_security_scan_result(
-            provider=provider,
-            decision=decision,
-            checkpoint=check_name,
-            implementation=implementation,
-            run_state=run_state,
-            phase_provenance=phase_provenance,
-            config=config,
-            canonical_root=canonical_root,
-            run_dir=run_dir,
-        )
+        with tempfile.TemporaryDirectory(prefix="dual-codex-security-rescan-") as output_directory:
+            output_path = Path(output_directory) / "executor-report.json"
+            if _relative_repository_path_lexical(output_path, config.repository) is not None:
+                raise SecurityScanError(
+                    "SECURITY_SCAN_ONLY_OUTPUT_INVALID: scan-only Executor output must be outside the repository workspace.",
+                    failure_class="SECURITY_SCAN_ONLY_OUTPUT_INVALID",
+                )
+            _run_security_scan_only_continuation(
+                config=config,
+                provider=provider,
+                decision=decision,
+                policy=policy,
+                requirement=requirement,
+                target_revision=target_revision,
+                scan_task=scan_task,
+                run_state=run_state,
+                canonical_root=canonical_root,
+                run_dir=run_dir,
+                phase_provenance=phase_provenance,
+                state_lock=state_lock,
+                progress=progress,
+                repository_trust_authorized=repository_trust_authorized,
+                checkpoint=check_name,
+                generation=generation,
+                output_path=output_path,
+            )
         dispatched = True
     raise SecurityScanError(
         f"SECURITY_SCAN_RESCAN_LIMIT: no fresh Security coverage was established after {max_generations} bounded scan generations.",
         failure_class="SECURITY_SCAN_RESCAN_LIMIT",
     )
+
+
+def _security_scan_only_failure_class(attribution: Mapping[str, object]) -> str | None:
+    if any(
+        attribution.get(field)
+        for field in (
+            "run_touched_paths",
+            "run_created_paths",
+            "run_removed_paths",
+            "head_changed",
+            "branch_changed",
+            "staged_state_changed",
+            "repository_metadata_changed",
+        )
+    ):
+        return "SECURITY_SCAN_ONLY_MUTATION"
+    if attribution.get("status") != "complete" or attribution.get("unknown_paths"):
+        return "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN"
+    return None
+
+
+def _security_scan_only_mutation_record(
+    *,
+    checkpoint: str,
+    generation: int,
+    attribution: Mapping[str, object] | None,
+    attribution_status: str | None,
+    failure_class: str | None,
+) -> dict:
+    attribution = attribution if isinstance(attribution, Mapping) else {}
+    path_fields = {
+        "modified": "run_touched_paths",
+        "added": "run_created_paths",
+        "removed": "run_removed_paths",
+        "unknown": "unknown_paths",
+    }
+    mutated_paths: dict[str, list[str]] = {}
+    paths_truncated = False
+    for category, field in path_fields.items():
+        raw_paths = attribution.get(field, [])
+        raw_paths = raw_paths if isinstance(raw_paths, (list, tuple)) else []
+        safe_paths = []
+        for raw_path in raw_paths:
+            if not isinstance(raw_path, str):
+                continue
+            path = raw_path.replace("\\", "/")
+            if path.startswith("/") or re.match(r"^[A-Za-z]:/", path) or ".." in PurePosixPath(path).parts:
+                paths_truncated = True
+                continue
+            if len(path) > 240:
+                path = path[:240]
+                paths_truncated = True
+            if len(safe_paths) < 20:
+                safe_paths.append(path)
+            else:
+                paths_truncated = True
+        mutated_paths[category] = safe_paths
+    mutation_categories = []
+    category_fields = (
+        ("existing_path_changed", "run_touched_paths"),
+        ("path_added", "run_created_paths"),
+        ("path_removed", "run_removed_paths"),
+        ("head_changed", "head_changed"),
+        ("branch_changed", "branch_changed"),
+        ("index_changed", "staged_state_changed"),
+        ("git_metadata_changed", "repository_metadata_changed"),
+        ("unknown_path", "unknown_paths"),
+    )
+    for category, field in category_fields:
+        if attribution.get(field):
+            mutation_categories.append(category)
+    if attribution.get("status") != "complete":
+        mutation_categories.append("attribution_unknown")
+    if attribution_status in {"baseline_capture_failed", "baseline_incomplete", "attribution_failed"}:
+        mutation_categories.append("repository_state_unknown")
+    return {
+        "checkpoint": str(checkpoint)[:120],
+        "generation": int(generation),
+        "attribution_status": str(attribution_status or attribution.get("status") or "unknown")[:40],
+        "mutation_categories": mutation_categories,
+        "mutated_paths": mutated_paths,
+        "paths_truncated": paths_truncated,
+        "observed_at": str(attribution.get("observed_at") or "")[:40],
+        "failure_class": failure_class,
+    }
+
+
+def _record_security_scan_only_mutation(
+    *,
+    config: OrchestratorConfig,
+    canonical_root: Path,
+    run_dir: Path,
+    run_state: dict,
+    phase_provenance: list[dict],
+    checkpoint: str,
+    generation: int,
+    attribution: Mapping[str, object] | None,
+    attribution_status: str | None = None,
+    failure_class: str | None,
+) -> None:
+    record = _security_scan_only_mutation_record(
+        checkpoint=checkpoint,
+        generation=generation,
+        attribution=attribution,
+        attribution_status=attribution_status,
+        failure_class=failure_class,
+    )
+    run_state.setdefault("security_scan_only_mutation_history", []).append(record)
+    if failure_class:
+        authority = run_state.get("security_scan_authority")
+        if isinstance(authority, dict):
+            authority["authority_state"] = "failed"
+            authority["failure_class"] = failure_class
+        run_state.setdefault("security_scan_authority_history", []).append(
+            {
+                "checkpoint": str(checkpoint)[:120],
+                "event": "scan_only_mutation_rejected",
+                "generation": int(generation),
+                "failure_class": failure_class,
+            }
+        )
+        checkpoint_token = re.sub(r"[^A-Za-z0-9_-]", "_", str(checkpoint))[:80]
+        sidecar = run_dir / f"security-scan-only-mutation-{int(generation)}-{checkpoint_token}.json"
+        try:
+            _safe_atomic_write_control_json(sidecar, record)
+        except OSError as exc:
+            raise SecurityScanError(
+                f"{failure_class}: scan-only mutation evidence could not be persisted safely.",
+                failure_class=failure_class,
+            ) from exc
+    try:
+        _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state, required=True)
+    except Exception as exc:
+        if not failure_class:
+            if isinstance(run_state.get("security_scan_authority"), dict):
+                run_state["security_scan_authority"]["authority_state"] = "failed"
+                run_state["security_scan_authority"]["failure_class"] = "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN"
+            record["failure_class"] = "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN"
+            run_state.setdefault("security_scan_authority_history", []).append(
+                {
+                    "checkpoint": str(checkpoint)[:120],
+                    "event": "scan_only_attribution_persistence_failed",
+                    "generation": int(generation),
+                    "failure_class": "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+                }
+            )
+            checkpoint_token = re.sub(r"[^A-Za-z0-9_-]", "_", str(checkpoint))[:80]
+            sidecar = run_dir / f"security-scan-only-mutation-{int(generation)}-{checkpoint_token}.json"
+            try:
+                _safe_atomic_write_control_json(sidecar, record)
+            except OSError:
+                pass
+        raise SecurityScanError(
+            "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN: scan-only mutation evidence could not be persisted safely.",
+            failure_class=failure_class or "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN",
+        ) from exc
 
 
 def _failure_reason(exc: BaseException) -> str:
@@ -1084,6 +1545,17 @@ def _relative_control_path(path: Path, repository: Path) -> str | None:
         return None
 
 
+def _relative_repository_path_lexical(path: Path, repository: Path) -> str | None:
+    """Return a repository-relative path without following an untrusted symlink."""
+
+    try:
+        absolute_path = Path(os.path.abspath(path))
+        absolute_repository = Path(os.path.abspath(repository))
+        return absolute_path.relative_to(absolute_repository).as_posix()
+    except (OSError, ValueError):
+        return None
+
+
 def _recover_interrupted_runs(
     config: OrchestratorConfig,
     repository: Path,
@@ -1180,7 +1652,7 @@ def _recover_interrupted_runs(
                 "observed_at": datetime.now(timezone.utc).isoformat(),
             }
             mutation_path = item / "mutation-attribution.json"
-            atomic_write_json(mutation_path, mutation)
+            _safe_atomic_write_control_json(mutation_path, mutation)
         except Exception as exc:
             run_state["status"] = "interrupted"
             run_state["provider_status"] = "unknown_after_interruption"
@@ -1490,6 +1962,7 @@ def _execute_locked(
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_dir = config.runs_dir / f"{timestamp}-{run_id[:8]}"
     run_dir.mkdir(parents=True, exist_ok=False)
+    run_dir = run_dir.resolve(strict=True)
     baseline_path = run_dir / "initial_git_baseline.json"
     phase_provenance: list[dict] = []
     state_lock = threading.RLock()
@@ -1577,7 +2050,7 @@ def _execute_locked(
             run_state["status"] = "blocked"
             run_state["failure"] = {"failure_type": "DirtyRepository"}
             run_state["mutation_attribution"] = mutation_summary()
-            atomic_write_json(run_dir / "mutation-attribution.json", run_state["mutation_attribution"])
+            _safe_atomic_write_control_json(run_dir / "mutation-attribution.json", run_state["mutation_attribution"])
             _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
             _progress_event(progress, phase="run", actor="", backend="", state="failed", failure_type="DirtyRepository")
             raise RuntimeError(
@@ -1789,7 +2262,7 @@ def _execute_locked(
             review_attempt += 1
 
         mutation = mutation_summary()
-        atomic_write_json(run_dir / "mutation-attribution.json", mutation)
+        _safe_atomic_write_control_json(run_dir / "mutation-attribution.json", mutation)
         run_state["mutation_attribution"] = mutation
         run_state["status"] = "completed"
         run_state["provider_status"] = "completed"
@@ -1859,7 +2332,7 @@ def _execute_locked(
             else:
                 try:
                     mutation = mutation_summary()
-                    atomic_write_json(run_dir / "mutation-attribution.json", mutation)
+                    _safe_atomic_write_control_json(run_dir / "mutation-attribution.json", mutation)
                 except Exception as attribution_error:
                     mutation = {"status": "unknown", "reason": _failure_reason(attribution_error)}
             run_state["mutation_attribution"] = mutation
