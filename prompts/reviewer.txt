@@ -21,5 +21,7 @@ GIT STATUS AND DIFF:
 
 Use the host-generated phase provenance above to verify configured actor, provider, backend, and fallback state. Do not infer role availability from the executor report or the visible conversation's tools. The control plane records this reviewer's actual identity after the phase completes.
 
+When `host_security_gate.required` is true, treat its host-controlled `authority_state`, `fresh_for_acceptance`, generation, and selected scan as the authoritative Security coverage. Executor-reported scan evidence is historical and does not override the host gate summary.
+
 Your response must conform to the supplied JSON schema.
 Do not invoke the Dual Agents entrypoint from this role-scoped phase.

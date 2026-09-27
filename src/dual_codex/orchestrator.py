@@ -35,6 +35,7 @@ from .security_scan import (
     CodexSecurityProvider,
     ScanDecision,
     SecurityScanError,
+    arbitrate_security_scans,
     continue_security_scan_authority,
     validate_scan_provenance,
 )
@@ -72,7 +73,7 @@ def _schema(config: OrchestratorConfig, name: str) -> Path:
     return config.project_root / "schemas" / name
 
 
-def _reviewer_phase_context(config: OrchestratorConfig, phase_provenance: list[dict]) -> dict:
+def _reviewer_phase_context(config: OrchestratorConfig, phase_provenance: list[dict], run_state: dict) -> dict:
     fields = (
         "role",
         "primary_actor",
@@ -84,6 +85,45 @@ def _reviewer_phase_context(config: OrchestratorConfig, phase_provenance: list[d
         "repository",
     )
     reviewer = config.agent_for_role("reviewer")
+    authority = run_state.get("security_scan_authority")
+    authority = authority if isinstance(authority, Mapping) else {}
+    requirement = run_state.get("mission_security_requirement")
+    requirement = requirement if isinstance(requirement, Mapping) else {}
+    history = run_state.get("security_scan_authority_history")
+    history = history if isinstance(history, list) else []
+    security_history = [
+        {
+            field: event.get(field)
+            for field in ("event", "generation", "selected_scan_id", "failure_class")
+            if event.get(field) is not None
+        }
+        for event in history
+        if isinstance(event, Mapping)
+        and event.get("event") in {"run_owned", "completed_fresh", "completed_stale", "generation_authorized", "rescan_limit"}
+    ]
+    security_gate = {
+        "required": bool(requirement.get("required", False)),
+        "authority_state": str(authority.get("authority_state") or "missing"),
+        "fresh_for_acceptance": authority.get("authority_state") == "completed_fresh",
+        "generation": authority.get("generation"),
+        "max_generations": authority.get("max_generations"),
+        "required_mode": str(authority.get("required_mode") or requirement.get("mode") or ""),
+        "required_scope": str(authority.get("required_scope") or requirement.get("scope") or ""),
+        "target_identity": {
+            field: str(authority.get(field) or "")
+            for field in ("target_path", "target_id", "target_revision")
+        },
+        "selected_scan": {
+            "scan_id": str(authority.get("selected_scan_id") or ""),
+            "mode": str(authority.get("selected_scan_mode") or ""),
+            "scope": str(authority.get("selected_scan_scope") or ""),
+        },
+        "coverage_history": security_history,
+        "authority_note": (
+            "This host-controlled gate summary determines whether Security coverage is fresh. "
+            "Executor scan evidence is historical and does not override this summary."
+        ),
+    }
     return {
         "completed_phases": [
             {field: item.get(field, "") for field in fields}
@@ -97,6 +137,7 @@ def _reviewer_phase_context(config: OrchestratorConfig, phase_provenance: list[d
             "backend": reviewer.backend,
             "actual_runtime_identity": "recorded by the control plane after this phase completes",
         },
+        "host_security_gate": security_gate,
     }
 
 
@@ -294,14 +335,18 @@ def _architect_security_gate_policy(
 ) -> str:
     required, mode, scope = requirement
     if not required:
-        return "The original mission does not require a Codex Security scan. Do not add or claim a host-mandated scan."
+        return (
+            "The original mission does not require a Codex Security scan. Architect must not start, resume, cancel, "
+            "await operationally, or claim completion of any Security scan. Do not add or claim a host-mandated scan."
+        )
     if decision is None:
-        return f"The original mission requires a Codex Security {mode} scan for scope {scope!r}; the host has not authorized a different mode or scope."
+        return (
+            f"The original mission requires a Codex Security {mode} scan for scope {scope!r}. "
+            "The host controls scan operations; do not operate or claim completion of a scan."
+        )
     return (
-        f"The original mission requires a Codex Security {mode} scan for scope {scope!r}. "
-        "The following host arbitration is authoritative; preserve its exact target and selected scan, "
-        "and do not downgrade, remove, replace, or duplicate it. "
-        + decision.executor_instruction()
+        "HOST SECURITY GATE SUMMARY (declarative, read-only): "
+        + decision.architect_summary()
     )
 
 
@@ -325,6 +370,7 @@ def _prepare_security_scan(
     run_dir: Path,
     phase_provenance: list[dict],
     checkpoint: str,
+    authorize_executor_dispatch: bool = False,
 ) -> tuple[CodexSecurityProvider | None, ScanDecision | None, str]:
     required, mode, scope = requirement
     if not required:
@@ -349,6 +395,12 @@ def _prepare_security_scan(
                     "target_revision": decision.target_revision,
                     "required_mode": decision.required_mode,
                     "required_scope": decision.required_scope,
+                    "generation": 1,
+                    "max_generations": max(2, int(getattr(config, "max_correction_cycles", 1)) + 1),
+                    "authority_state": (
+                        "start_authorized_unclaimed" if decision.action == "start" else "existing_authority"
+                    ),
+                    "ownership_state": "unclaimed" if decision.action == "start" else "existing_authority",
                     "initial_checkpoint": checkpoint,
                     "initial_decision": decision.action,
                     "initial_observed_scan_ids": [
@@ -356,6 +408,12 @@ def _prepare_security_scan(
                         for scan in decision.observed_scans
                         if scan.get("scanId", scan.get("scan_id", ""))
                     ],
+                    "generation_observed_scan_ids": [
+                        str(scan.get("scanId", scan.get("scan_id", "")))
+                        for scan in decision.observed_scans
+                        if scan.get("scanId", scan.get("scan_id", ""))
+                    ],
+                    "executor_dispatch_authorized": False,
                     "selected_scan_id": str(
                         (decision.selected_scan or {}).get("scanId", (decision.selected_scan or {}).get("scan_id", ""))
                     ),
@@ -370,18 +428,124 @@ def _prepare_security_scan(
                 run_state["security_scan_authority"] = dict(authority)
         else:
             scans = provider.list_target_scans(config.repository)
-            decision = continue_security_scan_authority(
-                scans,
-                authority=authority,
-                plugin_id=provider.plugin_id,
-                plugin_version=provider.plugin_version,
-                target_path=config.repository,
-                target_revision=target_revision,
-                required_mode=mode,
-                required_scope=scope,
-            )
+            try:
+                decision = continue_security_scan_authority(
+                    scans,
+                    authority=authority,
+                    plugin_id=provider.plugin_id,
+                    plugin_version=provider.plugin_version,
+                    target_path=config.repository,
+                    target_revision=target_revision,
+                    required_mode=mode,
+                    required_scope=scope,
+                )
+            except SecurityScanError as stale_error:
+                if stale_error.failure_class != "SECURITY_SCAN_SNAPSHOT_STALE":
+                    raise
+                stale_authority = dict(authority)
+                authority = stale_authority
+                generation = int(stale_authority.get("generation", 1))
+                validation = stale_authority.get("completed_validation")
+                selected_id = str(stale_authority.get("selected_scan_id") or "")
+                selected_scan = next(
+                    (
+                        item for item in scans
+                        if str(item.get("scanId", item.get("scan_id", ""))) == selected_id
+                    ),
+                    {},
+                )
+                stale_event = {
+                    "checkpoint": checkpoint,
+                    "event": "completed_stale",
+                    "generation": generation,
+                    "selected_scan_id": selected_id,
+                    "failure_class": stale_error.failure_class,
+                }
+                if isinstance(validation, Mapping) and validation.get("target_snapshot_identity"):
+                    stale_event["target_snapshot_identity"] = validation["target_snapshot_identity"]
+                current_digest = selected_scan.get("currentSnapshotDigest") if selected_scan else None
+                if isinstance(current_digest, str) and current_digest:
+                    stale_event["current_snapshot_identity"] = hashlib.sha256(
+                        current_digest.encode("utf-8")
+                    ).hexdigest()
+                run_state.setdefault("security_scan_authority_history", []).append(stale_event)
+                stale_authority["authority_state"] = "completed_stale"
+                run_state["security_scan_authority"] = stale_authority
+
+                max_generations = int(stale_authority.get("max_generations", 2))
+                if generation >= max_generations:
+                    limit_event = {
+                        "checkpoint": checkpoint,
+                        "event": "rescan_limit",
+                        "generation": generation,
+                        "selected_scan_id": selected_id,
+                    }
+                    run_state.setdefault("security_scan_authority_history", []).append(limit_event)
+                    stale_authority["authority_state"] = "completed_stale"
+                    _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
+                    raise SecurityScanError(
+                        f"SECURITY_SCAN_RESCAN_LIMIT: scan generation {generation} became stale and the run reached its bounded limit of {max_generations} generations.",
+                        failure_class="SECURITY_SCAN_RESCAN_LIMIT",
+                    )
+
+                replacement = arbitrate_security_scans(
+                    scans,
+                    plugin_id=provider.plugin_id,
+                    plugin_version=provider.plugin_version,
+                    target_path=config.repository,
+                    target_revision=target_revision,
+                    required_mode=mode,
+                    required_scope=scope,
+                    allow_completed_reuse=False,
+                )
+                if replacement.action != "start":
+                    stale_authority["authority_state"] = "conflict"
+                    run_state.setdefault("security_scan_authority_history", []).append(
+                        {
+                            "checkpoint": checkpoint,
+                            "event": "replacement_conflict",
+                            "generation": generation + 1,
+                            "failure_class": "SECURITY_SCAN_CONFLICT",
+                        }
+                    )
+                    _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
+                    raise SecurityScanError(
+                        "SECURITY_SCAN_CONFLICT: a replacement Security generation cannot start while the exact-target ledger is ambiguous or active.",
+                        failure_class="SECURITY_SCAN_CONFLICT",
+                    )
+
+                decision = replacement
+                stale_authority.update(
+                    {
+                        "generation": generation + 1,
+                        "authority_state": "start_authorized_unclaimed",
+                        "ownership_state": "unclaimed",
+                        "generation_observed_scan_ids": [
+                            str(scan.get("scanId", scan.get("scan_id", "")))
+                            for scan in decision.observed_scans
+                            if scan.get("scanId", scan.get("scan_id", ""))
+                        ],
+                        "selected_scan_id": "",
+                        "selected_scan_mode": "",
+                        "selected_scan_scope": "",
+                        "completed_validation": None,
+                        "executor_dispatch_authorized": False,
+                    }
+                )
+                run_state["security_scan_authority"] = stale_authority
+                run_state.setdefault("security_scan_authority_history", []).append(
+                    {
+                        "checkpoint": checkpoint,
+                        "event": "generation_authorized",
+                        "generation": generation + 1,
+                        "previous_scan_id": selected_id,
+                        "decision": "start",
+                        "required_mode": mode,
+                        "required_scope": scope,
+                    }
+                )
+            authority = dict(run_state.get("security_scan_authority", authority))
             if decision.selected_scan is not None:
-                authority = dict(authority)
                 authority["selected_scan_id"] = str(
                     decision.selected_scan.get("scanId", decision.selected_scan.get("scan_id", ""))
                 )
@@ -391,25 +555,56 @@ def _prepare_security_scan(
                     authority["selected_scan_scope"] = str(decision.selected_scan.get("scope", ""))
                 if decision.action == "reused" and not authority.get("completed_validation"):
                     snapshot_digest = decision.selected_scan.get("targetSnapshotDigest")
-                    if not snapshot_digest:
+                    current_digest = decision.selected_scan.get("currentSnapshotDigest")
+                    if not isinstance(snapshot_digest, str) or not snapshot_digest:
                         raise SecurityScanError(
                             "SECURITY_SCAN_AUTHORITY_INVALID: completed scan has no target snapshot identity.",
                             failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+                        )
+                    if not isinstance(current_digest, str) or not current_digest or snapshot_digest != current_digest:
+                        raise SecurityScanError(
+                            "SECURITY_SCAN_SNAPSHOT_STALE: completed scan no longer matches the provider's current repository snapshot.",
+                            failure_class="SECURITY_SCAN_SNAPSHOT_STALE",
                         )
                     authority["completed_validation"] = {
                         "scan_id": authority["selected_scan_id"],
                         "target_snapshot_identity": hashlib.sha256(
                             str(snapshot_digest).encode("utf-8")
                         ).hexdigest(),
+                        "current_snapshot_identity": hashlib.sha256(
+                            current_digest.encode("utf-8")
+                        ).hexdigest(),
                         "validated_at_checkpoint": checkpoint,
                     }
+                authority["authority_state"] = "completed_fresh" if decision.action == "reused" else authority.get("ownership_state", "existing_authority")
                 run_state["security_scan_authority"] = authority
+        if authorize_executor_dispatch and isinstance(authority, dict) and authority.get("authority_state") == "start_authorized_unclaimed":
+            if authority.get("executor_dispatch_authorized"):
+                raise SecurityScanError(
+                    "SECURITY_SCAN_AUTHORITY_INVALID: a start generation already has an Executor dispatch authorized.",
+                    failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+                )
+            authority["executor_dispatch_authorized"] = True
+            authority["executor_dispatch_checkpoint"] = checkpoint
+            run_state["security_scan_authority"] = authority
     except SecurityScanError as exc:
         failure_record = {
             "checkpoint": checkpoint,
             "failure_class": exc.failure_class,
             "authority_scan_id": str((authority or {}).get("selected_scan_id", "")) if isinstance(authority, Mapping) else "",
         }
+        if isinstance(authority, dict):
+            if exc.failure_class in {"SECURITY_SCAN_CONFLICT", "SECURITY_SCAN_UNOWNED_ACTIVITY"}:
+                authority["authority_state"] = "conflict"
+            elif exc.failure_class == "SECURITY_SCAN_AUTHORITY_FAILED":
+                authority["authority_state"] = "failed"
+            elif exc.failure_class == "SECURITY_SCAN_AUTHORITY_LOST":
+                authority["authority_state"] = "lost"
+            elif exc.failure_class in {"SECURITY_SCAN_SNAPSHOT_STALE", "SECURITY_SCAN_RESCAN_LIMIT"}:
+                authority["authority_state"] = "completed_stale"
+            else:
+                authority["authority_state"] = "failed"
+            run_state["security_scan_authority"] = authority
         run_state.setdefault("security_scan_authority_history", []).append(failure_record)
         run_state.setdefault("security_scan_arbitrations", []).append(dict(failure_record))
         _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
@@ -422,6 +617,9 @@ def _prepare_security_scan(
     history_entry["selected_scan_id"] = str(
         (decision.selected_scan or {}).get("scanId", (decision.selected_scan or {}).get("scan_id", ""))
     )
+    history_entry["generation"] = int(authority.get("generation", 1)) if isinstance(authority, Mapping) else 1
+    history_entry["authority_state"] = str(authority.get("authority_state", "")) if isinstance(authority, Mapping) else ""
+    history_entry["ownership_state"] = str(authority.get("ownership_state", "")) if isinstance(authority, Mapping) else ""
     if decision.selected_scan is not None:
         progress = decision.selected_scan.get("progress")
         history_entry["selected_status"] = str(
@@ -442,7 +640,7 @@ def _prepare_security_scan(
     return provider, decision, decision.executor_instruction()
 
 
-def _record_security_scan_result(
+def _record_security_scan_result_impl(
     *,
     provider: CodexSecurityProvider | None,
     decision: ScanDecision | None,
@@ -462,17 +660,68 @@ def _record_security_scan_result(
             )
         return
     final_scans = provider.list_target_scans(config.repository)
-    evidence = validate_scan_provenance(
-        implementation.get("security_scan_provenance"),
-        decision=decision,
-        final_scans=final_scans,
-    )
     authority = run_state.get("security_scan_authority")
     if not isinstance(authority, dict):
         raise SecurityScanError(
             "SECURITY_SCAN_AUTHORITY_INVALID: the run-local scan authority is missing after Executor dispatch.",
             failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
         )
+    actor = config.agent_for_role("executor")
+    executor_phase = next(
+        (item for item in reversed(phase_provenance) if item.get("role") == "executor"),
+        None,
+    )
+    if (
+        not isinstance(executor_phase, Mapping)
+        or executor_phase.get("phase_state") != "completed"
+        or executor_phase.get("configured_actor") is not True
+        or executor_phase.get("actor_id") != actor.account_name
+        or executor_phase.get("profile_id") != actor.account_name
+        or executor_phase.get("primary_actor") != actor.account_name
+        or executor_phase.get("actual_actor") != actor.account_name
+        or executor_phase.get("provider") != actor.provider_type
+        or executor_phase.get("backend") != actor.backend
+        or executor_phase.get("fallback_used") is not False
+        or executor_phase.get("dispatch_failed") is not False
+    ):
+        raise SecurityScanError(
+            "SECURITY_SCAN_EVIDENCE_INVALID: Security scan evidence must come from the exact configured Executor without fallback or substitution.",
+            failure_class="SECURITY_SCAN_EVIDENCE_INVALID",
+        )
+    if authority.get("authority_state") == "start_authorized_unclaimed":
+        if not authority.get("executor_dispatch_authorized"):
+            raise SecurityScanError(
+                "SECURITY_SCAN_AUTHORITY_INVALID: the host did not authorize an Executor dispatch for this scan generation.",
+                failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+            )
+        generation_baseline = {
+            str(item)
+            for item in authority.get(
+                "generation_observed_scan_ids",
+                authority.get("initial_observed_scan_ids", []),
+            )
+            if item
+        }
+        exact_new = [
+            scan for scan in final_scans
+            if scan.get("targetPath", scan.get("target_path"))
+            and same_path(Path(str(scan.get("targetPath", scan.get("target_path")))), Path(decision.target_path))
+            and str(scan.get("targetId", scan.get("target_id", ""))) == decision.target_id
+            and str(scan.get("scanId", scan.get("scan_id", ""))) not in generation_baseline
+        ]
+        reported = implementation.get("security_scan_provenance")
+        reported_id = str(reported.get("scan_id") or "") if isinstance(reported, Mapping) else ""
+        if len(exact_new) != 1 or not reported_id:
+            if exact_new:
+                raise SecurityScanError(
+                    "SECURITY_SCAN_CONFLICT: newly appearing exact-target scan activity cannot be attributed without one matching Executor report.",
+                    failure_class="SECURITY_SCAN_CONFLICT",
+                )
+    evidence = validate_scan_provenance(
+        implementation.get("security_scan_provenance"),
+        decision=decision,
+        final_scans=final_scans,
+    )
     scan_id = str(evidence["scan_id"])
     if authority.get("selected_scan_id") and authority["selected_scan_id"] != scan_id:
         raise SecurityScanError(
@@ -482,6 +731,9 @@ def _record_security_scan_result(
     selected_matches = [
         scan for scan in final_scans
         if str(scan.get("scanId", scan.get("scan_id", ""))) == scan_id
+        and str(scan.get("targetId", scan.get("target_id", ""))) == decision.target_id
+        and scan.get("targetPath", scan.get("target_path"))
+        and same_path(Path(str(scan.get("targetPath", scan.get("target_path")))), Path(decision.target_path))
     ]
     if len(selected_matches) != 1:
         raise SecurityScanError(
@@ -500,52 +752,238 @@ def _record_security_scan_result(
             failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
         )
     snapshot_digest = selected.get("targetSnapshotDigest")
-    if not snapshot_digest:
+    current_digest = selected.get("currentSnapshotDigest")
+    if not isinstance(snapshot_digest, str) or not snapshot_digest:
         raise SecurityScanError(
             "SECURITY_SCAN_AUTHORITY_INVALID: completed scan has no target snapshot identity.",
             failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
         )
+    if selected.get("warnings"):
+        raise SecurityScanError(
+            "SECURITY_SCAN_AUTHORITY_INVALID: completed scan contains provider warnings.",
+            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+        )
     snapshot_identity = hashlib.sha256(str(snapshot_digest).encode("utf-8")).hexdigest()
+    current_snapshot_identity = (
+        hashlib.sha256(current_digest.encode("utf-8")).hexdigest()
+        if isinstance(current_digest, str) and current_digest
+        else ""
+    )
     completed_validation = authority.get("completed_validation")
     if completed_validation:
         if (
             not isinstance(completed_validation, Mapping)
             or completed_validation.get("scan_id") != scan_id
             or completed_validation.get("target_snapshot_identity") != snapshot_identity
+            or completed_validation.get("current_snapshot_identity", snapshot_identity) != snapshot_identity
             or selected.get("warnings")
         ):
             raise SecurityScanError(
                 "SECURITY_SCAN_AUTHORITY_INVALID: completed authoritative scan changed its validated snapshot identity or warnings.",
                 failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
             )
-    elif snapshot_digest != selected.get("currentSnapshotDigest") or selected.get("warnings"):
-        raise SecurityScanError(
-            "SECURITY_SCAN_AUTHORITY_INVALID: scan completion is stale or contains warnings.",
-            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+    if authority.get("authority_state") == "start_authorized_unclaimed":
+        authority["ownership_state"] = "run_owned"
+        authority["authority_state"] = "run_owned"
+        authority["acquisition_checkpoint"] = checkpoint
+        executor_phase = next(
+            (item for item in reversed(phase_provenance) if item.get("role") == "executor"),
+            {},
         )
-    authority["selected_scan_id"] = scan_id
-    authority["selected_scan_mode"] = selected_mode
-    authority["selected_scan_scope"] = selected_scope
+        authority["acquisition_actor"] = str(executor_phase.get("actual_actor") or "")
+        run_state.setdefault("security_scan_authority_history", []).append(
+            {
+                "checkpoint": checkpoint,
+                "event": "run_owned",
+                "generation": int(authority.get("generation", 1)),
+                "selected_scan_id": scan_id,
+                "selected_scan_mode": selected_mode,
+                "selected_scan_scope": selected_scope,
+                "acquisition_actor": authority["acquisition_actor"],
+            }
+        )
+    if not isinstance(current_digest, str) or not current_digest or snapshot_digest != current_digest:
+        authority["selected_scan_id"] = scan_id
+        authority["selected_scan_mode"] = selected_mode
+        authority["selected_scan_scope"] = selected_scope
+        authority["authority_state"] = "completed_stale"
+        run_state.setdefault("security_scan_authority_history", []).append(
+            {
+                "checkpoint": checkpoint,
+                "event": "completed_stale",
+                "generation": int(authority.get("generation", 1)),
+                "selected_scan_id": scan_id,
+                "failure_class": "SECURITY_SCAN_SNAPSHOT_STALE",
+                "target_snapshot_identity": snapshot_identity,
+                "current_snapshot_identity": current_snapshot_identity,
+            }
+        )
+        run_state.setdefault("security_scan_provenance", []).append(evidence)
+        phase = next((item for item in reversed(phase_provenance) if item.get("role") == "executor"), None)
+        if phase is not None:
+            phase["security_scan_provenance"] = evidence
+        run_state["security_scan_authority"] = authority
+        _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
+        return
     if not completed_validation:
         authority["completed_validation"] = {
             "scan_id": scan_id,
             "target_snapshot_identity": snapshot_identity,
+            "current_snapshot_identity": current_snapshot_identity,
             "validated_at_checkpoint": checkpoint,
         }
+    authority["authority_state"] = "completed_fresh"
     run_state.setdefault("security_scan_authority_history", []).append(
         {
             "checkpoint": checkpoint,
-            "event": "completed_validation",
+            "event": "completed_fresh",
+            "generation": int(authority.get("generation", 1)),
             "selected_scan_id": scan_id,
             "selected_status": "complete",
             "target_snapshot_identity": snapshot_identity,
+            "current_snapshot_identity": current_snapshot_identity,
         }
     )
+    authority["selected_scan_id"] = scan_id
+    authority["selected_scan_mode"] = selected_mode
+    authority["selected_scan_scope"] = selected_scope
     run_state.setdefault("security_scan_provenance", []).append(evidence)
     phase = next((item for item in reversed(phase_provenance) if item.get("role") == "executor"), None)
     if phase is not None:
         phase["security_scan_provenance"] = evidence
     _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
+
+
+def _record_security_scan_result(**kwargs) -> None:
+    try:
+        _record_security_scan_result_impl(**kwargs)
+    except SecurityScanError as exc:
+        run_state = kwargs["run_state"]
+        authority = run_state.get("security_scan_authority")
+        if isinstance(authority, dict):
+            if exc.failure_class in {"SECURITY_SCAN_CONFLICT", "SECURITY_SCAN_UNOWNED_ACTIVITY"}:
+                authority["authority_state"] = "conflict"
+            elif exc.failure_class == "SECURITY_SCAN_AUTHORITY_LOST":
+                authority["authority_state"] = "lost"
+            elif exc.failure_class == "SECURITY_SCAN_SNAPSHOT_STALE":
+                authority["authority_state"] = "completed_stale"
+            else:
+                authority["authority_state"] = "failed"
+            run_state.setdefault("security_scan_authority_history", []).append(
+                {
+                    "checkpoint": kwargs.get("checkpoint", "executor_postflight"),
+                    "event": "authority_failure",
+                    "generation": int(authority.get("generation", 1)),
+                    "selected_scan_id": str(authority.get("selected_scan_id") or ""),
+                    "failure_class": exc.failure_class,
+                }
+            )
+            run_state["security_scan_authority"] = authority
+        try:
+            _persist_run_state(
+                kwargs["config"],
+                kwargs["canonical_root"],
+                kwargs["run_dir"],
+                kwargs["phase_provenance"],
+                run_state,
+            )
+        except Exception:
+            pass
+        raise
+
+
+def _ensure_security_gate_fresh(
+    *,
+    config: OrchestratorConfig,
+    requirement: tuple[bool, str, str],
+    target_revision: str,
+    run_state: dict,
+    canonical_root: Path,
+    run_dir: Path,
+    phase_provenance: list[dict],
+    state_lock,
+    progress=None,
+    repository_trust_authorized: bool = False,
+    checkpoint: str,
+) -> bool:
+    """Ensure completed, current Security coverage before or after Reviewer work.
+
+    Returns whether a scan-only Executor continuation ran during this check.
+    """
+
+    if not requirement[0]:
+        return False
+    dispatched = False
+    max_generations = max(2, int(getattr(config, "max_correction_cycles", 1)) + 1)
+    for attempt in range(max_generations):
+        generation = int(
+            (run_state.get("security_scan_authority") or {}).get("generation", 1)
+        )
+        check_name = f"{checkpoint}_{attempt + 1}"
+        provider, decision, policy = _prepare_security_scan(
+            config=config,
+            requirement=requirement,
+            target_revision=target_revision,
+            run_state=run_state,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            phase_provenance=phase_provenance,
+            checkpoint=check_name,
+            authorize_executor_dispatch=True,
+        )
+        if provider is None or decision is None:
+            return dispatched
+        if decision.action == "reused":
+            return dispatched
+        if decision.action not in {"start", "awaited"}:
+            raise SecurityScanError(
+                "SECURITY_SCAN_AUTHORITY_INVALID: final Reviewer gate has no completed fresh Security scan.",
+                failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+            )
+        scan_task = (
+            f"Complete one host-authorized Codex Security {requirement[1]} scan for scope "
+            f"{requirement[2]!r} at revision {target_revision}. This is a scan-only continuation; "
+            "do not modify repository source or create any additional scan."
+        )
+        output_name = re.sub(r"[^A-Za-z0-9_-]", "_", check_name)
+        output_path = run_dir / f"security-rescan-{generation}-{output_name}.json"
+        _dispatch_phase(
+            config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            phase_provenance=phase_provenance,
+            run_state=run_state,
+            state_lock=state_lock,
+            progress=progress,
+            role="executor",
+            repository_trust_authorized=repository_trust_authorized,
+            task=_prompt(
+                config,
+                "security-rescan.txt",
+                task=scan_task,
+                security_scan_policy=_executor_security_gate_policy(policy),
+            ),
+            repository=config.repository,
+            output_path=output_path,
+            schema_path=_schema(config, "implementation.schema.json"),
+        )
+        implementation = load_json(output_path)
+        _record_security_scan_result(
+            provider=provider,
+            decision=decision,
+            checkpoint=check_name,
+            implementation=implementation,
+            run_state=run_state,
+            phase_provenance=phase_provenance,
+            config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+        )
+        dispatched = True
+    raise SecurityScanError(
+        f"SECURITY_SCAN_RESCAN_LIMIT: no fresh Security coverage was established after {max_generations} bounded scan generations.",
+        failure_class="SECURITY_SCAN_RESCAN_LIMIT",
+    )
 
 
 def _failure_reason(exc: BaseException) -> str:
@@ -1199,6 +1637,7 @@ def _execute_locked(
             run_dir=run_dir,
             phase_provenance=phase_provenance,
             checkpoint="before_executor",
+            authorize_executor_dispatch=True,
         )
         scan_policy = _executor_security_gate_policy(scan_policy)
         _dispatch_phase(
@@ -1235,10 +1674,24 @@ def _execute_locked(
             run_dir=run_dir,
         )
 
+        review_attempt = 0
         while True:
+            _ensure_security_gate_fresh(
+                config=config,
+                requirement=security_requirement,
+                target_revision=str(baseline.get("head") or ""),
+                run_state=run_state,
+                canonical_root=canonical_root,
+                run_dir=run_dir,
+                phase_provenance=phase_provenance,
+                state_lock=state_lock,
+                progress=progress,
+                repository_trust_authorized=repository_trust_authorized,
+                checkpoint=f"before_reviewer_{review_attempt}",
+            )
             diff_text = status_and_diff(config.repository)
-            (run_dir / f"diff-{correction_cycles}.md").write_text(diff_text, encoding="utf-8")
-            review_path = run_dir / f"review-{correction_cycles}.json"
+            (run_dir / f"diff-{correction_cycles}-{review_attempt}.md").write_text(diff_text, encoding="utf-8")
+            review_path = run_dir / f"review-{correction_cycles}-{review_attempt}.json"
             _dispatch_phase(
                 config=config,
                 canonical_root=canonical_root,
@@ -1256,13 +1709,29 @@ def _execute_locked(
                     plan=dump_json(plan),
                     implementation=dump_json(implementation),
                     diff=diff_text,
-                    phase_provenance=dump_json(_reviewer_phase_context(config, phase_provenance)),
+                    phase_provenance=dump_json(_reviewer_phase_context(config, phase_provenance, run_state)),
                 ),
                 repository=config.repository,
                 output_path=review_path,
                 schema_path=_schema(config, "review.schema.json"),
             )
             review = load_json(review_path)
+            rescanned_after_review = _ensure_security_gate_fresh(
+                config=config,
+                requirement=security_requirement,
+                target_revision=str(baseline.get("head") or ""),
+                run_state=run_state,
+                canonical_root=canonical_root,
+                run_dir=run_dir,
+                phase_provenance=phase_provenance,
+                state_lock=state_lock,
+                progress=progress,
+                repository_trust_authorized=repository_trust_authorized,
+                checkpoint=f"after_reviewer_{review_attempt}",
+            )
+            if rescanned_after_review:
+                review_attempt += 1
+                continue
             if review["verdict"] == "approved":
                 break
             if correction_cycles >= config.max_correction_cycles:
@@ -1280,6 +1749,7 @@ def _execute_locked(
                 run_dir=run_dir,
                 phase_provenance=phase_provenance,
                 checkpoint=f"before_correction_{correction_cycles}",
+                authorize_executor_dispatch=True,
             )
             scan_policy = _executor_security_gate_policy(scan_policy)
             _dispatch_phase(
@@ -1316,6 +1786,7 @@ def _execute_locked(
                 canonical_root=canonical_root,
                 run_dir=run_dir,
             )
+            review_attempt += 1
 
         mutation = mutation_summary()
         atomic_write_json(run_dir / "mutation-attribution.json", mutation)
@@ -1336,6 +1807,8 @@ def _execute_locked(
             phase_provenance=phase_provenance,
             mutation_attribution=mutation,
             initial_git_baseline=run_state["initial_git_baseline"],
+            security_scan_authority=run_state.get("security_scan_authority"),
+            security_scan_authority_history=run_state.get("security_scan_authority_history", []),
         )
         _atomic_write_text(run_dir / "REPORT.md", report)
         return RunOutcome(

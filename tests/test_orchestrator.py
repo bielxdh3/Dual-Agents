@@ -764,7 +764,7 @@ class OrchestratorTests(unittest.TestCase):
             self.assertEqual(mutation["status"], "complete")
             self.assertNotIn("UNKNOWN_MUTATION_STATE", json.dumps(run_state))
 
-    def test_selected_security_scan_provenance_is_persisted(self) -> None:
+    def test_stale_security_scan_is_rescanned_before_reviewer_approval(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             repository = root / "disposable-security-success"
@@ -789,7 +789,7 @@ class OrchestratorTests(unittest.TestCase):
             config = OrchestratorConfig(
                 repository=repository,
                 runs_dir=root / "runs",
-                max_correction_cycles=0,
+                max_correction_cycles=2,
                 require_clean_git=True,
                 codex_command="codex",
                 accounts={"actor": actor},
@@ -810,7 +810,19 @@ class OrchestratorTests(unittest.TestCase):
                 "targetRevision": revision,
                 "scope": ".",
                 "targetSnapshotDigest": "completed-target-snapshot",
-                "currentSnapshotDigest": "completed-target-snapshot",
+                "currentSnapshotDigest": "workspace-mutated-after-scan",
+            }
+            replacement_scan = {
+                **completed_scan,
+                "scanId": "disposable-scan-2",
+                "targetSnapshotDigest": "fresh-target-snapshot",
+                "currentSnapshotDigest": "fresh-target-snapshot",
+            }
+            final_replacement_scan = {
+                **completed_scan,
+                "scanId": "disposable-scan-3",
+                "targetSnapshotDigest": "final-fresh-target-snapshot",
+                "currentSnapshotDigest": "final-fresh-target-snapshot",
             }
 
             class FakeSecurityProvider:
@@ -839,13 +851,21 @@ class OrchestratorTests(unittest.TestCase):
 
             provider = FakeSecurityProvider()
             seen_roles: list[str] = []
+            scan_only_calls = 0
+            reviewer_calls = 0
 
             def fake_runner(**kwargs):
+                nonlocal scan_only_calls, reviewer_calls
                 role = kwargs["role"]
                 seen_roles.append(role)
                 if role == "architect":
                     self.assertIn("HOST SECURITY GATE", kwargs["prompt"])
-                    self.assertIn("The original mission requires a Codex Security standard scan", kwargs["prompt"])
+                    self.assertIn('"required_mode":"standard"', kwargs["prompt"])
+                    self.assertIn('"host_decision":"start"', kwargs["prompt"])
+                    self.assertIn('"revision":"' + revision + '"', kwargs["prompt"])
+                    self.assertIn("must not start, resume, cancel, await operationally", kwargs["prompt"])
+                    self.assertNotIn("security_scan_provenance", kwargs["prompt"])
+                    self.assertNotIn("start exactly one scan", kwargs["prompt"])
                     payload = {
                         "summary": "plan",
                         "steps": ["Do not run the Codex Security scan."],
@@ -856,11 +876,25 @@ class OrchestratorTests(unittest.TestCase):
                     }
                 elif role == "executor":
                     self.assertIn('"decision":"start"', kwargs["prompt"])
-                    self.assertIn("supersedes any conflicting Architect plan", kwargs["prompt"])
-                    self.assertIn("Do not run the Codex Security scan", kwargs["prompt"])
-                    provider.scans = [completed_scan]
+                    if "scan-only continuation" in kwargs["prompt"]:
+                        scan_only_calls += 1
+                        self.assertNotIn("Implement the task", kwargs["prompt"])
+                        if scan_only_calls == 1:
+                            provider.scans = [completed_scan, replacement_scan]
+                            current_scan_id = "disposable-scan-2"
+                            summary = "fresh scan-only continuation completed"
+                        else:
+                            provider.scans = [completed_scan, replacement_scan, final_replacement_scan]
+                            current_scan_id = "disposable-scan-3"
+                            summary = "final fresh scan-only continuation completed"
+                    else:
+                        self.assertIn("supersedes any conflicting Architect plan", kwargs["prompt"])
+                        self.assertIn("Do not run the Codex Security scan", kwargs["prompt"])
+                        provider.scans = [completed_scan]
+                        current_scan_id = scan_id
+                        summary = "initial scan completed stale"
                     payload = {
-                        "summary": "scan completed",
+                        "summary": summary,
                         "files_changed": [],
                         "commands_run": [],
                         "tests": [],
@@ -874,7 +908,7 @@ class OrchestratorTests(unittest.TestCase):
                                 "revision": revision,
                                 "scope": ".",
                             },
-                            "scan_id": scan_id,
+                            "scan_id": current_scan_id,
                             "mode": "standard",
                             "initial_status": "running",
                             "action": "started",
@@ -882,7 +916,35 @@ class OrchestratorTests(unittest.TestCase):
                         },
                     }
                 else:
+                    reviewer_calls += 1
+                    prompt_parts = kwargs["prompt"].split("CONTROL-PLANE VERIFIED PHASE PROVENANCE:\n", 1)
+                    reviewer_context = json.loads(prompt_parts[1].split("\n\nGIT STATUS AND DIFF:", 1)[0])
+                    security_gate = reviewer_context["host_security_gate"]
+                    self.assertTrue(security_gate["fresh_for_acceptance"])
+                    self.assertEqual(security_gate["authority_state"], "completed_fresh")
+                    self.assertEqual(security_gate["selected_scan"]["scan_id"], "disposable-scan-2" if reviewer_calls == 1 else "disposable-scan-3")
+                    self.assertIn(
+                        {"event": "completed_stale", "generation": 1, "selected_scan_id": scan_id, "failure_class": "SECURITY_SCAN_SNAPSHOT_STALE"},
+                        security_gate["coverage_history"],
+                    )
+                    if reviewer_calls == 2:
+                        self.assertIn(
+                            {"event": "completed_stale", "generation": 2, "selected_scan_id": "disposable-scan-2", "failure_class": "SECURITY_SCAN_SNAPSHOT_STALE"},
+                            security_gate["coverage_history"],
+                        )
+                    state_at_review = json.loads(
+                        (kwargs["output_path"].parent / "run_state.json").read_text(encoding="utf-8")
+                    )
+                    authority_at_review = state_at_review["security_scan_authority"]
+                    self.assertEqual(authority_at_review["authority_state"], "completed_fresh")
+                    expected_generation = 2 if reviewer_calls == 1 else 3
+                    expected_scan_id = f"disposable-scan-{expected_generation}"
+                    self.assertEqual(authority_at_review["generation"], expected_generation)
+                    self.assertEqual(authority_at_review["selected_scan_id"], expected_scan_id)
                     payload = {"verdict": "approved", "summary": "approved", "findings": []}
+                    if reviewer_calls == 1:
+                        # Simulate the provider observing a repository mutation during Reviewer work.
+                        replacement_scan["currentSnapshotDigest"] = "workspace-changed-after-review"
                 kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
                 return CommandResult(
                     ["fake"],
@@ -908,18 +970,19 @@ class OrchestratorTests(unittest.TestCase):
 
             run_state = json.loads((outcome.run_dir / "run_state.json").read_text(encoding="utf-8"))
             provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
-            self.assertEqual(seen_roles, ["architect", "executor", "reviewer"])
+            self.assertEqual(
+                seen_roles,
+                ["architect", "executor", "executor", "reviewer", "executor", "reviewer"],
+            )
+            self.assertEqual(reviewer_calls, 2)
             self.assertEqual([item["required_mode"] for item in provider.arbitrations], ["standard"])
             self.assertEqual([item["required_scope"] for item in provider.arbitrations], ["."])
             self.assertEqual(run_state["security_scan_arbitrations"][0]["decision"], "start")
-            self.assertEqual(
-                [item["checkpoint"] for item in run_state["security_scan_arbitrations"]],
-                ["before_architect", "before_executor"],
-            )
-            self.assertEqual(run_state["security_scan_authority"]["selected_scan_id"], scan_id)
+            self.assertEqual(run_state["security_scan_authority"]["selected_scan_id"], "disposable-scan-3")
+            self.assertEqual(run_state["security_scan_authority"]["generation"], 3)
             self.assertEqual(
                 run_state["security_scan_authority"]["completed_validation"]["validated_at_checkpoint"],
-                "before_executor",
+                "after_reviewer_0_1",
             )
             saved_scan = run_state["security_scan_provenance"][0]
             self.assertEqual(saved_scan["scan_id"], scan_id)
@@ -927,10 +990,27 @@ class OrchestratorTests(unittest.TestCase):
             self.assertEqual(saved_scan["initial_status"], "running")
             self.assertEqual(saved_scan["action"], "started")
             self.assertEqual(saved_scan["final_status"], "complete")
-            self.assertEqual(provenance["security_scan_provenance"], [saved_scan])
-            self.assertEqual(provenance["configured_actor_routing"][1]["security_scan_provenance"], saved_scan)
+            self.assertEqual(
+                [item["scan_id"] for item in run_state["security_scan_provenance"]],
+                [scan_id, "disposable-scan-2", "disposable-scan-3"],
+            )
+            self.assertEqual(
+                [item["scan_id"] for item in provenance["security_scan_provenance"]],
+                [scan_id, "disposable-scan-2", "disposable-scan-3"],
+            )
+            executor_provenance = [item for item in provenance["configured_actor_routing"] if item["role"] == "executor"]
+            self.assertEqual(
+                [item["security_scan_provenance"]["scan_id"] for item in executor_provenance],
+                [scan_id, "disposable-scan-2", "disposable-scan-3"],
+            )
             report = (outcome.run_dir / "REPORT.md").read_text(encoding="utf-8")
-            self.assertIn("Codex Security scan", report)
+            self.assertIn("## Codex Security coverage", report)
+            self.assertIn("Authority: **completed_fresh** / generation **3** / fresh for acceptance: **true**", report)
+            self.assertIn("Authoritative scan: `disposable-scan-3`", report)
+            self.assertIn("Generation 1: **completed_stale** / scan `disposable-scan-1`", report)
+            self.assertIn("Generation 2: **completed_stale** / scan `disposable-scan-2`", report)
+            self.assertIn("Generation 3: **completed_fresh** / scan `disposable-scan-3`", report)
+            self.assertNotIn("Executor-reported Codex Security evidence", report)
             self.assertNotIn("handoffClaimToken", json.dumps(provenance))
 
 

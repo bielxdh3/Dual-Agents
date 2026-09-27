@@ -200,6 +200,8 @@ def render_markdown(
     phase_provenance: list[dict[str, Any]] | None = None,
     mutation_attribution: Mapping[str, Any] | None = None,
     initial_git_baseline: Mapping[str, Any] | None = None,
+    security_scan_authority: Mapping[str, Any] | None = None,
+    security_scan_authority_history: list[Mapping[str, Any]] | None = None,
 ) -> str:
     lines = [
         "# Dual Codex Run Report",
@@ -230,29 +232,57 @@ def render_markdown(
                 "",
             ]
         )
-    security_scan = implementation.get("security_scan_provenance")
-    if isinstance(security_scan, Mapping):
-        target = security_scan.get("target_identity")
-        target_path = target.get("path", "unknown") if isinstance(target, Mapping) else "unknown"
+    if isinstance(security_scan_authority, Mapping):
+        selected_id = str(security_scan_authority.get("selected_scan_id") or "")
+        status = str(security_scan_authority.get("authority_state") or "missing")
         lines.extend(
             [
-                "## Codex Security scan",
+                "## Codex Security coverage",
                 "",
-                "- Plugin: `{}` version `{}`".format(
-                    security_scan.get("plugin_id", "unknown"),
-                    security_scan.get("plugin_version", "unknown"),
-                ),
-                "- Target: `{}`".format(target_path),
-                "- Scan: `{}` / mode `{}` / action `{}` / `{}` → `{}`".format(
-                    security_scan.get("scan_id", "unknown"),
-                    security_scan.get("scan_mode", security_scan.get("mode", "unknown")),
-                    security_scan.get("action", "unknown"),
-                    security_scan.get("initial_status", "unknown"),
-                    security_scan.get("final_status", "unknown"),
-                ),
+                f"- Required mode and scope: `{security_scan_authority.get('required_mode', 'unknown')}` / `{security_scan_authority.get('required_scope', 'unknown')}`",
+                f"- Authority: **{status}** / generation **{security_scan_authority.get('generation', 'unknown')}** / fresh for acceptance: **{str(status == 'completed_fresh').lower()}**",
+                f"- Authoritative scan: `{selected_id or 'none'}` / mode `{security_scan_authority.get('selected_scan_mode', 'unknown')}` / scope `{security_scan_authority.get('selected_scan_scope', 'unknown')}`",
+                f"- Target: `{security_scan_authority.get('target_path', 'unknown')}` / revision `{security_scan_authority.get('target_revision', 'unknown')}`",
                 "",
             ]
         )
+        history = security_scan_authority_history or []
+        coverage_events = [
+            event
+            for event in history
+            if isinstance(event, Mapping)
+            and event.get("event") in {"run_owned", "completed_fresh", "completed_stale", "generation_authorized", "rescan_limit"}
+        ]
+        if coverage_events:
+            lines.extend(["### Security generation history", ""])
+            for event in coverage_events:
+                event_name = str(event.get("event", "unknown"))
+                generation = event.get("generation", "unknown")
+                scan_id = str(event.get("selected_scan_id") or event.get("previous_scan_id") or "none")
+                failure = f" / `{event.get('failure_class')}`" if event.get("failure_class") else ""
+                lines.append(f"- Generation {generation}: **{event_name}** / scan `{scan_id}`{failure}")
+            lines.append("")
+    else:
+        security_scan = implementation.get("security_scan_provenance")
+        if isinstance(security_scan, Mapping):
+            target = security_scan.get("target_identity")
+            target_path = target.get("path", "unknown") if isinstance(target, Mapping) else "unknown"
+            lines.extend(
+                [
+                    "## Executor-reported Codex Security evidence",
+                    "",
+                    "- Target: `{}`".format(target_path),
+                    "- Scan: `{}` / mode `{}` / action `{}` / `{}` → `{}`".format(
+                        security_scan.get("scan_id", "unknown"),
+                        security_scan.get("scan_mode", security_scan.get("mode", "unknown")),
+                        security_scan.get("action", "unknown"),
+                        security_scan.get("initial_status", "unknown"),
+                        security_scan.get("final_status", "unknown"),
+                    ),
+                    "- This is Executor-reported evidence; host authority is required to establish fresh coverage.",
+                    "",
+                ]
+            )
     if phase_provenance:
         lines.extend(["## Configured actor routing", ""])
         for item in phase_provenance:
