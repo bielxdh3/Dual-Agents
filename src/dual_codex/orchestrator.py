@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 import re
 import stat
 import threading
+from typing import Mapping
 from uuid import uuid4
 
 from .bootstrap import (
@@ -34,6 +35,7 @@ from .security_scan import (
     CodexSecurityProvider,
     ScanDecision,
     SecurityScanError,
+    continue_security_scan_authority,
     validate_scan_provenance,
 )
 
@@ -142,7 +144,10 @@ def _write_provenance(
                 "initial_git_baseline": run_state.get("initial_git_baseline"),
                 "mutation_attribution": run_state.get("mutation_attribution"),
                 "security_scan_arbitrations": run_state.get("security_scan_arbitrations", []),
+                "security_scan_authority": run_state.get("security_scan_authority"),
+                "security_scan_authority_history": run_state.get("security_scan_authority_history", []),
                 "security_scan_provenance": run_state.get("security_scan_provenance", []),
+                "app_server_dispatch_provenance": run_state.get("app_server_dispatch_provenance", []),
                 "dual_agents_bootstrap_artifacts": run_state.get("dual_agents_bootstrap_artifacts", []),
                 "failure": run_state.get("failure"),
             }
@@ -325,16 +330,104 @@ def _prepare_security_scan(
     if not required:
         return None, None, ""
     provider = CodexSecurityProvider(config.agent_for_role("executor"))
-    decision = provider.arbitrate(
-        repository=config.repository,
-        target_revision=target_revision,
-        required_mode=mode,
-        required_scope=scope,
-        allow_completed_reuse=False,
-    )
+    authority = run_state.get("security_scan_authority")
+    try:
+        if not isinstance(authority, Mapping):
+            decision = provider.arbitrate(
+                repository=config.repository,
+                target_revision=target_revision,
+                required_mode=mode,
+                required_scope=scope,
+                allow_completed_reuse=False,
+            )
+            if decision.action != "conflict":
+                authority = {
+                    "plugin_id": decision.plugin_id,
+                    "plugin_version": decision.plugin_version,
+                    "target_path": decision.target_path,
+                    "target_id": decision.target_id,
+                    "target_revision": decision.target_revision,
+                    "required_mode": decision.required_mode,
+                    "required_scope": decision.required_scope,
+                    "initial_checkpoint": checkpoint,
+                    "initial_decision": decision.action,
+                    "initial_observed_scan_ids": [
+                        str(scan.get("scanId", scan.get("scan_id", "")))
+                        for scan in decision.observed_scans
+                        if scan.get("scanId", scan.get("scan_id", ""))
+                    ],
+                    "selected_scan_id": str(
+                        (decision.selected_scan or {}).get("scanId", (decision.selected_scan or {}).get("scan_id", ""))
+                    ),
+                    "selected_scan_mode": str((decision.selected_scan or {}).get("mode", "")),
+                    "selected_scan_scope": str((decision.selected_scan or {}).get("scope", "")),
+                    "initial_selected_status": (
+                        str((decision.selected_scan or {}).get("progress", {}).get("status", ""))
+                        if isinstance((decision.selected_scan or {}).get("progress", {}), Mapping)
+                        else str((decision.selected_scan or {}).get("status", ""))
+                    ),
+                }
+                run_state["security_scan_authority"] = dict(authority)
+        else:
+            scans = provider.list_target_scans(config.repository)
+            decision = continue_security_scan_authority(
+                scans,
+                authority=authority,
+                plugin_id=provider.plugin_id,
+                plugin_version=provider.plugin_version,
+                target_path=config.repository,
+                target_revision=target_revision,
+                required_mode=mode,
+                required_scope=scope,
+            )
+            if decision.selected_scan is not None:
+                authority = dict(authority)
+                authority["selected_scan_id"] = str(
+                    decision.selected_scan.get("scanId", decision.selected_scan.get("scan_id", ""))
+                )
+                if not authority.get("selected_scan_mode"):
+                    authority["selected_scan_mode"] = str(decision.selected_scan.get("mode", ""))
+                if not authority.get("selected_scan_scope"):
+                    authority["selected_scan_scope"] = str(decision.selected_scan.get("scope", ""))
+                if decision.action == "reused" and not authority.get("completed_validation"):
+                    snapshot_digest = decision.selected_scan.get("targetSnapshotDigest")
+                    if not snapshot_digest:
+                        raise SecurityScanError(
+                            "SECURITY_SCAN_AUTHORITY_INVALID: completed scan has no target snapshot identity.",
+                            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+                        )
+                    authority["completed_validation"] = {
+                        "scan_id": authority["selected_scan_id"],
+                        "target_snapshot_identity": hashlib.sha256(
+                            str(snapshot_digest).encode("utf-8")
+                        ).hexdigest(),
+                        "validated_at_checkpoint": checkpoint,
+                    }
+                run_state["security_scan_authority"] = authority
+    except SecurityScanError as exc:
+        failure_record = {
+            "checkpoint": checkpoint,
+            "failure_class": exc.failure_class,
+            "authority_scan_id": str((authority or {}).get("selected_scan_id", "")) if isinstance(authority, Mapping) else "",
+        }
+        run_state.setdefault("security_scan_authority_history", []).append(failure_record)
+        run_state.setdefault("security_scan_arbitrations", []).append(dict(failure_record))
+        _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
+        raise
+
     record = decision.public_record()
     record["checkpoint"] = checkpoint
     run_state.setdefault("security_scan_arbitrations", []).append(record)
+    history_entry = dict(record)
+    history_entry["selected_scan_id"] = str(
+        (decision.selected_scan or {}).get("scanId", (decision.selected_scan or {}).get("scan_id", ""))
+    )
+    if decision.selected_scan is not None:
+        progress = decision.selected_scan.get("progress")
+        history_entry["selected_status"] = str(
+            progress.get("status", "") if isinstance(progress, Mapping) else decision.selected_scan.get("status", "")
+        )
+    run_state.setdefault("security_scan_authority_history", []).append(history_entry)
     _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
     if decision.action == "conflict":
         observed = ", ".join(
@@ -353,6 +446,7 @@ def _record_security_scan_result(
     *,
     provider: CodexSecurityProvider | None,
     decision: ScanDecision | None,
+    checkpoint: str = "executor_postflight",
     implementation: Mapping[str, Any],
     run_state: dict,
     phase_provenance: list[dict],
@@ -372,6 +466,80 @@ def _record_security_scan_result(
         implementation.get("security_scan_provenance"),
         decision=decision,
         final_scans=final_scans,
+    )
+    authority = run_state.get("security_scan_authority")
+    if not isinstance(authority, dict):
+        raise SecurityScanError(
+            "SECURITY_SCAN_AUTHORITY_INVALID: the run-local scan authority is missing after Executor dispatch.",
+            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+        )
+    scan_id = str(evidence["scan_id"])
+    if authority.get("selected_scan_id") and authority["selected_scan_id"] != scan_id:
+        raise SecurityScanError(
+            "SECURITY_SCAN_AUTHORITY_INVALID: Executor evidence names a scan other than the persisted run authority.",
+            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+        )
+    selected_matches = [
+        scan for scan in final_scans
+        if str(scan.get("scanId", scan.get("scan_id", ""))) == scan_id
+    ]
+    if len(selected_matches) != 1:
+        raise SecurityScanError(
+            "SECURITY_SCAN_AUTHORITY_LOST: the validated scan is missing or ambiguous while recording completion.",
+            failure_class="SECURITY_SCAN_AUTHORITY_LOST",
+        )
+    selected = selected_matches[0]
+    selected_mode = str(selected.get("mode", ""))
+    selected_scope = str(selected.get("scope", "")).replace("\\", "/").strip("/") or "."
+    pinned_mode = str(authority.get("selected_scan_mode") or "")
+    pinned_scope_raw = str(authority.get("selected_scan_scope") or "")
+    pinned_scope = (pinned_scope_raw.replace("\\", "/").strip("/") or ".") if pinned_scope_raw else ""
+    if (pinned_mode and pinned_mode != selected_mode) or (pinned_scope and pinned_scope != selected_scope):
+        raise SecurityScanError(
+            "SECURITY_SCAN_AUTHORITY_INVALID: completed scan changed its run-pinned mode or scope.",
+            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+        )
+    snapshot_digest = selected.get("targetSnapshotDigest")
+    if not snapshot_digest:
+        raise SecurityScanError(
+            "SECURITY_SCAN_AUTHORITY_INVALID: completed scan has no target snapshot identity.",
+            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+        )
+    snapshot_identity = hashlib.sha256(str(snapshot_digest).encode("utf-8")).hexdigest()
+    completed_validation = authority.get("completed_validation")
+    if completed_validation:
+        if (
+            not isinstance(completed_validation, Mapping)
+            or completed_validation.get("scan_id") != scan_id
+            or completed_validation.get("target_snapshot_identity") != snapshot_identity
+            or selected.get("warnings")
+        ):
+            raise SecurityScanError(
+                "SECURITY_SCAN_AUTHORITY_INVALID: completed authoritative scan changed its validated snapshot identity or warnings.",
+                failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+            )
+    elif snapshot_digest != selected.get("currentSnapshotDigest") or selected.get("warnings"):
+        raise SecurityScanError(
+            "SECURITY_SCAN_AUTHORITY_INVALID: scan completion is stale or contains warnings.",
+            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+        )
+    authority["selected_scan_id"] = scan_id
+    authority["selected_scan_mode"] = selected_mode
+    authority["selected_scan_scope"] = selected_scope
+    if not completed_validation:
+        authority["completed_validation"] = {
+            "scan_id": scan_id,
+            "target_snapshot_identity": snapshot_identity,
+            "validated_at_checkpoint": checkpoint,
+        }
+    run_state.setdefault("security_scan_authority_history", []).append(
+        {
+            "checkpoint": checkpoint,
+            "event": "completed_validation",
+            "selected_scan_id": scan_id,
+            "selected_status": "complete",
+            "target_snapshot_identity": snapshot_identity,
+        }
     )
     run_state.setdefault("security_scan_provenance", []).append(evidence)
     phase = next((item for item in reversed(phase_provenance) if item.get("role") == "executor"), None)
@@ -712,12 +880,31 @@ def _dispatch_phase(
                 event["detail"] = safe_detail
             _progress_event(progress, **event)
 
+        def app_server_dispatch_started(details: dict) -> None:
+            safe_details = {
+                key: details.get(key)
+                for key in (
+                    "turn_timeout_seconds",
+                    "timeout_source",
+                    "runtime_config_identity",
+                    "process_reuse_state",
+                    "reused_process_runtime_identity_matched",
+                )
+            }
+            with state_lock:
+                entry["app_server_dispatch_provenance"] = safe_details
+                run_state.setdefault("app_server_dispatch_provenance", []).append(
+                    {"phase": role, **safe_details}
+                )
+                _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state, required=True)
+
         result = delegate_to_configured_actor(
             config=config,
             role=role,
             repository_trust_authorized=repository_trust_authorized,
             run_id=run_state["run_id"],
             progress=backend_progress,
+            dispatch_started=app_server_dispatch_started,
             **kwargs,
         )
     except Exception as exc:
@@ -889,6 +1076,11 @@ def _execute_locked(
         "provider_status": "not_started",
         "last_progress_at": None,
         "app_server_turn_provenance": [],
+        "app_server_dispatch_provenance": [],
+        "security_scan_arbitrations": [],
+        "security_scan_authority": None,
+        "security_scan_authority_history": [],
+        "security_scan_provenance": [],
         "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest(),
         "initial_git_baseline": {
             "path": baseline_path.name,
@@ -1034,6 +1226,7 @@ def _execute_locked(
         _record_security_scan_result(
             provider=security_provider,
             decision=scan_decision,
+            checkpoint="before_executor",
             implementation=implementation,
             run_state=run_state,
             phase_provenance=phase_provenance,
@@ -1115,6 +1308,7 @@ def _execute_locked(
             _record_security_scan_result(
                 provider=security_provider,
                 decision=scan_decision,
+                checkpoint=f"before_correction_{correction_cycles}",
                 implementation=implementation,
                 run_state=run_state,
                 phase_provenance=phase_provenance,

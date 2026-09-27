@@ -124,6 +124,16 @@ class OrchestratorTests(unittest.TestCase):
                 role = kwargs["role"]
                 agent: AgentConfig = kwargs["agent"]
                 seen.append((role, agent.account_name, agent.backend))
+                if role == "executor":
+                    kwargs["dispatch_started"](
+                        {
+                            "turn_timeout_seconds": 3600,
+                            "timeout_source": "account_role_override",
+                            "runtime_config_identity": "a" * 64,
+                            "process_reuse_state": "new_process",
+                            "reused_process_runtime_identity_matched": None,
+                        }
+                    )
                 self.assertIn("harmless mission brief", kwargs["prompt"])
                 if role == "reviewer":
                     self.assertIn("CONTROL-PLANE VERIFIED PHASE PROVENANCE", kwargs["prompt"])
@@ -170,7 +180,27 @@ class OrchestratorTests(unittest.TestCase):
                 )
 
             with patch("dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner):
-                execute(config, task)
+                outcome = execute(config, task)
+
+            state = json.loads((outcome.run_dir / "run_state.json").read_text(encoding="utf-8"))
+            provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
+            dispatch = state["app_server_dispatch_provenance"][0]
+            self.assertEqual(dispatch["turn_timeout_seconds"], 3600)
+            self.assertEqual(dispatch["timeout_source"], "account_role_override")
+            self.assertEqual(dispatch["process_reuse_state"], "new_process")
+            executor_phase = next(
+                item for item in provenance["configured_actor_routing"] if item.get("role") == "executor"
+            )
+            self.assertEqual(
+                executor_phase["app_server_dispatch_provenance"],
+                {key: dispatch[key] for key in (
+                    "turn_timeout_seconds",
+                    "timeout_source",
+                    "runtime_config_identity",
+                    "process_reuse_state",
+                    "reused_process_runtime_identity_matched",
+                )},
+            )
 
             self.assertEqual(
                 seen,
@@ -779,6 +809,8 @@ class OrchestratorTests(unittest.TestCase):
                 "targetId": target_id,
                 "targetRevision": revision,
                 "scope": ".",
+                "targetSnapshotDigest": "completed-target-snapshot",
+                "currentSnapshotDigest": "completed-target-snapshot",
             }
 
             class FakeSecurityProvider:
@@ -877,12 +909,17 @@ class OrchestratorTests(unittest.TestCase):
             run_state = json.loads((outcome.run_dir / "run_state.json").read_text(encoding="utf-8"))
             provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
             self.assertEqual(seen_roles, ["architect", "executor", "reviewer"])
-            self.assertEqual([item["required_mode"] for item in provider.arbitrations], ["standard", "standard"])
-            self.assertEqual([item["required_scope"] for item in provider.arbitrations], [".", "."])
+            self.assertEqual([item["required_mode"] for item in provider.arbitrations], ["standard"])
+            self.assertEqual([item["required_scope"] for item in provider.arbitrations], ["."])
             self.assertEqual(run_state["security_scan_arbitrations"][0]["decision"], "start")
             self.assertEqual(
                 [item["checkpoint"] for item in run_state["security_scan_arbitrations"]],
                 ["before_architect", "before_executor"],
+            )
+            self.assertEqual(run_state["security_scan_authority"]["selected_scan_id"], scan_id)
+            self.assertEqual(
+                run_state["security_scan_authority"]["completed_validation"]["validated_at_checkpoint"],
+                "before_executor",
             )
             saved_scan = run_state["security_scan_provenance"][0]
             self.assertEqual(saved_scan["scan_id"], scan_id)

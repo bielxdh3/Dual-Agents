@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
+import json
 import unittest
 from unittest.mock import patch
 
@@ -10,10 +12,16 @@ from dual_codex.security_scan import (
     CodexSecurityProvider,
     SecurityScanError,
     arbitrate_security_scans,
+    continue_security_scan_authority,
     stable_target_id,
     validate_scan_provenance,
 )
-from dual_codex.orchestrator import _executor_security_gate_policy, _prepare_security_scan, _security_scan_request
+from dual_codex.orchestrator import (
+    _executor_security_gate_policy,
+    _prepare_security_scan,
+    _record_security_scan_result,
+    _security_scan_request,
+)
 
 
 def _scan(repository: Path, scan_id: str, mode: str, status: str, *, revision: str = "rev-1", scope: str = ".") -> dict:
@@ -78,6 +86,285 @@ class SecurityScanArbitrationTests(unittest.TestCase):
         self.assertEqual(_decide(repository, [stale], reuse=True).action, "start")
         warned = {**completed, "warnings": ["incomplete target"]}
         self.assertEqual(_decide(repository, [warned], reuse=True).action, "start")
+
+    def test_run_authority_preserves_running_scan_after_it_completes(self) -> None:
+        from types import SimpleNamespace
+
+        repository = Path(".").resolve()
+        running = _scan(repository, "deep-authority", "deep", "running")
+        completed = {**running, "progress": {"status": "complete"}}
+
+        class FakeProvider:
+            plugin_id = PLUGIN_ID
+            plugin_version = "0.1.31"
+
+            def __init__(self):
+                self.scans = [running]
+                self.arbitrations = []
+
+            def arbitrate(self, **kwargs):
+                self.arbitrations.append(dict(kwargs))
+                return arbitrate_security_scans(
+                    self.scans,
+                    plugin_id=self.plugin_id,
+                    plugin_version=self.plugin_version,
+                    target_path=kwargs["repository"],
+                    target_revision=kwargs["target_revision"],
+                    required_mode=kwargs["required_mode"],
+                    required_scope=kwargs["required_scope"],
+                    allow_completed_reuse=kwargs["allow_completed_reuse"],
+                )
+
+            def list_target_scans(self, _repository):
+                return list(self.scans)
+
+        provider = FakeProvider()
+        config = SimpleNamespace(repository=repository, agent_for_role=lambda _role: object())
+        run_state = {}
+        common = {
+            "config": config,
+            "requirement": (True, "standard", "."),
+            "target_revision": "rev-1",
+            "run_state": run_state,
+            "canonical_root": repository,
+            "run_dir": repository,
+            "phase_provenance": [],
+        }
+        with patch("dual_codex.orchestrator.CodexSecurityProvider", return_value=provider), patch(
+            "dual_codex.orchestrator._persist_run_state"
+        ):
+            _, first, _ = _prepare_security_scan(**common, checkpoint="before_architect")
+            provider.scans = [completed]
+            _, second, policy = _prepare_security_scan(**common, checkpoint="before_executor")
+            provider.scans = [{**completed, "currentSnapshotDigest": "workspace-changed-during-correction"}]
+            _, correction, _ = _prepare_security_scan(**common, checkpoint="before_correction_1")
+
+        self.assertEqual(first.action, "awaited")
+        self.assertEqual(second.action, "reused")
+        self.assertEqual(correction.action, "reused")
+        self.assertEqual(first.selected_scan["scanId"], second.selected_scan["scanId"])
+        self.assertEqual(second.selected_scan["scanId"], correction.selected_scan["scanId"])
+        self.assertEqual(len(provider.arbitrations), 1)
+        self.assertFalse(provider.arbitrations[0]["allow_completed_reuse"])
+        self.assertIn('"decision":"reused"', policy)
+        self.assertIn("do not start a competing scan", policy)
+        history = run_state["security_scan_authority_history"]
+        self.assertEqual([entry["checkpoint"] for entry in history], [
+            "before_architect", "before_executor", "before_correction_1"
+        ])
+        self.assertEqual([entry["selected_scan_id"] for entry in history], [
+            "deep-authority", "deep-authority", "deep-authority"
+        ])
+
+    def test_start_authority_adopts_one_scan_created_during_architect_phase(self) -> None:
+        from types import SimpleNamespace
+
+        repository = Path(".").resolve()
+        created = _scan(repository, "created-in-run", "standard", "running")
+
+        class FakeProvider:
+            plugin_id = PLUGIN_ID
+            plugin_version = "0.1.31"
+
+            def __init__(self):
+                self.scans = []
+                self.arbitrations = 0
+
+            def arbitrate(self, **kwargs):
+                self.arbitrations += 1
+                return arbitrate_security_scans(
+                    self.scans, plugin_id=self.plugin_id, plugin_version=self.plugin_version,
+                    target_path=kwargs["repository"], target_revision=kwargs["target_revision"],
+                    required_mode=kwargs["required_mode"], required_scope=kwargs["required_scope"],
+                    allow_completed_reuse=kwargs["allow_completed_reuse"],
+                )
+
+            def list_target_scans(self, _repository):
+                return list(self.scans)
+
+        provider = FakeProvider()
+        run_state = {}
+        config = SimpleNamespace(repository=repository, agent_for_role=lambda _role: object())
+        common = {
+            "config": config, "requirement": (True, "standard", "."), "target_revision": "rev-1",
+            "run_state": run_state, "canonical_root": repository, "run_dir": repository,
+            "phase_provenance": [],
+        }
+        with patch("dual_codex.orchestrator.CodexSecurityProvider", return_value=provider), patch(
+            "dual_codex.orchestrator._persist_run_state"
+        ):
+            _, initial, _ = _prepare_security_scan(**common, checkpoint="before_architect")
+            provider.scans = [created]
+            _, adopted, _ = _prepare_security_scan(**common, checkpoint="before_executor")
+
+        self.assertEqual(initial.action, "start")
+        self.assertEqual(adopted.action, "awaited")
+        self.assertEqual(adopted.selected_scan["scanId"], "created-in-run")
+        self.assertEqual(run_state["security_scan_authority"]["selected_scan_id"], "created-in-run")
+        self.assertEqual(provider.arbitrations, 1)
+
+    def test_scan_completing_during_executor_turn_is_pinned_for_correction(self) -> None:
+        from types import SimpleNamespace
+
+        repository = Path(".").resolve()
+        running = _scan(repository, "deep-in-flight", "deep", "running")
+
+        class FakeProvider:
+            plugin_id = PLUGIN_ID
+            plugin_version = "0.1.31"
+
+            def __init__(self):
+                self.scans = [running]
+                self.arbitrations = []
+
+            def arbitrate(self, **kwargs):
+                self.arbitrations.append(dict(kwargs))
+                return arbitrate_security_scans(
+                    self.scans,
+                    plugin_id=self.plugin_id,
+                    plugin_version=self.plugin_version,
+                    target_path=kwargs["repository"],
+                    target_revision=kwargs["target_revision"],
+                    required_mode=kwargs["required_mode"],
+                    required_scope=kwargs["required_scope"],
+                    allow_completed_reuse=kwargs["allow_completed_reuse"],
+                )
+
+            def list_target_scans(self, _repository):
+                return list(self.scans)
+
+        provider = FakeProvider()
+        config = SimpleNamespace(repository=repository, agent_for_role=lambda _role: object())
+        run_state = {}
+        phase_provenance = []
+        common = {
+            "config": config,
+            "requirement": (True, "standard", "."),
+            "target_revision": "rev-1",
+            "run_state": run_state,
+            "canonical_root": repository,
+            "run_dir": repository,
+            "phase_provenance": phase_provenance,
+        }
+        with patch("dual_codex.orchestrator.CodexSecurityProvider", return_value=provider), patch(
+            "dual_codex.orchestrator._persist_run_state"
+        ):
+            _, initial, _ = _prepare_security_scan(**common, checkpoint="before_architect")
+            _, preflight, _ = _prepare_security_scan(**common, checkpoint="before_executor")
+            completed = {**running, "progress": {"status": "complete"}}
+            provider.scans = [completed]
+            _record_security_scan_result(
+                provider=provider,
+                decision=preflight,
+                checkpoint="before_executor",
+                implementation={
+                    "security_scan_provenance": {
+                        "plugin_id": PLUGIN_ID,
+                        "plugin_version": "0.1.31",
+                        "target_identity": {
+                            "path": str(repository),
+                            "target_id": stable_target_id(repository),
+                            "revision": "rev-1",
+                            "scope": ".",
+                        },
+                        "scan_id": "deep-in-flight",
+                        "mode": "deep",
+                        "initial_status": "running",
+                        "action": "awaited",
+                        "final_status": "complete",
+                    }
+                },
+                run_state=run_state,
+                phase_provenance=phase_provenance,
+                config=config,
+                canonical_root=repository,
+                run_dir=repository,
+            )
+            provider.scans = [{**completed, "currentSnapshotDigest": "workspace-changed-during-correction"}]
+            _, correction, _ = _prepare_security_scan(**common, checkpoint="before_correction_1")
+
+        authority = run_state["security_scan_authority"]
+        self.assertEqual(initial.action, "awaited")
+        self.assertEqual(preflight.action, "awaited")
+        self.assertEqual(correction.action, "reused")
+        self.assertEqual(correction.selected_scan["scanId"], "deep-in-flight")
+        self.assertEqual(authority["selected_scan_id"], "deep-in-flight")
+        self.assertEqual(authority["completed_validation"]["validated_at_checkpoint"], "before_executor")
+        self.assertNotIn("targetSnapshotDigest", json.dumps(authority))
+        self.assertEqual(len(provider.arbitrations), 1)
+        self.assertFalse(provider.arbitrations[0]["allow_completed_reuse"])
+        self.assertEqual(
+            [entry.get("event") for entry in run_state["security_scan_authority_history"]],
+            [None, None, "completed_validation", None],
+        )
+
+    def test_run_authority_fails_closed_for_lost_failed_competing_or_mismatched_scan(self) -> None:
+        repository = Path(".").resolve()
+        running = _scan(repository, "deep-authority", "deep", "running")
+        authority = {
+            "plugin_id": PLUGIN_ID,
+            "plugin_version": "0.1.31",
+            "target_path": str(repository),
+            "target_id": stable_target_id(repository),
+            "target_revision": "rev-1",
+            "required_mode": "standard",
+            "required_scope": ".",
+            "initial_observed_scan_ids": ["deep-authority"],
+            "selected_scan_id": "deep-authority",
+            "selected_scan_mode": "deep",
+            "selected_scan_scope": ".",
+        }
+        base = {
+            "authority": authority,
+            "plugin_id": PLUGIN_ID,
+            "plugin_version": "0.1.31",
+            "target_path": repository,
+            "target_revision": "rev-1",
+            "required_mode": "standard",
+            "required_scope": ".",
+        }
+        cases = [
+            ([], "SECURITY_SCAN_AUTHORITY_LOST"),
+            ([{**running, "progress": {"status": "failed"}}], "SECURITY_SCAN_AUTHORITY_FAILED"),
+            ([{**running, "progress": {"status": "canceled"}}], "SECURITY_SCAN_AUTHORITY_FAILED"),
+            ([running, _scan(repository, "competitor", "standard", "running")], "SECURITY_SCAN_CONFLICT"),
+            ([{**running, "targetRevision": "other-rev"}], "SECURITY_SCAN_AUTHORITY_INVALID"),
+            ([{**running, "scope": "src"}], "SECURITY_SCAN_AUTHORITY_INVALID"),
+            ([{**running, "mode": "standard"}], "SECURITY_SCAN_AUTHORITY_INVALID"),
+            ([{**running, "targetId": "different-target"}], "SECURITY_SCAN_CONFLICT"),
+            ([running, _scan(repository, "duplicate-complete", "standard", "complete")], "SECURITY_SCAN_CONFLICT"),
+        ]
+        for scans, failure_class in cases:
+            with self.subTest(failure_class=failure_class, scans=len(scans)):
+                with self.assertRaises(SecurityScanError) as raised:
+                    continue_security_scan_authority(scans, **base)
+                self.assertEqual(raised.exception.failure_class, failure_class)
+
+        with self.assertRaises(SecurityScanError) as raised:
+            continue_security_scan_authority([running], **{**base, "target_revision": "new-rev"})
+        self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_AUTHORITY_INVALID")
+
+        narrower_compatible = _scan(repository, "deep-authority", "deep", "running", scope="src")
+        broader_pinned_authority = {**authority, "required_scope": "src", "selected_scan_scope": "."}
+        with self.assertRaises(SecurityScanError) as raised:
+            continue_security_scan_authority(
+                [narrower_compatible], **{**base, "authority": broader_pinned_authority, "required_scope": "src"}
+            )
+        self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_AUTHORITY_INVALID")
+
+        completed = {**running, "progress": {"status": "complete"}}
+        validated_authority = {
+            **authority,
+            "completed_validation": {
+                "scan_id": "deep-authority",
+                "target_snapshot_identity": hashlib.sha256(b"snapshot-current").hexdigest(),
+                "validated_at_checkpoint": "before_executor",
+            },
+        }
+        stale_target_snapshot = {**completed, "targetSnapshotDigest": "different-snapshot"}
+        with self.assertRaises(SecurityScanError) as raised:
+            continue_security_scan_authority([stale_target_snapshot], **{**base, "authority": validated_authority})
+        self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_AUTHORITY_INVALID")
 
     def test_incompatible_completed_scan_does_not_block_new_start(self) -> None:
         repository = Path(".").resolve()
@@ -229,6 +516,30 @@ class SecurityScanArbitrationTests(unittest.TestCase):
         self.assertEqual(result["scan_mode"], "deep")
         self.assertEqual(result["action"], "awaited")
         self.assertEqual(result["final_status"], "complete")
+
+    def test_initial_start_authority_rejects_mode_below_required_deep(self) -> None:
+        repository = Path(".").resolve()
+        decision = _decide(repository, [], mode="deep")
+        standard = _scan(repository, "standard-created", "standard", "complete")
+        evidence = {
+            "plugin_id": PLUGIN_ID,
+            "plugin_version": "0.1.31",
+            "target_identity": {
+                "path": str(repository),
+                "target_id": stable_target_id(repository),
+                "revision": "rev-1",
+                "scope": ".",
+            },
+            "scan_id": "standard-created",
+            "mode": "standard",
+            "initial_status": "running",
+            "action": "started",
+            "final_status": "complete",
+        }
+        self.assertEqual(decision.action, "start")
+        with self.assertRaises(SecurityScanError) as raised:
+            validate_scan_provenance(evidence, decision=decision, final_scans=[standard])
+        self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_EVIDENCE_INVALID")
 
     def test_scan_conflict_has_specific_class_and_no_mutation_unknown_fallback(self) -> None:
         repository = Path(".").resolve()

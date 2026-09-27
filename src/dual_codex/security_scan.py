@@ -133,7 +133,8 @@ class ScanDecision:
             f"{json.dumps(policy, ensure_ascii=False, separators=(',', ':'))}\n"
             "Follow this decision before using any Codex Security start tool. If the decision is "
             "'awaited', inspect and await the selected scan through its supported provider API; "
-            "do not start a competing scan. If the decision is 'start', re-list scans immediately "
+            "if the decision is 'reused', use the selected completed scan as the run's authority. "
+            "For either selected-scan decision, do not start a competing scan. If the decision is 'start', re-list scans immediately "
             "before starting exactly one scan for this exact target and scope. Never cancel an "
             "existing scan. Return a security_scan_provenance object containing only plugin_id, "
             "plugin_version, target_identity (path, target_id, revision, scope), scan_id, mode, "
@@ -248,6 +249,202 @@ def arbitrate_security_scans(
         "start", plugin_id, plugin_version, current_path, target_id, target_revision,
         required_mode, _scope(required_scope), None, tuple(exact),
         "No active or explicitly reusable exact-target scan was found.",
+    )
+
+
+def continue_security_scan_authority(
+    scans: list[Mapping[str, Any]],
+    *,
+    authority: Mapping[str, Any],
+    plugin_id: str,
+    plugin_version: str,
+    target_path: Path,
+    target_revision: str,
+    required_mode: str,
+    required_scope: str,
+) -> ScanDecision:
+    """Continue one persisted run-local scan authority after re-reading the ledger."""
+
+    current_path = str(target_path.expanduser().resolve())
+    target_id = stable_target_id(Path(current_path))
+    scope = _scope(required_scope)
+    if (
+        authority.get("plugin_id") != plugin_id
+        or authority.get("plugin_version") != plugin_version
+        or authority.get("target_path") != current_path
+        or authority.get("target_id") != target_id
+        or authority.get("target_revision") != target_revision
+        or authority.get("required_mode") != required_mode
+        or authority.get("required_scope") != scope
+    ):
+        raise SecurityScanError(
+            "SECURITY_SCAN_AUTHORITY_INVALID: the persisted run authority no longer matches the required plugin, target, revision, mode, or scope.",
+            failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+        )
+
+    same_path = [
+        scan for scan in scans
+        if _normal_path(scan.get("targetPath", scan.get("target_path"))) == _normal_path(current_path)
+    ]
+    mismatched_target = [
+        scan for scan in same_path
+        if str(scan.get("targetId", scan.get("target_id", ""))) != target_id
+    ]
+    if mismatched_target:
+        raise SecurityScanError(
+            "SECURITY_SCAN_CONFLICT: the scan ledger contains a path match with a different target identity.",
+            failure_class="SECURITY_SCAN_CONFLICT",
+        )
+    exact = [
+        scan for scan in same_path
+        if str(scan.get("targetId", scan.get("target_id", ""))) == target_id
+    ]
+    baseline_ids = {str(item) for item in authority.get("initial_observed_scan_ids", []) if item}
+    selected_id = str(authority.get("selected_scan_id") or "")
+
+    def validate_identity(scan: Mapping[str, Any], *, selected: bool) -> None:
+        scan_id = str(scan.get("scanId", scan.get("scan_id", "")))
+        if (
+            not scan_id
+            or str(scan.get("targetRevision", scan.get("target_revision", ""))) != target_revision
+            or not _scope_covers(str(scan.get("scope", "")), scope)
+            or not _supports_mode(str(scan.get("mode", "")), required_mode)
+        ):
+            classification = "SECURITY_SCAN_AUTHORITY_INVALID" if selected else "SECURITY_SCAN_CONFLICT"
+            raise SecurityScanError(
+                f"{classification}: scan {scan_id or 'unknown'} no longer matches the exact required revision, scope, or mode.",
+                failure_class=classification,
+            )
+
+    def completed_is_fresh(scan: Mapping[str, Any]) -> bool:
+        digest = scan.get("targetSnapshotDigest")
+        return bool(digest) and digest == scan.get("currentSnapshotDigest") and not scan.get("warnings")
+
+    if selected_id:
+        selected_matches = [
+            scan for scan in exact
+            if str(scan.get("scanId", scan.get("scan_id", ""))) == selected_id
+        ]
+        if len(selected_matches) != 1:
+            raise SecurityScanError(
+                f"SECURITY_SCAN_AUTHORITY_LOST: authoritative scan {selected_id} is missing or ambiguous in the provider ledger.",
+                failure_class="SECURITY_SCAN_AUTHORITY_LOST",
+            )
+        selected = selected_matches[0]
+        new_competitors = [
+            scan for scan in exact
+            if str(scan.get("scanId", scan.get("scan_id", ""))) != selected_id
+            and str(scan.get("scanId", scan.get("scan_id", ""))) not in baseline_ids
+        ]
+        active_competitors = [scan for scan in exact if _scan_status(scan) == "running" and scan is not selected]
+        if new_competitors or active_competitors:
+            raise SecurityScanError(
+                "SECURITY_SCAN_CONFLICT: a competing exact-target scan appeared after run authority was selected.",
+                failure_class="SECURITY_SCAN_CONFLICT",
+            )
+        validate_identity(selected, selected=True)
+        selected_mode = str(selected.get("mode", ""))
+        if not authority.get("selected_scan_mode") or selected_mode != authority.get("selected_scan_mode"):
+            raise SecurityScanError(
+                f"SECURITY_SCAN_AUTHORITY_INVALID: authoritative scan {selected_id} changed its selected mode.",
+                failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+            )
+        selected_scope = _scope(selected.get("scope", ""))
+        if not authority.get("selected_scan_scope") or selected_scope != authority.get("selected_scan_scope"):
+            raise SecurityScanError(
+                f"SECURITY_SCAN_AUTHORITY_INVALID: authoritative scan {selected_id} changed its selected scope.",
+                failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+            )
+        status = _scan_status(selected)
+        if status in {"failed", "canceled"}:
+            raise SecurityScanError(
+                f"SECURITY_SCAN_AUTHORITY_FAILED: authoritative scan {selected_id} ended with status {status}.",
+                failure_class="SECURITY_SCAN_AUTHORITY_FAILED",
+            )
+        if status == "running":
+            action = "awaited"
+        elif status == "complete":
+            completed_validation = authority.get("completed_validation")
+            target_digest = selected.get("targetSnapshotDigest")
+            pinned_digest_identity = (
+                hashlib.sha256(str(target_digest).encode("utf-8")).hexdigest() if target_digest else ""
+            )
+            if completed_validation:
+                still_same_scan = (
+                    isinstance(completed_validation, Mapping)
+                    and completed_validation.get("scan_id") == selected_id
+                    and completed_validation.get("target_snapshot_identity") == pinned_digest_identity
+                    and not selected.get("warnings")
+                )
+                if not still_same_scan:
+                    raise SecurityScanError(
+                        f"SECURITY_SCAN_AUTHORITY_INVALID: completed authoritative scan {selected_id} changed its validated snapshot identity or warnings.",
+                        failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+                    )
+            elif not completed_is_fresh(selected):
+                raise SecurityScanError(
+                    f"SECURITY_SCAN_AUTHORITY_INVALID: completed authoritative scan {selected_id} has stale snapshot evidence or warnings.",
+                    failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+                )
+            action = "reused"
+        else:
+            raise SecurityScanError(
+                f"SECURITY_SCAN_AUTHORITY_INVALID: authoritative scan {selected_id} has unsupported status {status}.",
+                failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+            )
+        return ScanDecision(
+            action, plugin_id, plugin_version, current_path, target_id, target_revision,
+            required_mode, scope, selected, tuple(exact),
+            "The persisted run-local scan authority remains valid.",
+        )
+
+    new_scans = [
+        scan for scan in exact
+        if str(scan.get("scanId", scan.get("scan_id", ""))) not in baseline_ids
+    ]
+    active = [scan for scan in exact if _scan_status(scan) == "running"]
+    if len(active) > 1 or len(new_scans) > 1:
+        raise SecurityScanError(
+            "SECURITY_SCAN_CONFLICT: multiple exact-target scans appeared while this run was authorized to start one scan.",
+            failure_class="SECURITY_SCAN_CONFLICT",
+        )
+    if active:
+        selected = active[0]
+        validate_identity(selected, selected=False)
+        if any(scan is not selected for scan in new_scans):
+            raise SecurityScanError(
+                "SECURITY_SCAN_CONFLICT: a competing exact-target scan appeared while adopting the run's scan authority.",
+                failure_class="SECURITY_SCAN_CONFLICT",
+            )
+        return ScanDecision(
+            "awaited", plugin_id, plugin_version, current_path, target_id, target_revision,
+            required_mode, scope, selected, tuple(exact),
+            "A scan started under this run's initial start authority and is now selected.",
+        )
+    if new_scans:
+        selected = new_scans[0]
+        status = _scan_status(selected)
+        validate_identity(selected, selected=False)
+        if status in {"failed", "canceled"}:
+            raise SecurityScanError(
+                f"SECURITY_SCAN_AUTHORITY_FAILED: scan {selected.get('scanId', selected.get('scan_id', 'unknown'))} ended with status {status}.",
+                failure_class="SECURITY_SCAN_AUTHORITY_FAILED",
+            )
+        if status != "complete" or not completed_is_fresh(selected):
+            raise SecurityScanError(
+                "SECURITY_SCAN_AUTHORITY_INVALID: the scan created under this run's start authority is incomplete or has stale evidence.",
+                failure_class="SECURITY_SCAN_AUTHORITY_INVALID",
+            )
+        return ScanDecision(
+            "reused", plugin_id, plugin_version, current_path, target_id, target_revision,
+            required_mode, scope, selected, tuple(exact),
+            "A scan started under this run's initial start authority completed successfully.",
+        )
+
+    return ScanDecision(
+        "start", plugin_id, plugin_version, current_path, target_id, target_revision,
+        required_mode, scope, None, tuple(exact),
+        "The run's initial start authority is unchanged; no scan has appeared in the provider ledger.",
     )
 
 
@@ -673,6 +870,14 @@ def validate_scan_provenance(
         )
         or revision != decision.target_revision
         or not _scope_covers(scope, decision.required_scope)
+        or not _supports_mode(mode, decision.required_mode)
+        or (
+            decision.action != "start"
+            and (
+                mode != str((decision.selected_scan or {}).get("mode", ""))
+                or scope != _scope((decision.selected_scan or {}).get("scope", ""))
+            )
+        )
         or value.get("final_status") != actual_status
     ):
         raise SecurityScanError(

@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from collections import deque
 import atexit
+import hashlib
 import json
 import os
 from pathlib import Path
 import queue
 import re
+import shutil
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -135,6 +138,85 @@ def _profile_config_identity(agent: AgentConfig) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError:
         return "missing"
+
+
+def _stable_identity(value: Mapping[str, Any]) -> str:
+    """Hash a canonical, non-secret runtime identity payload."""
+
+    encoded = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _command_runtime_identity(config: OrchestratorConfig, agent: AgentConfig, role: str) -> str:
+    command = _app_server_command(config, agent=agent, role=role)
+    prepared = _prepare_command([str(item) for item in command])
+    executable = command[0]
+    resolved = shutil.which(executable) or executable
+    executable_path = Path(resolved).expanduser()
+    try:
+        stat = executable_path.stat()
+        executable_file = {
+            "path": str(executable_path.resolve(strict=False)),
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+        }
+    except OSError:
+        executable_file = {"path": str(executable_path.resolve(strict=False)), "missing": True}
+    return _stable_identity({"prepared_command": prepared, "executable": executable_file})
+
+
+def _runtime_config_identity(
+    agent: AgentConfig,
+    config: OrchestratorConfig,
+    repository: Path,
+    role: str,
+    require_workspace_ready: bool,
+) -> str:
+    """Identify every configured value retained by a persistent App Server."""
+
+    timeout, timeout_source = _effective_turn_timeout(agent, config)
+    return _stable_identity(
+        {
+            "account": agent.account_name,
+            "codex_home": str(agent.codex_home.expanduser().resolve(strict=False)),
+            "repository": str(repository.expanduser().resolve(strict=False)),
+            "runs_dir": str(config.runs_dir.expanduser().resolve(strict=False)),
+            "role": str(role or ""),
+            "profile_config_identity": _profile_config_identity(agent),
+            "sandbox": agent.sandbox,
+            "network_access": bool(agent.network_access),
+            "model": agent.model,
+            "reasoning_effort": agent.reasoning_effort,
+            "service_tier": agent.service_tier,
+            "account_role_turn_timeout": getattr(agent, "app_server_turn_timeout", None),
+            "global_turn_timeout": config.app_server_turn_timeout,
+            "effective_turn_timeout": timeout,
+            "timeout_source": timeout_source,
+            "initialize_timeout": config.app_server_initialize_timeout,
+            "thread_timeout": config.app_server_thread_timeout,
+            "turn_start_timeout": config.app_server_turn_start_timeout,
+            "command_identity": _command_runtime_identity(config, agent, role),
+            "require_workspace_ready": bool(require_workspace_ready),
+            "host_mode": {"os_name": os.name, "platform": sys.platform},
+        }
+    )
+
+
+def _thread_mapping_identity(
+    agent: AgentConfig,
+    config: OrchestratorConfig,
+    repository: Path,
+    role: str,
+    require_workspace_ready: bool,
+) -> str:
+    """Bind resumable thread state to the process configuration that owns it.
+
+    App Server failures invalidate a thread mapping. Keeping mappings scoped to
+    the full runtime identity also prevents an old in-flight turn from deleting
+    or resuming a session after another dispatch has changed process settings.
+    """
+
+    return _runtime_config_identity(agent, config, repository, role, require_workspace_ready)
 
 
 def _app_server_command(
@@ -482,7 +564,21 @@ class _AppServerProcess:
         self.repository = repository.resolve()
         self.progress = progress
         self.role = str(role or "")
-        self.require_workspace_ready = require_workspace_ready
+        self.require_workspace_ready = bool(require_workspace_ready)
+        self.runtime_config_identity = _runtime_config_identity(
+            agent,
+            config,
+            self.repository,
+            self.role,
+            self.require_workspace_ready,
+        )
+        self.thread_mapping_identity = _thread_mapping_identity(
+            agent,
+            config,
+            self.repository,
+            self.role,
+            self.require_workspace_ready,
+        )
         self._lock = threading.RLock()
         self._next_id = 0
         self._messages: queue.Queue[str | None] = queue.Queue()
@@ -1035,6 +1131,7 @@ class _AppServerProcess:
             repository,
             role=self.role,
             windows_sandbox=self.windows_sandbox,
+            require_workspace_ready=self.require_workspace_ready,
         )
         if stored:
             response = self.request(
@@ -1101,6 +1198,9 @@ class _AppServerProcess:
             "last_safe_provider_notification_method": None,
         }
         self.last_turn_provenance = self._active_turn_provenance
+        dispatch_provenance = getattr(self, "_active_dispatch_provenance", None)
+        if isinstance(dispatch_provenance, Mapping):
+            self._active_turn_provenance.update(dispatch_provenance)
         response = self.request("turn/start", params, timeout=self.config.app_server_turn_start_timeout)
         if "error" in response:
             self._active_turn_provenance["termination_classification"] = "APP_SERVER_TURN_START_ERROR"
@@ -1252,6 +1352,7 @@ class _AppServerProcess:
             thread_id,
             role=self.role,
             windows_sandbox=self.windows_sandbox,
+            require_workspace_ready=bool(getattr(self, "require_workspace_ready", False)),
         )
         return {
             "thread_id": thread_id,
@@ -1286,6 +1387,7 @@ class _AppServerProcess:
         prompt: str,
         *,
         journal: LiveEventJournal | None,
+        dispatch_provenance: Mapping[str, Any] | None = None,
         **context: str,
     ) -> dict[str, Any]:
         """Serialize provenance context with thread/resume and the turn.
@@ -1298,9 +1400,11 @@ class _AppServerProcess:
         with self._lock:
             previous_journal = self._event_journal
             previous_context = self._event_context
+            previous_dispatch_provenance = getattr(self, "_active_dispatch_provenance", None)
             self.last_turn_provenance = {}
             self._event_journal = journal
             self._event_context = {str(key): str(value) for key, value in context.items()}
+            self._active_dispatch_provenance = dict(dispatch_provenance or {})
             try:
                 thread_id, resumed = self._thread_id_for_unlocked(repository)
                 self._active_thread_id = thread_id
@@ -1317,8 +1421,17 @@ class _AppServerProcess:
             finally:
                 self._event_journal = previous_journal
                 self._event_context = previous_context
+                self._active_dispatch_provenance = previous_dispatch_provenance
 
     def close(self) -> None:
+        lock = getattr(self, "_lock", None)
+        if lock is None:
+            self._close_unlocked()
+            return
+        with lock:
+            self._close_unlocked()
+
+    def _close_unlocked(self) -> None:
         if self._closed:
             return
         self._closed = True
@@ -1355,7 +1468,13 @@ class _AppServerProcess:
 
 
 _PROCESS_LOCK = threading.RLock()
-_PROCESSES: dict[tuple[str, str, str, str, str, str, str, str], _AppServerProcess] = {}
+_PROCESSES: dict[tuple[str, str, str, str], _AppServerProcess] = {}
+_PROCESS_SLOT_LOCKS: dict[tuple[str, str, str, str], threading.RLock] = {}
+
+
+def _process_slot_lock(key: tuple[str, str, str, str]) -> threading.RLock:
+    with _PROCESS_LOCK:
+        return _PROCESS_SLOT_LOCKS.setdefault(key, threading.RLock())
 
 
 def _process_key(
@@ -1363,15 +1482,11 @@ def _process_key(
     config: OrchestratorConfig,
     repository: Path | None = None,
     role: str = "",
-) -> tuple[str, str, str, str, str, str, str, str]:
+) -> tuple[str, str, str, str]:
     return (
         agent.account_name,
         str(agent.codex_home.expanduser().resolve()),
-        str(Path(config.codex_command).resolve()),
-        str(bool(agent.network_access)),
         str(repository.expanduser().resolve()) if repository is not None else "",
-        _profile_config_identity(agent),
-        agent.sandbox,
         str(role or ""),
     )
 
@@ -1383,15 +1498,40 @@ def _get_process(
     progress: Callable[[str], None] | None,
     role: str = "",
     require_workspace_ready: bool = False,
+    dispatch_provenance: dict[str, Any] | None = None,
 ) -> _AppServerProcess:
     key = _process_key(agent, config, repository, role)
-    with _PROCESS_LOCK:
-        process = _PROCESSES.get(key)
-        if process is not None and process.process.poll() is None:
+    requested_identity = _runtime_config_identity(agent, config, repository, role, require_workspace_ready)
+    slot_lock = _process_slot_lock(key)
+    with slot_lock:
+        with _PROCESS_LOCK:
+            process = _PROCESSES.get(key)
+        alive = process is not None and process.process.poll() is None
+        runtime_matches = bool(
+            alive and getattr(process, "runtime_config_identity", None) == requested_identity
+        )
+        if runtime_matches:
+            assert process is not None
             process.progress = progress
+            if dispatch_provenance is not None:
+                timeout, timeout_source = _effective_turn_timeout(process.agent, process.config)
+                dispatch_provenance.update(
+                    {
+                        "turn_timeout_seconds": timeout,
+                        "timeout_source": timeout_source,
+                        "runtime_config_identity": process.runtime_config_identity,
+                        "process_reuse_state": "reused_process",
+                        "reused_process_runtime_identity_matched": True,
+                    }
+                )
             return process
         if process is not None:
+            with _PROCESS_LOCK:
+                if _PROCESSES.get(key) is process:
+                    _PROCESSES.pop(key, None)
             process.close()
+            if getattr(process, "runtime_config_identity", None) != requested_identity:
+                _delete_thread_mapping(process.config, process.agent, Path(process.repository), role=process.role)
         process = _AppServerProcess(
             config=config,
             agent=agent,
@@ -1400,7 +1540,19 @@ def _get_process(
             role=role,
             require_workspace_ready=require_workspace_ready,
         )
-        _PROCESSES[key] = process
+        with _PROCESS_LOCK:
+            _PROCESSES[key] = process
+        if dispatch_provenance is not None:
+            timeout, timeout_source = _effective_turn_timeout(process.agent, process.config)
+            dispatch_provenance.update(
+                {
+                    "turn_timeout_seconds": timeout,
+                    "timeout_source": timeout_source,
+                    "runtime_config_identity": process.runtime_config_identity,
+                    "process_reuse_state": "new_process",
+                    "reused_process_runtime_identity_matched": None,
+                }
+            )
         return process
 
 
@@ -1415,20 +1567,21 @@ def _close_processes() -> None:
 def _discard_process(process: _AppServerProcess) -> None:
     repository = getattr(process, "repository", None)
     key = _process_key(process.agent, process.config, repository, getattr(process, "role", ""))
-    with _PROCESS_LOCK:
-        if _PROCESSES.get(key) is process:
-            _PROCESSES.pop(key, None)
-    if repository is not None:
-        _delete_thread_mapping(process.config, process.agent, Path(repository), role=getattr(process, "role", ""))
-    process.close()
+    slot_lock = _process_slot_lock(key)
+    with slot_lock:
+        with _PROCESS_LOCK:
+            current_process = _PROCESSES.get(key) is process
+            if current_process:
+                _PROCESSES.pop(key, None)
+        if current_process and repository is not None:
+            _delete_thread_mapping(process.config, process.agent, Path(repository), role=getattr(process, "role", ""))
+        process.close()
 
 
 atexit.register(_close_processes)
 
 
 def _mapping_path(config: OrchestratorConfig, agent: AgentConfig, repository: Path, role: str = "") -> Path:
-    import hashlib
-
     key = f"{agent.account_name}|{agent.codex_home.resolve()}|{repository.resolve()}|{role or ''}".encode("utf-8")
     return config.runs_dir / "app-server-sessions" / (hashlib.sha256(key).hexdigest() + ".json")
 
@@ -1440,6 +1593,7 @@ def _load_thread_mapping(
     *,
     role: str = "",
     windows_sandbox: str = "",
+    require_workspace_ready: bool = False,
 ) -> str | None:
     path = _mapping_path(config, agent, repository, role)
     try:
@@ -1452,6 +1606,8 @@ def _load_thread_mapping(
         or value.get("account") != agent.account_name
         or value.get("codex_home") != str(agent.codex_home.resolve())
         or value.get("role", "") != str(role or "")
+        or value.get("thread_mapping_identity")
+        != _thread_mapping_identity(agent, config, repository, role, require_workspace_ready)
         or value.get("windows_sandbox") != expected_windows_sandbox
         or value.get("headless_raw_events") != (_HEADLESS_RAW_EVENTS_VERSION if os.name == "nt" else "")
     ):
@@ -1469,6 +1625,7 @@ def _save_thread_mapping(
     *,
     role: str = "",
     windows_sandbox: str = "",
+    require_workspace_ready: bool = False,
 ) -> None:
     path = _mapping_path(config, agent, repository, role)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1479,6 +1636,9 @@ def _save_thread_mapping(
             "codex_home": str(agent.codex_home.resolve()),
             "repository": str(repository.resolve()),
             "role": str(role or ""),
+            "thread_mapping_identity": _thread_mapping_identity(
+                agent, config, repository, role, require_workspace_ready
+            ),
             "thread_id": thread_id,
             "windows_sandbox": windows_sandbox if os.name == "nt" else "",
             "headless_raw_events": _HEADLESS_RAW_EVENTS_VERSION if os.name == "nt" else "",
@@ -1486,7 +1646,13 @@ def _save_thread_mapping(
     )
 
 
-def _delete_thread_mapping(config: OrchestratorConfig, agent: AgentConfig, repository: Path, *, role: str = "") -> None:
+def _delete_thread_mapping(
+    config: OrchestratorConfig,
+    agent: AgentConfig,
+    repository: Path,
+    *,
+    role: str = "",
+) -> None:
     """Forget a thread that may contain an unresolved client tool call."""
 
     path = _mapping_path(config, agent, repository, role)
@@ -1523,6 +1689,7 @@ def run_codex_app_server(
     require_workspace_ready: bool = False,
     progress: Callable[[str], None] | None = None,
     process_started: Callable[[int], None] | None = None,
+    dispatch_started: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> CommandResult:
     command = _app_server_command(config, agent=agent, role=role)
     metadata: dict[str, Any] = {
@@ -1592,7 +1759,25 @@ def run_codex_app_server(
             progress,
             role=role,
             require_workspace_ready=require_workspace_ready,
+            dispatch_provenance=metadata,
         )
+        dispatch_record = {
+            field: metadata.get(field)
+            for field in (
+                "turn_timeout_seconds",
+                "timeout_source",
+                "runtime_config_identity",
+                "process_reuse_state",
+                "reused_process_runtime_identity_matched",
+            )
+        }
+        if dispatch_started is not None:
+            try:
+                dispatch_started(dispatch_record)
+            except BaseException:
+                _discard_process(process)
+                raise
+        metadata["app_server_dispatch_provenance"] = dispatch_record
         if require_workspace_ready and role == "executor":
             check_capabilities = getattr(process, "check_executor_capabilities", None)
             if not callable(check_capabilities):
@@ -1613,6 +1798,7 @@ def run_codex_app_server(
                 repository,
                 prompt,
                 journal=journal,
+                dispatch_provenance=dispatch_record,
                 run_id=run_id or session_id,
                 request_id=request_id,
                 account=agent.account_name,

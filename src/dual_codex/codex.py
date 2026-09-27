@@ -391,6 +391,7 @@ def _delegate_to_configured_actor(
     run_id: str = "",
     repository_trust_authorized: bool = False,
     progress: Callable[[str], None] | None = None,
+    dispatch_started: Callable[[dict[str, Any]], None] | None = None,
     runner: Callable[..., CommandResult],
 ) -> CommandResult:
     """Resolve a role from the registry and dispatch only to that actor.
@@ -461,6 +462,7 @@ def _delegate_to_configured_actor(
             request_id=request_id,
             run_id=run_id,
             progress=progress,
+            dispatch_started=dispatch_started,
         )
         if not isinstance(result, CommandResult):
             raise TypeError("Configured actor dispatch must return CommandResult.")
@@ -658,6 +660,7 @@ def delegate_to_configured_actor(
     request_id: str = "",
     run_id: str = "",
     progress: Callable[[str], None] | None = None,
+    dispatch_started: Callable[[dict[str, Any]], None] | None = None,
 ) -> CommandResult:
     """Resolve and dispatch a phase through its configured actor only."""
 
@@ -671,6 +674,7 @@ def delegate_to_configured_actor(
         request_id=request_id,
         run_id=run_id,
         progress=progress,
+        dispatch_started=dispatch_started,
         runner=run_codex_for_role,
     )
 
@@ -688,6 +692,7 @@ def run_codex_for_role(
     request_id: str = "",
     run_id: str = "",
     progress: Callable[[str], None] | None = None,
+    dispatch_started: Callable[[dict[str, Any]], None] | None = None,
 ) -> CommandResult:
     """Dispatch orchestration through the configured account backend."""
     if role not in SUPPORTED_ROLES:
@@ -868,6 +873,7 @@ def run_codex_for_role(
                 require_workspace_ready=(role == "executor" and agent.sandbox == "workspace-write"),
                 canonical_bootstrap=bootstrap,
                 progress=progress,
+                dispatch_started=dispatch_started,
                 process_started=lambda pid: update_canonical_bootstrap_provider(
                     bootstrap,
                     backend=agent.backend,

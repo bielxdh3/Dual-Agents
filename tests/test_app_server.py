@@ -22,6 +22,7 @@ from dual_codex.app_server import (
     _normalise_report,
     _provider_turn_failure_class,
     _process_key,
+    _get_process,
     _save_thread_mapping,
     _sanitize_stderr,
     _workspace_write_sandbox_policy,
@@ -611,6 +612,12 @@ class AppServerTests(unittest.TestCase):
             )
             self.assertEqual(first.metadata["app_server_thread_id"], "thread-probe")
             self.assertEqual(second.metadata["app_server_thread_id"], "thread-probe")
+            self.assertEqual(first.metadata["app_server_dispatch_provenance"]["turn_timeout_seconds"], 5)
+            self.assertEqual(first.metadata["app_server_dispatch_provenance"]["timeout_source"], "global_default")
+            self.assertEqual(first.metadata["app_server_dispatch_provenance"]["process_reuse_state"], "new_process")
+            self.assertEqual(second.metadata["app_server_dispatch_provenance"]["turn_timeout_seconds"], 5)
+            self.assertEqual(second.metadata["app_server_dispatch_provenance"]["process_reuse_state"], "reused_process")
+            self.assertTrue(second.metadata["app_server_dispatch_provenance"]["reused_process_runtime_identity_matched"])
             self.assertEqual(first.metadata["app_server_turn_id"], "turn-1")
             self.assertEqual(second.metadata["app_server_turn_id"], "turn-2")
             self.assertEqual(second.metadata["task_transport"], "app_server")
@@ -1084,6 +1091,53 @@ class AppServerTests(unittest.TestCase):
             )
             self.assertFalse(_mapping_path(config, agent, repository).exists())
 
+    def test_thread_mapping_identity_tracks_effective_runtime_configuration(self) -> None:
+        from dataclasses import replace
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=False,
+            )
+            _save_thread_mapping(config, agent, repository, "thread-1", role="executor")
+            self.assertIsNone(
+                _load_thread_mapping(
+                    config,
+                    replace(agent, app_server_turn_timeout=3600),
+                    repository,
+                    role="executor",
+                )
+            )
+            _save_thread_mapping(config, agent, repository, "thread-1", role="executor")
+            self.assertIsNone(
+                _load_thread_mapping(config, replace(agent, network_access=True), repository, role="executor")
+            )
+            _save_thread_mapping(config, agent, repository, "thread-2", role="executor")
+            self.assertIsNone(
+                _load_thread_mapping(config, replace(agent, sandbox="read-only"), repository, role="executor")
+            )
+            _save_thread_mapping(config, agent, repository, "thread-3", role="executor")
+            agent.codex_home.mkdir(parents=True)
+            (agent.codex_home / "config.toml").write_text("[features]\nnew = true\n", encoding="utf-8")
+            self.assertIsNone(_load_thread_mapping(config, agent, repository, role="executor"))
+            _save_thread_mapping(
+                config, agent, repository, "thread-4", role="executor", require_workspace_ready=True
+            )
+            self.assertIsNone(
+                _load_thread_mapping(
+                    config, agent, repository, role="executor", require_workspace_ready=False
+                )
+            )
+
     def test_process_key_is_scoped_to_repository(self) -> None:
         config = _config(Path("C:/dual-codex-test"))
         agent = AgentConfig(
@@ -1098,6 +1152,298 @@ class AppServerTests(unittest.TestCase):
             _process_key(agent, config, Path("C:/repo-a")),
             _process_key(agent, config, Path("C:/repo-b")),
         )
+
+    def test_persistent_process_reuse_requires_exact_runtime_identity(self) -> None:
+        from dataclasses import replace
+
+        from dual_codex.app_server import _runtime_config_identity, _thread_mapping_identity
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=True,
+                service_tier="priority",
+                app_server_turn_timeout=600,
+            )
+            created = []
+
+            class FakePersistentProcess:
+                def __init__(self, **kwargs):
+                    self.agent = kwargs["agent"]
+                    self.config = kwargs["config"]
+                    self.repository = repository
+                    self.role = kwargs["role"]
+                    self.require_workspace_ready = kwargs["require_workspace_ready"]
+                    self.runtime_config_identity = _runtime_config_identity(
+                        self.agent, self.config, repository, self.role, self.require_workspace_ready
+                    )
+                    self.thread_mapping_identity = _thread_mapping_identity(
+                        self.agent, self.config, repository, self.role, self.require_workspace_ready
+                    )
+                    self.process = SimpleNamespace(poll=lambda: None)
+                    self.progress = kwargs["progress"]
+                    self.pid = len(created) + 5000
+                    self.close = Mock()
+                    created.append(self)
+
+            with patch("dual_codex.app_server._AppServerProcess", FakePersistentProcess):
+                dispatch = {}
+                first = _get_process(config, agent, repository, None, role="executor", dispatch_provenance=dispatch)
+                self.assertEqual(dispatch["turn_timeout_seconds"], 600)
+                self.assertEqual(dispatch["timeout_source"], "account_role_override")
+                self.assertEqual(dispatch["process_reuse_state"], "new_process")
+                self.assertIsNone(dispatch["reused_process_runtime_identity_matched"])
+
+                same_identity = {}
+                reused = _get_process(config, replace(agent, label="metadata-only"), repository, None, role="executor", dispatch_provenance=same_identity)
+                self.assertIs(reused, first)
+                self.assertEqual(same_identity["process_reuse_state"], "reused_process")
+                self.assertTrue(same_identity["reused_process_runtime_identity_matched"])
+                self.assertEqual(same_identity["runtime_config_identity"], first.runtime_config_identity)
+                self.assertEqual(len(created), 1)
+
+                changed_values = [
+                    replace(agent, app_server_turn_timeout=3600),
+                    replace(agent, model="gpt-test-next"),
+                    replace(agent, reasoning_effort="medium"),
+                    replace(agent, service_tier="flex"),
+                    replace(agent, network_access=False),
+                    replace(agent, sandbox="read-only"),
+                ]
+                current = first
+                for changed in changed_values:
+                    next_process = _get_process(config, changed, repository, None, role="executor")
+                    self.assertIsNot(next_process, current)
+                    current.close.assert_called_once_with()
+                    self.assertNotEqual(
+                        next_process.runtime_config_identity,
+                        current.runtime_config_identity,
+                    )
+                    current = next_process
+
+                global_timeout_change = _get_process(
+                    replace(config, app_server_turn_timeout=9), current.agent, repository, None, role="executor"
+                )
+                self.assertIsNot(global_timeout_change, current)
+                self.assertNotEqual(global_timeout_change.runtime_config_identity, current.runtime_config_identity)
+
+                secret_agent = replace(global_timeout_change.agent, label="secret-value", auth_reference="secret-value")
+                self.assertEqual(
+                    _runtime_config_identity(secret_agent, config, repository, "executor", False),
+                    _runtime_config_identity(global_timeout_change.agent, config, repository, "executor", False),
+                )
+                serialized = json.dumps(
+                    {
+                        "identity": global_timeout_change.runtime_config_identity,
+                        "dispatch": same_identity,
+                    }
+                )
+                self.assertNotIn("secret-value", serialized)
+
+    def test_dead_matching_process_preserves_compatible_thread_mapping(self) -> None:
+        from dual_codex.app_server import _load_thread_mapping
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                app_server_turn_timeout=600,
+            )
+            created = []
+
+            class FakePersistentProcess:
+                def __init__(self, **kwargs):
+                    from dual_codex.app_server import _runtime_config_identity, _thread_mapping_identity
+
+                    self.agent = kwargs["agent"]
+                    self.config = kwargs["config"]
+                    self.repository = repository
+                    self.role = kwargs["role"]
+                    self.require_workspace_ready = kwargs["require_workspace_ready"]
+                    self.runtime_config_identity = _runtime_config_identity(
+                        self.agent, self.config, repository, self.role, self.require_workspace_ready
+                    )
+                    self.thread_mapping_identity = _thread_mapping_identity(
+                        self.agent, self.config, repository, self.role, self.require_workspace_ready
+                    )
+                    self.process = SimpleNamespace(poll=lambda: None)
+                    self.close = Mock()
+                    created.append(self)
+
+            with patch("dual_codex.app_server._AppServerProcess", FakePersistentProcess):
+                first = _get_process(config, agent, repository, None, role="executor")
+                _save_thread_mapping(config, agent, repository, "valid-session-thread", role="executor")
+                first.process.poll = lambda: 1
+                replacement = _get_process(config, agent, repository, None, role="executor")
+
+            self.assertEqual(len(created), 2)
+            self.assertIsNot(replacement, first)
+            first.close.assert_called_once_with()
+            self.assertEqual(
+                _load_thread_mapping(config, agent, repository, role="executor"),
+                "valid-session-thread",
+            )
+
+    def test_process_replacement_does_not_hold_global_lock_while_closing_other_turn(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        from dataclasses import replace
+
+        from dual_codex.app_server import _runtime_config_identity, _thread_mapping_identity
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repo"
+            unrelated_repository = root / "other-repo"
+            repository.mkdir()
+            unrelated_repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=True,
+                app_server_turn_timeout=600,
+            )
+
+            class FakePersistentProcess:
+                def __init__(self, **kwargs):
+                    self.agent = kwargs["agent"]
+                    self.config = kwargs["config"]
+                    self.repository = kwargs["repository"]
+                    self.role = kwargs["role"]
+                    self.require_workspace_ready = kwargs["require_workspace_ready"]
+                    self.runtime_config_identity = _runtime_config_identity(
+                        self.agent, self.config, self.repository, self.role, self.require_workspace_ready
+                    )
+                    self.thread_mapping_identity = _thread_mapping_identity(
+                        self.agent, self.config, self.repository, self.role, self.require_workspace_ready
+                    )
+                    self.process = SimpleNamespace(poll=lambda: None)
+                    self.progress = kwargs["progress"]
+                    self.pid = 6000
+                    self.close = Mock()
+
+            close_entered = threading.Event()
+            release_close = threading.Event()
+
+            with patch("dual_codex.app_server._AppServerProcess", FakePersistentProcess):
+                old = _get_process(config, agent, repository, None, role="executor")
+
+                def slow_close():
+                    close_entered.set()
+                    release_close.wait(timeout=5)
+
+                old.close = slow_close
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    replacement = pool.submit(
+                        _get_process,
+                        config,
+                        replace(agent, app_server_turn_timeout=3600),
+                        repository,
+                        None,
+                        "executor",
+                    )
+                    self.assertTrue(close_entered.wait(timeout=1))
+                    unrelated = pool.submit(
+                        _get_process,
+                        config,
+                        agent,
+                        unrelated_repository,
+                        None,
+                        "executor",
+                    )
+                    try:
+                        unrelated_process = unrelated.result(timeout=1)
+                    finally:
+                        release_close.set()
+                    replacement_process = replacement.result(timeout=2)
+
+                self.assertIsNot(unrelated_process, old)
+                self.assertIsNot(replacement_process, old)
+                self.assertEqual(replacement_process.agent.app_server_turn_timeout, 3600)
+
+    def test_timeout_change_recreates_live_process_and_dispatch_provenance_uses_3600(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repo"
+            repository.mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="executor",
+                backend="app_server",
+                app_server_turn_timeout=600,
+            )
+            config = _config(root)
+            processes = []
+
+            def create_process(*args, **kwargs):
+                process = _FakeProcess(*args, **kwargs)
+                processes.append(process)
+                return process
+
+            with patch("dual_codex.app_server.subprocess.Popen", side_effect=create_process):
+                first_dispatch = []
+                first = run_codex_app_server(
+                    config=config,
+                    agent=agent,
+                    repository=repository,
+                    prompt="first",
+                    output_path=root / "first.json",
+                    session_id="session",
+                    dispatch_started=first_dispatch.append,
+                )
+                second_dispatch = []
+                second = run_codex_app_server(
+                    config=config,
+                    agent=AgentConfig(
+                        **{**agent.__dict__, "app_server_turn_timeout": 3600}
+                    ),
+                    repository=repository,
+                    prompt="second",
+                    output_path=root / "second.json",
+                    session_id="session",
+                    dispatch_started=second_dispatch.append,
+                )
+
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+            time.sleep(0.05)
+
+            self.assertEqual(first.returncode, 0)
+            self.assertEqual(second.returncode, 0)
+            self.assertEqual(len(processes), 2)
+            self.assertEqual(first_dispatch[0]["turn_timeout_seconds"], 600)
+            self.assertEqual(second_dispatch[0]["turn_timeout_seconds"], 3600)
+            self.assertEqual(second_dispatch[0]["timeout_source"], "account_role_override")
+            self.assertEqual(second_dispatch[0]["process_reuse_state"], "new_process")
+            self.assertIsNone(second_dispatch[0]["reused_process_runtime_identity_matched"])
+            self.assertEqual(second.metadata["app_server_turn_provenance"]["turn_timeout_seconds"], 3600)
+            self.assertEqual(second.metadata["app_server_turn_provenance"]["runtime_config_identity"], second_dispatch[0]["runtime_config_identity"])
+            self.assertEqual(second.metadata["app_server_turn_provenance"]["process_reuse_state"], "new_process")
 
     def test_thread_mapping_is_scoped_to_profile_repository_and_role(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
