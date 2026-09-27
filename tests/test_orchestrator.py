@@ -722,13 +722,14 @@ class OrchestratorTests(unittest.TestCase):
             self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_CONFLICT")
             self.assertIn("deep-active", str(raised.exception))
             self.assertIn("standard-active", str(raised.exception))
-            self.assertEqual(seen_roles, ["architect"])
+            self.assertEqual(seen_roles, [])
             run_result = raised.exception.dual_codex_run_result
             self.assertEqual(run_result["failure_class"], "SECURITY_SCAN_CONFLICT")
             self.assertEqual(run_result["mutation_attribution_status"], "complete")
             run_state = json.loads(Path(run_result["run_state_path"]).read_text(encoding="utf-8"))
             mutation = json.loads(Path(run_result["mutation_attribution_path"]).read_text(encoding="utf-8"))
             self.assertEqual(run_state["failure"]["failure_class"], "SECURITY_SCAN_CONFLICT")
+            self.assertEqual(run_state["mission_security_requirement"]["source"], "original_task")
             self.assertEqual(run_state["mutation_attribution"]["status"], "complete")
             self.assertEqual(mutation["status"], "complete")
             self.assertNotIn("UNKNOWN_MUTATION_STATE", json.dumps(run_state))
@@ -786,8 +787,10 @@ class OrchestratorTests(unittest.TestCase):
 
                 def __init__(self):
                     self.scans = []
+                    self.arbitrations = []
 
                 def arbitrate(self, **kwargs):
+                    self.arbitrations.append(dict(kwargs))
                     return arbitrate_security_scans(
                         self.scans,
                         plugin_id=self.plugin_id,
@@ -809,9 +812,11 @@ class OrchestratorTests(unittest.TestCase):
                 role = kwargs["role"]
                 seen_roles.append(role)
                 if role == "architect":
+                    self.assertIn("HOST SECURITY GATE", kwargs["prompt"])
+                    self.assertIn("The original mission requires a Codex Security standard scan", kwargs["prompt"])
                     payload = {
                         "summary": "plan",
-                        "steps": ["Run a Codex Security standard scan."],
+                        "steps": ["Do not run the Codex Security scan."],
                         "acceptance_criteria": [],
                         "risks": [],
                         "files_to_inspect": [],
@@ -819,6 +824,8 @@ class OrchestratorTests(unittest.TestCase):
                     }
                 elif role == "executor":
                     self.assertIn('"decision":"start"', kwargs["prompt"])
+                    self.assertIn("supersedes any conflicting Architect plan", kwargs["prompt"])
+                    self.assertIn("Do not run the Codex Security scan", kwargs["prompt"])
                     provider.scans = [completed_scan]
                     payload = {
                         "summary": "scan completed",
@@ -870,7 +877,13 @@ class OrchestratorTests(unittest.TestCase):
             run_state = json.loads((outcome.run_dir / "run_state.json").read_text(encoding="utf-8"))
             provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
             self.assertEqual(seen_roles, ["architect", "executor", "reviewer"])
+            self.assertEqual([item["required_mode"] for item in provider.arbitrations], ["standard", "standard"])
+            self.assertEqual([item["required_scope"] for item in provider.arbitrations], [".", "."])
             self.assertEqual(run_state["security_scan_arbitrations"][0]["decision"], "start")
+            self.assertEqual(
+                [item["checkpoint"] for item in run_state["security_scan_arbitrations"]],
+                ["before_architect", "before_executor"],
+            )
             saved_scan = run_state["security_scan_provenance"][0]
             self.assertEqual(saved_scan["scan_id"], scan_id)
             self.assertEqual(saved_scan["scan_mode"], "standard")

@@ -9,5 +9,10 @@ The trusted host loads and records the mandatory baseline skills. List only addi
 TASK:
 {task}
 
+HOST SECURITY GATE:
+{security_gate_policy}
+
+Treat the host Security gate as authoritative. Preserve its mode, scope, target, and selected scan in the plan. Do not remove, downgrade, replace, duplicate, or invent a host-required scan.
+
 Your response must conform to the supplied JSON schema.
 Do not invoke the Dual Agents entrypoint from this role-scoped phase.

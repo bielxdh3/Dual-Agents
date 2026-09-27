@@ -16,9 +16,11 @@ from dual_codex.app_server import (
     _PROCESSES,
     _canonical_workspace_roots,
     _app_server_command,
+    _finalize_turn_failure,
     _load_thread_mapping,
     _mapping_path,
     _normalise_report,
+    _provider_turn_failure_class,
     _process_key,
     _save_thread_mapping,
     _sanitize_stderr,
@@ -268,6 +270,10 @@ class AppServerTests(unittest.TestCase):
         process.request_methods = []
         process.last_thread_request = {}
         process.last_thread_binding = {}
+        process._active_turn_provenance = None
+        process.last_turn_provenance = {}
+        process._active_thread_id = "thread-1"
+        process._active_thread_resumed = False
         process.request = Mock(return_value={"result": {"turn": {"id": "turn-1"}}})
         process._record_notification = Mock()
         process._read_event = Mock(
@@ -310,10 +316,176 @@ class AppServerTests(unittest.TestCase):
             process = self._turn_process(repository, timeout=5, progress=events)
             clock = iter([0.0, 0.0, 6.0])
             with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock)):
-                with self.assertRaisesRegex(AppServerError, "Timed out waiting for turn/completed"):
+                with self.assertRaisesRegex(AppServerError, "Timed out waiting for turn/completed") as raised:
                     process._turn_unlocked("thread-1", "private", repository)
             process._read_event.assert_not_called()
             self.assertEqual(events, [])
+            self.assertEqual(raised.exception.failure_class, "HOST_TURN_DEADLINE")
+            self.assertEqual(process.last_turn_provenance["termination_classification"], "HOST_TURN_DEADLINE")
+            self.assertTrue(process.last_turn_provenance["host_deadline_expired"])
+
+    def test_app_server_turn_provenance_records_effective_timeout_source_and_thread_state(self) -> None:
+        from dual_codex.app_server import _save_thread_mapping
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            process = self._turn_process(repository, timeout=600, agent_timeout=3600, progress=[])
+            process._active_thread_resumed = True
+            with patch("dual_codex.app_server.time.monotonic", return_value=0.0), patch(
+                "dual_codex.app_server._save_thread_mapping"
+            ):
+                result = process._turn_unlocked("thread-1", "PRIVATE_PROMPT", repository)
+
+            provenance = result["turn_provenance"]
+            self.assertEqual(provenance["turn_timeout_seconds"], 3600)
+            self.assertEqual(provenance["timeout_source"], "account_role_override")
+            self.assertEqual(provenance["thread_state"], "resumed")
+            self.assertTrue(provenance["thread_resumed"])
+            self.assertEqual(provenance["turn_id"], "turn-1")
+            self.assertEqual(provenance["termination_classification"], "TURN_COMPLETED")
+            self.assertNotIn("PRIVATE_PROMPT", json.dumps(provenance))
+            self.assertNotIn("PRIVATE_REASONING", json.dumps(provenance))
+
+    def test_app_server_turn_provenance_records_global_default_for_fresh_thread(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            process = self._turn_process(repository, timeout=600, progress=[])
+            with patch("dual_codex.app_server.time.monotonic", return_value=0.0), patch(
+                "dual_codex.app_server._save_thread_mapping"
+            ):
+                result = process._turn_unlocked("thread-1", "PRIVATE_PROMPT", repository)
+
+            provenance = result["turn_provenance"]
+            self.assertEqual(provenance["turn_timeout_seconds"], 600)
+            self.assertEqual(provenance["timeout_source"], "global_default")
+            self.assertEqual(provenance["thread_state"], "fresh")
+            self.assertFalse(provenance["thread_resumed"])
+            self.assertIsInstance(provenance["turn_start_monotonic"], float)
+            self.assertIsInstance(provenance["turn_start_timestamp"], str)
+
+    def test_app_server_turn_provenance_records_only_safe_provider_event_metadata(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        process = object.__new__(_AppServerProcess)
+        process._active_turn_provenance = {"turn_id": "turn-1"}
+        process._events = []
+        message = {
+            "jsonrpc": "2.0",
+            "method": "item/started",
+            "params": {"turnId": "turn-1", "item": {"type": "agentMessage", "text": "PRIVATE_PROMPT"}},
+        }
+        process._record_notification(message)
+        provenance = process._active_turn_provenance
+
+        self.assertEqual(provenance["last_safe_provider_notification_method"], "item/started")
+        self.assertIsInstance(provenance["last_provider_event_timestamp"], str)
+        self.assertNotIn("PRIVATE_PROMPT", json.dumps(provenance))
+
+    def test_app_server_failure_provenance_distinguishes_process_exit(self) -> None:
+        process = SimpleNamespace(
+            last_turn_provenance={
+                "termination_classification": "IN_PROGRESS",
+                "host_deadline_expired": False,
+                "thread_resumed": False,
+            },
+            process=SimpleNamespace(poll=lambda: 17),
+        )
+        error = AppServerError(
+            "App Server process exited unexpectedly.",
+            failure_class="APP_SERVER_PROCESS_EXIT",
+            termination_classification="APP_SERVER_PROCESS_EXIT",
+        )
+        provenance = _finalize_turn_failure(process, error)
+        self.assertEqual(provenance["termination_classification"], "APP_SERVER_PROCESS_EXIT")
+        self.assertFalse(provenance["host_deadline_expired"])
+        self.assertFalse(provenance["app_server_process_alive_at_failure"])
+        self.assertEqual(provenance["app_server_process_exit_code"], 17)
+        self.assertIn("exit code 17", provenance["failure_reason"])
+
+    def test_app_server_failure_provenance_preserves_provider_error_before_deadline(self) -> None:
+        process = SimpleNamespace(
+            last_turn_provenance={
+                "termination_classification": "APP_SERVER_ERROR_EVENT",
+                "host_deadline_expired": False,
+                "thread_resumed": False,
+            },
+            process=SimpleNamespace(poll=lambda: None),
+        )
+        error = AppServerError(
+            "App Server emitted an error notification.",
+            failure_class="APP_SERVER_ERROR_EVENT",
+            termination_classification="APP_SERVER_ERROR_EVENT",
+        )
+        provenance = _finalize_turn_failure(process, error)
+        self.assertEqual(provenance["termination_classification"], "APP_SERVER_ERROR_EVENT")
+        self.assertFalse(provenance["host_deadline_expired"])
+        self.assertTrue(provenance["app_server_process_alive_at_failure"])
+        self.assertEqual(provenance["failure_reason"], str(error))
+        self.assertNotIn("provider_runtime_unavailable", json.dumps(provenance))
+
+    def test_app_server_provider_timeout_is_distinct_from_host_deadline(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            process = self._turn_process(repository, timeout=600, progress=[])
+            process.process = SimpleNamespace(poll=lambda: None)
+            process._read_event = Mock(
+                side_effect=[
+                    {"jsonrpc": "2.0", "method": "turn/started", "params": {"turn": {"id": "turn-1"}}},
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "turn/completed",
+                        "params": {
+                            "turn": {
+                                "id": "turn-1",
+                                "status": "failed",
+                                "error": {
+                                    "code": "provider_timeout",
+                                    "type": "model_timeout",
+                                    "message": "PRIVATE_PROMPT PRIVATE_REASONING private provider payload",
+                                    "payload": {"secret": "private provider payload"},
+                                },
+                            }
+                        },
+                    },
+                ]
+            )
+            with patch("dual_codex.app_server._save_thread_mapping"):
+                with self.assertRaises(AppServerError) as raised:
+                    process._turn_unlocked("thread-1", "PRIVATE_PROMPT", repository)
+            self.assertEqual(raised.exception.failure_class, "PROVIDER_TURN_TIMEOUT")
+            provenance = _finalize_turn_failure(process, raised.exception)
+
+        self.assertEqual(provenance["termination_classification"], "PROVIDER_TURN_TIMEOUT")
+        self.assertFalse(provenance["host_deadline_expired"])
+        self.assertEqual(provenance["provider_error_code"], "provider_timeout")
+        self.assertEqual(provenance["provider_error_type"], "model_timeout")
+        self.assertEqual(
+            provenance["failure_reason"],
+            "App Server turn turn-1 ended with status 'failed'. Provider error code=provider_timeout, type=model_timeout.",
+        )
+        self.assertNotIn("private provider payload", json.dumps(provenance))
+        self.assertNotIn("PRIVATE_PROMPT", json.dumps(provenance))
+        self.assertNotIn("PRIVATE_REASONING", json.dumps(provenance))
+
+    def test_failure_provenance_keeps_host_timeout_cause_without_prompt_or_secret(self) -> None:
+        message = "Timed out waiting for turn/completed (turn-1)."
+        process = SimpleNamespace(
+            last_turn_provenance={
+                "termination_classification": "HOST_TURN_DEADLINE",
+                "host_deadline_expired": True,
+                "turn_id": "turn-1",
+            },
+            process=SimpleNamespace(poll=lambda: None),
+        )
+        provenance = _finalize_turn_failure(
+            process,
+            AppServerError(message, failure_class="HOST_TURN_DEADLINE", termination_classification="HOST_TURN_DEADLINE"),
+        )
+        self.assertEqual(provenance["failure_reason"], message)
+        serialized = json.dumps(provenance)
+        self.assertNotIn("PRIVATE_PROMPT", serialized)
+        self.assertNotIn("PRIVATE_REASONING", serialized)
+        self.assertNotIn("secret-value", serialized)
 
     def test_app_server_account_role_timeout_overrides_only_turn_completion(self) -> None:
         from dual_codex.app_server import _save_thread_mapping
@@ -1187,12 +1359,29 @@ class AppServerTests(unittest.TestCase):
         process._messages = queue.Queue()
         process._messages.put(None)
         process._stderr = deque(['state=auth.json token="secret-value"'])
+        process.process = SimpleNamespace(poll=lambda: 17)
 
         with self.assertRaisesRegex(AppServerError, "process exited unexpectedly") as raised:
             process._next_message(0.1)
 
         self.assertIn("[REDACTED_AUTH_PATH]", str(raised.exception))
         self.assertNotIn("secret-value", str(raised.exception))
+        self.assertEqual(raised.exception.termination_classification, "APP_SERVER_PROCESS_EXIT")
+
+    def test_stdout_eof_while_app_server_is_alive_is_transport_failure(self) -> None:
+        from collections import deque
+        from dual_codex.app_server import _AppServerProcess
+
+        process = object.__new__(_AppServerProcess)
+        process._messages = queue.Queue()
+        process._messages.put(None)
+        process._stderr = deque()
+        process.process = SimpleNamespace(poll=lambda: None)
+
+        with self.assertRaises(AppServerError) as raised:
+            process._next_message(0.1)
+
+        self.assertEqual(raised.exception.termination_classification, "APP_SERVER_TRANSPORT_EOF")
 
     def test_report_normalisation_keeps_existing_delegation_shape(self) -> None:
         value = json.loads(

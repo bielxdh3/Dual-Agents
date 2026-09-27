@@ -10,6 +10,7 @@ import re
 import subprocess
 import threading
 import time
+from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
 
 from .config import AgentConfig, OrchestratorConfig
@@ -26,9 +27,23 @@ from .report import (
 class AppServerError(RuntimeError):
     """Raised when the local Codex App Server cannot complete a safe request."""
 
-    def __init__(self, message: str, *, failure_class: str = ""):
+    def __init__(
+        self,
+        message: str,
+        *,
+        failure_class: str = "",
+        termination_classification: str = "",
+    ):
         super().__init__(message)
         self.failure_class = failure_class
+        self.termination_classification = termination_classification
+
+
+def _effective_turn_timeout(agent: AgentConfig, config: OrchestratorConfig) -> tuple[float, str]:
+    override = getattr(agent, "app_server_turn_timeout", None)
+    if override is not None:
+        return float(override), "account_role_override"
+    return float(config.app_server_turn_timeout), "global_default"
 
 
 _EVENT_PUBLICATION_QUEUE_SIZE = 64
@@ -360,6 +375,97 @@ def _sanitize_stderr(value: str) -> str:
     )[-8000:]
 
 
+def _provider_turn_failure_class(turn: Mapping[str, Any]) -> str:
+    status = str(turn.get("status", "")).casefold()
+    error = turn.get("error")
+    details = [status]
+    if isinstance(error, Mapping):
+        details.extend(str(error.get(key, "")) for key in ("code", "type", "message"))
+    elif isinstance(error, str):
+        details.append(error)
+    return "PROVIDER_TURN_TIMEOUT" if re.search(r"(?:timed?\s*out|timeout|deadline)", " ".join(details)) else "APP_SERVER_PROVIDER_ERROR"
+
+
+_SAFE_PROVIDER_ERROR_TOKENS = {
+    "provider_timeout",
+    "model_timeout",
+    "timeout",
+    "deadline_exceeded",
+    "rate_limit",
+    "rate_limited",
+    "overloaded",
+    "server_error",
+    "internal_error",
+    "invalid_request",
+    "authentication_error",
+    "context_length_exceeded",
+    "cancelled",
+    "canceled",
+    "failed",
+    "error",
+}
+
+
+def _safe_turn_failure_reason(exc: BaseException, classification: str, exit_code: int | None) -> str:
+    if classification == "APP_SERVER_PROCESS_EXIT":
+        suffix = f" (exit code {exit_code})" if exit_code is not None else ""
+        return f"App Server process exited unexpectedly{suffix}."
+    if classification == "APP_SERVER_TRANSPORT_EOF":
+        return "App Server stdout closed unexpectedly."
+    if classification == "HOST_TURN_DEADLINE":
+        return " ".join(_sanitize_stderr(str(exc)).split())[:500]
+    if classification == "APP_SERVER_TRANSPORT_TIMEOUT":
+        return " ".join(_sanitize_stderr(str(exc)).split())[:500]
+    if classification == "APP_SERVER_ERROR_EVENT":
+        return " ".join(_sanitize_stderr(str(exc)).split())[:500]
+    if classification == "PROVIDER_TURN_TIMEOUT":
+        return " ".join(_sanitize_stderr(str(exc)).split())[:500]
+    if classification == "APP_SERVER_PROVIDER_ERROR":
+        return " ".join(_sanitize_stderr(str(exc)).split())[:500]
+    if classification == "APP_SERVER_TURN_START_ERROR":
+        return " ".join(_sanitize_stderr(str(exc)).split())[:500]
+    return f"{type(exc).__name__} ({classification})."
+
+
+def _finalize_turn_failure(process: Any, exc: BaseException) -> dict[str, Any] | None:
+    record = getattr(process, "last_turn_provenance", None)
+    if not isinstance(record, Mapping) or not record:
+        return None
+    finalized = dict(record)
+    if finalized.get("termination_classification") == "TURN_COMPLETED":
+        return finalized
+    process_object = getattr(process, "process", None)
+    try:
+        process_exit_code = process_object.poll() if process_object is not None else None
+    except Exception:
+        process_exit_code = None
+    classification = str(finalized.get("termination_classification") or "")
+    if not classification or classification == "IN_PROGRESS":
+        classification = str(getattr(exc, "termination_classification", ""))
+    if not classification:
+        message = str(exc).casefold()
+        if process_exit_code is not None or "process exited unexpectedly" in message:
+            classification = "APP_SERVER_PROCESS_EXIT"
+        elif "timed out waiting for app server" in message:
+            classification = "APP_SERVER_TRANSPORT_TIMEOUT"
+        elif "timed out waiting for turn/completed" in message:
+            classification = "HOST_TURN_DEADLINE"
+        else:
+            classification = "APP_SERVER_PROVIDER_ERROR"
+    finalized.update(
+        {
+            "termination_classification": classification,
+            "host_deadline_expired": classification == "HOST_TURN_DEADLINE",
+            "app_server_process_alive_at_failure": process_exit_code is None if process_object is not None else None,
+            "failure_type": type(exc).__name__,
+            "failure_reason": _safe_turn_failure_reason(exc, classification, process_exit_code),
+        }
+    )
+    if process_exit_code is not None:
+        finalized["app_server_process_exit_code"] = int(process_exit_code)
+    return finalized
+
+
 class _AppServerProcess:
     def __init__(
         self,
@@ -403,6 +509,10 @@ class _AppServerProcess:
         self.initialize_response: dict[str, Any] = {}
         self.last_thread_request: dict[str, Any] = {}
         self.last_thread_binding: dict[str, Any] = {}
+        self._active_turn_provenance: dict[str, Any] | None = None
+        self.last_turn_provenance: dict[str, Any] = {}
+        self._active_thread_id = ""
+        self._active_thread_resumed = False
         self.request_methods: list[str] = []
         command = _app_server_command(config, agent=agent, role=role)
         process_args = _prepare_command([str(item) for item in command])
@@ -777,13 +887,32 @@ class _AppServerProcess:
             if line is None:
                 stderr = _sanitize_stderr(self.stderr_tail)
                 detail = f": {stderr}" if stderr else "."
-                raise AppServerError(f"App Server process exited unexpectedly{detail}")
+                process = getattr(self, "process", None)
+                try:
+                    exit_code = process.poll() if process is not None else None
+                except Exception:
+                    exit_code = None
+                classification = "APP_SERVER_PROCESS_EXIT" if exit_code is not None else "APP_SERVER_TRANSPORT_EOF"
+                description = "App Server process exited unexpectedly" if exit_code is not None else "App Server stdout closed unexpectedly"
+                raise AppServerError(
+                    f"{description}{detail}",
+                    failure_class=classification,
+                    termination_classification=classification,
+                )
             try:
                 message = json.loads(line)
             except (TypeError, ValueError) as exc:
-                raise AppServerError("App Server emitted invalid JSON-RPC data.") from exc
+                raise AppServerError(
+                    "App Server emitted invalid JSON-RPC data.",
+                    failure_class="APP_SERVER_PROTOCOL_ERROR",
+                    termination_classification="APP_SERVER_PROTOCOL_ERROR",
+                ) from exc
             if not isinstance(message, dict):
-                raise AppServerError("App Server emitted a non-object JSON-RPC message.")
+                raise AppServerError(
+                    "App Server emitted a non-object JSON-RPC message.",
+                    failure_class="APP_SERVER_PROTOCOL_ERROR",
+                    termination_classification="APP_SERVER_PROTOCOL_ERROR",
+                )
             if "method" in message and "id" in message:
                 # Preserve client-owned dynamic-tool calls in the same
                 # provenance stream as notifications before replying.
@@ -794,9 +923,21 @@ class _AppServerProcess:
 
     def _record_notification(self, message: dict[str, Any]) -> None:
         if "method" in message:
+            active_turn = getattr(self, "_active_turn_provenance", None)
+            method = message.get("method")
+            params = message.get("params")
+            params = params if isinstance(params, Mapping) else {}
+            provider_turn = params.get("turn")
+            event_turn_id = provider_turn.get("id") if isinstance(provider_turn, Mapping) else params.get("turnId")
+            if active_turn is not None:
+                if not active_turn.get("turn_id") and method == "turn/started" and isinstance(event_turn_id, str):
+                    active_turn["turn_id"] = event_turn_id
+                if isinstance(event_turn_id, str) and event_turn_id == active_turn.get("turn_id"):
+                    active_turn["last_provider_event_timestamp"] = datetime.now(timezone.utc).isoformat()
+                    if isinstance(method, str) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_./-]{0,127}", method):
+                        active_turn["last_safe_provider_notification_method"] = method
             event_message = message
             if message.get("method") == "rawResponseItem/completed":
-                params = message.get("params")
                 if isinstance(params, dict):
                     safe_params: dict[str, Any] = {
                         key: params[key]
@@ -844,7 +985,11 @@ class _AppServerProcess:
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    raise AppServerError(f"Timed out waiting for App Server response to {method}.")
+                    raise AppServerError(
+                        f"Timed out waiting for App Server response to {method}.",
+                        failure_class="APP_SERVER_TRANSPORT_TIMEOUT",
+                        termination_classification="APP_SERVER_TRANSPORT_TIMEOUT",
+                    )
                 try:
                     message = self._next_message(min(1.0, remaining))
                 except AppServerError as exc:
@@ -937,13 +1082,43 @@ class _AppServerProcess:
             params["effort"] = self.agent.reasoning_effort
         if self.agent.service_tier:
             params["serviceTier"] = self.agent.service_tier
+        turn_timeout, timeout_source = _effective_turn_timeout(self.agent, self.config)
+        self._active_turn_provenance = {
+            "turn_timeout_seconds": turn_timeout,
+            "timeout_source": timeout_source,
+            "turn_start_monotonic": None,
+            "turn_start_timestamp": None,
+            "last_provider_event_timestamp": None,
+            "termination_classification": "IN_PROGRESS",
+            "host_deadline_expired": False,
+            "app_server_process_alive_at_failure": None,
+            "app_server_process_exit_code": None,
+            "thread_resumed": bool(getattr(self, "_active_thread_resumed", False)),
+            "thread_state": "resumed" if getattr(self, "_active_thread_resumed", False) else "fresh",
+            "thread_id": thread_id,
+            "turn_id": None,
+            "process_id": getattr(getattr(self, "process", None), "pid", None),
+            "last_safe_provider_notification_method": None,
+        }
+        self.last_turn_provenance = self._active_turn_provenance
         response = self.request("turn/start", params, timeout=self.config.app_server_turn_start_timeout)
         if "error" in response:
-            raise AppServerError(f"App Server turn/start failed: {_error_message(response)}")
+            self._active_turn_provenance["termination_classification"] = "APP_SERVER_TURN_START_ERROR"
+            raise AppServerError(
+                f"App Server turn/start failed: {_error_message(response)}",
+                failure_class="APP_SERVER_TURN_START_ERROR",
+                termination_classification="APP_SERVER_TURN_START_ERROR",
+            )
         turn = response.get("result", {}).get("turn", {})
         turn_id = turn.get("id") if isinstance(turn, dict) else None
         if not isinstance(turn_id, str) or not turn_id:
-            raise AppServerError("App Server turn/start returned no turn ID.")
+            self._active_turn_provenance["termination_classification"] = "APP_SERVER_PROTOCOL_ERROR"
+            raise AppServerError(
+                "App Server turn/start returned no turn ID.",
+                failure_class="APP_SERVER_PROTOCOL_ERROR",
+                termination_classification="APP_SERVER_PROTOCOL_ERROR",
+            )
+        self._active_turn_provenance["turn_id"] = turn_id
 
         started = False
         completed: dict[str, Any] | None = None
@@ -968,15 +1143,21 @@ class _AppServerProcess:
             elif item_type == "custom_tool_call_output" and call_id:
                 raw_custom_outputs[call_id] = evidence
 
-        turn_timeout = getattr(self.agent, "app_server_turn_timeout", None)
-        if turn_timeout is None:
-            turn_timeout = self.config.app_server_turn_timeout
-        deadline = time.monotonic() + float(turn_timeout)
+        turn_start_monotonic = time.monotonic()
+        self._active_turn_provenance["turn_start_monotonic"] = turn_start_monotonic
+        self._active_turn_provenance["turn_start_timestamp"] = datetime.now(timezone.utc).isoformat()
+        deadline = turn_start_monotonic + turn_timeout
         last_progress = time.monotonic()
         while completed is None:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise AppServerError(f"Timed out waiting for turn/completed ({turn_id}).")
+                self._active_turn_provenance["termination_classification"] = "HOST_TURN_DEADLINE"
+                self._active_turn_provenance["host_deadline_expired"] = True
+                raise AppServerError(
+                    f"Timed out waiting for turn/completed ({turn_id}).",
+                    failure_class="HOST_TURN_DEADLINE",
+                    termination_classification="HOST_TURN_DEADLINE",
+                )
             try:
                 message = self._read_event(min(1.0, remaining))
             except AppServerError as exc:
@@ -1000,14 +1181,52 @@ class _AppServerProcess:
             elif method == "turn/completed" and event_turn_id == turn_id:
                 completed = event_turn
             elif method == "error":
-                raise AppServerError("App Server emitted an error notification.")
+                self._active_turn_provenance["termination_classification"] = "APP_SERVER_ERROR_EVENT"
+                raise AppServerError(
+                    "App Server emitted an error notification.",
+                    failure_class="APP_SERVER_ERROR_EVENT",
+                    termination_classification="APP_SERVER_ERROR_EVENT",
+                )
             if self.progress and time.monotonic() - last_progress >= 15:
                 self.progress(f"app-server turn {turn_id} still running")
                 last_progress = time.monotonic()
         if not started:
-            raise AppServerError(f"App Server completed turn {turn_id} without turn/started.")
+            self._active_turn_provenance["termination_classification"] = "APP_SERVER_PROTOCOL_ERROR"
+            raise AppServerError(
+                f"App Server completed turn {turn_id} without turn/started.",
+                failure_class="APP_SERVER_PROTOCOL_ERROR",
+                termination_classification="APP_SERVER_PROTOCOL_ERROR",
+            )
         if completed.get("status") != "completed":
-            raise AppServerError(f"App Server turn {turn_id} ended with status {completed.get('status')!r}.")
+            failure_class = _provider_turn_failure_class(completed)
+            self._active_turn_provenance["termination_classification"] = failure_class
+            error = completed.get("error")
+            if isinstance(error, Mapping):
+                for field in ("code", "type"):
+                    value = error.get(field)
+                    if isinstance(value, int):
+                        self._active_turn_provenance[f"provider_error_{field}"] = str(value)
+                    elif isinstance(value, str):
+                        safe_value = _sanitize_stderr(value).strip().casefold()
+                        if safe_value in _SAFE_PROVIDER_ERROR_TOKENS:
+                            self._active_turn_provenance[f"provider_error_{field}"] = safe_value
+                        elif value.strip():
+                            self._active_turn_provenance[f"provider_error_{field}_present"] = True
+            reason_parts = [f"App Server turn {turn_id} ended with status {completed.get('status')!r}."]
+            provider_code = self._active_turn_provenance.get("provider_error_code")
+            provider_type = self._active_turn_provenance.get("provider_error_type")
+            if provider_code or provider_type:
+                details = ", ".join(
+                    f"{key}={value}"
+                    for key, value in (("code", provider_code), ("type", provider_type))
+                    if value
+                )
+                reason_parts.append(f"Provider error {details}.")
+            raise AppServerError(
+                " ".join(reason_parts),
+                failure_class=failure_class,
+                termination_classification=failure_class,
+            )
         items = completed.get("items") or []
         for item in items:
             observe_item(item)
@@ -1015,10 +1234,14 @@ class _AppServerProcess:
         assistant = str(messages[-1]) if messages else ""
         missing_custom_outputs = sorted(set(raw_custom_calls) - set(raw_custom_outputs))
         if missing_custom_outputs:
+            self._active_turn_provenance["termination_classification"] = "APP_SERVER_PROTOCOL_ERROR"
             raise AppServerError(
                 "App Server completed turn with missing custom-tool output for call ids: "
-                + ", ".join(missing_custom_outputs)
+                + ", ".join(missing_custom_outputs),
+                failure_class="APP_SERVER_PROTOCOL_ERROR",
+                termination_classification="APP_SERVER_PROTOCOL_ERROR",
             )
+        self._active_turn_provenance["termination_classification"] = "TURN_COMPLETED"
         # A fresh thread has no durable rollout until its first turn is
         # accepted. Persist only materialized threads so a later invocation
         # cannot resume the unmaterialized id returned by thread/start.
@@ -1040,13 +1263,22 @@ class _AppServerProcess:
             "event_count": len(self._events),
             "turn_started": started,
             "turn_status": completed.get("status"),
+            "turn_provenance": dict(self._active_turn_provenance),
             "tool_executions": list(tool_items.values()),
             "custom_tool_outputs": list(raw_custom_outputs.values()),
         }
 
     def turn(self, thread_id: str, prompt: str, repository: Path) -> dict[str, Any]:
         with self._lock:
-            return self._turn_unlocked(thread_id, prompt, repository)
+            self.last_turn_provenance = {}
+            self._active_thread_id = thread_id
+            self._active_thread_resumed = False
+            try:
+                return self._turn_unlocked(thread_id, prompt, repository)
+            finally:
+                if self._active_turn_provenance is not None:
+                    self.last_turn_provenance = dict(self._active_turn_provenance)
+                    self._active_turn_provenance = None
 
     def run_turn_with_context(
         self,
@@ -1066,11 +1298,19 @@ class _AppServerProcess:
         with self._lock:
             previous_journal = self._event_journal
             previous_context = self._event_context
+            self.last_turn_provenance = {}
             self._event_journal = journal
             self._event_context = {str(key): str(value) for key, value in context.items()}
             try:
                 thread_id, resumed = self._thread_id_for_unlocked(repository)
-                turn = self._turn_unlocked(thread_id, prompt, repository)
+                self._active_thread_id = thread_id
+                self._active_thread_resumed = resumed
+                try:
+                    turn = self._turn_unlocked(thread_id, prompt, repository)
+                finally:
+                    if self._active_turn_provenance is not None:
+                        self.last_turn_provenance = dict(self._active_turn_provenance)
+                        self._active_turn_provenance = None
                 turn["thread_id"] = thread_id
                 turn["thread_resumed"] = resumed
                 return turn
@@ -1411,6 +1651,9 @@ def run_codex_app_server(
                 "app_server_turn_id": turn["turn_id"],
                 "app_server_thread_resumed": str(resumed).lower(),
                 "app_server_process_id": str(process.pid),
+                "app_server_turn_provenance": dict(
+                    getattr(process, "last_turn_provenance", {}) or turn.get("turn_provenance", {})
+                ),
                 "app_server_event_count": str(turn["event_count"]),
                 "app_server_request_order": turn.get("request_order", []),
                 "app_server_tool_executions": turn.get("tool_executions", []),
@@ -1426,10 +1669,18 @@ def run_codex_app_server(
         )
         return CommandResult(command, 0, assistant, _sanitize_stderr(process.stderr_tail), metadata)
     except (AppServerError, OSError, ValueError) as exc:
+        failure_reason = _sanitize_stderr(str(exc))
+        if process is not None:
+            turn_provenance = _finalize_turn_failure(process, exc)
+            if turn_provenance is not None:
+                metadata["app_server_turn_provenance"] = turn_provenance
+                if turn_provenance.get("termination_classification") != "TURN_COMPLETED":
+                    metadata["availability_failure_class"] = turn_provenance["termination_classification"]
+                    failure_reason = turn_provenance["failure_reason"]
         if process is not None:
             _discard_process(process)
         text = str(exc).casefold()
-        failure_class = str(getattr(exc, "failure_class", ""))
+        failure_class = str(metadata.get("availability_failure_class") or getattr(exc, "failure_class", ""))
         if failure_class:
             metadata["availability_failure_class"] = failure_class
         elif "not_configured" in text:
@@ -1442,7 +1693,7 @@ def run_codex_app_server(
             metadata["availability_failure_class"] = "authentication_unavailable"
         else:
             metadata["availability_failure_class"] = "provider_runtime_unavailable"
-        return CommandResult(command, 1, "", _sanitize_stderr(str(exc)), metadata)
+        return CommandResult(command, 1, "", failure_reason, metadata)
 
 
 def app_server_call(

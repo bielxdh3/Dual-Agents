@@ -129,6 +129,59 @@ def _fake_actor(*, fail_role: str | None = None, interrupt: bool = False):
 
 
 class StructuredRunResultTests(unittest.TestCase):
+    def test_executor_failure_includes_safe_app_server_turn_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, repository, instructions, task = _fixture(root)
+            turn_provenance = {
+                "turn_timeout_seconds": 600.0,
+                "timeout_source": "global_default",
+                "turn_start_monotonic": 100.5,
+                "turn_start_timestamp": "2026-01-01T00:00:00+00:00",
+                "last_provider_event_timestamp": "2026-01-01T00:09:59+00:00",
+                "termination_classification": "HOST_TURN_DEADLINE",
+                "host_deadline_expired": True,
+                "app_server_process_alive_at_failure": True,
+                "app_server_process_exit_code": None,
+                "thread_resumed": False,
+                "thread_state": "fresh",
+                "turn_id": "turn-safe-id",
+                "last_safe_provider_notification_method": "item/started",
+                "failure_reason": "Timed out waiting for turn/completed (turn-safe-id).",
+            }
+
+            def actor(**kwargs):
+                role = kwargs["role"]
+                account = kwargs["config"].agent_for_role(role).account_name
+                if role == "executor":
+                    raise ActorAvailabilityError(
+                        "Timed out waiting for turn/completed (turn-safe-id).",
+                        failure_class="HOST_TURN_DEADLINE",
+                        actor=account,
+                        metadata={"app_server_turn_provenance": turn_provenance},
+                    )
+                payloads = {
+                    "architect": {"summary": "plan", "steps": [], "acceptance_criteria": [], "risks": [], "files_to_inspect": [], "skills_loaded": []},
+                    "reviewer": {"verdict": "approved", "summary": "approved", "findings": []},
+                }
+                kwargs["output_path"].write_text(json.dumps(payloads[role]), encoding="utf-8")
+                return CommandResult(["fake"], 0, "", "", {"phase": role, "role": role, "actor_id": account, "backend": "app_server"})
+
+            exit_code, result, output, _ = _run_cli(config, repository, instructions, task, actor)
+            run_dir = Path(result["run_directory"])
+            run_state = json.loads((run_dir / "run_state.json").read_text(encoding="utf-8"))
+            provenance = json.loads((run_dir / "provenance.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(result["failure_class"], "HOST_TURN_DEADLINE")
+            self.assertEqual(result["app_server_turn_provenance"], turn_provenance)
+            self.assertEqual(run_state["failure"]["app_server_turn_provenance"], turn_provenance)
+            self.assertEqual(run_state["app_server_turn_provenance"], [turn_provenance])
+            self.assertEqual(provenance["configured_actor_routing"][1]["app_server_turn_provenance"], turn_provenance)
+            result_line = next(line for line in output.splitlines() if line.startswith("DUAL_CODEX_RUN_RESULT "))
+            self.assertNotIn("PRIVATE_PROMPT_MUST_NOT_LEAK", result_line)
+            self.assertNotIn("PRIVATE_REASONING", result_line)
+
     def test_architect_failure_reports_exact_run_and_partial_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

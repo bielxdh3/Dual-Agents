@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import stat
 import threading
@@ -226,33 +226,102 @@ _SECURITY_SCAN_INTENT = re.compile(
 )
 
 
-def _security_scan_request(task: str, plan: Mapping[str, Any]) -> tuple[bool, str]:
-    plan_steps = plan.get("steps")
-    candidates = [task]
-    if isinstance(plan_steps, list):
-        candidates.extend(step for step in plan_steps if isinstance(step, str))
-    requested_text = "\n".join(candidates)
+_SECURITY_TOOL_REQUIRED = re.compile(
+    r"\bcodex\s+security\s+(?:plugin(?:/tool)?|tool)\b.{0,160}"
+    r"\b(?:must|shall|required|mandatory)\s+(?:(?:be|also)\s+)?(?:run|execute|perform|conduct|start)\b",
+    re.IGNORECASE,
+)
+
+_DEEP_SCAN_REQUIRED = re.compile(
+    r"^\s*(?:(?:please|you\s+(?:must|should|need\s+to))\s+)?"
+    r"(?:run|start|perform|conduct|execute|launch|await|wait\s+for|complete)\b"
+    r".{0,100}\bdeep\s+(?:(?:codex\s+)?security\s+)?scan\b|"
+    r"^\s*(?:the\s+)?deep\s+(?:(?:codex\s+)?security\s+)?scan\b.{0,60}\b(?:must|required|mandatory)\b",
+    re.IGNORECASE,
+)
+
+_NEGATED_DEEP_SCAN = re.compile(
+    r"\b(?:do\s+not|don't|never|must\s+not|should\s+not|not)\b.{0,80}"
+    r"\bdeep\s+(?:(?:codex\s+)?security\s+)?scan\b|"
+    r"\bdeep\s+(?:(?:codex\s+)?security\s+)?scan\b.{0,80}"
+    r"\b(?:not|required against|avoid|forbid|prohibit)\b",
+    re.IGNORECASE,
+)
+
+_MISSION_SECURITY_SCOPE = re.compile(
+    r"^\s*(?:codex\s+)?security\s+scan\s+scope\s*[:=]\s*([^\s#]+)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _security_scan_request(task: str) -> tuple[bool, str, str]:
+    mission_lines = [re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line) for line in task.splitlines()]
     requested = any(
-        _SECURITY_SCAN_INTENT.search(re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line))
-        for line in requested_text.splitlines()
-    )
+        _SECURITY_SCAN_INTENT.search(line) for line in mission_lines
+    ) or bool(_SECURITY_TOOL_REQUIRED.search(task))
     if not requested:
-        return False, "standard"
-    return True, "deep" if re.search(r"\bdeep\s+(?:(?:codex\s+)?security\s+)?scan\b", requested_text, re.IGNORECASE) else "standard"
+        return False, "standard", "."
+    mode = "deep" if any(
+        _DEEP_SCAN_REQUIRED.search(line) and not _NEGATED_DEEP_SCAN.search(line)
+        for line in mission_lines
+    ) else "standard"
+    scope_match = _MISSION_SECURITY_SCOPE.search(task)
+    if scope_match is None:
+        return True, mode, "."
+    requested_scope = scope_match.group(1).strip("`\"'").replace("\\", "/")
+    scope_path = PurePosixPath(requested_scope)
+    if (
+        not requested_scope
+        or scope_path.is_absolute()
+        or ":" in requested_scope
+        or ".." in scope_path.parts
+    ):
+        raise SecurityScanError(
+            "The original mission contains an invalid Codex Security scan scope.",
+            failure_class="SECURITY_SCAN_REQUIREMENT_INVALID",
+        )
+    return True, mode, scope_path.as_posix() or "."
+
+
+def _architect_security_gate_policy(
+    requirement: tuple[bool, str, str],
+    decision: ScanDecision | None,
+) -> str:
+    required, mode, scope = requirement
+    if not required:
+        return "The original mission does not require a Codex Security scan. Do not add or claim a host-mandated scan."
+    if decision is None:
+        return f"The original mission requires a Codex Security {mode} scan for scope {scope!r}; the host has not authorized a different mode or scope."
+    return (
+        f"The original mission requires a Codex Security {mode} scan for scope {scope!r}. "
+        "The following host arbitration is authoritative; preserve its exact target and selected scan, "
+        "and do not downgrade, remove, replace, or duplicate it. "
+        + decision.executor_instruction()
+    )
+
+
+def _executor_security_gate_policy(policy: str) -> str:
+    if not policy:
+        return ""
+    return (
+        "The host Security arbitration below is authoritative and supersedes any conflicting Architect plan. "
+        "Follow its exact mode, scope, target, and selected scan.\n"
+        + policy
+    )
 
 
 def _prepare_security_scan(
     *,
     config: OrchestratorConfig,
-    task: str,
-    plan: Mapping[str, Any],
+    requirement: tuple[bool, str, str],
     target_revision: str,
     run_state: dict,
     canonical_root: Path,
     run_dir: Path,
     phase_provenance: list[dict],
+    checkpoint: str,
 ) -> tuple[CodexSecurityProvider | None, ScanDecision | None, str]:
-    required, mode = _security_scan_request(task, plan)
+    required, mode, scope = requirement
     if not required:
         return None, None, ""
     provider = CodexSecurityProvider(config.agent_for_role("executor"))
@@ -260,10 +329,12 @@ def _prepare_security_scan(
         repository=config.repository,
         target_revision=target_revision,
         required_mode=mode,
-        required_scope=".",
+        required_scope=scope,
         allow_completed_reuse=False,
     )
-    run_state.setdefault("security_scan_arbitrations", []).append(decision.public_record())
+    record = decision.public_record()
+    record["checkpoint"] = checkpoint
+    run_state.setdefault("security_scan_arbitrations", []).append(record)
     _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
     if decision.action == "conflict":
         observed = ", ".join(
@@ -378,6 +449,7 @@ def _run_result_record(run_dir: Path, run_state: dict) -> dict:
         "provider_status": run_state.get("provider_status"),
         "failure_type": failure.get("failure_type"),
         "failure_class": failure.get("failure_class"),
+        "app_server_turn_provenance": failure.get("app_server_turn_provenance"),
         "verdict": run_state.get("verdict") if run_state.get("verdict") in ("approved", "changes_requested") else None,
         "correction_cycles": run_state.get("correction_cycles", 0),
         "mutation_attribution_status": attribution.get("status"),
@@ -668,6 +740,9 @@ def _dispatch_phase(
         if getattr(exc, "failure_class", None):
             entry["failure_class"] = str(exc.failure_class)
         with state_lock:
+            app_server_turn = entry.get("app_server_turn_provenance")
+            if isinstance(app_server_turn, dict):
+                run_state.setdefault("app_server_turn_provenance", []).append(dict(app_server_turn))
             run_state["current_phase"] = None
             run_state["current_actor"] = None
             run_state["current_backend"] = None
@@ -699,6 +774,9 @@ def _dispatch_phase(
         }
     )
     with state_lock:
+        app_server_turn = entry.get("app_server_turn_provenance")
+        if isinstance(app_server_turn, dict):
+            run_state.setdefault("app_server_turn_provenance", []).append(dict(app_server_turn))
         run_state["current_phase"] = None
         run_state["current_actor"] = None
         run_state["current_backend"] = None
@@ -810,6 +888,7 @@ def _execute_locked(
         "last_backend": None,
         "provider_status": "not_started",
         "last_progress_at": None,
+        "app_server_turn_provenance": [],
         "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest(),
         "initial_git_baseline": {
             "path": baseline_path.name,
@@ -877,6 +956,25 @@ def _execute_locked(
             )
 
         plan_path = run_dir / "plan.json"
+        security_requirement = _security_scan_request(task)
+        run_state["mission_security_requirement"] = {
+            "required": security_requirement[0],
+            "mode": security_requirement[1],
+            "scope": security_requirement[2],
+            "source": "original_task",
+        }
+        _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
+        security_provider, scan_decision, _ = _prepare_security_scan(
+            config=config,
+            requirement=security_requirement,
+            target_revision=str(baseline.get("head") or ""),
+            run_state=run_state,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            phase_provenance=phase_provenance,
+            checkpoint="before_architect",
+        )
+        architect_gate_policy = _architect_security_gate_policy(security_requirement, scan_decision)
         _dispatch_phase(
             config=config,
             canonical_root=canonical_root,
@@ -887,7 +985,12 @@ def _execute_locked(
             progress=progress,
             role="architect",
             repository_trust_authorized=repository_trust_authorized,
-            task=_prompt(config, "architect.txt", task=task),
+            task=_prompt(
+                config,
+                "architect.txt",
+                task=task,
+                security_gate_policy=architect_gate_policy,
+            ),
             repository=config.repository,
             output_path=plan_path,
             schema_path=_schema(config, "architect-plan.schema.json"),
@@ -897,14 +1000,15 @@ def _execute_locked(
         implementation_path = run_dir / "implementation.json"
         security_provider, scan_decision, scan_policy = _prepare_security_scan(
             config=config,
-            task=task,
-            plan=plan,
+            requirement=security_requirement,
             target_revision=str(baseline.get("head") or ""),
             run_state=run_state,
             canonical_root=canonical_root,
             run_dir=run_dir,
             phase_provenance=phase_provenance,
+            checkpoint="before_executor",
         )
+        scan_policy = _executor_security_gate_policy(scan_policy)
         _dispatch_phase(
             config=config,
             canonical_root=canonical_root,
@@ -976,14 +1080,15 @@ def _execute_locked(
             implementation_path = run_dir / f"correction-{correction_cycles}.json"
             security_provider, scan_decision, scan_policy = _prepare_security_scan(
                 config=config,
-                task=task,
-                plan=plan,
+                requirement=security_requirement,
                 target_revision=str(baseline.get("head") or ""),
                 run_state=run_state,
                 canonical_root=canonical_root,
                 run_dir=run_dir,
                 phase_provenance=phase_provenance,
+                checkpoint=f"before_correction_{correction_cycles}",
             )
+            scan_policy = _executor_security_gate_policy(scan_policy)
             _dispatch_phase(
                 config=config,
                 canonical_root=canonical_root,
@@ -1056,11 +1161,19 @@ def _execute_locked(
                 run_state["status"] = "failed"
                 if run_state.get("current_phase"):
                     run_state["provider_status"] = "failed"
-            run_state["failure"] = {
+            failure_record = {
                 "failure_type": "DirtyRepository" if "Repository has uncommitted changes." in str(exc) else type(exc).__name__,
                 "failure_class": str(getattr(exc, "failure_class", "")),
                 "failed_at": datetime.now(timezone.utc).isoformat(),
             }
+            failed_phase = next(
+                (item for item in reversed(phase_provenance) if item.get("role") == run_state.get("last_phase")),
+                None,
+            )
+            turn_provenance = failed_phase.get("app_server_turn_provenance") if isinstance(failed_phase, dict) else None
+            if isinstance(turn_provenance, dict):
+                failure_record["app_server_turn_provenance"] = turn_provenance
+            run_state["failure"] = failure_record
             interrupted_phase = run_state.get("current_phase")
             if interrupted_phase:
                 run_state["last_phase"] = interrupted_phase

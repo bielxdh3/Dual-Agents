@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from dual_codex.security_scan import (
     PLUGIN_ID,
@@ -12,7 +13,7 @@ from dual_codex.security_scan import (
     stable_target_id,
     validate_scan_provenance,
 )
-from dual_codex.orchestrator import _security_scan_request
+from dual_codex.orchestrator import _executor_security_gate_policy, _prepare_security_scan, _security_scan_request
 
 
 def _scan(repository: Path, scan_id: str, mode: str, status: str, *, revision: str = "rev-1", scope: str = ".") -> dict:
@@ -58,6 +59,7 @@ class SecurityScanArbitrationTests(unittest.TestCase):
         self.assertEqual(decision.action, "awaited")
         self.assertEqual(decision.selected_scan["scanId"], "deep-1")
         self.assertIn('"decision":"awaited"', decision.executor_instruction())
+        self.assertIn('"scan_id":"deep-1"', decision.executor_instruction())
         self.assertIn("do not start a competing scan", decision.executor_instruction())
 
     def test_active_standard_scan_is_awaited(self) -> None:
@@ -114,11 +116,59 @@ class SecurityScanArbitrationTests(unittest.TestCase):
         self.assertTrue(all(name.startswith(("list_", "get_")) for name in _READ_TOOLS))
         self.assertFalse(any("cancel" in name or "start" in name or "resume" in name for name in _READ_TOOLS))
 
-    def test_scan_detection_requires_an_affirmative_scan_action(self) -> None:
-        self.assertEqual(_security_scan_request("Do not start a competing security scan.", {})[0], False)
-        self.assertEqual(_security_scan_request("The security scan must not be started.", {})[0], False)
-        self.assertEqual(_security_scan_request("Run a Codex Security standard scan.", {})[0], True)
-        self.assertEqual(_security_scan_request("Implement arbitration.", {"steps": ["Run a deep security scan."]}), (True, "deep"))
+    def test_scan_detection_uses_actual_bielos_mandatory_wording_from_mission(self) -> None:
+        task = (
+            "The Codex Security plugin/tool available in the Codex environment MUST run.\n"
+            "Run it at least after the initial code and architecture audit."
+        )
+        self.assertEqual(_security_scan_request(task), (True, "standard", "."))
+
+    def test_scan_detection_ignores_architect_plan_wording_and_negative_mission_text(self) -> None:
+        self.assertEqual(_security_scan_request("Implement arbitration."), (False, "standard", "."))
+        self.assertEqual(
+            _security_scan_request("The Codex Security plugin/tool MUST NOT run. Do not start a competing security scan."),
+            (False, "standard", "."),
+        )
+
+    def test_mission_without_security_requirement_skips_provider_arbitration(self) -> None:
+        requirement = _security_scan_request("Implement a harmless formatting change.")
+        with patch("dual_codex.orchestrator.CodexSecurityProvider") as provider:
+            result = _prepare_security_scan(
+                config=object(),
+                requirement=requirement,
+                target_revision="rev-1",
+                run_state={},
+                canonical_root=Path("."),
+                run_dir=Path("."),
+                phase_provenance=[],
+                checkpoint="before_architect",
+            )
+        self.assertEqual(result, (None, None, ""))
+        provider.assert_not_called()
+
+    def test_executor_host_security_policy_overrides_a_contradictory_plan(self) -> None:
+        repository = Path(".").resolve()
+        decision = _decide(repository, [])
+        architect_plan = {"steps": ["Do not run the Codex Security scan."]}
+        policy = _executor_security_gate_policy(decision.executor_instruction())
+
+        self.assertEqual(architect_plan["steps"], ["Do not run the Codex Security scan."])
+        self.assertEqual(decision.action, "start")
+        self.assertIn("supersedes any conflicting Architect plan", policy)
+        self.assertIn('"decision":"start"', policy)
+
+    def test_scan_detection_keeps_required_mode_and_scope_in_original_mission(self) -> None:
+        self.assertEqual(
+            _security_scan_request("Run a Codex Security standard scan.\nSecurity scan scope: src/dual_codex"),
+            (True, "standard", "src/dual_codex"),
+        )
+        self.assertEqual(_security_scan_request("Run a deep security scan."), (True, "deep", "."))
+        self.assertEqual(
+            _security_scan_request(
+                "The Codex Security plugin/tool MUST run.\nDeep security scan is not required; use the standard scan."
+            ),
+            (True, "standard", "."),
+        )
 
     def test_provider_reads_paginated_scan_ledger_without_mutating_it(self) -> None:
         from dual_codex.config import AgentConfig
