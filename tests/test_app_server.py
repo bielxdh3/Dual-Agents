@@ -210,7 +210,7 @@ class _FakeProcess:
             if len(argv) >= 2 and argv[0] == "node" and argv[1] == "-e":
                 stdout = (
                     json.dumps({"registry": True, "prisma_host": True})
-                    if "registry.npmjs.org" in argv[-1]
+                    if "checks={registry:false,prisma_host:false}" in argv[-1]
                     else json.dumps({"child": True, "worker": True, "temp_write": True, "cache_write": True})
                 )
             else:
