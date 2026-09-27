@@ -13,6 +13,7 @@ from dual_codex.config import AccountConfig, AgentConfig, OrchestratorConfig
 from dual_codex.delegation import DelegationError, RepositoryLock
 from dual_codex.orchestrator import execute
 from dual_codex.process import CommandError, CommandResult
+from dual_codex.security_scan import PLUGIN_ID, SecurityScanError, arbitrate_security_scans, stable_target_id
 
 
 class OrchestratorTests(unittest.TestCase):
@@ -624,6 +625,263 @@ class OrchestratorTests(unittest.TestCase):
             self.assertTrue(any(event.get("state") == "timeout" for event in decoded))
             self.assertEqual(mutation["unchanged_preexisting_paths"], ["tracked.txt"])
             self.assertEqual(mutation["run_touched_paths"], [])
+
+    def test_security_scan_conflict_keeps_git_mutation_attribution_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "disposable-security-conflict"
+            repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.name", "Run Test"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.email", "run@example.invalid"], cwd=repository, check=True)
+            (repository / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=repository, check=True)
+            subprocess.run(["git", "commit", "-qm", "initial"], cwd=repository, check=True)
+            revision = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repository, check=True, capture_output=True, text=True
+            ).stdout.strip()
+            actor = AccountConfig(
+                name="actor",
+                label="Actor",
+                codex_home=root / "actor-home",
+                model="",
+                reasoning_effort="high",
+                backend="app_server",
+            )
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=0,
+                require_clean_git=True,
+                codex_command="codex",
+                accounts={"actor": actor},
+                roles={"architect": "actor", "executor": "actor", "reviewer": "actor", "orchestrator": "actor"},
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+            )
+            task = root / "brief.md"
+            task.write_text("Run a Codex Security standard scan for this repository.", encoding="utf-8")
+            active_scans = [
+                {
+                    "scanId": scan_id,
+                    "mode": mode,
+                    "progress": {"status": "running"},
+                    "targetPath": str(repository.resolve()),
+                    "targetId": stable_target_id(repository),
+                    "targetRevision": revision,
+                    "scope": ".",
+                }
+                for scan_id, mode in (("deep-active", "deep"), ("standard-active", "standard"))
+            ]
+            decision = arbitrate_security_scans(
+                active_scans,
+                plugin_id=PLUGIN_ID,
+                plugin_version="0.1.31",
+                target_path=repository,
+                target_revision=revision,
+            )
+            self.assertEqual(decision.action, "conflict")
+            provider = type("Provider", (), {"arbitrate": lambda *_args, **_kwargs: decision})()
+            seen_roles: list[str] = []
+
+            def fake_runner(**kwargs):
+                role = kwargs["role"]
+                seen_roles.append(role)
+                payload = {
+                    "summary": "plan",
+                    "steps": [],
+                    "acceptance_criteria": [],
+                    "risks": [],
+                    "files_to_inspect": [],
+                    "skills_loaded": [],
+                }
+                kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
+                return CommandResult(
+                    ["fake"],
+                    0,
+                    "",
+                    "",
+                    {
+                        "phase": role,
+                        "role": role,
+                        "actor_id": "actor",
+                        "actual_actor": "actor",
+                        "provider": "codex",
+                        "backend": "app_server",
+                        "repository": str(repository.resolve()),
+                        "fallback_used": False,
+                    },
+                )
+
+            with patch("dual_codex.orchestrator.CodexSecurityProvider", return_value=provider), patch(
+                "dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner
+            ):
+                with self.assertRaises(SecurityScanError) as raised:
+                    execute(config, task)
+
+            self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_CONFLICT")
+            self.assertIn("deep-active", str(raised.exception))
+            self.assertIn("standard-active", str(raised.exception))
+            self.assertEqual(seen_roles, ["architect"])
+            run_result = raised.exception.dual_codex_run_result
+            self.assertEqual(run_result["failure_class"], "SECURITY_SCAN_CONFLICT")
+            self.assertEqual(run_result["mutation_attribution_status"], "complete")
+            run_state = json.loads(Path(run_result["run_state_path"]).read_text(encoding="utf-8"))
+            mutation = json.loads(Path(run_result["mutation_attribution_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(run_state["failure"]["failure_class"], "SECURITY_SCAN_CONFLICT")
+            self.assertEqual(run_state["mutation_attribution"]["status"], "complete")
+            self.assertEqual(mutation["status"], "complete")
+            self.assertNotIn("UNKNOWN_MUTATION_STATE", json.dumps(run_state))
+
+    def test_selected_security_scan_provenance_is_persisted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "disposable-security-success"
+            repository.mkdir()
+            subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.name", "Run Test"], cwd=repository, check=True)
+            subprocess.run(["git", "config", "user.email", "run@example.invalid"], cwd=repository, check=True)
+            (repository / "tracked.txt").write_text("baseline\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=repository, check=True)
+            subprocess.run(["git", "commit", "-qm", "initial"], cwd=repository, check=True)
+            revision = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repository, check=True, capture_output=True, text=True
+            ).stdout.strip()
+            actor = AccountConfig(
+                name="actor",
+                label="Actor",
+                codex_home=root / "actor-home",
+                model="",
+                reasoning_effort="high",
+                backend="app_server",
+            )
+            config = OrchestratorConfig(
+                repository=repository,
+                runs_dir=root / "runs",
+                max_correction_cycles=0,
+                require_clean_git=True,
+                codex_command="codex",
+                accounts={"actor": actor},
+                roles={"architect": "actor", "executor": "actor", "reviewer": "actor", "orchestrator": "actor"},
+                project_root=Path.cwd(),
+                config_path=root / "config.toml",
+            )
+            task = root / "brief.md"
+            task.write_text("Run a Codex Security standard scan for this repository.", encoding="utf-8")
+            scan_id = "disposable-scan-1"
+            target_id = stable_target_id(repository)
+            completed_scan = {
+                "scanId": scan_id,
+                "mode": "standard",
+                "progress": {"status": "complete"},
+                "targetPath": str(repository.resolve()),
+                "targetId": target_id,
+                "targetRevision": revision,
+                "scope": ".",
+            }
+
+            class FakeSecurityProvider:
+                plugin_id = PLUGIN_ID
+                plugin_version = "0.1.31"
+
+                def __init__(self):
+                    self.scans = []
+
+                def arbitrate(self, **kwargs):
+                    return arbitrate_security_scans(
+                        self.scans,
+                        plugin_id=self.plugin_id,
+                        plugin_version=self.plugin_version,
+                        target_path=kwargs["repository"],
+                        target_revision=kwargs["target_revision"],
+                        required_mode=kwargs["required_mode"],
+                        required_scope=kwargs["required_scope"],
+                        allow_completed_reuse=kwargs["allow_completed_reuse"],
+                    )
+
+                def list_target_scans(self, _repository):
+                    return list(self.scans)
+
+            provider = FakeSecurityProvider()
+            seen_roles: list[str] = []
+
+            def fake_runner(**kwargs):
+                role = kwargs["role"]
+                seen_roles.append(role)
+                if role == "architect":
+                    payload = {
+                        "summary": "plan",
+                        "steps": ["Run a Codex Security standard scan."],
+                        "acceptance_criteria": [],
+                        "risks": [],
+                        "files_to_inspect": [],
+                        "skills_loaded": [],
+                    }
+                elif role == "executor":
+                    self.assertIn('"decision":"start"', kwargs["prompt"])
+                    provider.scans = [completed_scan]
+                    payload = {
+                        "summary": "scan completed",
+                        "files_changed": [],
+                        "commands_run": [],
+                        "tests": [],
+                        "remaining_issues": [],
+                        "security_scan_provenance": {
+                            "plugin_id": PLUGIN_ID,
+                            "plugin_version": "0.1.31",
+                            "target_identity": {
+                                "path": str(repository.resolve()),
+                                "target_id": target_id,
+                                "revision": revision,
+                                "scope": ".",
+                            },
+                            "scan_id": scan_id,
+                            "mode": "standard",
+                            "initial_status": "running",
+                            "action": "started",
+                            "final_status": "complete",
+                        },
+                    }
+                else:
+                    payload = {"verdict": "approved", "summary": "approved", "findings": []}
+                kwargs["output_path"].write_text(json.dumps(payload), encoding="utf-8")
+                return CommandResult(
+                    ["fake"],
+                    0,
+                    "",
+                    "",
+                    {
+                        "phase": role,
+                        "role": role,
+                        "actor_id": "actor",
+                        "actual_actor": "actor",
+                        "provider": "codex",
+                        "backend": "app_server",
+                        "repository": str(repository.resolve()),
+                        "fallback_used": False,
+                    },
+                )
+
+            with patch("dual_codex.orchestrator.CodexSecurityProvider", return_value=provider), patch(
+                "dual_codex.orchestrator.run_codex_for_role", side_effect=fake_runner
+            ):
+                outcome = execute(config, task)
+
+            run_state = json.loads((outcome.run_dir / "run_state.json").read_text(encoding="utf-8"))
+            provenance = json.loads((outcome.run_dir / "provenance.json").read_text(encoding="utf-8"))
+            self.assertEqual(seen_roles, ["architect", "executor", "reviewer"])
+            self.assertEqual(run_state["security_scan_arbitrations"][0]["decision"], "start")
+            saved_scan = run_state["security_scan_provenance"][0]
+            self.assertEqual(saved_scan["scan_id"], scan_id)
+            self.assertEqual(saved_scan["scan_mode"], "standard")
+            self.assertEqual(saved_scan["initial_status"], "running")
+            self.assertEqual(saved_scan["action"], "started")
+            self.assertEqual(saved_scan["final_status"], "complete")
+            self.assertEqual(provenance["security_scan_provenance"], [saved_scan])
+            self.assertEqual(provenance["configured_actor_routing"][1]["security_scan_provenance"], saved_scan)
+            report = (outcome.run_dir / "REPORT.md").read_text(encoding="utf-8")
+            self.assertIn("Codex Security scan", report)
+            self.assertNotIn("handoffClaimToken", json.dumps(provenance))
 
 
 if __name__ == "__main__":

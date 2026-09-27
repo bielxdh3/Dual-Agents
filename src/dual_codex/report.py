@@ -10,7 +10,7 @@ from uuid import uuid4
 EXECUTOR_REPORT_FIELDS = frozenset(
     {"summary", "files_changed", "commands_run", "tests", "remaining_issues"}
 )
-EXECUTOR_REPORT_OPTIONAL_FIELDS = frozenset({"memory_updates"})
+EXECUTOR_REPORT_OPTIONAL_FIELDS = frozenset({"memory_updates", "security_scan_provenance"})
 EXECUTOR_REPORT_REQUIRED_WITHOUT_TELEMETRY = EXECUTOR_REPORT_FIELDS - {"commands_run"}
 _EXTENDED_REPORT_FIELDS = frozenset(
     {
@@ -28,6 +28,7 @@ _EXTENDED_REPORT_FIELDS = frozenset(
         "tests",
         "remaining_issues",
         "memory_updates",
+        "security_scan_provenance",
         "push_result",
         "remote_result",
         "pr_result",
@@ -129,6 +130,8 @@ def _normalise_extended_report(value: Mapping[str, Any]) -> dict[str, Any] | Non
     }
     if "memory_updates" in value:
         result["memory_updates"] = value["memory_updates"]
+    if "security_scan_provenance" in value:
+        result["security_scan_provenance"] = value["security_scan_provenance"]
     return result
 
 
@@ -141,7 +144,7 @@ def normalise_executor_report(value: Mapping[str, Any]) -> dict[str, Any]:
 
     normalised = dict(value)
     if (
-        set(normalised).issubset(EXECUTOR_REPORT_FIELDS)
+        set(normalised).issubset(EXECUTOR_REPORT_FIELDS | EXECUTOR_REPORT_OPTIONAL_FIELDS)
         and EXECUTOR_REPORT_REQUIRED_WITHOUT_TELEMETRY.issubset(normalised)
         and "commands_run" not in normalised
     ):
@@ -157,7 +160,7 @@ def is_executor_report_shape(value: Mapping[str, Any]) -> bool:
 
     keys = set(value)
     return (
-        keys.issubset(EXECUTOR_REPORT_FIELDS)
+        keys.issubset(EXECUTOR_REPORT_FIELDS | EXECUTOR_REPORT_OPTIONAL_FIELDS)
         and EXECUTOR_REPORT_FIELDS.issubset(keys)
     )
 
@@ -224,6 +227,29 @@ def render_markdown(
                 f"### {finding['severity'].upper()}: {finding['title']}",
                 "",
                 finding["details"],
+                "",
+            ]
+        )
+    security_scan = implementation.get("security_scan_provenance")
+    if isinstance(security_scan, Mapping):
+        target = security_scan.get("target_identity")
+        target_path = target.get("path", "unknown") if isinstance(target, Mapping) else "unknown"
+        lines.extend(
+            [
+                "## Codex Security scan",
+                "",
+                "- Plugin: `{}` version `{}`".format(
+                    security_scan.get("plugin_id", "unknown"),
+                    security_scan.get("plugin_version", "unknown"),
+                ),
+                "- Target: `{}`".format(target_path),
+                "- Scan: `{}` / mode `{}` / action `{}` / `{}` → `{}`".format(
+                    security_scan.get("scan_id", "unknown"),
+                    security_scan.get("scan_mode", security_scan.get("mode", "unknown")),
+                    security_scan.get("action", "unknown"),
+                    security_scan.get("initial_status", "unknown"),
+                    security_scan.get("final_status", "unknown"),
+                ),
                 "",
             ]
         )

@@ -26,6 +26,10 @@ from .report import (
 class AppServerError(RuntimeError):
     """Raised when the local Codex App Server cannot complete a safe request."""
 
+    def __init__(self, message: str, *, failure_class: str = ""):
+        super().__init__(message)
+        self.failure_class = failure_class
+
 
 _EVENT_PUBLICATION_QUEUE_SIZE = 64
 _HEADLESS_RAW_EVENTS_VERSION = "responses-raw-v1"
@@ -118,7 +122,12 @@ def _profile_config_identity(agent: AgentConfig) -> str:
         return "missing"
 
 
-def _app_server_command(config: OrchestratorConfig) -> list[str]:
+def _app_server_command(
+    config: OrchestratorConfig,
+    *,
+    agent: AgentConfig | None = None,
+    role: str = "",
+) -> list[str]:
     """Build the non-interactive App Server command.
 
     The account-isolated CODEX_HOME owns the effective Windows sandbox
@@ -127,7 +136,19 @@ def _app_server_command(config: OrchestratorConfig) -> list[str]:
     bridge state from selecting a foreign host.
     """
 
-    command = [config.codex_command, "app-server", "--stdio"]
+    command = [config.codex_command, "app-server"]
+    # `unelevated` is an emergency fallback with environment-level offline
+    # controls. The Executor needs the supported Windows sandbox for Node's
+    # worker and child-process validation; workspaceWrite still supplies the
+    # exact filesystem/network boundary on each command and turn.
+    if (
+        agent is not None
+        and role == "executor"
+        and os.name == "nt"
+        and agent.sandbox == "workspace-write"
+    ):
+        command.extend(["-c", 'windows.sandbox="elevated"'])
+    command.append("--stdio")
     return command
 
 
@@ -371,6 +392,7 @@ class _AppServerProcess:
         self._closed = False
         self.windows_sandbox = ""
         self.windows_sandbox_readiness = "not_checked"
+        self.executor_readiness: dict[str, bool | str] = {"status": "not_required"}
         self.initialize_params: dict[str, Any] = {
             "clientInfo": {
                 "name": "dual-codex",
@@ -382,9 +404,17 @@ class _AppServerProcess:
         self.last_thread_request: dict[str, Any] = {}
         self.last_thread_binding: dict[str, Any] = {}
         self.request_methods: list[str] = []
-        command = _app_server_command(config)
+        command = _app_server_command(config, agent=agent, role=role)
         process_args = _prepare_command([str(item) for item in command])
         env = codex_environment(agent, isolate_desktop_bridge=True)
+        if os.name == "nt" and require_workspace_ready and agent.sandbox == "workspace-write":
+            try:
+                executor_npm_cache(agent).mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                raise AppServerError(
+                    "EXECUTOR_WRITE_PATH_UNAVAILABLE: could not prepare the Executor's exact npm cache root.",
+                    failure_class="EXECUTOR_WRITE_PATH_UNAVAILABLE",
+                ) from exc
         self.process = subprocess.Popen(
             process_args,
             cwd=repository,
@@ -482,6 +512,142 @@ class _AppServerProcess:
                 f"from an administrative terminal: {_windows_sandbox_setup_command(self.agent)}"
             )
         return mode, "ready"
+
+    def _executor_command(
+        self,
+        command: list[str],
+        *,
+        timeout_ms: int = 8000,
+        failure_class: str,
+    ) -> dict[str, Any]:
+        npm_cache = executor_npm_cache(self.agent)
+        policy = _workspace_write_sandbox_policy(
+            self.repository,
+            network_access=self.agent.network_access,
+            npm_cache=npm_cache,
+        )
+        try:
+            response = self.request(
+                "command/exec",
+                {
+                    "command": command,
+                    "cwd": str(self.repository),
+                    "timeoutMs": timeout_ms,
+                    "sandboxPolicy": policy,
+                },
+                timeout=(timeout_ms / 1000) + 3,
+            )
+        except AppServerError as exc:
+            raise AppServerError(
+                f"{failure_class}: required Executor readiness command did not complete.",
+                failure_class=failure_class,
+            ) from exc
+        if "error" in response:
+            raise AppServerError(
+                f"{failure_class}: App Server sandbox rejected a required Executor readiness command.",
+                failure_class=failure_class,
+            )
+        result = response.get("result")
+        if not isinstance(result, Mapping):
+            raise AppServerError(
+                f"{failure_class}: App Server omitted the Executor readiness command result.",
+                failure_class=failure_class,
+            )
+        return dict(result)
+
+    def check_executor_capabilities(self) -> dict[str, bool | str]:
+        """Run cheap, bounded checks for the configured workspaceWrite Executor."""
+
+        if os.name != "nt" or self.agent.sandbox != "workspace-write" or self.role != "executor":
+            self.executor_readiness = {"status": "not_applicable"}
+            return dict(self.executor_readiness)
+        if self.windows_sandbox != "elevated" or self.windows_sandbox_readiness != "ready":
+            raise AppServerError(
+                "EXECUTOR_SANDBOX_UNAVAILABLE: the Executor requires the provisioned elevated Windows sandbox.",
+                failure_class="EXECUTOR_SANDBOX_UNAVAILABLE",
+            )
+
+        trivial = self._executor_command(
+            ["cmd.exe", "/d", "/c", "exit", "0"],
+            failure_class="EXECUTOR_SUBPROCESS_UNAVAILABLE",
+        )
+        if trivial.get("exitCode") != 0:
+            raise AppServerError(
+                "EXECUTOR_SUBPROCESS_UNAVAILABLE: the Windows sandbox could not launch a trivial child process.",
+                failure_class="EXECUTOR_SUBPROCESS_UNAVAILABLE",
+            )
+
+        git = self._executor_command(["git", "--version"], failure_class="EXECUTOR_GIT_UNAVAILABLE")
+        if git.get("exitCode") != 0:
+            raise AppServerError(
+                "EXECUTOR_GIT_UNAVAILABLE: Git could not launch inside the Executor sandbox.",
+                failure_class="EXECUTOR_GIT_UNAVAILABLE",
+            )
+
+        node = self._executor_command(["node", "--version"], failure_class="EXECUTOR_NODE_UNAVAILABLE")
+        if node.get("exitCode") != 0:
+            raise AppServerError(
+                "EXECUTOR_NODE_UNAVAILABLE: Node could not launch inside the Executor sandbox.",
+                failure_class="EXECUTOR_NODE_UNAVAILABLE",
+            )
+
+        node_checks = r'''const fs=require("node:fs");const os=require("node:os");const path=require("node:path");const cp=require("node:child_process");const {Worker}=require("node:worker_threads");(async()=>{const out={child:false,worker:false,temp_write:false,cache_write:false};try{const c=cp.spawnSync(process.execPath,["-e","process.exit(0)"],{stdio:"ignore",timeout:5000,windowsHide:true});out.child=!c.error&&c.status===0}catch{}try{await new Promise((resolve,reject)=>{const w=new Worker("const {parentPort}=require('node:worker_threads');parentPort.postMessage('ready');parentPort.close()",{eval:true});const t=setTimeout(()=>reject(Error('timeout')),4000);w.once('message',()=>{clearTimeout(t);resolve()});w.once('error',e=>{clearTimeout(t);reject(e)})}) ;out.worker=true}catch{}for(const [key,root] of [["temp_write",os.tmpdir()],["cache_write",process.env.NPM_CONFIG_CACHE||""]]){try{if(!root)continue;const file=path.join(root,".dual-codex-readiness-"+process.pid+"-"+Date.now());fs.writeFileSync(file,"ok",{flag:"wx"});fs.unlinkSync(file);out[key]=true}catch{}}process.stdout.write(JSON.stringify(out))})().catch(()=>process.exit(90));'''
+        worker = self._executor_command(
+            ["node", "-e", node_checks],
+            timeout_ms=12000,
+            failure_class="EXECUTOR_NODE_WORKER_UNAVAILABLE",
+        )
+        try:
+            worker_result = json.loads(str(worker.get("stdout", "")))
+        except (TypeError, json.JSONDecodeError):
+            worker_result = {}
+        if worker.get("exitCode") != 0 or not isinstance(worker_result, Mapping) or not worker_result.get("child"):
+            raise AppServerError(
+                "EXECUTOR_SUBPROCESS_UNAVAILABLE: Node could not launch a child process inside the sandbox.",
+                failure_class="EXECUTOR_SUBPROCESS_UNAVAILABLE",
+            )
+        if not worker_result.get("worker"):
+            raise AppServerError(
+                "EXECUTOR_NODE_WORKER_UNAVAILABLE: Node worker_threads could not start inside the sandbox.",
+                failure_class="EXECUTOR_NODE_WORKER_UNAVAILABLE",
+            )
+        if not worker_result.get("temp_write") or not worker_result.get("cache_write"):
+            raise AppServerError(
+                "EXECUTOR_WRITE_PATH_UNAVAILABLE: TEMP or the exact npm cache root is not writable.",
+                failure_class="EXECUTOR_WRITE_PATH_UNAVAILABLE",
+            )
+
+        readiness: dict[str, bool | str] = {
+            "status": "ready",
+            "child_process": True,
+            "git": True,
+            "node_process": True,
+            "node_child_process": True,
+            "node_worker": True,
+            "temp_write": True,
+            "npm_cache_write": True,
+            "network_enabled": bool(self.agent.network_access),
+        }
+        if self.agent.network_access:
+            network = r'''const https=require("node:https");const checks={registry:false,prisma_host:false};function get(url,key){return new Promise(resolve=>{const req=https.get(url,{timeout:5000},res=>{res.resume();checks[key]=res.statusCode<500;resolve()});req.on("timeout",()=>req.destroy(Error("timeout")));req.on("error",()=>resolve())})}Promise.all([get("https://registry.npmjs.org/-/ping","registry"),get("https://binaries.prisma.sh/","prisma_host")]).then(()=>{process.stdout.write(JSON.stringify(checks));process.exit(checks.registry&&checks.prisma_host?0:2)})'''
+            probe = self._executor_command(
+                ["node", "-e", network],
+                timeout_ms=11000,
+                failure_class="EXECUTOR_NETWORK_UNAVAILABLE",
+            )
+            try:
+                network_result = json.loads(str(probe.get("stdout", "")))
+            except (TypeError, json.JSONDecodeError):
+                network_result = {}
+            if probe.get("exitCode") != 0 or not isinstance(network_result, Mapping) or not network_result.get("registry") or not network_result.get("prisma_host"):
+                raise AppServerError(
+                    "EXECUTOR_NETWORK_UNAVAILABLE: networkAccess is enabled but npm or Prisma HTTPS is unreachable.",
+                    failure_class="EXECUTOR_NETWORK_UNAVAILABLE",
+                )
+            readiness["network_registry"] = True
+            readiness["network_prisma"] = True
+        self.executor_readiness = readiness
+        return dict(readiness)
 
     def set_event_context(self, journal: LiveEventJournal | None, **context: str) -> None:
         with self._lock:
@@ -1118,7 +1284,7 @@ def run_codex_app_server(
     progress: Callable[[str], None] | None = None,
     process_started: Callable[[int], None] | None = None,
 ) -> CommandResult:
-    command = _app_server_command(config)
+    command = _app_server_command(config, agent=agent, role=role)
     metadata: dict[str, Any] = {
         "phase": role,
         "role": role,
@@ -1151,6 +1317,7 @@ def run_codex_app_server(
         "app_server_experimental_api": True,
         "app_server_windows_sandbox": "",
         "app_server_windows_sandbox_readiness": "not_checked",
+        "app_server_executor_readiness": {"status": "not_checked"},
         "app_server_sandbox_policy": agent.sandbox,
         "app_server_approval_policy": "never" if agent.sandbox == "workspace-write" else "on-request",
         "app_server_raw_events": os.name == "nt",
@@ -1186,6 +1353,14 @@ def run_codex_app_server(
             role=role,
             require_workspace_ready=require_workspace_ready,
         )
+        if require_workspace_ready and role == "executor":
+            check_capabilities = getattr(process, "check_executor_capabilities", None)
+            if not callable(check_capabilities):
+                raise AppServerError(
+                    "EXECUTOR_READINESS_UNAVAILABLE: App Server adapter has no capability readiness check.",
+                    failure_class="EXECUTOR_READINESS_UNAVAILABLE",
+                )
+            metadata["app_server_executor_readiness"] = check_capabilities()
         if process_started:
             try:
                 process_started(process.pid)
@@ -1229,6 +1404,9 @@ def run_codex_app_server(
             {
                 "app_server_windows_sandbox": getattr(process, "windows_sandbox", ""),
                 "app_server_windows_sandbox_readiness": getattr(process, "windows_sandbox_readiness", "not_checked"),
+                "app_server_executor_readiness": getattr(
+                    process, "executor_readiness", metadata["app_server_executor_readiness"]
+                ),
                 "app_server_thread_id": thread_id,
                 "app_server_turn_id": turn["turn_id"],
                 "app_server_thread_resumed": str(resumed).lower(),
@@ -1251,7 +1429,10 @@ def run_codex_app_server(
         if process is not None:
             _discard_process(process)
         text = str(exc).casefold()
-        if "not_configured" in text:
+        failure_class = str(getattr(exc, "failure_class", ""))
+        if failure_class:
+            metadata["availability_failure_class"] = failure_class
+        elif "not_configured" in text:
             metadata["availability_failure_class"] = "profile_readiness_unavailable"
         elif "not_ready" in text or "readiness=" in text:
             metadata["availability_failure_class"] = "profile_readiness_unavailable"

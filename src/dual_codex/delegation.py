@@ -1081,6 +1081,29 @@ def _validate_executor_report(value: Mapping[str, Any]) -> str:
                 return f"memory_updates[{index}] fields must be non-empty strings"
             if update["kind"] not in allowed_kinds:
                 return f"memory_updates[{index}] has unsupported kind '{update['kind']}'"
+    if "security_scan_provenance" in value:
+        provenance = value["security_scan_provenance"]
+        provenance_fields = {
+            "plugin_id", "plugin_version", "target_identity", "scan_id", "mode",
+            "initial_status", "action", "final_status",
+        }
+        if not isinstance(provenance, Mapping) or set(provenance) != provenance_fields:
+            return "security_scan_provenance must contain only the documented scan fields"
+        target = provenance.get("target_identity")
+        if not isinstance(target, Mapping) or set(target) != {"path", "target_id", "revision", "scope"}:
+            return "security_scan_provenance.target_identity must identify path, target_id, revision and scope"
+        if not all(isinstance(provenance.get(field), str) and provenance[field] for field in ("plugin_id", "plugin_version", "scan_id")):
+            return "security_scan_provenance plugin and scan identifiers must be non-empty strings"
+        if not all(isinstance(target.get(field), str) and target[field] for field in ("path", "target_id", "revision", "scope")):
+            return "security_scan_provenance target identity fields must be non-empty strings"
+        if provenance.get("mode") not in {"standard", "deep"}:
+            return "security_scan_provenance.mode must be standard or deep"
+        statuses = {"running", "complete", "failed", "canceled"}
+        actions = {"reused", "resumed", "started", "awaited", "conflict"}
+        if provenance.get("initial_status") not in statuses or provenance.get("final_status") not in statuses:
+            return "security_scan_provenance statuses must be supported Codex Security statuses"
+        if provenance.get("action") not in actions:
+            return "security_scan_provenance.action is unsupported"
     return ""
 
 
@@ -1607,7 +1630,17 @@ def delegate(
             fallback_reason = ""
             fallback_failure_class = ""
             failure_class = classify_actor_failure(command_result, backend=agent.backend)
-            if command_result.returncode != 0 and failure_class and fallback_enabled:
+            # Capability failures describe this Executor's required host boundary;
+            # swapping actors would conceal the unavailable production capability.
+            executor_capability_failure = bool(
+                failure_class and failure_class.startswith("EXECUTOR_")
+            )
+            if (
+                command_result.returncode != 0
+                and failure_class
+                and fallback_enabled
+                and not executor_capability_failure
+            ):
                 candidates = [
                     account_name for account_name in sorted(config.accounts)
                     if account_name != primary_actor

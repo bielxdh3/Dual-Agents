@@ -30,6 +30,12 @@ from .git import (
 )
 from .paths import same_path
 from .report import atomic_write_json, dump_json, load_json, render_markdown
+from .security_scan import (
+    CodexSecurityProvider,
+    ScanDecision,
+    SecurityScanError,
+    validate_scan_provenance,
+)
 
 
 @dataclass(frozen=True)
@@ -135,6 +141,8 @@ def _write_provenance(
                 "last_progress_at": run_state.get("last_progress_at"),
                 "initial_git_baseline": run_state.get("initial_git_baseline"),
                 "mutation_attribution": run_state.get("mutation_attribution"),
+                "security_scan_arbitrations": run_state.get("security_scan_arbitrations", []),
+                "security_scan_provenance": run_state.get("security_scan_provenance", []),
                 "dual_agents_bootstrap_artifacts": run_state.get("dual_agents_bootstrap_artifacts", []),
                 "failure": run_state.get("failure"),
             }
@@ -207,6 +215,98 @@ def _phase_failure_state(exc: BaseException) -> str:
     ):
         return "timeout"
     return "failed"
+
+
+_SECURITY_SCAN_INTENT = re.compile(
+    r"^\s*(?:(?:please|you\s+(?:must|should|need\s+to))\s+)?"
+    r"(?:run|start|perform|conduct|execute|launch|await|wait\s+for|complete)\b.{0,100}"
+    r"\b(?:codex\s+security\s+(?:standard\s+|deep\s+)?scan|"
+    r"(?:standard\s+|deep\s+)?security\s+scan)\b",
+    re.IGNORECASE,
+)
+
+
+def _security_scan_request(task: str, plan: Mapping[str, Any]) -> tuple[bool, str]:
+    plan_steps = plan.get("steps")
+    candidates = [task]
+    if isinstance(plan_steps, list):
+        candidates.extend(step for step in plan_steps if isinstance(step, str))
+    requested_text = "\n".join(candidates)
+    requested = any(
+        _SECURITY_SCAN_INTENT.search(re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line))
+        for line in requested_text.splitlines()
+    )
+    if not requested:
+        return False, "standard"
+    return True, "deep" if re.search(r"\bdeep\s+(?:(?:codex\s+)?security\s+)?scan\b", requested_text, re.IGNORECASE) else "standard"
+
+
+def _prepare_security_scan(
+    *,
+    config: OrchestratorConfig,
+    task: str,
+    plan: Mapping[str, Any],
+    target_revision: str,
+    run_state: dict,
+    canonical_root: Path,
+    run_dir: Path,
+    phase_provenance: list[dict],
+) -> tuple[CodexSecurityProvider | None, ScanDecision | None, str]:
+    required, mode = _security_scan_request(task, plan)
+    if not required:
+        return None, None, ""
+    provider = CodexSecurityProvider(config.agent_for_role("executor"))
+    decision = provider.arbitrate(
+        repository=config.repository,
+        target_revision=target_revision,
+        required_mode=mode,
+        required_scope=".",
+        allow_completed_reuse=False,
+    )
+    run_state.setdefault("security_scan_arbitrations", []).append(decision.public_record())
+    _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
+    if decision.action == "conflict":
+        observed = ", ".join(
+            f"{scan.get('scanId', scan.get('scan_id', 'unknown'))} "
+            f"(mode={scan.get('mode', 'unknown')}, status={scan.get('progress', {}).get('status', scan.get('status', 'unknown'))})"
+            for scan in decision.observed_scans
+        )
+        raise SecurityScanError(
+            "SECURITY_SCAN_CONFLICT: " + decision.reason + (f" Active scans: {observed}." if observed else ""),
+            failure_class="SECURITY_SCAN_CONFLICT",
+        )
+    return provider, decision, decision.executor_instruction()
+
+
+def _record_security_scan_result(
+    *,
+    provider: CodexSecurityProvider | None,
+    decision: ScanDecision | None,
+    implementation: Mapping[str, Any],
+    run_state: dict,
+    phase_provenance: list[dict],
+    config: OrchestratorConfig,
+    canonical_root: Path,
+    run_dir: Path,
+) -> None:
+    if provider is None or decision is None:
+        if implementation.get("security_scan_provenance") is not None:
+            raise SecurityScanError(
+                "Executor reported Codex Security use without a host scan preflight decision.",
+                failure_class="SECURITY_SCAN_EVIDENCE_INVALID",
+            )
+        return
+    final_scans = provider.list_target_scans(config.repository)
+    evidence = validate_scan_provenance(
+        implementation.get("security_scan_provenance"),
+        decision=decision,
+        final_scans=final_scans,
+    )
+    run_state.setdefault("security_scan_provenance", []).append(evidence)
+    phase = next((item for item in reversed(phase_provenance) if item.get("role") == "executor"), None)
+    if phase is not None:
+        phase["security_scan_provenance"] = evidence
+    _persist_run_state(config, canonical_root, run_dir, phase_provenance, run_state)
 
 
 def _failure_reason(exc: BaseException) -> str:
@@ -795,6 +895,16 @@ def _execute_locked(
         plan = load_json(plan_path)
 
         implementation_path = run_dir / "implementation.json"
+        security_provider, scan_decision, scan_policy = _prepare_security_scan(
+            config=config,
+            task=task,
+            plan=plan,
+            target_revision=str(baseline.get("head") or ""),
+            run_state=run_state,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+            phase_provenance=phase_provenance,
+        )
         _dispatch_phase(
             config=config,
             canonical_root=canonical_root,
@@ -805,12 +915,28 @@ def _execute_locked(
             progress=progress,
             role="executor",
             repository_trust_authorized=repository_trust_authorized,
-            task=_prompt(config, "executor.txt", task=task, plan=dump_json(plan)),
+            task=_prompt(
+                config,
+                "executor.txt",
+                task=task,
+                plan=dump_json(plan),
+                security_scan_policy=scan_policy,
+            ),
             repository=config.repository,
             output_path=implementation_path,
             schema_path=_schema(config, "implementation.schema.json"),
         )
         implementation = load_json(implementation_path)
+        _record_security_scan_result(
+            provider=security_provider,
+            decision=scan_decision,
+            implementation=implementation,
+            run_state=run_state,
+            phase_provenance=phase_provenance,
+            config=config,
+            canonical_root=canonical_root,
+            run_dir=run_dir,
+        )
 
         while True:
             diff_text = status_and_diff(config.repository)
@@ -848,6 +974,16 @@ def _execute_locked(
             correction_cycles += 1
             run_state["correction_cycles"] = correction_cycles
             implementation_path = run_dir / f"correction-{correction_cycles}.json"
+            security_provider, scan_decision, scan_policy = _prepare_security_scan(
+                config=config,
+                task=task,
+                plan=plan,
+                target_revision=str(baseline.get("head") or ""),
+                run_state=run_state,
+                canonical_root=canonical_root,
+                run_dir=run_dir,
+                phase_provenance=phase_provenance,
+            )
             _dispatch_phase(
                 config=config,
                 canonical_root=canonical_root,
@@ -864,12 +1000,23 @@ def _execute_locked(
                     task=task,
                     plan=dump_json(plan),
                     review=dump_json(review),
+                    security_scan_policy=scan_policy,
                 ),
                 repository=config.repository,
                 output_path=implementation_path,
                 schema_path=_schema(config, "implementation.schema.json"),
             )
             implementation = load_json(implementation_path)
+            _record_security_scan_result(
+                provider=security_provider,
+                decision=scan_decision,
+                implementation=implementation,
+                run_state=run_state,
+                phase_provenance=phase_provenance,
+                config=config,
+                canonical_root=canonical_root,
+                run_dir=run_dir,
+            )
 
         mutation = mutation_summary()
         atomic_write_json(run_dir / "mutation-attribution.json", mutation)

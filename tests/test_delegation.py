@@ -780,6 +780,48 @@ class DelegationTests(unittest.TestCase):
             self.assertTrue(primary_report.exists())
             self.assertFalse(fallback_report.exists())
 
+    def test_executor_capability_failure_does_not_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            base = _make_config(root, repository)
+            accounts = dict(base.accounts)
+            accounts["fallback"] = AccountConfig(
+                name="fallback",
+                label="Fallback executor",
+                codex_home=root / "profiles" / "fallback",
+                model="",
+                reasoning_effort="medium",
+                backend="app_server",
+                fallback_roles=("executor",),
+            )
+            config = replace(base, accounts=accounts, fallback_enabled=True)
+            request_file = root / "request.json"
+            result_file = root / "result.json"
+            request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
+
+            def run_executor(**kwargs):
+                self.assertEqual(kwargs["agent"].account_name, "executor")
+                return CommandResult(
+                    ["app-server"],
+                    1,
+                    "",
+                    "Executor child process could not launch",
+                    {"availability_failure_class": "EXECUTOR_SUBPROCESS_UNAVAILABLE"},
+                )
+
+            with patch("dual_codex.delegation.login_status", return_value="OK"), patch(
+                "dual_codex.delegation.run_codex_exec", side_effect=run_executor
+            ) as execute_mock:
+                outcome = delegate(config, request_file=request_file, result_file=result_file)
+
+            result = json.loads(result_file.read_text(encoding="utf-8"))
+            self.assertEqual(outcome.status, "failed")
+            self.assertTrue(result["fallback_enabled"])
+            self.assertFalse(result["fallback_used"])
+            self.assertEqual(result["executor_account"], "executor")
+            self.assertEqual(execute_mock.call_count, 1)
+
     def test_explicit_request_workspace_beats_config_and_reaches_executor(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

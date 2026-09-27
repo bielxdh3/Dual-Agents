@@ -34,6 +34,31 @@
           "evidence": {"type": "string", "minLength": 1}
         }
       }
+    },
+    "security_scan_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plugin_id", "plugin_version", "target_identity", "scan_id", "mode", "initial_status", "action", "final_status"],
+      "properties": {
+        "plugin_id": {"type": "string", "minLength": 1},
+        "plugin_version": {"type": "string", "minLength": 1},
+        "target_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "target_id", "revision", "scope"],
+          "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "target_id": {"type": "string", "minLength": 1},
+            "revision": {"type": "string", "minLength": 1},
+            "scope": {"type": "string", "minLength": 1}
+          }
+        },
+        "scan_id": {"type": "string", "minLength": 1},
+        "mode": {"type": "string", "enum": ["standard", "deep"]},
+        "initial_status": {"type": "string", "enum": ["running", "complete", "failed", "canceled"]},
+        "action": {"type": "string", "enum": ["reused", "resumed", "started", "awaited", "conflict"]},
+        "final_status": {"type": "string", "enum": ["running", "complete", "failed", "canceled"]}
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import queue
 import tempfile
@@ -76,6 +77,7 @@ class _FakeProcess:
         self.request_order: list[str] = []
         self.thread_id = "thread-probe"
         self.turn_number = 0
+        self.command_exec_params: list[dict] = []
         self.start_error = False
         self.resume_error = False
         self.response_roots_override: list[str] | None = None
@@ -198,6 +200,23 @@ class _FakeProcess:
             self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"config": {"windows": windows}, "origins": {}}})
         elif method == "windowsSandbox/readiness":
             self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"status": self.windows_sandbox_readiness}})
+        elif method == "command/exec":
+            params = message["params"]
+            self.command_exec_params.append(params)
+            argv = params.get("command", [])
+            if len(argv) >= 2 and argv[0] == "node" and argv[1] == "-e":
+                stdout = (
+                    json.dumps({"registry": True, "prisma_host": True})
+                    if "registry.npmjs.org" in argv[-1]
+                    else json.dumps({"child": True, "worker": True, "temp_write": True, "cache_write": True})
+                )
+            else:
+                stdout = "ready"
+            self._emit({
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {"exitCode": 0, "stdout": stdout, "stderr": ""},
+            })
 
 
 def _config(root: Path) -> OrchestratorConfig:
@@ -407,12 +426,16 @@ class AppServerTests(unittest.TestCase):
                     request_id="request-1",
                     run_id="run-1",
                 )
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+            time.sleep(0.05)
 
             self.assertEqual(first.returncode, 0)
             self.assertEqual(second.returncode, 0)
             self.assertEqual(
                 first.command,
-                ["codex", "app-server", "--stdio"],
+                ["codex", "app-server", "-c", 'windows.sandbox="elevated"', "--stdio"],
             )
             self.assertEqual(first.metadata["app_server_thread_id"], "thread-probe")
             self.assertEqual(second.metadata["app_server_thread_id"], "thread-probe")
@@ -605,6 +628,143 @@ class AppServerTests(unittest.TestCase):
         enabled = _workspace_write_sandbox_policy(repository, network_access=True)
         self.assertFalse(disabled["networkAccess"])
         self.assertTrue(enabled["networkAccess"])
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor sandbox policy")
+    def test_elevated_sandbox_override_is_limited_to_workspace_write_executor(self) -> None:
+        root = Path("C:/dual-codex-test")
+        config = _config(root)
+        executor = AgentConfig(
+            codex_home=root / "executor-profile",
+            model="",
+            reasoning_effort="high",
+            sandbox="workspace-write",
+            account_name="executor",
+            backend="app_server",
+        )
+        architect_command = _app_server_command(config, agent=executor, role="architect")
+        reviewer_command = _app_server_command(config, agent=executor, role="reviewer")
+        executor_command = _app_server_command(config, agent=executor, role="executor")
+        self.assertNotIn("windows.sandbox", " ".join(architect_command))
+        self.assertNotIn("windows.sandbox", " ".join(reviewer_command))
+        self.assertIn('windows.sandbox="elevated"', executor_command)
+        read_only = AgentConfig(
+            codex_home=root / "read-only-profile",
+            model="",
+            reasoning_effort="high",
+            sandbox="read-only",
+            account_name="executor",
+            backend="app_server",
+        )
+        self.assertNotIn("windows.sandbox", " ".join(_app_server_command(config, agent=read_only, role="executor")))
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
+    def test_executor_readiness_runs_before_turn_with_bounded_workspace_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                backend="app_server",
+                network_access=False,
+            )
+            fake = _FakeProcess()
+            fake.windows_sandbox = "elevated"
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                expected_cache = executor_npm_cache(agent)
+                with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                    result = run_codex_app_server(
+                        config=_config(root),
+                        agent=agent,
+                        repository=repository,
+                        prompt="probe",
+                        output_path=root / "result.json",
+                        session_id="executor-readiness",
+                        role="executor",
+                        require_workspace_ready=True,
+                    )
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+            time.sleep(0.05)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(fake.request_order.index("command/exec") < fake.request_order.index("turn/start"), True)
+            self.assertEqual(len(fake.command_exec_params), 4)
+            expected_roots = [repository.resolve(), (repository / ".git").resolve(), expected_cache.resolve()]
+            for params in fake.command_exec_params:
+                self.assertNotIn("outputBytesCap", params)
+                self.assertEqual(params["timeoutMs"], 8000 if params["command"][0] != "node" or len(params["command"]) == 2 else 12000)
+                policy = params["sandboxPolicy"]
+                self.assertEqual(policy["type"], "workspaceWrite")
+                self.assertFalse(policy["networkAccess"])
+                self.assertEqual(len(policy["writableRoots"]), len(expected_roots))
+                for actual, expected in zip(policy["writableRoots"], expected_roots):
+                    self.assertTrue(same_path(actual, expected), (actual, expected))
+            readiness = result.metadata["app_server_executor_readiness"]
+            self.assertEqual(readiness["status"], "ready")
+            self.assertTrue(readiness["child_process"])
+            self.assertTrue(readiness["git"])
+            self.assertTrue(readiness["node_child_process"])
+            self.assertTrue(readiness["node_worker"])
+            self.assertTrue(readiness["temp_write"])
+            self.assertTrue(readiness["npm_cache_write"])
+            self.assertFalse(readiness["network_enabled"])
+            self.assertFalse(set(readiness) & {"token", "handoffClaimToken", "secret", "credential"})
+            self.assertFalse(result.metadata["fallback_used"])
+            self.assertEqual(result.metadata["actor_id"], "codex-secundario")
+            self.assertIn("windows.sandbox=\"elevated\"", result.command)
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
+    def test_executor_readiness_classifies_child_git_worker_and_network_failures(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=True,
+            )
+
+            def build_process(responses: list[dict]):
+                process = object.__new__(_AppServerProcess)
+                process.agent = agent
+                process.repository = repository
+                process.role = "executor"
+                process.windows_sandbox = "elevated"
+                process.windows_sandbox_readiness = "ready"
+                process.executor_readiness = {"status": "not_checked"}
+                process.config = SimpleNamespace(app_server_initialize_timeout=2)
+                process.request = Mock(side_effect=responses)
+                return process
+
+            success = {"result": {"exitCode": 0, "stdout": "ready", "stderr": ""}}
+            worker_success = {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": True, "temp_write": True, "cache_write": True}), "stderr": ""}}
+            cases = [
+                ([{"error": {"message": "blocked"}}], "EXECUTOR_SUBPROCESS_UNAVAILABLE"),
+                ([success, {"result": {"exitCode": 1, "stdout": "", "stderr": "git"}}], "EXECUTOR_GIT_UNAVAILABLE"),
+                ([success, success, success, {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": False, "temp_write": True, "cache_write": True}), "stderr": ""}}], "EXECUTOR_NODE_WORKER_UNAVAILABLE"),
+                ([success, success, success, worker_success, {"result": {"exitCode": 2, "stdout": json.dumps({"registry": False, "prisma_host": True}), "stderr": ""}}], "EXECUTOR_NETWORK_UNAVAILABLE"),
+            ]
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                for responses, expected in cases:
+                    with self.subTest(failure=expected):
+                        process = build_process(responses)
+                        with self.assertRaises(AppServerError) as raised:
+                            process.check_executor_capabilities()
+                        self.assertEqual(raised.exception.failure_class, expected)
 
     def test_headless_app_server_does_not_override_profile_windows_sandbox(self) -> None:
         command = _app_server_command(_config(Path("C:/dual-codex-test")))
