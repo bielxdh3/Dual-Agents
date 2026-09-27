@@ -1327,7 +1327,7 @@ class SecurityScanArbitrationTests(unittest.TestCase):
                 link_run_state_to_external_target,
                 external_run_dir=False,
             )
-            self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_MUTATION")
+            self.assertEqual(result["failure"].failure_class, "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN")
             self.assertEqual(result["events"][:3], ["baseline", "dispatch", "attribution"])
             self.assertNotIn("security_provenance", result["events"])
             self.assertNotIn("security_scan_provenance", result["run_state"])
@@ -1335,7 +1335,7 @@ class SecurityScanArbitrationTests(unittest.TestCase):
             diagnostic_files = list(result["run_dir"].glob("security-scan-only-mutation-*.json"))
             self.assertEqual(len(diagnostic_files), 1)
             diagnostic = json.loads(diagnostic_files[0].read_text(encoding="utf-8"))
-            self.assertEqual(diagnostic["failure_class"], "SECURITY_SCAN_ONLY_MUTATION")
+            self.assertEqual(diagnostic["failure_class"], "SECURITY_SCAN_ONLY_MUTATION_UNKNOWN")
             self.assertTrue(
                 any(
                     path.endswith("run_state.json")
