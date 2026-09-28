@@ -16,6 +16,7 @@ from .security_scan import CodexSecurityProvider, SecurityScanError, _normal_pat
 
 
 _SHA = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$", re.IGNORECASE)
+_SAFE_FAILURE_CLASS = re.compile(r"^[A-Z0-9_]{1,128}$")
 _TERMINAL_STATUSES = frozenset({"complete", "failed", "canceled"})
 
 
@@ -23,6 +24,16 @@ class SecurityRecoveryError(RuntimeError):
     def __init__(self, message: str, *, classification: str):
         super().__init__(message)
         self.classification = classification
+
+
+def _safe_failure_class(value: Any, fallback: str = "UNKNOWN_ERROR") -> str:
+    if isinstance(value, str) and _SAFE_FAILURE_CLASS.fullmatch(value):
+        return value
+    if fallback == "":
+        return ""
+    if isinstance(fallback, str) and _SAFE_FAILURE_CLASS.fullmatch(fallback):
+        return fallback
+    return "UNKNOWN_ERROR"
 
 
 def _validate_uuid(value: str, field: str) -> str:
@@ -402,11 +413,13 @@ def cancel_security_scan(
                 "thread_resumed": action_result.get("thread_resumed") is True,
                 "turn_id": str(action_result.get("turn_id", "")),
                 "turn_state": str(action_result.get("turn_state", "unknown")),
-                "failure_class": str(action_result.get("failure_class", "")),
-                "resume_failure_class": str(action_result.get("resume_failure_class", "")),
+                "failure_class": _safe_failure_class(action_result.get("failure_class", ""), ""),
+                "resume_failure_class": _safe_failure_class(action_result.get("resume_failure_class", ""), ""),
                 "approval_state_cleared": action_result.get("approval_state_cleared") is True,
                 "approval_policy_reset": action_result.get("approval_policy_reset") is True,
-                "approval_policy_reset_failure_class": str(action_result.get("approval_policy_reset_failure_class", "")),
+                "approval_policy_reset_failure_class": _safe_failure_class(
+                    action_result.get("approval_policy_reset_failure_class", ""), ""
+                ),
                 "tool_catalog": dict(action_result.get("tool_catalog", {}))
                 if isinstance(action_result.get("tool_catalog"), Mapping)
                 else {},
@@ -485,6 +498,10 @@ def cancel_security_scan(
             record["approval"]["approval_granted"] = False
             record["approval"]["approval_required"] = False
             record["provider_outcome"] = dict(action_result)
+            if "failure_class" in record["provider_outcome"]:
+                record["provider_outcome"]["failure_class"] = _safe_failure_class(
+                    record["provider_outcome"].get("failure_class", ""), "UNKNOWN_ERROR"
+                )
             tool_result_acceptable = (
                 action_result.get("tool") == "cancel_codex_security_scan_from_app"
                 and action_result.get("scan_id") == scan_id
@@ -494,7 +511,11 @@ def cancel_security_scan(
                 and str(action_result.get("result_status", "")).casefold() in _TERMINAL_STATUSES
             )
         if not tool_result_acceptable:
-            failure_class = str(action_result.get("failure_class", "")) if isinstance(action_result, Mapping) else ""
+            failure_class = (
+                _safe_failure_class(action_result.get("failure_class", ""), "")
+                if isinstance(action_result, Mapping)
+                else ""
+            )
             result_was_returned = (
                 action_result.get("result_returned") is True and action_result.get("provider_error") is False
                 if isinstance(action_result, Mapping)
@@ -506,11 +527,16 @@ def cancel_security_scan(
                 else "SECURITY_RECOVERY_PROVIDER_TOOL_FAILED"
             )
     except SecurityRecoveryError as exc:
-        preflight_classification = exc.classification
+        preflight_classification = _safe_failure_class(exc.classification, "SECURITY_RECOVERY_ERROR")
+        record["preflight_failure_class"] = preflight_classification
     except SecurityScanError as exc:
-        preflight_classification = exc.failure_class
+        preflight_classification = _safe_failure_class(exc.failure_class, "SECURITY_SCAN_ERROR")
+        record["preflight_failure_class"] = preflight_classification
     except Exception as exc:
-        preflight_classification = str(getattr(exc, "failure_class", "")) or type(exc).__name__.upper()
+        preflight_classification = _safe_failure_class(
+            getattr(exc, "failure_class", ""), _safe_failure_class(type(exc).__name__.upper())
+        )
+        record["preflight_failure_class"] = preflight_classification
     finally:
         if provider is not None and baseline is not None:
             try:
@@ -538,7 +564,9 @@ def cancel_security_scan(
                 record["ledger_after"] = {
                     "scan_id": scan_id,
                     "status": "unavailable",
-                    "failure_class": str(getattr(exc, "failure_class", "")) or type(exc).__name__.upper(),
+                    "failure_class": _safe_failure_class(
+                        getattr(exc, "failure_class", ""), _safe_failure_class(type(exc).__name__.upper())
+                    ),
                 }
                 record["ledger_after_identity_matches"] = False
         if baseline is not None:
@@ -549,13 +577,16 @@ def cancel_security_scan(
                 attribution = None
                 record["mutation_attribution"] = {
                     "status": "unknown",
-                    "failure_class": str(getattr(exc, "failure_class", "")) or type(exc).__name__.upper(),
+                    "failure_class": _safe_failure_class(
+                        getattr(exc, "failure_class", ""), _safe_failure_class(type(exc).__name__.upper())
+                    ),
                 }
         else:
             attribution = None
             record["mutation_attribution"] = {"status": "unknown", "failure_class": "baseline_not_captured"}
 
-        after_status = str(record.get("ledger_after", {}).get("status", "unknown"))
+        ledger_after = record.get("ledger_after")
+        after_status = str(ledger_after.get("status", "unknown")) if isinstance(ledger_after, Mapping) else "unknown"
         record["scan_terminal"] = after_status in _TERMINAL_STATUSES
         mutation_clean = attribution is not None and _mutation_is_clean(attribution)
         if already_terminal:

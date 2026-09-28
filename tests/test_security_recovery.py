@@ -4,6 +4,7 @@ from collections import deque
 import copy
 import json
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import threading
@@ -175,6 +176,33 @@ class SecurityRecoveryTests(unittest.TestCase):
                 owner_thread_id=owner_thread,
                 ownerless_admin=ownerless_admin,
             )
+
+    def test_preflight_exception_is_finalized_without_claiming_cancellation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository = _init_repo(root)
+            provider = _FakeSecurityProvider([_scan(repository)])
+            failure = AttributeError("fixture")
+            failure.failure_class = "private provider detail / " + ("x" * 200)
+            with patch("dual_codex.security_recovery.capture_git_baseline", side_effect=failure), patch(
+                "dual_codex.security_recovery.CodexSecurityProvider", return_value=provider
+            ) as provider_constructor:
+                result = self._run(root, provider)
+
+            provider_constructor.assert_not_called()
+            self.assertFalse(result["cancellation_attempted"])
+            self.assertIsNone(result["ledger_before"])
+            self.assertIsNone(result["ledger_after"])
+            self.assertFalse(result["scan_terminal"])
+            self.assertFalse(result["success"])
+            self.assertEqual(result["classification"], "SECURITY_RECOVERY_MUTATION_ATTRIBUTION_FAILED")
+            self.assertEqual(result["preflight_failure_class"], "ATTRIBUTEERROR")
+            self.assertLessEqual(len(result["preflight_failure_class"]), 128)
+            self.assertRegex(result["preflight_failure_class"], re.compile(r"^[A-Z0-9_]+$"))
+            self.assertNotIn("private provider detail", json.dumps(result))
+            saved = json.loads(Path(result["provenance_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(saved["classification"], result["classification"])
+            self.assertEqual(saved["preflight_failure_class"], "ATTRIBUTEERROR")
 
     def test_cancellation_requires_exact_owner_or_explicit_deep_admin_authority(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
