@@ -15,11 +15,17 @@ import os
 from pathlib import Path
 import re
 import stat
-import tempfile
 from typing import Iterable
 
 from .config import SUPPORTED_ROLES
-from .report import atomic_write_json
+from .paths import (
+    safe_atomic_write_text,
+    safe_create_temp_file,
+    safe_ensure_directory_tree,
+    safe_read_bytes,
+    safe_unlink_if_identity,
+)
+from .report import dump_json
 
 CANONICAL_INSTRUCTIONS_ROOT = Path(r"C:\CodexGlobal")
 _DEFAULT_SELECTED_SKILLS = (
@@ -32,6 +38,48 @@ _MANDATORY_ARCHITECT_SKILLS = _DEFAULT_SELECTED_SKILLS
 _CANONICAL_BOOTSTRAP_NAME = re.compile(
     rf"^\.canonical-bootstrap-(?P<role>{'|'.join(re.escape(role) for role in SUPPORTED_ROLES)})-[A-Za-z0-9_]{{8}}\.md$"
 )
+
+
+def canonical_bootstrap_owner_directory_path(runs_dir: Path, repository: Path) -> Path:
+    """Compute the host-control directory outside the Executor workspace."""
+
+    repository = repository.expanduser().resolve(strict=True)
+    candidate = Path(os.path.abspath(os.path.expanduser(os.fspath(runs_dir)))) / ".bootstrap-owners"
+
+    def inside_repository(path: Path) -> bool:
+        try:
+            path.relative_to(repository)
+            return True
+        except ValueError:
+            return False
+
+    if inside_repository(candidate):
+        if os.name == "nt":
+            state_root = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
+        else:
+            state_root = Path(os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state"))
+        candidate = state_root / "dual-codex" / "bootstrap-owners"
+    if inside_repository(candidate.resolve(strict=False)):
+        raise OSError("host bootstrap owner records must be stored outside the Executor repository")
+    return candidate
+
+
+def canonical_bootstrap_owner_directory(runs_dir: Path, repository: Path) -> Path:
+    """Return a host-owned owner-record directory outside the Executor workspace."""
+
+    candidate = safe_ensure_directory_tree(canonical_bootstrap_owner_directory_path(runs_dir, repository))
+    repository = repository.expanduser().resolve(strict=True)
+    if candidate.resolve(strict=True).is_relative_to(repository):
+        raise OSError("host bootstrap owner records must be stored outside the Executor repository")
+    if os.name != "nt":
+        candidate.chmod(0o700)
+    return candidate
+
+
+def _bootstrap_owner_record_path(owner_directory: Path, artifact: Path) -> Path:
+    identity = os.path.normcase(os.path.abspath(os.fspath(artifact)))
+    digest = hashlib.sha256(os.fsencode(identity)).hexdigest()
+    return owner_directory / f"{digest}.owner.json"
 
 
 @dataclass(frozen=True)
@@ -143,14 +191,33 @@ class CanonicalBootstrap:
 def canonical_instructions_root(root: Path | None = None) -> Path:
     """Return the canonical policy root, failing closed when it is incomplete."""
 
-    resolved = (root or CANONICAL_INSTRUCTIONS_ROOT).expanduser()
+    requested = (root or CANONICAL_INSTRUCTIONS_ROOT).expanduser().absolute()
+    if _path_has_reparse_component(requested):
+        raise ValueError(f"Canonical instruction root uses a symlink or reparse point: {requested}")
+    resolved = requested
     agents = resolved / "AGENTS.md"
     skills = resolved / "skills"
-    if not agents.is_file():
+    if _path_is_reparse_point(agents) or not agents.is_file():
         raise FileNotFoundError(f"Canonical instruction file is unavailable: {agents}")
-    if not skills.is_dir():
+    if _path_is_reparse_point(skills) or not skills.is_dir():
         raise FileNotFoundError(f"Canonical skill tree is unavailable: {skills}")
-    return resolved
+    return resolved.resolve(strict=True)
+
+
+def _path_has_reparse_component(path: Path) -> bool:
+    """Check each lexical component without resolving through a link/junction."""
+
+    current = Path(path.anchor)
+    for part in path.parts[1:]:
+        current = current / part
+        if _path_is_reparse_point(current):
+            return True
+    return False
+
+
+def _ensure_safe_directory_tree(path: Path) -> Path:
+    """Create a directory chain while refusing links and reparse points."""
+    return safe_ensure_directory_tree(path)
 
 
 def _normalise_skill_names(selected_skills: Iterable[str] | None) -> tuple[str, ...]:
@@ -235,7 +302,9 @@ def _canonical_files(
     *,
     selected_skills: Iterable[str] | None = None,
 ) -> list[tuple[str, bytes]]:
-    files = [("AGENTS.md", (root / "AGENTS.md").read_bytes())]
+    if _path_has_reparse_component(root):
+        raise ValueError("Canonical instruction root uses a symlink or reparse point.")
+    files = [("AGENTS.md", _read_regular_file_nofollow(root / "AGENTS.md"))]
     for name in _normalise_skill_names(selected_skills):
         path = root / "skills" / name / "SKILL.md"
         content = _read_skill_file(path, root / "skills", name, "global")
@@ -245,7 +314,7 @@ def _canonical_files(
     return files
 
 
-def _is_reparse_point(path: Path) -> bool:
+def _path_is_reparse_point(path: Path) -> bool:
     try:
         info = path.lstat()
     except OSError:
@@ -258,7 +327,11 @@ def _read_skill_file(path: Path, skill_root: Path, name: str, scope: str) -> byt
     """Read a direct regular skill file without following links or junctions."""
 
     skill_dir = path.parent
-    if _is_reparse_point(skill_root) or _is_reparse_point(skill_dir) or _is_reparse_point(path):
+    if (
+        _path_has_reparse_component(skill_root)
+        or _path_is_reparse_point(skill_dir)
+        or _path_is_reparse_point(path)
+    ):
         raise ValueError(f"{scope.title()} skill '{name}' uses a symlink or reparse point.")
     try:
         resolved_root = skill_root.resolve(strict=True)
@@ -270,8 +343,8 @@ def _read_skill_file(path: Path, skill_root: Path, name: str, scope: str) -> byt
     if resolved_dir.parent != resolved_root or resolved_file.parent != resolved_dir or not stat.S_ISREG(info.st_mode):
         raise ValueError(f"{scope.title()} skill '{name}' does not resolve under its expected skill root.")
     try:
-        return path.read_bytes()
-    except OSError:
+        return _read_regular_file_nofollow(path)
+    except FileNotFoundError:
         return None
 
 
@@ -280,10 +353,10 @@ def _canonical_skill_catalog(root: Path) -> tuple[tuple[str, str], ...]:
 
     entries: list[tuple[str, str]] = []
     skill_root = root / "skills"
-    if _is_reparse_point(skill_root):
+    if _path_has_reparse_component(skill_root):
         raise ValueError("Canonical skill root uses a symlink or reparse point.")
     for directory in sorted(skill_root.iterdir(), key=lambda item: item.name.casefold()):
-        if _is_reparse_point(directory):
+        if _path_is_reparse_point(directory):
             raise ValueError(f"Canonical skill directory '{directory.name}' uses a symlink or reparse point.")
         if not directory.is_dir():
             continue
@@ -308,16 +381,16 @@ def _project_skill_catalog(repository: Path | None) -> tuple[SkillSource, ...]:
     agents_dir = root / ".agents"
     if not os.path.lexists(agents_dir):
         return ()
-    if _is_reparse_point(agents_dir) or not agents_dir.is_dir():
+    if _path_is_reparse_point(agents_dir) or not agents_dir.is_dir():
         raise ValueError("Project .agents directory is not a safe directory under the target repository.")
     skill_root = agents_dir / "skills"
     if not os.path.lexists(skill_root):
         return ()
-    if _is_reparse_point(skill_root) or not skill_root.is_dir():
+    if _path_is_reparse_point(skill_root) or not skill_root.is_dir():
         raise ValueError("Project skill root is not a safe directory under the target repository.")
     entries: list[SkillSource] = []
     for directory in sorted(skill_root.iterdir(), key=lambda item: item.name.casefold()):
-        if _is_reparse_point(directory):
+        if _path_is_reparse_point(directory):
             raise ValueError(f"Project skill entry '{directory.name}' uses a symlink or reparse point.")
         if not directory.is_dir():
             continue
@@ -377,7 +450,7 @@ def _read_catalog_source(entry: SkillSource, *, source_root: Path, project_root:
         agents_dir = project_root / ".agents"
         expected_root = agents_dir / "skills"
         expected_path = expected_root / entry.identifier / "SKILL.md"
-        if _is_reparse_point(agents_dir) or _is_reparse_point(expected_root):
+        if _path_is_reparse_point(agents_dir) or _path_is_reparse_point(expected_root):
             raise RuntimeError(f"Project skill '{entry.identifier}' no longer resolves under its expected skill root.")
     else:
         raise RuntimeError(f"Skill '{entry.identifier}' has an invalid source scope.")
@@ -449,6 +522,7 @@ def create_canonical_bootstrap(
     repository: Path | None = None,
     selected_skills: Iterable[str] | None = None,
     artifact_repository: Path | None = None,
+    owner_runs_dir: Path | None = None,
     run_id: str = "",
     provider_backend: str = "",
 ) -> CanonicalBootstrap:
@@ -484,11 +558,16 @@ def create_canonical_bootstrap(
             project_root=project_root,
             host_loaded_skills=selected,
         )
-    destination = artifact_dir.expanduser().resolve()
-    destination.mkdir(parents=True, exist_ok=True)
-    fd, raw_path = tempfile.mkstemp(prefix=f".canonical-bootstrap-{role}-", suffix=".md", dir=destination)
-    path = Path(raw_path)
-    owner_path = path.with_suffix(".owner.json")
+    destination = _ensure_safe_directory_tree(artifact_dir)
+    fd, path = safe_create_temp_file(
+        destination,
+        prefix=f".canonical-bootstrap-{role}-",
+        suffix=".md",
+        token_length=8,
+    )
+    artifact_created_info = os.fstat(fd)
+    owner_path = None
+    owner_created_info = None
     try:
         content = _artifact_text(source_root, role, files, source_sha256).encode("utf-8")
         with os.fdopen(fd, "wb") as handle:
@@ -497,18 +576,21 @@ def create_canonical_bootstrap(
             os.fsync(handle.fileno())
         owner_root = artifact_repository.expanduser().resolve(strict=True) if artifact_repository is not None else None
         if owner_root is not None:
+            if owner_runs_dir is None:
+                raise ValueError("A host-owned runs directory is required for bootstrap ownership records.")
+            owner_directory = canonical_bootstrap_owner_directory(owner_runs_dir, owner_root)
+            owner_path = _bootstrap_owner_record_path(owner_directory, path)
             try:
                 from .delegation import _safe_process_start_token
 
                 process_start = _safe_process_start_token(os.getpid())
             except Exception:
                 process_start = None
-            atomic_write_json(
-                owner_path,
-                {
-                    "schema_version": 1,
+            owner_content = dump_json({
+                    "schema_version": 2,
                     "repository": str(owner_root),
                     "artifact": path.name,
+                    "artifact_path": str(path),
                     "artifact_sha256": hashlib.sha256(content).hexdigest(),
                     "role": role,
                     "backend": provider_backend,
@@ -519,8 +601,9 @@ def create_canonical_bootstrap(
                     "pid": os.getpid(),
                     "process_start": process_start,
                     "created_at": datetime.now(timezone.utc).isoformat(),
-                },
-            )
+                }) + "\n"
+            safe_atomic_write_text(owner_path, owner_content)
+            owner_created_info = owner_path.lstat()
         return CanonicalBootstrap(
             source_root=source_root,
             source_sha256=source_sha256,
@@ -537,15 +620,27 @@ def create_canonical_bootstrap(
             artifact_source_sha256=source_sha256,
             artifact_source_files=source_files,
             host_loaded_skills=selected,
-            artifact_owner_path=owner_path if owner_root is not None else None,
+            artifact_owner_path=owner_path,
         )
     except BaseException:
         try:
             os.close(fd)
         except OSError:
             pass
-        path.unlink(missing_ok=True)
-        owner_path.unlink(missing_ok=True)
+        try:
+            current_artifact_info = path.lstat()
+            if (
+                (current_artifact_info.st_dev, current_artifact_info.st_ino)
+                == (artifact_created_info.st_dev, artifact_created_info.st_ino)
+            ):
+                safe_unlink_if_identity(path, current_artifact_info)
+        except OSError:
+            pass
+        if owner_path is not None and owner_created_info is not None:
+            try:
+                safe_unlink_if_identity(owner_path, owner_created_info)
+            except OSError:
+                pass
         raise
 
 
@@ -569,7 +664,7 @@ def finalize_architect_bootstrap(
     actor_selected = tuple(name for name in reported if name.casefold() not in baseline_names)
     names = tuple(sorted((*baseline, *actor_selected)))
     selected_sources = [source_by_name[name.casefold()] for name in names]
-    files = [("AGENTS.md", (bootstrap.source_root / "AGENTS.md").read_bytes())]
+    files = [("AGENTS.md", _read_regular_file_nofollow(bootstrap.source_root / "AGENTS.md"))]
     for entry in selected_sources:
         content = _read_catalog_source(
             entry,
@@ -610,7 +705,7 @@ def bootstrap_artifact_dir(repository: Path, output_path: Path) -> Path:
     """Choose a per-run directory already readable by the provider sandbox."""
 
     repository = repository.expanduser().resolve()
-    candidate = output_path.expanduser().resolve().parent
+    candidate = Path(os.path.abspath(output_path.expanduser())).parent
     try:
         candidate.relative_to(repository)
     except ValueError:
@@ -633,10 +728,11 @@ def cleanup_canonical_bootstrap(bootstrap: CanonicalBootstrap | None) -> None:
                 owner = json.loads(owner_bytes.decode("utf-8"))
                 if (
                     not isinstance(owner, dict)
-                    or owner.get("schema_version") != 1
+                    or owner.get("schema_version") != 2
                     or not isinstance(owner.get("repository"), str)
                     or not owner.get("repository")
                     or owner.get("artifact") != artifact.name
+                    or owner.get("artifact_path") != str(artifact)
                     or owner.get("artifact_sha256") != bootstrap.artifact_sha256
                 ):
                     return
@@ -666,7 +762,8 @@ def cleanup_canonical_bootstrap(bootstrap: CanonicalBootstrap | None) -> None:
                 return
             if not _same_file_identity(artifact_info, artifact.lstat()):
                 return
-            artifact.unlink()
+            if not safe_unlink_if_identity(artifact, artifact_info):
+                return
             if owner_path is not None:
                 try:
                     current_owner_info = owner_path.lstat()
@@ -674,7 +771,7 @@ def cleanup_canonical_bootstrap(bootstrap: CanonicalBootstrap | None) -> None:
                     if _same_file_identity(owner_info, current_owner_info) and current_owner_bytes == owner_bytes:
                         if not _same_file_identity(current_owner_info, owner_path.lstat()):
                             return
-                        owner_path.unlink()
+                        safe_unlink_if_identity(owner_path, current_owner_info)
                 except (OSError, UnicodeError, json.JSONDecodeError):
                     pass
         except FileNotFoundError:
@@ -700,12 +797,13 @@ def update_canonical_bootstrap_provider(
     if not _regular_file(owner_path):
         raise RuntimeError("Canonical bootstrap ownership metadata is unavailable.")
     try:
-        owner = json.loads(owner_path.read_text(encoding="utf-8"))
+        owner = json.loads(safe_read_bytes(owner_path, max_bytes=256 * 1024).decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise RuntimeError("Canonical bootstrap ownership metadata is unreadable.") from exc
     if (
         not isinstance(owner, dict)
         or owner.get("artifact") != bootstrap.artifact_path.name
+        or owner.get("artifact_path") != str(bootstrap.artifact_path)
         or owner.get("artifact_sha256") != bootstrap.artifact_sha256
     ):
         raise RuntimeError("Canonical bootstrap ownership metadata does not match its artifact.")
@@ -721,7 +819,7 @@ def update_canonical_bootstrap_provider(
             owner["provider_process_start"] = None
     else:
         owner["provider_process_start"] = None
-    atomic_write_json(owner_path, owner)
+    safe_atomic_write_text(owner_path, dump_json(owner) + "\n")
 
 
 def _is_reparse_point(info: os.stat_result) -> bool:
@@ -756,33 +854,7 @@ def _same_file_identity(left: os.stat_result, right: os.stat_result) -> bool:
 
 def _read_regular_file_nofollow(path: Path, *, max_bytes: int = 16 * 1024 * 1024) -> bytes:
     """Read a stable regular file without accepting a link or reparse target."""
-
-    before = path.lstat()
-    if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode) or _is_reparse_point(before):
-        raise OSError("Refusing to read a non-regular or reparse file.")
-    if before.st_size > max_bytes:
-        raise OSError("File exceeds the safe read size.")
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags)
-    with os.fdopen(descriptor, "rb") as handle:
-        opened = os.fstat(handle.fileno())
-        if (
-            not stat.S_ISREG(opened.st_mode)
-            or stat.S_ISLNK(opened.st_mode)
-            or _is_reparse_point(opened)
-            or not _same_file_identity(before, opened)
-        ):
-            raise OSError("File changed or resolved through a reparse point while opening.")
-        content = handle.read(max_bytes + 1)
-        after_open = os.fstat(handle.fileno())
-        after_path = path.lstat()
-        if (
-            len(content) > max_bytes
-            or not _same_file_identity(opened, after_open)
-            or not _same_file_identity(opened, after_path)
-        ):
-            raise OSError("File changed while being read.")
-        return content
+    return safe_read_bytes(path, max_bytes=max_bytes)
 
 
 def _active_process(pid: int, recorded_start: object) -> tuple[bool, bool]:
@@ -807,20 +879,98 @@ def _verified_legacy_bootstrap(path: Path, *, role: str, canonical_root: Path) -
 
     try:
         text = _read_regular_file_nofollow(path).decode("utf-8")
-        lines = text.splitlines()
-        expected_root = canonical_root.expanduser().resolve(strict=True)
+        expected_root = canonical_instructions_root(canonical_root)
     except (OSError, UnicodeError, RuntimeError, ValueError):
         return False
+    header = (
+        "# Dual Codex canonical bootstrap transport\n\n"
+        "This is an ephemeral, read-only transport snapshot. The canonical source remains machine-owned.\n"
+        f"canonical_source_path: {expected_root}\n"
+    )
+    if not text.startswith(header):
+        return False
+    cursor = len(header)
+    digest_line_end = text.find("\n", cursor)
+    if digest_line_end < 0:
+        return False
+    digest_line = text[cursor:digest_line_end]
+    match = re.fullmatch(r"canonical_source_sha256: ([0-9a-f]{64})", digest_line)
+    if match is None:
+        return False
+    source_digest = match.group(1)
+    cursor = digest_line_end + 1
+    role_line = f"trusted_configured_phase_role: {role}\n\n"
+    if not text.startswith(role_line, cursor):
+        return False
+    cursor += len(role_line)
+
+    files: list[tuple[str, bytes]] = []
+    while cursor < len(text):
+        section_end = text.find("\n", cursor)
+        hash_end = text.find("\n", section_end + 1) if section_end >= 0 else -1
+        if section_end < 0 or hash_end < 0:
+            return False
+        section = text[cursor:section_end]
+        if not section.startswith("## "):
+            return False
+        relative = section[3:]
+        section_hash = text[section_end + 1:hash_end]
+        if re.fullmatch(r"sha256: [0-9a-f]{64}", section_hash) is None:
+            return False
+        body_start = hash_end + 1
+        if not text.startswith("\n", body_start):
+            return False
+        body_start += 1
+        if relative == "AGENTS.md":
+            if any(existing == relative for existing, _ in files):
+                return False
+            try:
+                content = _read_regular_file_nofollow(expected_root / relative)
+            except OSError:
+                return False
+        else:
+            prefix, separator, tail = relative.partition("/")
+            name, separator2, filename = tail.partition("/")
+            if (
+                prefix != "skills"
+                or not separator
+                or not separator2
+                or filename != "SKILL.md"
+                or not name
+                or any(existing == relative for existing, _ in files)
+            ):
+                return False
+            try:
+                if _normalise_skill_names((name,)) != (name,):
+                    return False
+            except ValueError:
+                return False
+            try:
+                content = _read_skill_file(expected_root / relative, expected_root / "skills", name, "global")
+            except (OSError, ValueError):
+                return False
+            if content is None:
+                return False
+        if hashlib.sha256(content).hexdigest() != section_hash.removeprefix("sha256: "):
+            return False
+        try:
+            body = content.decode("utf-8")
+        except UnicodeError:
+            return False
+        block = f"## {relative}\n{section_hash}\n\n{body}\n\n"
+        if text.startswith(block, cursor):
+            pass
+        else:
+            final_block = f"## {relative}\n{section_hash}\n\n{body}\n"
+            if not text.startswith(final_block, cursor) or cursor + len(final_block) != len(text):
+                return False
+            block = final_block
+        files.append((relative, content))
+        cursor += len(block)
     return (
-        len(lines) >= 7
-        and lines[0] == "# Dual Codex canonical bootstrap transport"
-        and lines[1] == ""
-        and lines[2] == "This is an ephemeral, read-only transport snapshot. The canonical source remains machine-owned."
-        and lines[3] == f"canonical_source_path: {expected_root}"
-        and re.fullmatch(r"canonical_source_sha256: [0-9a-f]{64}", lines[4]) is not None
-        and lines[5] == f"trusted_configured_phase_role: {role}"
-        and lines[6]
-        == "trusted_role_dispatch_boundary: already inside this configured phase; follow its task and schema without recursively dispatching"
+        any(relative == "AGENTS.md" for relative, _ in files)
+        and _source_sha256(files) == source_digest
+        and cursor == len(text)
     )
 
 
@@ -851,16 +1001,13 @@ def canonical_bootstrap_artifacts(repository: Path) -> list[str]:
 
 
 def canonical_bootstrap_control_paths(repository: Path) -> list[str]:
-    """Return repository-relative paths for recognized bootstrap files and sidecars."""
+    """Return repository-relative paths for recognized bootstrap artifacts."""
 
     repository = repository.expanduser().resolve(strict=True)
     bootstrap_dir = repository / ".dual_codex" / "bootstrap"
     paths: list[str] = []
     for name in canonical_bootstrap_artifacts(repository):
         paths.append(f".dual_codex/bootstrap/{name}")
-        owner_path = (bootstrap_dir / name).with_suffix(".owner.json")
-        if _regular_file(owner_path):
-            paths.append(f".dual_codex/bootstrap/{owner_path.name}")
     return sorted(paths)
 
 
@@ -893,6 +1040,14 @@ def reconcile_orphan_canonical_bootstrap(
     except OSError:
         return {"removed": [], "retained": [{"name": "bootstrap", "reason": "directory_unavailable"}]}
 
+    try:
+        owner_directory = getattr(repository_lock, "host_control_dir", None)
+        if owner_directory is None:
+            owner_runs_dir = Path(repository_lock.path).parent.parent
+            owner_directory = canonical_bootstrap_owner_directory(owner_runs_dir, repository)
+    except (AttributeError, OSError, RuntimeError, ValueError):
+        return {"removed": [], "retained": [{"name": "bootstrap", "reason": "owner_store_unavailable"}]}
+
     configured_backends = configured_backends or {}
     for entry in os.scandir(bootstrap_dir):
         name = entry.name
@@ -919,7 +1074,7 @@ def reconcile_orphan_canonical_bootstrap(
             retained.append({"name": name, "reason": "artifact_unreadable"})
             continue
 
-        owner_path = artifact.with_suffix(".owner.json")
+        owner_path = _bootstrap_owner_record_path(owner_directory, artifact)
         owner = None
         owner_bytes = None
         try:
@@ -944,9 +1099,10 @@ def reconcile_orphan_canonical_bootstrap(
                 continue
             if (
                 not isinstance(owner, dict)
-                or owner.get("schema_version") != 1
+                or owner.get("schema_version") != 2
                 or owner.get("repository") != str(repository)
                 or owner.get("artifact") != name
+                or owner.get("artifact_path") != str(artifact)
                 or owner.get("artifact_sha256") != artifact_digest
                 or not isinstance(owner.get("pid"), int)
             ):
@@ -1003,6 +1159,11 @@ def reconcile_orphan_canonical_bootstrap(
             if not _verified_legacy_bootstrap(artifact, role=role, canonical_root=canonical_root):
                 retained.append({"name": name, "reason": "legacy_ownership_unproven"})
                 continue
+            # The old artifact body has no unforgeable owner sidecar. Exact
+            # canonical content proves the format, but a user can recreate it
+            # under a generated-looking name, so it is not deletion authority.
+            retained.append({"name": name, "reason": "legacy_ownership_unproven"})
+            continue
         try:
             current_metadata_info = metadata_dir.lstat()
             current_bootstrap_info = bootstrap_dir.lstat()
@@ -1033,7 +1194,13 @@ def reconcile_orphan_canonical_bootstrap(
             if hashlib.sha256(_read_regular_file_nofollow(artifact)).hexdigest() != artifact_digest:
                 retained.append({"name": name, "reason": "changed_before_unlink"})
                 continue
-            artifact.unlink()
+            if not safe_unlink_if_identity(artifact, current_info):
+                try:
+                    artifact.lstat()
+                except FileNotFoundError:
+                    continue
+                retained.append({"name": name, "reason": "changed_before_unlink"})
+                continue
             if owner_info is not None:
                 try:
                     current_owner_info = owner_path.lstat()
@@ -1042,7 +1209,7 @@ def reconcile_orphan_canonical_bootstrap(
                         _same_file_identity(owner_info, current_owner_info)
                         and current_owner_bytes == owner_bytes
                     ):
-                        owner_path.unlink()
+                        safe_unlink_if_identity(owner_path, current_owner_info)
                 except OSError:
                     pass
             removed.append({"name": name, "run_id": str(owner.get("run_id", "")) if owner else "legacy"})
@@ -1068,7 +1235,7 @@ def configured_actor_prompt(
         transport = "The trusted host could not provide an inline canonical bootstrap artifact. Fail closed."
     elif system_prompt_file:
         try:
-            content = artifact.read_bytes()
+            content = _read_regular_file_nofollow(artifact)
         except OSError as exc:
             raise FileNotFoundError(f"Canonical bootstrap artifact is unavailable: {artifact}") from exc
         if hashlib.sha256(content).hexdigest() != bootstrap.artifact_sha256:
@@ -1082,7 +1249,7 @@ def configured_actor_prompt(
         )
     else:
         try:
-            snapshot = artifact.read_text(encoding="utf-8")
+            snapshot = _read_regular_file_nofollow(artifact).decode("utf-8")
         except (OSError, UnicodeError) as exc:
             raise FileNotFoundError(f"Canonical bootstrap artifact is unavailable: {artifact}") from exc
         if deferred_architect_skills:

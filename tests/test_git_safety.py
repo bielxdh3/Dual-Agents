@@ -310,6 +310,30 @@ class GitSafetyTests(unittest.TestCase):
             self.assertEqual(safe_status.returncode, 1)
             self.assertIn("Trusted host Git cannot inspect paths that use Git content filters", safe_status.stderr)
 
+    def test_final_git_command_receives_optional_locks_disabled(self) -> None:
+        captured: dict[str, object] = {}
+        probe_environments: list[dict[str, str]] = []
+
+        def probe_runner(args, **kwargs):
+            probe_environments.append(dict(kwargs["env"]))
+            return CommandResult(list(args), 0, "", "")
+
+        def runner(_args, **kwargs):
+            captured.update(kwargs)
+            return CommandResult([], 0, "", "")
+
+        with patch("dual_codex.git.run_command", side_effect=probe_runner):
+            run_git(
+                ["git", "status", "--short"],
+                cwd=Path.cwd(),
+                runner=runner,
+                env={**os.environ, "GIT_OPTIONAL_LOCKS": "1"},
+            )
+
+        self.assertGreaterEqual(len(probe_environments), 2)
+        self.assertTrue(all(env["GIT_OPTIONAL_LOCKS"] == "0" for env in probe_environments))
+        self.assertEqual(captured["env"]["GIT_OPTIONAL_LOCKS"], "0")
+
     def test_unrepresentable_filter_names_fail_closed_before_host_git_runs(self) -> None:
         runner = Mock()
         with patch(

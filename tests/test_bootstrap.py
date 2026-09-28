@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -285,6 +286,47 @@ class CanonicalBootstrapTests(unittest.TestCase):
                 or "does not resolve under its expected skill root" in message,
                 msg=f"unexpected project-skill escape rejection: {error.exception}",
             )
+
+    def test_reparse_points_are_rejected_for_canonical_and_project_skill_components(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            canonical_root = root / "CodexGlobal"
+            canonical_root.mkdir()
+            _write_fixture(canonical_root)
+            repository = root / "repo"
+            repository.mkdir()
+            project_skill = _write_project_skill(repository, "project-policy")
+            canonical_targets = (
+                canonical_root / "AGENTS.md",
+                canonical_root / "skills",
+                canonical_root / "skills" / "memory",
+                canonical_root / "skills" / "memory" / "SKILL.md",
+            )
+            project_targets = (
+                repository / ".agents",
+                repository / ".agents" / "skills",
+                project_skill.parent,
+                project_skill,
+            )
+            original_lstat = Path.lstat
+
+            for target in (*canonical_targets, *project_targets):
+                with self.subTest(path=target):
+                    def lstat_with_reparse(path: Path):
+                        info = original_lstat(path)
+                        if path == target:
+                            return SimpleNamespace(st_mode=info.st_mode, st_file_attributes=0x400)
+                        return info
+
+                    with patch.object(Path, "lstat", lstat_with_reparse):
+                        if target in canonical_targets:
+                            with self.assertRaises((ValueError, FileNotFoundError)):
+                                bootstrap.create_canonical_bootstrap(role="architect", root=canonical_root)
+                        else:
+                            with self.assertRaises(ValueError):
+                                bootstrap.create_canonical_bootstrap(
+                                    role="architect", root=canonical_root, repository=repository
+                                )
 
     def test_architect_reported_skill_names_resolve_case_insensitively_to_catalog_names(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

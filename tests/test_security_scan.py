@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import hashlib
 import json
+import queue
 import subprocess
 import tempfile
 import unittest
@@ -11,6 +12,7 @@ from unittest.mock import patch
 from dual_codex.security_scan import (
     PLUGIN_ID,
     _READ_TOOLS,
+    _McpReadClient,
     CodexSecurityProvider,
     SecurityScanError,
     arbitrate_security_scans,
@@ -184,6 +186,16 @@ def _commit_test_file(repository: Path, relative_path: str = "tracked.txt") -> P
 
 
 class SecurityScanArbitrationTests(unittest.TestCase):
+    def test_mcp_read_client_rejects_non_object_jsonrpc_frames(self) -> None:
+        client = object.__new__(_McpReadClient)
+        client._request_id = 0
+        client._lines = queue.Queue()
+        client._lines.put("[]\n")
+        with patch.object(client, "_send"):
+            with self.assertRaisesRegex(SecurityScanError, "invalid protocol data") as raised:
+                client._request("tools/list", {})
+        self.assertEqual(raised.exception.failure_class, "SECURITY_SCAN_PROVIDER_UNAVAILABLE")
+
     def test_no_existing_scan_starts_one(self) -> None:
         with self.subTest("empty ledger"):
             repository = Path(".").resolve()
@@ -1185,6 +1197,37 @@ class SecurityScanArbitrationTests(unittest.TestCase):
             "git info exclude edit": lambda repo, _tracked, _run, _output: (repo / ".git" / "info" / "exclude").write_text(
                 "pre-existing-ignored.txt\nnew-pattern\n", encoding="utf-8"
             ),
+            "local Git config edit": lambda repo, _tracked, _run, _output: subprocess.run(
+                ["git", "config", "--local", "dual-agents.scan-only-probe", "changed"],
+                cwd=repo,
+                check=True,
+            ),
+            "loose branch ref addition": lambda repo, _tracked, _run, _output: subprocess.run(
+                ["git", "update-ref", "refs/heads/scan-only-created", "HEAD"], cwd=repo, check=True
+            ),
+            "tag ref addition": lambda repo, _tracked, _run, _output: subprocess.run(
+                ["git", "tag", "scan-only-created"], cwd=repo, check=True
+            ),
+            "hook content edit": lambda repo, _tracked, _run, _output: (
+                (repo / ".git" / "hooks" / "pre-commit").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            ),
+            "packed refs edit": lambda repo, _tracked, _run, _output: subprocess.run(
+                ["git", "pack-refs", "--all", "--prune"], cwd=repo, check=True
+            ),
+            "pseudoref edit": lambda repo, _tracked, _run, _output: (
+                (repo / ".git" / "ORIG_HEAD").write_text(
+                    subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, text=True, stdout=subprocess.PIPE).stdout,
+                    encoding="utf-8",
+                )
+            ),
+            "new object addition": lambda repo, _tracked, _run, _output: subprocess.run(
+                ["git", "hash-object", "-w", "--stdin"],
+                cwd=repo,
+                input="new scan-only object\n",
+                text=True,
+                check=True,
+                stdout=subprocess.PIPE,
+            ),
             "deletion": lambda _repo, tracked, _run, _output: tracked.unlink(),
             "rename": lambda repo, tracked, _run, _output: tracked.rename(repo / "renamed.txt"),
             "index change": lambda repo, tracked, _run, _output: (
@@ -1192,6 +1235,14 @@ class SecurityScanArbitrationTests(unittest.TestCase):
                 subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True),
             ),
             "unrelated run artifact": lambda _repo, _tracked, run, _output: (run / "executor-added.txt").write_text("not host state\n", encoding="utf-8"),
+            "generated-looking bootstrap artifact": lambda repo, _tracked, _run, _output: (
+                (repo / ".dual_codex" / "bootstrap" / ".canonical-bootstrap-executor-ABCDEFGH.md").parent.mkdir(
+                    parents=True, exist_ok=True
+                ),
+                (repo / ".dual_codex" / "bootstrap" / ".canonical-bootstrap-executor-ABCDEFGH.md").write_text(
+                    "executor-created control-name collision\n", encoding="utf-8"
+                ),
+            ),
         }
         for name, mutation in mutations.items():
             with self.subTest(name=name):
@@ -1217,6 +1268,11 @@ class SecurityScanArbitrationTests(unittest.TestCase):
                     self.assertTrue((result["repository"] / "renamed.txt").is_file())
                 elif name == "untracked addition":
                     self.assertTrue((result["repository"] / "added.txt").is_file())
+                elif name == "generated-looking bootstrap artifact":
+                    self.assertIn(
+                        ".dual_codex/bootstrap/.canonical-bootstrap-executor-ABCDEFGH.md",
+                        diagnostic["mutated_paths"]["added"],
+                    )
                 elif name == "pre-existing ignored modification":
                     self.assertEqual(result["ignored"].read_text(encoding="utf-8"), "ignored changed\n")
                     self.assertIn("pre-existing-ignored.txt", diagnostic["mutated_paths"]["modified"])

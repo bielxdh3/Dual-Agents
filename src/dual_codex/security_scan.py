@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import shutil
 import subprocess
 import threading
@@ -475,14 +476,32 @@ def continue_security_scan_authority(
     )
 
 
-def _version_key(value: str) -> tuple[int, ...]:
-    parts: list[int] = []
-    for part in value.split("."):
-        digits = "".join(character for character in part if character.isdigit())
-        if not digits:
-            return ()
-        parts.append(int(digits))
-    return tuple(parts)
+_SEMVER = re.compile(
+    r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+    r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+    r"(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
+)
+
+
+def _version_key(value: str) -> tuple[object, ...] | None:
+    """Return a SemVer precedence key, ignoring build metadata."""
+
+    if not isinstance(value, str) or len(value) > 64:
+        return None
+    match = _SEMVER.fullmatch(value)
+    if match is None:
+        return None
+    major, minor, patch, prerelease, _build = match.groups()
+    identifiers = []
+    if prerelease is not None:
+        for identifier in prerelease.split("."):
+            if identifier.isdigit():
+                if len(identifier) > 1 and identifier.startswith("0"):
+                    return None
+                identifiers.append((0, int(identifier)))
+            else:
+                identifiers.append((1, identifier))
+    return (int(major), int(minor), int(patch), 1 if prerelease is None else 0, tuple(identifiers))
 
 
 def _installed_plugin(codex_home: Path) -> tuple[Path, str, str]:
@@ -499,7 +518,8 @@ def _installed_plugin(codex_home: Path) -> tuple[Path, str, str]:
                 continue
             servers = mcp_manifest.get("mcpServers") if isinstance(mcp_manifest, Mapping) else None
             if (
-                plugin.get("name") == "codex-security"
+                isinstance(plugin, Mapping)
+                and plugin.get("name") == "codex-security"
                 and isinstance(plugin.get("version"), str)
                 and installed.is_file()
                 and isinstance(servers, Mapping)
@@ -508,13 +528,16 @@ def _installed_plugin(codex_home: Path) -> tuple[Path, str, str]:
             ):
                 marketplace = plugin_root.parent.parent.name
                 matches.append((plugin_root, f"codex-security@{marketplace}", plugin["version"]))
-    matches = [item for item in matches if item[1] == PLUGIN_ID]
+    matches = [item for item in matches if item[1] == PLUGIN_ID and _version_key(item[2]) is not None]
     if not matches:
         raise SecurityScanError(
             "The Executor profile has no installed Codex Security MCP server.",
             failure_class="SECURITY_SCAN_PROVIDER_UNAVAILABLE",
         )
-    matches.sort(key=lambda item: _version_key(item[2]), reverse=True)
+    matches.sort(
+        key=lambda item: (_version_key(item[2]), "+" not in item[2], item[1], str(item[0]).casefold()),
+        reverse=True,
+    )
     return matches[0]
 
 
@@ -650,6 +673,11 @@ class _McpReadClient:
                     "The Codex Security MCP server returned invalid protocol data.",
                     failure_class="SECURITY_SCAN_PROVIDER_UNAVAILABLE",
                 ) from exc
+            if not isinstance(message, Mapping):
+                raise SecurityScanError(
+                    "The Codex Security MCP server returned invalid protocol data.",
+                    failure_class="SECURITY_SCAN_PROVIDER_UNAVAILABLE",
+                )
             if message.get("id") != request_id:
                 continue
             if "error" in message or not isinstance(message.get("result"), Mapping):

@@ -22,6 +22,7 @@ from dual_codex.delegation import (
     RepositoryLock,
     _acquire_recovery_claim,
     _pid_alive,
+    _unlink_lock_if_identity,
     _release_recovery_claim,
     delegate,
     parse_request,
@@ -34,6 +35,7 @@ from dual_codex.delegation import (
 )
 from dual_codex.cli import main
 from dual_codex.live_events import journal_path, read_journal
+from dual_codex.paths import safe_read_bytes
 from dual_codex.process import CommandError, CommandResult, run_command
 from dual_codex.terminal import TERMINAL_INLINE_MESSAGE_MAX, session_id_for
 
@@ -346,6 +348,7 @@ class DelegationTests(unittest.TestCase):
             self.assertIs(result, expected)
             self.assertEqual(legacy.call_args.kwargs["schema_path"], root / "schema.json")
             self.assertFalse(legacy.call_args.kwargs["check"])
+            self.assertEqual(legacy.call_args.kwargs["timeout"], config.legacy_exec_timeout)
 
     def test_terminal_report_validation_rejects_invalid_structured_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1211,6 +1214,23 @@ class DelegationTests(unittest.TestCase):
                 stale.acquire()
             stale.release()
 
+    def test_repository_lock_uses_host_control_store_outside_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            runs_dir = repository / "runs"
+            state_root = root / "host-state"
+            with patch.dict(
+                os.environ,
+                {"LOCALAPPDATA": str(state_root), "XDG_STATE_HOME": str(state_root)},
+            ):
+                lock = RepositoryLock(runs_dir, repository, "request")
+                self.assertFalse(lock.path.is_relative_to(repository.resolve()))
+                self.assertTrue(lock.path.is_relative_to(state_root.resolve()))
+                self.assertFalse(runs_dir.exists())
+                lock.acquire()
+                lock.release()
+
     def test_lock_recovers_live_pid_with_a_different_process_start_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1232,6 +1252,79 @@ class DelegationTests(unittest.TestCase):
                 self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "new-request")
                 lock.release()
 
+    def test_lock_retries_when_stale_file_disappears_during_inspection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            lock = RepositoryLock(root / "runs", repository, "new-owner")
+            lock.path.parent.mkdir(parents=True)
+            lock.path.write_text(json.dumps({"pid": 999999, "request_id": "stale-owner"}), encoding="utf-8")
+            read_bytes = safe_read_bytes
+            removed = False
+
+            def read_then_disappear(path: Path, **kwargs):
+                nonlocal removed
+                content = read_bytes(path, **kwargs)
+                if path == lock.path and not removed:
+                    removed = True
+                    path.unlink()
+                return content
+
+            with patch("dual_codex.delegation._pid_alive", return_value=False), patch(
+                "dual_codex.delegation.safe_read_bytes", side_effect=read_then_disappear
+            ):
+                lock.acquire()
+
+            self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "new-owner")
+            lock.release()
+
+    def test_lock_does_not_delete_replacement_owner_before_stale_unlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            lock = RepositoryLock(root / "runs", repository, "new-owner")
+            lock.path.parent.mkdir(parents=True)
+            lock.path.write_text(
+                json.dumps({"pid": os.getpid(), "process_start": "old-process-instance", "request_id": "stale-owner"}),
+                encoding="utf-8",
+            )
+            unlink_if_identity = _unlink_lock_if_identity
+            swapped = False
+
+            def replace_before_unlink(path, expected):
+                nonlocal swapped
+                if not swapped:
+                    swapped = True
+                    path.write_text(
+                        json.dumps({"pid": os.getpid(), "process_start": "current-process-instance", "request_id": "replacement-owner"}),
+                        encoding="utf-8",
+                    )
+                return unlink_if_identity(path, expected)
+
+            with patch("dual_codex.delegation._pid_alive", return_value=True), patch(
+                "dual_codex.delegation._safe_process_start_token", return_value="current-process-instance"
+            ), patch("dual_codex.delegation._unlink_lock_if_identity", side_effect=replace_before_unlink):
+                with self.assertRaisesRegex(DelegationError, "replacement-owner"):
+                    lock.acquire()
+
+            self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "replacement-owner")
+
+    def test_release_preserves_a_replacement_lock_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            lock = RepositoryLock(root / "runs", repository, "current-owner")
+            lock.acquire()
+            unlink_if_identity = _unlink_lock_if_identity
+
+            def replace_before_unlink(path, expected):
+                path.write_text(json.dumps({"pid": os.getpid(), "request_id": "replacement-owner"}), encoding="utf-8")
+                return unlink_if_identity(path, expected)
+
+            with patch("dual_codex.delegation._unlink_lock_if_identity", side_effect=replace_before_unlink):
+                lock.release()
+            self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "replacement-owner")
+
     def test_concurrent_stale_lock_recovery_has_one_owner_and_preserves_new_lock(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1250,6 +1343,8 @@ class DelegationTests(unittest.TestCase):
 
             start_together = threading.Barrier(2)
             both_saw_stale = threading.Barrier(2)
+            claim_calls = 0
+            claim_calls_guard = threading.Lock()
             owner_acquired = threading.Event()
             other_finished = threading.Event()
             state_guard = threading.Lock()
@@ -1258,9 +1353,12 @@ class DelegationTests(unittest.TestCase):
             outcomes: list[tuple[str, str]] = []
 
             def synchronized_claim(path: Path) -> int | None:
-                # Both callers have already received FileExistsError on the
-                # same stale primary lock before either takes the claim.
-                both_saw_stale.wait(timeout=5)
+                nonlocal claim_calls
+                with claim_calls_guard:
+                    claim_calls += 1
+                    current_call = claim_calls
+                if current_call <= 2:
+                    both_saw_stale.wait(timeout=5)
                 return _acquire_recovery_claim(path)
 
             def attempt(lock: RepositoryLock) -> None:

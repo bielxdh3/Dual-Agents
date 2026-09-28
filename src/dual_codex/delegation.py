@@ -8,11 +8,12 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import time
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
-from .bootstrap import canonical_instructions_root
+from .bootstrap import canonical_bootstrap_owner_directory_path, canonical_instructions_root
 from .codex import classify_actor_failure, configured_actor_provenance
 from .codex import run_codex_exec as _run_codex_exec_legacy
 from .codex import run_codex_app_server
@@ -21,7 +22,13 @@ from .antigravity import antigravity_status, run_antigravity
 from .config import ConfigError, OrchestratorConfig
 from .git import ensure_git_repository, head_revision, status_and_diff, status_porcelain
 from .live_events import LiveEventJournal, repository_identity
-from .paths import path_identity_key
+from .paths import (
+    path_identity_key,
+    safe_ensure_directory_tree,
+    safe_open_regular_file,
+    safe_read_bytes,
+    safe_unlink_if_identity,
+)
 from .process import CommandError, CommandResult
 from .providers import provider_supports_role
 from .registry import login_status
@@ -97,6 +104,7 @@ def run_codex_exec(**kwargs):
             output_path=kwargs["output_path"],
             schema_path=kwargs["schema_path"],
             check=False,
+            timeout=float(getattr(config, "legacy_exec_timeout", 1800.0)),
             progress=kwargs.get("progress"),
         )
     terminal_kwargs = dict(kwargs)
@@ -513,11 +521,45 @@ def _safe_process_start_token(pid: int) -> str | None:
         return None
 
 
+def _is_reparse_point(info: os.stat_result) -> bool:
+    return bool(getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+
+
+def _lock_file_identity(info: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_mode,
+        getattr(info, "st_file_attributes", 0),
+    )
+
+
+def _unlink_lock_if_identity(path: Path, expected: os.stat_result) -> bool:
+    return safe_unlink_if_identity(path, expected)
+
+
+def repository_lock_path(runs_dir: Path, repository: Path) -> Path:
+    """Return the host-control lock path shared by writers and readers."""
+
+    digest = hashlib.sha256(path_identity_key(repository).encode("utf-8")).hexdigest()[:24]
+    control_dir = canonical_bootstrap_owner_directory_path(runs_dir, repository)
+    return control_dir / ".locks" / f"{digest}.json"
+
+
 def _acquire_recovery_claim(path: Path) -> int | None:
     """Try to serialize stale-lock recovery with a kernel-managed file lock."""
 
-    descriptor = os.open(path, os.O_CREAT | os.O_RDWR)
+    descriptor = safe_open_regular_file(
+        path,
+        flags=os.O_CREAT | os.O_RDWR,
+        mode=0o600,
+    )
     try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or stat.S_ISLNK(opened.st_mode) or _is_reparse_point(opened):
+            raise DelegationError("Repository lock recovery claim is not a regular file.")
         os.lseek(descriptor, 0, os.SEEK_SET)
         if os.name == "nt":
             import msvcrt
@@ -562,8 +604,8 @@ class RepositoryLock:
     """A conservative, repository-scoped lock for local executor runs."""
 
     def __init__(self, runs_dir: Path, repository: Path, request_id: str, run_id: str = "") -> None:
-        digest = hashlib.sha256(path_identity_key(repository).encode("utf-8")).hexdigest()[:24]
-        self.path = runs_dir / ".locks" / f"{digest}.json"
+        self.path = repository_lock_path(runs_dir, repository)
+        self.host_control_dir = self.path.parent.parent
         self.recovery_path = self.path.with_name(self.path.name + ".recovery")
         self.repository = repository
         self.request_id = request_id
@@ -571,7 +613,7 @@ class RepositoryLock:
         self._held = False
 
     def acquire(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        safe_ensure_directory_tree(self.path.parent)
         payload = {
             "request_id": self.request_id,
             "run_id": self.run_id,
@@ -581,29 +623,30 @@ class RepositoryLock:
             "process_start": _safe_process_start_token(os.getpid()),
             "started_at": datetime.now(timezone.utc).isoformat(),
         }
-        for _ in range(2):
-            try:
-                descriptor = os.open(
-                    self.path,
-                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+        for _ in range(3):
+            claim = _acquire_recovery_claim(self.recovery_path)
+            if claim is None:
+                raise DelegationError(
+                    f"Another process is acquiring or recovering the repository lock: {self.path}"
                 )
+            try:
                 try:
-                    os.write(descriptor, (json.dumps(payload) + "\n").encode("utf-8"))
-                finally:
-                    os.close(descriptor)
-                self._held = True
-                return
-            except FileExistsError:
-                claim = _acquire_recovery_claim(self.recovery_path)
-                if claim is None:
-                    raise DelegationError(
-                        f"Another process is recovering the repository lock: {self.path}"
+                    descriptor = safe_open_regular_file(
+                        self.path,
+                        flags=os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                        mode=0o600,
                     )
-                try:
+                except FileExistsError:
                     try:
-                        existing = json.loads(self.path.read_text(encoding="utf-8"))
+                        before = self.path.lstat()
+                        if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode) or _is_reparse_point(before):
+                            raise DelegationError(f"Repository lock is not a regular file: {self.path}")
+                        existing = json.loads(safe_read_bytes(self.path, max_bytes=256 * 1024).decode("utf-8"))
+                        after = self.path.lstat()
+                        if _lock_file_identity(before) != _lock_file_identity(after):
+                            continue
                         pid = int(existing.get("pid", 0))
-                    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+                    except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError) as exc:
                         if isinstance(exc, FileNotFoundError):
                             continue
                         raise DelegationError(
@@ -622,11 +665,31 @@ class RepositoryLock:
                             "Repository is already delegated or in use; active request "
                             f"'{existing.get('request_id', 'unknown')}'."
                         )
-                    self.path.unlink()
-                except OSError as exc:
-                    raise DelegationError(f"Could not recover stale repository lock: {self.path}") from exc
-                finally:
-                    _release_recovery_claim(claim)
+                    _unlink_lock_if_identity(self.path, before)
+                    continue
+                else:
+                    created_info = os.fstat(descriptor)
+                    try:
+                        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+                            stream.write(json.dumps(payload) + "\n")
+                            stream.flush()
+                            os.fsync(stream.fileno())
+                    except BaseException:
+                        try:
+                            created = self.path.lstat()
+                            if (created.st_dev, created.st_ino) == (created_info.st_dev, created_info.st_ino):
+                                safe_unlink_if_identity(self.path, created)
+                        except (OSError, ValueError):
+                            pass
+                        raise
+                    self._held = True
+                    return
+            except DelegationError:
+                raise
+            except OSError as exc:
+                raise DelegationError(f"Could not acquire or recover repository lock: {self.path}") from exc
+            finally:
+                _release_recovery_claim(claim)
         raise DelegationError(f"Repository lock acquisition raced: {self.path}")
 
     def is_held_for_repository(self, repository: Path) -> bool:
@@ -635,7 +698,7 @@ class RepositoryLock:
         if not self._held or repository_identity(repository) != repository_identity(self.repository):
             return False
         try:
-            existing = json.loads(self.path.read_text(encoding="utf-8"))
+            existing = json.loads(safe_read_bytes(self.path, max_bytes=256 * 1024).decode("utf-8"))
             current_start = _safe_process_start_token(os.getpid())
             stored_start = existing.get("process_start")
             return (
@@ -652,23 +715,37 @@ class RepositoryLock:
         if not self._held:
             return
         try:
-            existing = json.loads(self.path.read_text(encoding="utf-8"))
-            current_start = _safe_process_start_token(os.getpid())
-            stored_start = existing.get("process_start")
-            same_process = (
-                current_start is None
-                or stored_start is None
-                or stored_start == current_start
-            )
-            if (
-                existing.get("request_id") == self.request_id
-                and int(existing.get("pid", 0)) == os.getpid()
-                and same_process
-            ):
-                self.path.unlink(missing_ok=True)
-        except (OSError, ValueError, TypeError, json.JSONDecodeError):
-            pass
-        self._held = False
+            try:
+                self.path.lstat()
+            except FileNotFoundError:
+                return
+            for _ in range(50):
+                claim = _acquire_recovery_claim(self.recovery_path)
+                if claim is not None:
+                    try:
+                        try:
+                            before = self.path.lstat()
+                            existing = json.loads(safe_read_bytes(self.path, max_bytes=256 * 1024).decode("utf-8"))
+                        except FileNotFoundError:
+                            return
+                        current_start = _safe_process_start_token(os.getpid())
+                        stored_start = existing.get("process_start")
+                        same_process = current_start is None or stored_start is None or stored_start == current_start
+                        if (
+                            existing.get("request_id") == self.request_id
+                            and existing.get("run_id", "") == self.run_id
+                            and int(existing.get("pid", 0)) == os.getpid()
+                            and same_process
+                        ):
+                            _unlink_lock_if_identity(self.path, before)
+                        return
+                    except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError):
+                        return
+                    finally:
+                        _release_recovery_claim(claim)
+                time.sleep(0.01)
+        finally:
+            self._held = False
 
     def __enter__(self) -> "RepositoryLock":
         self.acquire()

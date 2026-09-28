@@ -8,6 +8,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import subprocess
 import tempfile
 import threading
 from typing import Mapping
@@ -30,7 +31,7 @@ from .git import (
     git_top_level,
     status_and_diff,
 )
-from .paths import same_path
+from .paths import safe_atomic_write_text, safe_read_bytes, same_path
 from .report import atomic_write_json, dump_json, load_json, render_markdown
 from .security_scan import (
     CodexSecurityProvider,
@@ -85,36 +86,7 @@ def _safe_regular_control_file(path: Path) -> bool:
 
 def _safe_atomic_write_control_json(path: Path, data: dict) -> None:
     """Atomically write host state without resolving or following the target path."""
-
-    path = Path(os.path.abspath(path.expanduser()))
-    if not _control_parent_is_safe(path):
-        raise OSError("control artifact parent is not a regular directory")
-    try:
-        existing = path.lstat()
-    except FileNotFoundError:
-        existing = None
-    if existing is not None and not _safe_regular_control_file(path):
-        raise OSError("control artifact is not a regular non-reparse file")
-
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{uuid4().hex}")
-    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(temporary, flags, 0o600)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-            stream.write(dump_json(data) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        if not _control_parent_is_safe(path):
-            raise OSError("control artifact parent changed during write")
-        try:
-            current = path.lstat()
-        except FileNotFoundError:
-            current = None
-        if current is not None and not _safe_regular_control_file(path):
-            raise OSError("control artifact changed to a link or non-file during write")
-        os.replace(temporary, path)
-    finally:
-        temporary.unlink(missing_ok=True)
+    safe_atomic_write_text(path, dump_json(data) + "\n")
 
 
 def delegate_to_configured_actor(**kwargs):
@@ -320,13 +292,18 @@ def _persist_run_state(
 
 
 def _phase_failure_state(exc: BaseException) -> str:
-    failure_class = str(getattr(exc, "failure_class", ""))
-    if (
-        isinstance(exc, TimeoutError)
-        or "timeout" in type(exc).__name__.casefold()
-        or "timeout" in failure_class.casefold()
-        or "timed out" in str(exc).casefold()
-    ):
+    if isinstance(exc, (TimeoutError, subprocess.TimeoutExpired)):
+        return "timeout"
+    metadata = getattr(exc, "metadata", {})
+    metadata_class = metadata.get("failure_class") or metadata.get("availability_failure_class") if isinstance(metadata, Mapping) else ""
+    failure_class = str(getattr(exc, "failure_class", "") or metadata_class or getattr(exc, "termination_classification", "")).upper()
+    if failure_class in {
+        "TIMEOUT",
+        "PROVIDER_TURN_TIMEOUT",
+        "APP_SERVER_TRANSPORT_TIMEOUT",
+        "HOST_TURN_DEADLINE",
+        "HOST_COMMAND_TIMEOUT",
+    }:
         return "timeout"
     return "failed"
 
@@ -1577,13 +1554,21 @@ def _recover_interrupted_runs(
     for item in runs_dir.iterdir():
         try:
             directory_info = item.lstat()
-            if not stat.S_ISDIR(directory_info.st_mode) or stat.S_ISLNK(directory_info.st_mode):
+            if (
+                not stat.S_ISDIR(directory_info.st_mode)
+                or stat.S_ISLNK(directory_info.st_mode)
+                or getattr(directory_info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+            ):
                 continue
             state_path = item / "run_state.json"
             state_info = state_path.lstat()
-            if not stat.S_ISREG(state_info.st_mode) or stat.S_ISLNK(state_info.st_mode):
+            if (
+                not stat.S_ISREG(state_info.st_mode)
+                or stat.S_ISLNK(state_info.st_mode)
+                or getattr(state_info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+            ):
                 continue
-            run_state = json.loads(state_path.read_text(encoding="utf-8"))
+            run_state = json.loads(safe_read_bytes(state_path, max_bytes=8 * 1024 * 1024).decode("utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError, TypeError):
             continue
         if (
@@ -1618,15 +1603,18 @@ def _recover_interrupted_runs(
         baseline_path = item / "initial_git_baseline.json"
         try:
             baseline_info = baseline_path.lstat()
-            if not stat.S_ISREG(baseline_info.st_mode) or stat.S_ISLNK(baseline_info.st_mode):
+            if (
+                not stat.S_ISREG(baseline_info.st_mode)
+                or stat.S_ISLNK(baseline_info.st_mode)
+                or getattr(baseline_info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+            ):
                 raise OSError("unsafe baseline file")
-            baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+            baseline = json.loads(safe_read_bytes(baseline_path, max_bytes=64 * 1024 * 1024).decode("utf-8"))
             run_id = str(run_state.get("run_id", ""))
             if not isinstance(baseline, dict) or baseline.get("repository") != str(repository):
                 raise ValueError("baseline repository mismatch")
             excluded = _relative_control_path(item, repository)
             excluded_paths = [excluded] if excluded else []
-            excluded_paths.extend(canonical_bootstrap_control_paths(repository))
             mutation = attribute_git_mutations(
                 repository,
                 baseline,
@@ -1675,32 +1663,34 @@ def _recover_interrupted_runs(
         run_state["current_backend"] = None
         run_state["finalized_by_run_id"] = current_run_id
         try:
-            atomic_write_json(state_path, run_state)
+            _safe_atomic_write_control_json(state_path, run_state)
             provenance_path = item / "provenance.json"
-            if provenance_path.is_file() and not provenance_path.is_symlink():
-                provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
-                if isinstance(provenance, dict):
-                    phases = provenance.get("configured_actor_routing")
-                    if isinstance(phases, list) and phases and isinstance(phases[-1], dict):
-                        if phases[-1].get("phase_state") in {"started", "running"}:
-                            phases[-1]["phase_state"] = "interrupted"
-                            phases[-1]["provider_status"] = "unknown_after_interruption"
-                    provenance.update(
-                        {
-                            "status": "interrupted",
-                            "current_phase": None,
-                            "last_phase": run_state.get("last_phase"),
-                            "current_actor": None,
-                            "current_backend": None,
-                            "last_actor": run_state.get("last_actor"),
-                            "last_backend": run_state.get("last_backend"),
-                            "provider_status": "unknown_after_interruption",
-                            "mutation_attribution": run_state.get("mutation_attribution"),
-                            "dual_agents_bootstrap_artifacts": run_state.get("dual_agents_bootstrap_artifacts", []),
-                            "failure": run_state.get("failure"),
-                        }
-                    )
-                    atomic_write_json(provenance_path, provenance)
+            try:
+                provenance = json.loads(safe_read_bytes(provenance_path, max_bytes=16 * 1024 * 1024).decode("utf-8"))
+            except FileNotFoundError:
+                provenance = None
+            if isinstance(provenance, dict):
+                phases = provenance.get("configured_actor_routing")
+                if isinstance(phases, list) and phases and isinstance(phases[-1], dict):
+                    if phases[-1].get("phase_state") in {"started", "running"}:
+                        phases[-1]["phase_state"] = "interrupted"
+                        phases[-1]["provider_status"] = "unknown_after_interruption"
+                provenance.update(
+                    {
+                        "status": "interrupted",
+                        "current_phase": None,
+                        "last_phase": run_state.get("last_phase"),
+                        "current_actor": None,
+                        "current_backend": None,
+                        "last_actor": run_state.get("last_actor"),
+                        "last_backend": run_state.get("last_backend"),
+                        "provider_status": "unknown_after_interruption",
+                        "mutation_attribution": run_state.get("mutation_attribution"),
+                        "dual_agents_bootstrap_artifacts": run_state.get("dual_agents_bootstrap_artifacts", []),
+                        "failure": run_state.get("failure"),
+                    }
+                )
+                _safe_atomic_write_control_json(provenance_path, provenance)
         except (OSError, UnicodeError, json.JSONDecodeError):
             pass
 
@@ -2036,7 +2026,6 @@ def _execute_locked(
         run_relative = _relative_control_path(run_dir, config.repository)
         if run_relative:
             excluded.append(run_relative)
-        excluded.extend(set(initial_bootstrap_control_paths) | set(final_bootstrap_control_paths))
         result = attribute_git_mutations(config.repository, baseline, excluded_paths=excluded)
         result["dual_agents_ephemeral_artifacts"] = {
             "initial": initial_bootstrap_control_paths,
@@ -2295,8 +2284,7 @@ def _execute_locked(
         if run_state.get("status") != "blocked":
             if isinstance(exc, KeyboardInterrupt):
                 run_state["status"] = "interrupted"
-                if run_state.get("current_phase"):
-                    run_state["provider_status"] = "unknown_after_interruption"
+                run_state["provider_status"] = "unknown_after_interruption"
             else:
                 run_state["status"] = "failed"
                 if run_state.get("current_phase"):

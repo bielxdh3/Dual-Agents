@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from dual_codex.config import load_config
+from dual_codex.delegation import repository_lock_path
 from dual_codex.live_events import LiveEventJournal, repository_identity
 from dual_codex.live_reader import LiveExecutorReader
-from dual_codex.paths import path_identity_key
 
 
 def _config(root: Path, repository: Path):
@@ -70,8 +71,7 @@ class LiveReaderTests(unittest.TestCase):
         run_id: str = "run-1",
         process_start: str = "start-1",
     ) -> None:
-        digest = hashlib.sha256(path_identity_key(self.repository).encode()).hexdigest()[:24]
-        path = self.config.runs_dir / ".locks" / f"{digest}.json"
+        path = repository_lock_path(self.config.runs_dir, self.repository)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(
@@ -98,6 +98,27 @@ class LiveReaderTests(unittest.TestCase):
         self.assertEqual(snapshot["state"], "WORKING")
         self.assertEqual(snapshot["run_id"], "run-1")
         self.assertIsNone(snapshot["ended_at"])
+
+    def test_active_marker_uses_host_control_path_when_runs_dir_is_inside_repository(self) -> None:
+        state_root = self.root / "host-state"
+        self.config = replace(self.config, runs_dir=self.repository / "runs")
+        with patch.dict(
+            os.environ,
+            {"LOCALAPPDATA": str(state_root), "XDG_STATE_HOME": str(state_root)},
+        ):
+            journal = self.journal()
+            journal.append(kind="run", state="started", method="run/started", detail={})
+            journal.append(kind="turn", state="started", method="turn/started", turn_id="turn-1")
+            self.write_lock()
+            lock_path = repository_lock_path(self.config.runs_dir, self.repository)
+            with patch("dual_codex.live_reader._pid_alive", return_value=True), patch(
+                "dual_codex.live_reader._process_start_token", return_value="start-1"
+            ):
+                snapshot = LiveExecutorReader(self.config, self.repository).snapshot()
+
+        self.assertEqual(snapshot["state"], "WORKING")
+        self.assertFalse((self.repository / "runs" / ".locks").exists())
+        self.assertFalse(lock_path.is_relative_to(self.repository))
 
     def test_terminal_event_beats_stale_marker_and_elapsed_is_frozen(self) -> None:
         journal = self.journal()

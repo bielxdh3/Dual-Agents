@@ -9,10 +9,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from dual_codex import orchestrator
 from dual_codex.cli import main
 from dual_codex.codex import ActorAvailabilityError
 from dual_codex.config import AccountConfig, OrchestratorConfig
-from dual_codex.process import CommandResult
+from dual_codex.orchestrator import _phase_failure_state
+from dual_codex.process import CommandError, CommandResult
 
 
 def _fixture(root: Path, *, require_clean_git: bool = True) -> tuple[OrchestratorConfig, Path, Path, Path]:
@@ -129,6 +131,23 @@ def _fake_actor(*, fail_role: str | None = None, interrupt: bool = False):
 
 
 class StructuredRunResultTests(unittest.TestCase):
+    def test_phase_timeout_state_uses_structural_failure_class_only(self) -> None:
+        prose_only = ActorAvailabilityError(
+            "The provider's model output contains the phrase timed out.",
+            failure_class="transport_unavailable",
+            actor="executor",
+        )
+        actual_timeout = ActorAvailabilityError(
+            "Provider transport failed.",
+            failure_class="PROVIDER_TURN_TIMEOUT",
+            actor="executor",
+        )
+        host_timeout = CommandError("command failed", metadata={"failure_class": "HOST_COMMAND_TIMEOUT"})
+
+        self.assertEqual(_phase_failure_state(prose_only), "failed")
+        self.assertEqual(_phase_failure_state(actual_timeout), "timeout")
+        self.assertEqual(_phase_failure_state(host_timeout), "timeout")
+
     def test_executor_failure_includes_safe_app_server_turn_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -294,6 +313,26 @@ class StructuredRunResultTests(unittest.TestCase):
             self.assertEqual(result["failure_type"], "KeyboardInterrupt")
             self.assertEqual(result["last_phase"], "architect")
             self.assertTrue(Path(result["run_state_path"]).is_file())
+
+    def test_interrupt_after_all_provider_phases_marks_provider_status_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, repository, instructions, task = _fixture(root)
+            original_write = orchestrator._atomic_write_text
+
+            def interrupt_report(path: Path, content: str) -> None:
+                if path.name == "REPORT.md":
+                    raise KeyboardInterrupt()
+                original_write(path, content)
+
+            with patch("dual_codex.orchestrator._atomic_write_text", side_effect=interrupt_report):
+                exit_code, result, _, _ = _run_cli(config, repository, instructions, task, _fake_actor())
+
+            run_state = json.loads(Path(result["run_state_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(exit_code, 130)
+            self.assertEqual(result["status"], "interrupted")
+            self.assertEqual(result["provider_status"], "unknown_after_interruption")
+            self.assertEqual(run_state["provider_status"], "unknown_after_interruption")
 
 
 if __name__ == "__main__":

@@ -97,6 +97,7 @@ executor = "executor"
 [orchestrator]
 repository = "repo"
 app_server_turn_timeout = 600
+legacy_exec_timeout = 2400
 
 [accounts.architect]
 codex_home = "profiles/architect"
@@ -122,6 +123,7 @@ executor = "codex-secundario"
             self.assertEqual(config.executor.app_server_turn_timeout, 3600)
             self.assertIsNone(config.architect.app_server_turn_timeout)
             self.assertEqual(config.app_server_turn_timeout, 600)
+            self.assertEqual(config.legacy_exec_timeout, 2400)
             self.assertEqual(config.app_server_turn_start_timeout, 30)
             self.assertEqual(config.app_server_initialize_timeout, 30)
             self.assertEqual(config.app_server_thread_timeout, 30)
@@ -148,6 +150,28 @@ executor = "executor"
             )
             with self.assertRaisesRegex(ConfigError, "must be positive and finite"):
                 load_config(root / "config.toml")
+
+    def test_legacy_exec_timeout_must_be_finite_and_positive(self) -> None:
+        for value in ("0", "inf"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                (root / "config.toml").write_text(
+                    f"""
+[orchestrator]
+repository = "repo"
+legacy_exec_timeout = {value}
+
+[accounts.executor]
+codex_home = "profile"
+backend = "windows"
+
+[roles]
+executor = "executor"
+""".strip(),
+                    encoding="utf-8",
+                )
+                with self.assertRaises(ConfigError):
+                    load_config(root / "config.toml")
 
 
 if __name__ == "__main__":

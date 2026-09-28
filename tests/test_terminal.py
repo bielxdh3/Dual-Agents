@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from dual_codex.config import AgentConfig, OrchestratorConfig
 from dual_codex.cli import _VtKeyBuffer, _WindowsConsoleModes, _interactive_attach, _windows_vt_console, _write_terminal_output
-from dual_codex.paths import path_identity_key, same_path
+from dual_codex.paths import path_identity_key, safe_unlink_if_identity, same_path
 from dual_codex.terminal import (
     TerminalError,
     TerminalSetupRequiredError,
@@ -1831,6 +1831,79 @@ function idleScreen(model) {{
             turn_activity.assert_not_called()
             self.assertFalse(artifact.exists())
             self.assertFalse(record.exists())
+
+    def test_pending_task_artifact_replacement_during_cleanup_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, _record = _write_terminal_session(config, "biel3", repository, role="architect")
+            artifact = repository / ".dual-codex-task-0123456789abcdef0123456789abcdef.md"
+            original_content = "original task artifact\n"
+            artifact.write_text(original_content, encoding="utf-8", newline="\n")
+            digest = hashlib.sha256(original_content.encode("utf-8")).hexdigest()
+            session = replace(
+                session,
+                pending_task_artifact_cleanup=((str(artifact), digest, 0, "", 0),),
+            )
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+            def replace_before_identity_check(path, expected):
+                path.write_text("replacement owner\n", encoding="utf-8", newline="\n")
+                return safe_unlink_if_identity(path, expected)
+
+            with patch("dual_codex.terminal.safe_unlink_if_identity", side_effect=replace_before_identity_check):
+                updated = manager._cleanup_pending_task_artifacts(session, lifecycle="identity_invalid")
+
+            self.assertTrue(artifact.exists())
+            self.assertEqual(artifact.read_text(encoding="utf-8"), "replacement owner\n")
+            self.assertEqual(len(updated.pending_task_artifact_cleanup), 1)
+
+    def test_missing_pending_task_artifact_is_reconciled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, _record = _write_terminal_session(config, "biel3", repository, role="architect")
+            artifact = repository / ".dual-codex-task-0123456789abcdef0123456789abcdef.md"
+            session = replace(
+                session,
+                pending_task_artifact_cleanup=((str(artifact), "0" * 64, 0, "", 0),),
+            )
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+
+            updated = manager._cleanup_pending_task_artifacts(session, lifecycle="identity_invalid")
+
+            self.assertEqual(updated.pending_task_artifact_cleanup, ())
+
+    def test_pending_task_artifact_that_disappears_during_read_is_reconciled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root, repository)
+            session, _record = _write_terminal_session(config, "biel3", repository, role="architect")
+            artifact = repository / ".dual-codex-task-0123456789abcdef0123456789abcdef.md"
+            artifact.write_text("task input\n", encoding="utf-8", newline="\n")
+            session = replace(
+                session,
+                pending_task_artifact_cleanup=((str(artifact), "0" * 64, 0, "", 0),),
+            )
+            manager = TerminalManager.__new__(TerminalManager)
+            manager.config = config
+
+            def disappear_during_read(path, *, max_bytes):
+                path.unlink()
+                raise FileNotFoundError(path)
+
+            with patch("dual_codex.terminal.safe_read_bytes", side_effect=disappear_during_read):
+                updated = manager._cleanup_pending_task_artifacts(session, lifecycle="identity_invalid")
+
+            self.assertFalse(artifact.exists())
+            self.assertEqual(updated.pending_task_artifact_cleanup, ())
 
     def test_expired_task_artifact_is_reaped_after_terminal_exit_without_rollout_end_event(self) -> None:
         for terminal_state in ("exited", "identity_invalid"):

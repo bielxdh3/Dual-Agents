@@ -156,7 +156,14 @@ class OfficialRunStateSmokeTests(unittest.TestCase):
             self.assertIn("tracked.txt", [entry["path"] for entry in first_baseline["status_entries"]])
             preexisting_paths = sorted(entry["path"] for entry in first_baseline["status_entries"])
             self.assertEqual(first_mutation["unchanged_preexisting_paths"], preexisting_paths)
-            self.assertEqual(first_mutation["run_created_paths"], ["created-by-run.txt"])
+            run_created_paths = first_mutation["run_created_paths"]
+            self.assertIn("created-by-run.txt", run_created_paths)
+            self.assertTrue(
+                any(
+                    path.startswith(".dual_codex/bootstrap/.canonical-bootstrap-executor-")
+                    for path in run_created_paths
+                )
+            )
 
             old_state = json.loads((first_run / "run_state.json").read_text(encoding="utf-8"))
             old_state.update(
@@ -180,6 +187,7 @@ class OfficialRunStateSmokeTests(unittest.TestCase):
                 artifact_dir=bootstrap_dir,
                 root=instructions,
                 artifact_repository=repository,
+                owner_runs_dir=config.runs_dir,
                 run_id=old_state["run_id"],
             )
             stale_owner = json.loads(stale.artifact_owner_path.read_text(encoding="utf-8"))
@@ -216,7 +224,14 @@ class OfficialRunStateSmokeTests(unittest.TestCase):
             recovered_mutation = json.loads((first_run / "mutation-attribution.json").read_text(encoding="utf-8"))
             self.assertEqual(recovered["status"], "interrupted")
             self.assertEqual(recovered_mutation["unchanged_preexisting_paths"], preexisting_paths)
-            self.assertEqual(recovered_mutation["run_created_paths"], ["created-by-run.txt"])
+            recovered_created_paths = recovered_mutation["run_created_paths"]
+            self.assertIn("created-by-run.txt", recovered_created_paths)
+            self.assertTrue(
+                any(
+                    path.startswith(".dual_codex/bootstrap/.canonical-bootstrap-executor-")
+                    for path in recovered_created_paths
+                )
+            )
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import threading
@@ -18,7 +19,7 @@ from typing import Any
 from uuid import uuid4
 
 from .config import AgentConfig, OrchestratorConfig
-from .paths import path_identity_key, same_path
+from .paths import path_identity_key, safe_read_bytes, safe_unlink_if_identity, same_path
 from .process import codex_environment
 from .report import atomic_write_json
 
@@ -40,6 +41,17 @@ _TURN_START_EVENTS = {"task_started", "turn_started", "turn_start"}
 _ANSI_SEQUENCE = re.compile(
     r"\x1b(?:\][^\x07]*(?:\x07|\x1b\\)|\[[0-?]*[ -/]*[@-~]|[@-_])"
 )
+
+
+def _terminal_file_identity(info: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_mode,
+        getattr(info, "st_file_attributes", 0),
+    )
 
 
 class TuiReadinessDetector:
@@ -985,12 +997,34 @@ class TerminalManager:
                 remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
                 continue
             try:
-                if not artifact_path.exists():
+                try:
+                    before = artifact_path.lstat()
+                except FileNotFoundError:
                     continue
-                if not artifact_path.is_file() or hashlib.sha256(artifact_path.read_bytes()).hexdigest() != expected_sha256:
+                reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+                if (
+                    not stat.S_ISREG(before.st_mode)
+                    or stat.S_ISLNK(before.st_mode)
+                    or getattr(before, "st_file_attributes", 0) & reparse_flag
+                ):
                     remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
                     continue
-                artifact_path.unlink()
+                artifact_bytes = safe_read_bytes(artifact_path, max_bytes=16 * 1024 * 1024)
+                after_read = artifact_path.lstat()
+                if (
+                    _terminal_file_identity(before) != _terminal_file_identity(after_read)
+                    or hashlib.sha256(artifact_bytes).hexdigest() != expected_sha256
+                ):
+                    remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+                    continue
+                if not safe_unlink_if_identity(artifact_path, after_read):
+                    try:
+                        artifact_path.lstat()
+                    except FileNotFoundError:
+                        continue
+                    remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
+            except FileNotFoundError:
+                continue
             except OSError:
                 remaining.append((artifact_text, expected_sha256, not_before, cursor_text, cursor_offset))
 

@@ -96,6 +96,7 @@ class OrchestratorConfig:
     app_server_turn_start_timeout: float = 30.0
     app_server_turn_timeout: float = 600.0
     claude_turn_timeout: float = 600.0
+    legacy_exec_timeout: float = 1800.0
     dashboard_telemetry_timeout: float = 5.0
     live_event_journal_max_records: int = 2000
     live_event_journal_max_record_bytes: int = 65536
@@ -413,6 +414,7 @@ def load_config(path: Path) -> OrchestratorConfig:
     app_server_turn_start_timeout = float(orch.get("app_server_turn_start_timeout", 30.0))
     app_server_turn_timeout = float(orch.get("app_server_turn_timeout", 600.0))
     claude_turn_timeout = float(orch.get("claude_turn_timeout", app_server_turn_timeout))
+    legacy_exec_timeout = float(orch.get("legacy_exec_timeout", 1800.0))
     dashboard_telemetry_timeout = float(orch.get("dashboard_telemetry_timeout", 5.0))
     live_event_journal_max_records = int(orch.get("live_event_journal_max_records", 2000))
     live_event_journal_max_record_bytes = int(orch.get("live_event_journal_max_record_bytes", 65536))
@@ -435,9 +437,12 @@ def load_config(path: Path) -> OrchestratorConfig:
             app_server_turn_timeout,
             claude_turn_timeout,
             dashboard_telemetry_timeout,
+            legacy_exec_timeout,
         )
     ):
         raise ConfigError("App Server timeouts must be positive.")
+    if not math.isfinite(legacy_exec_timeout):
+        raise ConfigError("legacy_exec_timeout must be a finite number of seconds.")
 
     return OrchestratorConfig(
         repository=repository,
@@ -466,6 +471,7 @@ def load_config(path: Path) -> OrchestratorConfig:
         app_server_turn_start_timeout=app_server_turn_start_timeout,
         app_server_turn_timeout=app_server_turn_timeout,
         claude_turn_timeout=claude_turn_timeout,
+        legacy_exec_timeout=legacy_exec_timeout,
         dashboard_telemetry_timeout=dashboard_telemetry_timeout,
         live_event_journal_max_records=live_event_journal_max_records,
         live_event_journal_max_record_bytes=live_event_journal_max_record_bytes,

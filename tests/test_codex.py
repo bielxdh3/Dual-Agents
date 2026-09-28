@@ -198,6 +198,7 @@ class CodexCommandTests(unittest.TestCase):
             agent = _agent("read-only", backend="windows")
             config = SimpleNamespace(
                 codex_command="codex",
+                runs_dir=root / "runs",
                 agent_for_role=lambda role: agent,
             )
 

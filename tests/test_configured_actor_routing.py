@@ -11,6 +11,7 @@ import unittest
 from dataclasses import replace
 from unittest.mock import patch
 
+from dual_codex import codex
 from dual_codex.cli import main as cli_main
 from dual_codex.codex import ActorAvailabilityError, ActorResultError, classify_actor_failure, create_canonical_bootstrap, delegate_to_configured_actor, run_codex_for_role
 from dual_codex.config import AccountConfig, ConfigError, OrchestratorConfig
@@ -1068,6 +1069,117 @@ class ConfiguredActorRoutingTests(unittest.TestCase):
                 )
             self.assertEqual(captured["agent"].account_name, "executor-b")
             self.assertTrue(result.metadata["configured_actor"])
+
+    def test_architect_plan_is_finalized_once_at_the_configured_dispatch_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = self._config(root)
+            repository = root / "repository"
+            repository.mkdir()
+            final_output = root / "plan.json"
+            observed_paths: list[Path] = []
+
+            def fake_runner(**kwargs):
+                observed_paths.append(kwargs["output_path"])
+                kwargs["output_path"].write_text(json.dumps(_architect_plan()), encoding="utf-8")
+                return CommandResult(["fake"], 0, "", "")
+
+            with patch("dual_codex.codex.run_codex_for_role", side_effect=fake_runner), patch(
+                "dual_codex.codex.finalize_architect_bootstrap",
+                wraps=codex.finalize_architect_bootstrap,
+            ) as finalize:
+                delegate_to_configured_actor(
+                    config=config,
+                    role="architect",
+                    task="inspect",
+                    repository=repository,
+                    output_path=final_output,
+                    schema_path=root / "schema.json",
+                )
+
+            self.assertEqual(finalize.call_count, 1)
+            self.assertEqual(len(observed_paths), 1)
+            self.assertNotEqual(observed_paths[0], final_output)
+            self.assertEqual(json.loads(final_output.read_text(encoding="utf-8")), _architect_plan())
+            self.assertFalse(observed_paths[0].exists())
+
+    def test_architect_empty_attempt_cannot_reuse_stale_plan_or_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["orchestrator"] = replace(accounts["orchestrator"], fallback_roles=("architect",))
+            config = replace(base, accounts=accounts, fallback_enabled=True)
+            repository = root / "repository"
+            repository.mkdir()
+            final_output = root / "plan.json"
+            stale_plan = json.dumps(_architect_plan())
+            final_output.write_text(stale_plan, encoding="utf-8")
+            calls: list[str] = []
+
+            def fake_runner(**kwargs):
+                calls.append(kwargs["agent"].account_name)
+                return CommandResult(["fake"], 0, "", "")
+
+            with patch("dual_codex.codex.run_codex_for_role", side_effect=fake_runner):
+                with self.assertRaises(ActorResultError) as error:
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="architect",
+                        task="inspect",
+                        repository=repository,
+                        output_path=final_output,
+                        schema_path=root / "schema.json",
+                    )
+
+            self.assertEqual(calls, ["secondary"])
+            self.assertIn("Completed output preserved", error.exception.metadata["architect_result_validation_error"])
+            self.assertEqual(final_output.read_text(encoding="utf-8"), stale_plan)
+            self.assertTrue(Path(str(final_output) + ".raw.txt").is_file())
+
+    def test_architect_attempt_is_retained_when_raw_sidecar_cannot_be_written(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            base = self._config(root)
+            accounts = dict(base.accounts)
+            accounts["orchestrator"] = replace(accounts["orchestrator"], fallback_roles=("architect",))
+            config = replace(base, accounts=accounts, fallback_enabled=True)
+            repository = root / "repository"
+            repository.mkdir()
+            final_output = root / "plan.json"
+            stale_plan = json.dumps(_architect_plan())
+            final_output.write_text(stale_plan, encoding="utf-8")
+            invalid_output = "Completed turn without a valid plan.\n"
+
+            def invalid_runner(**kwargs):
+                kwargs["output_path"].write_text(invalid_output, encoding="utf-8")
+                return CommandResult(["fake"], 0, "", "")
+
+            def fail_raw_sidecar(path, content, *, encoding="utf-8"):
+                if path == Path(str(final_output) + ".raw.txt"):
+                    raise OSError("raw sidecar unavailable")
+                return original_write(path, content, encoding=encoding)
+
+            original_write = codex.safe_atomic_write_text
+            with patch("dual_codex.codex.run_codex_for_role", side_effect=invalid_runner), patch(
+                "dual_codex.codex.safe_atomic_write_text", side_effect=fail_raw_sidecar
+            ):
+                with self.assertRaises(ActorResultError) as error:
+                    delegate_to_configured_actor(
+                        config=config,
+                        role="architect",
+                        task="inspect",
+                        repository=repository,
+                        output_path=final_output,
+                        schema_path=root / "schema.json",
+                    )
+
+            attempt_output = Path(error.exception.metadata["architect_attempt_output"])
+            self.assertTrue(error.exception.metadata["architect_attempt_output_retained"])
+            self.assertEqual(Path(error.exception.metadata["architect_raw_output_path"]), attempt_output)
+            self.assertTrue(attempt_output.is_file())
+            self.assertEqual(attempt_output.read_text(encoding="utf-8"), invalid_output)
+            self.assertEqual(final_output.read_text(encoding="utf-8"), stale_plan)
 
     def test_same_configured_actor_can_serve_architect_and_reviewer(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

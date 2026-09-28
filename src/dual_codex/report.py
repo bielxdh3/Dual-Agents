@@ -4,7 +4,8 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Mapping
-from uuid import uuid4
+
+from .paths import safe_atomic_write_text, safe_ensure_directory_tree, safe_read_bytes
 
 
 EXECUTOR_REPORT_FIELDS = frozenset(
@@ -166,8 +167,7 @@ def is_executor_report_shape(value: Mapping[str, Any]) -> bool:
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
-        value = json.load(handle)
+    value = json.loads(safe_read_bytes(path, max_bytes=64 * 1024 * 1024).decode("utf-8"))
     if not isinstance(value, dict):
         raise ValueError(f"Expected JSON object in {path}")
     return value
@@ -179,15 +179,9 @@ def dump_json(data: dict[str, Any]) -> str:
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     """Write a JSON object without leaving a partially written result."""
-    path = path.expanduser().resolve()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{uuid4().hex}")
-    try:
-        temporary.write_text(dump_json(data) + "\n", encoding="utf-8", newline="\n")
-        os.replace(temporary, path)
-    finally:
-        if temporary.exists():
-            temporary.unlink()
+    path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
+    safe_ensure_directory_tree(path.parent)
+    safe_atomic_write_text(path, dump_json(data) + "\n")
 
 
 def render_markdown(

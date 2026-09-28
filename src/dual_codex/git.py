@@ -63,7 +63,10 @@ def run_git(
     if not args or Path(args[0]).name.casefold() not in {"git", "git.exe"}:
         raise ValueError("run_git requires a Git command.")
     timeout = kwargs.get("timeout", DEFAULT_HOST_COMMAND_TIMEOUT)
-    env = kwargs.get("env")
+    env = dict(os.environ if kwargs.get("env") is None else kwargs["env"])
+    # Prevent a status read at either edge of scan-only attribution from
+    # taking an optional index lock and rewriting cache-only index fields.
+    env["GIT_OPTIONAL_LOCKS"] = "0"
     # Git's content filters can launch repository-configured processes during
     # status/diff. Disabling a filter changes Git's clean/smudge comparison
     # semantics, so first reject commands where a filter applies to a tracked
@@ -190,7 +193,9 @@ def run_git(
             safe_args.extend(git_args[command_offset + 1 :])
         else:
             safe_args.extend(git_args[command_offset:])
-        return runner(safe_args, cwd=cwd, **kwargs)
+        run_kwargs = dict(kwargs)
+        run_kwargs["env"] = env
+        return runner(safe_args, cwd=cwd, **run_kwargs)
 
 
 def ensure_git_repository(repository: Path) -> None:
@@ -258,19 +263,51 @@ def _index_entries(repository: Path) -> dict[str, list[dict[str, str]]]:
     return entries
 
 
-def _worktree_snapshot(repository: Path, relative_path: str) -> dict[str, object]:
+def _stat_identity(info: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_mode,
+        getattr(info, "st_file_attributes", 0),
+    )
+
+
+def _directory_identity(info: os.stat_result) -> tuple[int, int, int, int]:
+    """Identify a directory without treating read-only access-time/mtime noise as content."""
+
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_mode,
+        getattr(info, "st_file_attributes", 0),
+    )
+
+
+def _worktree_snapshot(
+    repository: Path,
+    relative_path: str,
+    *,
+    max_file_bytes: int | None = None,
+) -> dict[str, object]:
     """Hash raw worktree bytes without following symlinks or running Git filters."""
 
     parts = relative_path.split("/")
     if not relative_path or relative_path.startswith("/") or any(part in {"", ".", ".."} for part in parts):
         return {"kind": "unknown", "reason": "invalid_repository_relative_path"}
     path = repository
+    parent_snapshots: list[tuple[Path, os.stat_result]] = []
     try:
+        root_info = path.lstat()
+        if stat.S_ISLNK(root_info.st_mode) or _is_reparse_point(root_info) or not stat.S_ISDIR(root_info.st_mode):
+            return {"kind": "unknown", "reason": "unsafe_repository_root"}
         for part in parts[:-1]:
             path = path / part
             info = path.lstat()
             if stat.S_ISLNK(info.st_mode) or _is_reparse_point(info) or not stat.S_ISDIR(info.st_mode):
                 return {"kind": "unknown", "reason": "unsafe_parent_path"}
+            parent_snapshots.append((path, info))
         path = path / parts[-1]
         before = path.lstat()
     except FileNotFoundError:
@@ -294,24 +331,38 @@ def _worktree_snapshot(repository: Path, relative_path: str) -> dict[str, object
         return {"kind": "directory", "mode": stat.S_IMODE(before.st_mode)}
     if not stat.S_ISREG(before.st_mode):
         return {"kind": "unknown", "reason": "unsupported_file_type"}
+    if max_file_bytes is not None and before.st_size > max_file_bytes:
+        return {"kind": "unknown", "reason": "file_exceeds_metadata_limit"}
 
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         descriptor = os.open(path, flags)
         with os.fdopen(descriptor, "rb") as handle:
             opened = os.fstat(handle.fileno())
-            if not stat.S_ISREG(opened.st_mode) or _is_reparse_point(opened):
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or _is_reparse_point(opened)
+                or stat.S_ISLNK(opened.st_mode)
+                or _stat_identity(opened) != _stat_identity(before)
+            ):
                 return {"kind": "unknown", "reason": "unsafe_opened_file"}
             digest = hashlib.sha256()
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(chunk)
             after = path.lstat()
+            parents_unchanged = all(
+                _stat_identity(parent.lstat()) == _stat_identity(parent_before)
+                for parent, parent_before in parent_snapshots
+            )
+            root_after = repository.lstat()
             if (
-                (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-                != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                _stat_identity(before) != _stat_identity(after)
+                or not parents_unchanged
+                or _stat_identity(root_info) != _stat_identity(root_after)
+                or _stat_identity(opened) != _stat_identity(os.fstat(handle.fileno()))
             ):
                 return {"kind": "unknown", "reason": "path_changed_during_snapshot"}
-            return {"kind": "file", "mode": stat.S_IMODE(after.st_mode), "sha256": digest.hexdigest()}
+            return {"kind": "file", "mode": stat.S_IMODE(opened.st_mode), "sha256": digest.hexdigest()}
     except OSError:
         return {"kind": "unknown", "reason": "file_read_failed"}
 
@@ -378,6 +429,326 @@ def _ignored_tree_snapshots(repository: Path, ignored_paths: Iterable[str]) -> d
     return snapshots
 
 
+_GIT_METADATA_FILES = (
+    "HEAD",
+    "ORIG_HEAD",
+    "FETCH_HEAD",
+    "MERGE_HEAD",
+    "MERGE_MSG",
+    "MERGE_MODE",
+    "MERGE_AUTOSTASH",
+    "CHERRY_PICK_HEAD",
+    "REVERT_HEAD",
+    "REBASE_HEAD",
+    "AUTO_MERGE",
+    "SQUASH_MSG",
+    "BISECT_LOG",
+    "BISECT_NAMES",
+    "BISECT_START",
+    "BISECT_EXPECTED_REV",
+    "BISECT_TERMS",
+    "COMMIT_EDITMSG",
+    "index.lock",
+    "config.lock",
+    "packed-refs.lock",
+    "HEAD.lock",
+    "shallow.lock",
+    "FETCH_HEAD.lock",
+    "index",
+    "config",
+    "config.worktree",
+    "packed-refs",
+    "shallow",
+    "commondir",
+    "gitdir",
+    "info/exclude",
+    "info/attributes",
+    "info/sparse-checkout",
+    "info/grafts",
+    "objects/info/alternates",
+    "objects/info/http-alternates",
+    "objects/info/packs",
+)
+_GIT_METADATA_TREES = (
+    "refs",
+    "hooks",
+    "reftable",
+    "worktrees",
+    "logs",
+    "sequencer",
+    "rebase-apply",
+    "rebase-merge",
+    "bisect",
+    "rr-cache",
+)
+
+
+def _git_object_inventory(
+    root: Path,
+    *,
+    max_entries: int = 250_000,
+    max_bytes: int = 1024 * 1024 * 1024,
+) -> dict[str, object]:
+    """Hash a bounded inventory and contents of Git's object store."""
+
+    objects = root / "objects"
+    digest = hashlib.sha256()
+    pending = [Path("objects")]
+    visited = 0
+    total_bytes = 0
+    try:
+        root_info = objects.lstat()
+        if stat.S_ISLNK(root_info.st_mode) or _is_reparse_point(root_info) or not stat.S_ISDIR(root_info.st_mode):
+            return {"kind": "unknown", "reason": "unsafe_git_object_directory"}
+    except OSError:
+        return {"kind": "unknown", "reason": "git_object_directory_unavailable"}
+
+    while pending:
+        relative_dir = pending.pop()
+        directory = root / relative_dir
+        try:
+            before = directory.lstat()
+            if stat.S_ISLNK(before.st_mode) or _is_reparse_point(before) or not stat.S_ISDIR(before.st_mode):
+                return {"kind": "unknown", "reason": "unsafe_git_object_subdirectory"}
+            with os.scandir(directory) as entries:
+                children = sorted(list(entries), key=lambda entry: entry.name)
+            for entry in children:
+                visited += 1
+                if visited > max_entries:
+                    return {"kind": "unknown", "reason": "git_object_inventory_budget_exceeded"}
+                relative = relative_dir / entry.name
+                try:
+                    info = entry.stat(follow_symlinks=False)
+                except OSError:
+                    return {"kind": "unknown", "reason": "git_object_entry_unavailable"}
+                if stat.S_ISLNK(info.st_mode) or _is_reparse_point(info):
+                    return {"kind": "unknown", "reason": "git_object_reparse_point"}
+                if stat.S_ISDIR(info.st_mode):
+                    kind = "directory"
+                    pending.append(relative)
+                elif stat.S_ISREG(info.st_mode):
+                    kind = "file"
+                    total_bytes += max(info.st_size, 0)
+                    if total_bytes > max_bytes:
+                        return {"kind": "unknown", "reason": "git_object_byte_budget_exceeded"}
+                else:
+                    return {"kind": "unknown", "reason": "unsupported_git_object_entry"}
+                identity = _stat_identity(info)
+                digest.update(os.fsencode(relative.as_posix()))
+                digest.update(b"\0")
+                digest.update(kind.encode("ascii"))
+                digest.update(b"\0")
+                digest.update(",".join(str(field) for field in identity).encode("ascii"))
+                if kind == "file":
+                    snapshot = _worktree_snapshot(root, relative.as_posix(), max_file_bytes=max_bytes)
+                    if snapshot.get("kind") != "file":
+                        return {"kind": "unknown", "reason": "git_object_content_unavailable"}
+                    digest.update(b"\0")
+                    digest.update(str(snapshot["sha256"]).encode("ascii"))
+                digest.update(b"\n")
+            after = directory.lstat()
+            if _stat_identity(before) != _stat_identity(after):
+                return {"kind": "unknown", "reason": "git_object_directory_changed"}
+        except OSError:
+            return {"kind": "unknown", "reason": "git_object_inventory_failed"}
+    return {"kind": "inventory", "entries": visited, "sha256": digest.hexdigest()}
+
+
+def _git_metadata_snapshots(repository: Path) -> tuple[str, str, dict[str, dict[str, object]]]:
+    """Capture bounded Git configuration, hook, ref and worktree metadata."""
+
+    git_dir = Path(run_git(["git", "rev-parse", "--absolute-git-dir"], cwd=repository).stdout.strip())
+    common_raw = run_git(["git", "rev-parse", "--git-common-dir"], cwd=repository).stdout.strip()
+    common_path = Path(common_raw)
+    if not common_path.is_absolute():
+        common_path = repository / common_path
+    common_dir = Path(os.path.abspath(common_path))
+    git_dir = Path(os.path.abspath(git_dir))
+    roots: list[tuple[str, Path]] = [("git_dir", git_dir)]
+    if os.path.normcase(str(common_dir)) != os.path.normcase(str(git_dir)):
+        roots.append(("git_common_dir", common_dir))
+
+    snapshots: dict[str, dict[str, object]] = {}
+    hooks_config = run_command(
+        ["git", "config", "--path", "--null", "--get-all", "core.hooksPath"],
+        cwd=repository,
+        check=False,
+    )
+    if hooks_config.returncode not in {0, 1}:
+        raise RuntimeError("Could not safely inspect the configured Git hooks path.")
+    configured_hooks_paths = sorted(
+        {
+            os.path.abspath(value if Path(value).is_absolute() else repository / value)
+            for value in hooks_config.stdout.split("\0")
+            if value
+        }
+    )
+    snapshots["git_behavior/@hooks_paths"] = {
+        "kind": "paths",
+        "paths": configured_hooks_paths,
+    }
+    include_config = run_command(
+        ["git", "config", "--no-includes", "--null", "--get-regexp", r"^include"],
+        cwd=repository,
+        check=False,
+    )
+    if include_config.returncode == 0:
+        snapshots["git_behavior/@config_includes"] = {
+            "kind": "unknown",
+            "reason": "included_git_configuration_not_inventoried",
+        }
+    elif include_config.returncode != 1:
+        snapshots["git_behavior/@config_includes"] = {
+            "kind": "unknown",
+            "reason": "git_configuration_include_inspection_failed",
+        }
+
+    extra_tree_roots: dict[str, set[str]] = {label: set() for label, _root in roots}
+    for hook_path_text in configured_hooks_paths:
+        hook_path = Path(hook_path_text)
+        for label, root in roots:
+            try:
+                relative = hook_path.relative_to(root)
+            except ValueError:
+                continue
+            if not relative.parts:
+                snapshots[f"{label}/@hooks_path"] = {
+                    "kind": "unknown",
+                    "reason": "hooks_path_is_git_directory",
+                }
+                continue
+            extra_tree_roots[label].add(relative.as_posix())
+
+    for label, root in roots:
+        try:
+            root_info = root.lstat()
+            safe_root = stat.S_ISDIR(root_info.st_mode) and not stat.S_ISLNK(root_info.st_mode) and not _is_reparse_point(root_info)
+        except OSError:
+            safe_root = False
+        if not safe_root:
+            snapshots[f"{label}/@root"] = {"kind": "unknown", "reason": "unsafe_git_directory"}
+            continue
+        snapshots[f"{label}/@root"] = {
+            "kind": "directory",
+            "identity": list(_directory_identity(root_info)),
+        }
+        try:
+            with os.scandir(root) as entries:
+                root_names = sorted(entry.name for entry in entries)
+            shared_index_names = [name for name in root_names if name.startswith("sharedindex.")]
+            snapshots[f"{label}/@entries"] = {
+                "kind": "names",
+                "names": root_names,
+            }
+        except OSError:
+            snapshots[f"{label}/@entries"] = {
+                "kind": "unknown",
+                "reason": "git_directory_enumeration_failed",
+            }
+            snapshots[f"{label}/@sharedindex_names"] = {
+                "kind": "unknown",
+                "reason": "shared_index_enumeration_failed",
+            }
+            shared_index_names = []
+        else:
+            snapshots[f"{label}/@sharedindex_names"] = {
+                "kind": "names",
+                "names": shared_index_names,
+            }
+        for shared_index_name in shared_index_names:
+            snapshots[f"{label}/{shared_index_name}"] = _worktree_snapshot(
+                root,
+                shared_index_name,
+                max_file_bytes=64 * 1024 * 1024,
+            )
+        for relative in _GIT_METADATA_FILES:
+            snapshots[f"{label}/{relative}"] = _worktree_snapshot(
+                root,
+                relative,
+                max_file_bytes=64 * 1024 * 1024 if relative == "index" else 1024 * 1024,
+            )
+        for relative_root in sorted(set(_GIT_METADATA_TREES) | extra_tree_roots[label]):
+            tree_key = f"{label}/{relative_root}"
+            initial = _worktree_snapshot(root, relative_root)
+            snapshots[tree_key] = initial
+            if initial.get("kind") != "directory":
+                continue
+            pending = [(relative_root, 0)]
+            visited = 0
+            total_file_bytes = 0
+            total_index_bytes = 0
+            while pending:
+                current, depth = pending.pop()
+                if depth >= 8 or visited >= 4096:
+                    snapshots[tree_key] = {"kind": "unknown", "reason": "metadata_tree_budget_exceeded"}
+                    break
+                directory = root / Path(*current.split("/"))
+                try:
+                    before = directory.lstat()
+                    if stat.S_ISLNK(before.st_mode) or _is_reparse_point(before) or not stat.S_ISDIR(before.st_mode):
+                        raise OSError("unsafe Git metadata directory")
+                    with os.scandir(directory) as entries:
+                        children = sorted(list(entries), key=lambda entry: entry.name)
+                    after = directory.lstat()
+                    if _stat_identity(before) != _stat_identity(after):
+                        raise OSError("Git metadata directory changed")
+                except OSError:
+                    snapshots[tree_key] = {"kind": "unknown", "reason": "metadata_tree_unavailable"}
+                    break
+                for entry in children:
+                    visited += 1
+                    if visited > 4096:
+                        snapshots[tree_key] = {"kind": "unknown", "reason": "metadata_tree_budget_exceeded"}
+                        break
+                    relative = f"{current}/{entry.name}"
+                    try:
+                        info = entry.stat(follow_symlinks=False)
+                    except OSError:
+                        info = None
+                    if info is not None and stat.S_ISREG(info.st_mode):
+                        if relative.endswith("/index"):
+                            total_index_bytes += max(info.st_size, 0)
+                            over_budget = info.st_size > 64 * 1024 * 1024 or total_index_bytes > 128 * 1024 * 1024
+                        else:
+                            total_file_bytes += max(info.st_size, 0)
+                            over_budget = info.st_size > 1024 * 1024 or total_file_bytes > 16 * 1024 * 1024
+                        if over_budget:
+                            snapshots[tree_key] = {"kind": "unknown", "reason": "metadata_tree_byte_budget_exceeded"}
+                            break
+                    child = _worktree_snapshot(root, relative, max_file_bytes=1024 * 1024)
+                    snapshots[f"{label}/{relative}"] = child
+                    if child.get("kind") == "directory":
+                        pending.append((relative, depth + 1))
+                if snapshots[tree_key].get("kind") == "unknown":
+                    break
+        # Linked worktree gitdirs keep per-worktree state here, while Git's
+        # object database lives in the shared common directory. Snapshot it
+        # once at its actual location instead of marking every linked
+        # worktree baseline incomplete for a deliberately absent objects/.
+        if os.path.normcase(os.path.abspath(root)) == os.path.normcase(os.path.abspath(common_dir)):
+            inventory_key = f"{label}/objects/@inventory"
+            snapshots[inventory_key] = _git_object_inventory(root)
+            if any(
+                os.environ.get(name)
+                for name in (
+                    "GIT_OBJECT_DIRECTORY",
+                    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+                    "GIT_INDEX_FILE",
+                )
+            ):
+                snapshots[inventory_key] = {
+                    "kind": "unknown",
+                    "reason": "git_object_or_index_environment_override",
+                }
+            alternates = snapshots.get(f"{label}/objects/info/alternates", {})
+            if alternates.get("kind") != "missing":
+                snapshots[inventory_key] = {
+                    "kind": "unknown",
+                    "reason": "external_git_alternate_object_store_not_inventoried",
+                }
+    return str(git_dir), str(common_dir), snapshots
+
+
 def capture_git_baseline(repository: Path, *, include_ignored: bool = False) -> dict[str, object]:
     """Capture a hook/filter-safe, hash-only Git/worktree baseline."""
 
@@ -429,18 +800,29 @@ def capture_git_baseline(repository: Path, *, include_ignored: bool = False) -> 
         head = ""
     else:
         raise RuntimeError("Could not safely determine the current Git HEAD.")
-    git_dir = run_git(["git", "rev-parse", "--absolute-git-dir"], cwd=repository).stdout.strip()
-    git_metadata_snapshots = (
-        {"info/exclude": _worktree_snapshot(Path(git_dir), "info/exclude")}
-        if include_ignored
-        else {}
-    )
-    if include_ignored and git_metadata_snapshots.get("info/exclude", {}).get("kind") == "symlink":
-        git_metadata_snapshots["info/exclude"] = {"kind": "unknown", "reason": "symlink_target_unverified"}
+    if include_ignored:
+        git_dir, git_common_dir, git_metadata_snapshots = _git_metadata_snapshots(repository)
+        if any(
+            entry.get("mode") == "160000"
+            for entries in index.values()
+            for entry in entries
+        ):
+            git_metadata_snapshots["git_behavior/@submodules"] = {
+                "kind": "unknown",
+                "reason": "submodule_gitdirs_not_inventoried",
+            }
+        for path, snapshot in tuple(git_metadata_snapshots.items()):
+            if snapshot.get("kind") == "symlink":
+                git_metadata_snapshots[path] = {"kind": "unknown", "reason": "symlink_target_unverified"}
+    else:
+        git_dir = run_git(["git", "rev-parse", "--absolute-git-dir"], cwd=repository).stdout.strip()
+        git_common_dir = run_git(["git", "rev-parse", "--git-common-dir"], cwd=repository).stdout.strip()
+        git_metadata_snapshots = {}
     return {
         "schema_version": 1,
         "repository": str(repository),
         "git_dir": git_dir,
+        "git_common_dir": git_common_dir,
         "head": head,
         "branch": branch.stdout.strip() if branch.returncode == 0 else "",
         "detached": branch.returncode == 1,
@@ -498,7 +880,11 @@ def attribute_git_mutations(
     new_index = final.get("staged_index_entries", {})
     old_metadata = baseline.get("git_metadata_snapshots", {})
     new_metadata = final.get("git_metadata_snapshots", {})
-    metadata_changed = old_metadata != new_metadata
+    git_directory_changed = (
+        baseline.get("git_dir") != final.get("git_dir")
+        or baseline.get("git_common_dir") != final.get("git_common_dir")
+    )
+    metadata_changed = old_metadata != new_metadata or git_directory_changed
     metadata_unknown = any(
         isinstance(snapshot, dict) and snapshot.get("kind") == "unknown"
         for snapshot in (*old_metadata.values(), *new_metadata.values())

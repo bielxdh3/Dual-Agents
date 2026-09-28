@@ -3,7 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import replace
+import os
 from pathlib import Path
+import tempfile
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -18,7 +20,7 @@ from .bootstrap import (
 )
 from .architect_plan import ArchitectPlanError, parse_architect_result
 from .config import AgentConfig, SUPPORTED_ROLES
-from .paths import path_identity_key, same_path
+from .paths import path_identity_key, safe_atomic_write_text, safe_read_bytes, same_path
 from .process import CommandError, CommandResult, codex_environment, run_command
 
 
@@ -151,6 +153,7 @@ def run_codex_exec(
     output_path: Path,
     schema_path: Path,
     check: bool = True,
+    timeout: float = 1800.0,
     progress: Callable[[str], None] | None = None,
 ) -> CommandResult:
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -181,7 +184,7 @@ def run_codex_exec(
         env=codex_environment(agent),
         stdin=prompt,
         check=check,
-        timeout=None,
+        timeout=timeout,
         progress=progress,
     )
 
@@ -286,34 +289,36 @@ def _annotate_provider_result(
     bootstrap=None,
     output_path: Path | None = None,
     configured_actor: bool = True,
+    finalize_architect: bool = False,
 ) -> CommandResult:
     if role == "architect" and bootstrap is not None:
         if output_path is None:
             raise ValueError("Architect output path is required for canonical skill provenance.")
-        try:
-            if result.stdout:
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                output_path.write_text(result.stdout, encoding="utf-8")
-            bootstrap = _finalize_architect_output(bootstrap, output_path)
-        except ArchitectPlanError as exc:
-            metadata = dict(result.metadata)
-            metadata.update(
-                configured_actor_provenance(
-                    agent=agent,
-                    role=role,
-                    repository=repository or Path("."),
-                    canonical_root=canonical_root,
-                    bootstrap=bootstrap,
-                    configured_actor=configured_actor,
+        if result.stdout:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            safe_atomic_write_text(output_path, result.stdout)
+        if finalize_architect:
+            try:
+                bootstrap = _finalize_architect_output(bootstrap, output_path)
+            except ArchitectPlanError as exc:
+                metadata = dict(result.metadata)
+                metadata.update(
+                    configured_actor_provenance(
+                        agent=agent,
+                        role=role,
+                        repository=repository or Path("."),
+                        canonical_root=canonical_root,
+                        bootstrap=bootstrap,
+                        configured_actor=configured_actor,
+                    )
                 )
-            )
-            metadata["architect_result_validation_error"] = str(exc)
-            return replace(
-                result,
-                returncode=1,
-                stderr=f"Architect plan validation failed: {exc}",
-                metadata=metadata,
-            )
+                metadata["architect_result_validation_error"] = str(exc)
+                return replace(
+                    result,
+                    returncode=1,
+                    stderr=f"Architect plan validation failed: {exc}",
+                    metadata=metadata,
+                )
     result.metadata.update(
         configured_actor_provenance(
             agent=agent,
@@ -331,23 +336,40 @@ def _annotate_provider_result(
     return result
 
 
-def _finalize_architect_output(bootstrap, output_path: Path):
+def _finalize_architect_output(
+    bootstrap,
+    output_path: Path,
+    *,
+    normalized_output_path: Path | None = None,
+    raw_output_path: Path | None = None,
+):
     try:
-        raw = output_path.read_text(encoding="utf-8")
+        raw = safe_read_bytes(output_path).decode("utf-8")
     except (OSError, UnicodeError) as exc:
         raise ArchitectPlanError("Architect result is unavailable for local plan validation.") from exc
     try:
         architect_plan = parse_architect_result(raw)
         finalized = finalize_architect_bootstrap(bootstrap, architect_plan["skills_loaded"])
     except (ValueError, FileNotFoundError, RuntimeError) as exc:
-        raw_path = output_path.with_suffix(output_path.suffix + ".raw.txt")
+        raw_path = raw_output_path or output_path.with_suffix(output_path.suffix + ".raw.txt")
         try:
-            raw_path.write_text(raw, encoding="utf-8")
+            safe_atomic_write_text(raw_path, raw)
         except OSError:
+            # ``output_path`` is the attempt-owned source in this call. Keep it
+            # intact when the user-facing sidecar cannot be written.
             raw_path = output_path
-        raise ArchitectPlanError(f"{exc} Completed output preserved at {raw_path}.") from exc
+        error = ArchitectPlanError(f"{exc} Completed output preserved at {raw_path}.")
+        error.preserved_output_path = raw_path
+        raise error from exc
     architect_plan["skills_loaded"] = list(finalized.actor_selected_skills)
-    output_path.write_text(json.dumps(architect_plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    destination = normalized_output_path or output_path
+    try:
+        safe_atomic_write_text(
+            destination,
+            json.dumps(architect_plan, ensure_ascii=False, indent=2) + "\n",
+        )
+    except OSError as exc:
+        raise ArchitectPlanError("Validated Architect plan could not be written to its control output.") from exc
     return finalized
 
 
@@ -421,6 +443,7 @@ def _delegate_to_configured_actor(
         repository=repository if role == "architect" else None,
         selected_skills=select_required_skills(role, task),
         artifact_repository=repository,
+        owner_runs_dir=config.runs_dir,
         run_id=run_id,
         provider_backend=agent.backend,
     )
@@ -436,55 +459,106 @@ def _delegate_to_configured_actor(
     fallback_enabled = bool(getattr(config, "fallback_enabled", False))
 
     def invoke(dispatch_config, dispatch_agent):
-        trust_updated = None
-        update_canonical_bootstrap_provider(
-            bootstrap,
-            backend=dispatch_agent.backend,
-            state="starting",
-        )
-        if (
-            repository_trust_authorized
-            and dispatch_agent.provider_type == "codex"
-            and dispatch_agent.backend in {"windows", "app_server"}
-        ):
-            from .repo_trust import provision_repository_trust
-
-            trust_updated = provision_repository_trust(dispatch_agent.codex_home, repository)
-        result = dispatch(
-            config=dispatch_config,
-            agent=dispatch_agent,
-            role=role,
-            repository=repository,
-            prompt=prepared_prompt,
-            output_path=output_path,
-            schema_path=schema_path,
-            bootstrap=bootstrap,
-            request_id=request_id,
-            run_id=run_id,
-            progress=progress,
-            dispatch_started=dispatch_started,
-        )
-        if not isinstance(result, CommandResult):
-            raise TypeError("Configured actor dispatch must return CommandResult.")
-        update_canonical_bootstrap_provider(
-            bootstrap,
-            backend=dispatch_agent.backend,
-            state="exited",
-        )
-        if trust_updated is not None:
-            result.metadata["codex_repository_trust"] = {
-                "repository": str(repository.expanduser().resolve()),
-                "codex_home": str(dispatch_agent.codex_home.expanduser().resolve()),
-                "updated": trust_updated,
-            }
-        if result.returncode != 0:
-            _raise_dispatch_failure(
-                result,
-                role=role,
-                agent=dispatch_agent,
-                message=f"Configured actor '{dispatch_agent.account_name}' failed for role '{role}': {result.stderr}",
+        nonlocal bootstrap
+        attempt_path = output_path
+        preserve_attempt_output = False
+        if role == "architect":
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, raw_attempt_path = tempfile.mkstemp(
+                prefix=f".{output_path.name}.{uuid4().hex}.",
+                suffix=".attempt.json",
+                dir=output_path.parent,
             )
-        return result
+            os.close(descriptor)
+            attempt_path = Path(raw_attempt_path)
+        trust_updated = None
+        try:
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=dispatch_agent.backend,
+                state="starting",
+            )
+            if (
+                repository_trust_authorized
+                and dispatch_agent.provider_type == "codex"
+                and dispatch_agent.backend in {"windows", "app_server"}
+            ):
+                from .repo_trust import provision_repository_trust
+
+                trust_updated = provision_repository_trust(dispatch_agent.codex_home, repository)
+            result = dispatch(
+                config=dispatch_config,
+                agent=dispatch_agent,
+                role=role,
+                repository=repository,
+                prompt=prepared_prompt,
+                output_path=attempt_path,
+                schema_path=schema_path,
+                bootstrap=bootstrap,
+                request_id=request_id,
+                run_id=run_id,
+                progress=progress,
+                dispatch_started=dispatch_started,
+            )
+            if not isinstance(result, CommandResult):
+                raise TypeError("Configured actor dispatch must return CommandResult.")
+            update_canonical_bootstrap_provider(
+                bootstrap,
+                backend=dispatch_agent.backend,
+                state="exited",
+            )
+            if trust_updated is not None:
+                result.metadata["codex_repository_trust"] = {
+                    "repository": str(repository.expanduser().resolve()),
+                    "codex_home": str(dispatch_agent.codex_home.expanduser().resolve()),
+                    "updated": trust_updated,
+                }
+            if result.returncode != 0:
+                _raise_dispatch_failure(
+                    result,
+                    role=role,
+                    agent=dispatch_agent,
+                    message=f"Configured actor '{dispatch_agent.account_name}' failed for role '{role}': {result.stderr}",
+                )
+            if role == "architect":
+                try:
+                    bootstrap = _finalize_architect_output(
+                        bootstrap,
+                        attempt_path,
+                        normalized_output_path=output_path,
+                        raw_output_path=output_path.with_suffix(output_path.suffix + ".raw.txt"),
+                    )
+                except ArchitectPlanError as exc:
+                    preserved_output_path = getattr(exc, "preserved_output_path", None)
+                    preserve_attempt_output = preserved_output_path == attempt_path
+                    metadata = dict(result.metadata)
+                    metadata.update(
+                        configured_actor_provenance(
+                            agent=dispatch_agent,
+                            role=role,
+                            repository=repository,
+                            canonical_root=canonical_root,
+                            bootstrap=bootstrap,
+                        )
+                    )
+                    metadata["architect_result_validation_error"] = str(exc)
+                    metadata["architect_attempt_output"] = str(attempt_path)
+                    metadata["architect_attempt_output_retained"] = preserve_attempt_output
+                    if preserved_output_path is not None:
+                        metadata["architect_raw_output_path"] = str(preserved_output_path)
+                    raise ActorResultError(
+                        f"Architect plan validation failed for configured actor '{dispatch_agent.account_name}': {exc}",
+                        actor=dispatch_agent.account_name,
+                        metadata=metadata,
+                    ) from exc
+                result.metadata.update(bootstrap.metadata())
+            return result
+        finally:
+            if role == "architect" and not preserve_attempt_output:
+                try:
+                    attempt_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     try:
         try:
@@ -622,9 +696,6 @@ def _delegate_to_configured_actor(
             })
             exc.metadata = metadata
             raise
-        if role == "architect":
-            bootstrap = _finalize_architect_output(bootstrap, output_path)
-            result.metadata.update(bootstrap.metadata())
         provenance = configured_actor_provenance(
             agent=actual_agent,
             role=role,
@@ -723,6 +794,7 @@ def run_codex_for_role(
                 repository=repository if role == "architect" else None,
                 selected_skills=select_required_skills(role, prompt),
                 artifact_repository=repository,
+                owner_runs_dir=config.runs_dir,
                 run_id=run_id,
                 provider_backend=agent.backend,
             )
@@ -767,7 +839,8 @@ def run_codex_for_role(
             )
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
-                bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
+                bootstrap=bootstrap, output_path=output_path, configured_actor=configured,
+                finalize_architect=owns_bootstrap)
         finally:
             cleanup_owned_bootstrap()
     if agent.backend == "claude_code":
@@ -817,6 +890,7 @@ def run_codex_for_role(
                 bootstrap=bootstrap,
                 output_path=output_path,
                 configured_actor=configured,
+                finalize_architect=owns_bootstrap,
             )
         finally:
             cleanup_owned_bootstrap()
@@ -852,7 +926,8 @@ def run_codex_for_role(
             )
             _raise_dispatch_failure(result, role=role, agent=agent, message=f"{agent.provider_type} {role} dispatch failed: {result.stderr}")
             return _annotate_provider_result(result, agent, role, repository=repository, canonical_root=canonical_root,
-                bootstrap=bootstrap, output_path=output_path, configured_actor=configured)
+                bootstrap=bootstrap, output_path=output_path, configured_actor=configured,
+                finalize_architect=owns_bootstrap)
         finally:
             cleanup_owned_bootstrap()
     if agent.backend == "app_server":
@@ -897,6 +972,7 @@ def run_codex_for_role(
                 bootstrap=bootstrap,
                 output_path=output_path,
                 configured_actor=configured,
+                finalize_architect=owns_bootstrap,
             )
         finally:
             cleanup_owned_bootstrap()
@@ -941,6 +1017,7 @@ def run_codex_for_role(
         bootstrap=bootstrap,
         output_path=output_path,
         configured_actor=configured,
+        finalize_architect=owns_bootstrap,
     )
 
 

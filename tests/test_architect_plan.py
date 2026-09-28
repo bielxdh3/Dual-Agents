@@ -7,9 +7,7 @@ import unittest
 
 from dual_codex.architect_plan import ArchitectPlanError, parse_architect_result
 from dual_codex.bootstrap import create_canonical_bootstrap
-from dual_codex.codex import _annotate_provider_result, _finalize_architect_output
-from dual_codex.config import AgentConfig
-from dual_codex.process import CommandResult
+from dual_codex.codex import _finalize_architect_output
 
 
 def _plan(*, skills: list[str] | None = None) -> dict[str, object]:
@@ -76,27 +74,9 @@ class ArchitectPlanTests(unittest.TestCase):
             bootstrap = create_canonical_bootstrap(role="architect", root=canonical)
             raw = "Completed turn with malformed plan: {\"summary\":\"missing fields\"}"
             output = root / "plan.json"
-            agent = AgentConfig(
-                codex_home=root / "profile",
-                model="model",
-                reasoning_effort="high",
-                sandbox="read-only",
-                backend="app_server",
-            )
-            result = CommandResult(["codex", "app-server"], 0, raw, "")
-
-            annotated = _annotate_provider_result(
-                result,
-                agent,
-                "architect",
-                repository=root,
-                bootstrap=bootstrap,
-                output_path=output,
-            )
-
-            self.assertEqual(annotated.returncode, 1)
-            self.assertIn("Architect plan validation failed", annotated.stderr)
-            self.assertIn("Completed output preserved", annotated.stderr)
+            output.write_text(raw, encoding="utf-8")
+            with self.assertRaisesRegex(ArchitectPlanError, "Completed output preserved"):
+                _finalize_architect_output(bootstrap, output)
             self.assertEqual(Path(str(output) + ".raw.txt").read_text(encoding="utf-8"), raw)
 
     def test_final_plan_rewrites_case_variant_to_canonical_catalog_name(self) -> None:

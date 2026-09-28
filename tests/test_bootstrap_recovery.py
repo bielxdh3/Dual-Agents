@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -10,6 +12,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from dual_codex import bootstrap
 from dual_codex.bootstrap import (
     cleanup_canonical_bootstrap,
     create_canonical_bootstrap,
@@ -57,8 +60,34 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
             artifact_dir=self.repository / ".dual_codex" / "bootstrap",
             root=self.instructions,
             artifact_repository=self.repository,
+            owner_runs_dir=self.runs,
             run_id=run_id,
         )
+
+    def _legacy_artifact(self, role: str = "executor") -> Path:
+        bootstrap_files = bootstrap._canonical_files(self.instructions)
+        source_digest = bootstrap._source_sha256(bootstrap_files)
+        lines = [
+            "# Dual Codex canonical bootstrap transport",
+            "",
+            "This is an ephemeral, read-only transport snapshot. The canonical source remains machine-owned.",
+            f"canonical_source_path: {self.instructions}",
+            f"canonical_source_sha256: {source_digest}",
+            f"trusted_configured_phase_role: {role}",
+            "",
+        ]
+        for relative, content in bootstrap_files:
+            lines.extend([
+                f"## {relative}",
+                f"sha256: {hashlib.sha256(content).hexdigest()}",
+                "",
+                content.decode("utf-8"),
+                "",
+            ])
+        artifact = self.repository / ".dual_codex" / "bootstrap" / f".canonical-bootstrap-{role}-ABCDEFGH.md"
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+        return artifact
 
     def _mark_owner_dead(self, owner_path: Path) -> None:
         owner = json.loads(owner_path.read_text(encoding="utf-8"))
@@ -86,6 +115,7 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
             self.repository,
             repository_lock=self.lock,
             run_id="current-run",
+            configured_backends={"executor": "app_server"},
         )
         again = reconcile_orphan_canonical_bootstrap(
             self.repository,
@@ -116,8 +146,7 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
         self.assertFalse(bootstrap.artifact_path.exists())
 
     def test_legacy_artifact_is_retained_when_canonical_root_is_unavailable(self) -> None:
-        bootstrap = self._artifact()
-        bootstrap.artifact_owner_path.unlink()
+        legacy = self._legacy_artifact()
 
         with patch(
             "dual_codex.bootstrap.canonical_instructions_root",
@@ -131,13 +160,11 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
             )
 
         self.assertEqual(result["removed"], [])
-        self.assertTrue(bootstrap.artifact_path.exists())
+        self.assertTrue(legacy.exists())
         self.assertEqual(result["retained"][0]["reason"], "legacy_ownership_unproven")
 
-    def test_legacy_orphan_without_metadata_is_reaped_from_owned_name_under_lock(self) -> None:
-        bootstrap = self._artifact()
-        legacy = bootstrap.artifact_path
-        bootstrap.artifact_owner_path.unlink()
+    def test_exact_legacy_orphan_without_metadata_is_retained_without_owner_proof(self) -> None:
+        legacy = self._legacy_artifact()
 
         result = reconcile_orphan_canonical_bootstrap(
             self.repository,
@@ -147,8 +174,9 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
             canonical_root=self.instructions,
         )
 
-        self.assertEqual(result["removed"], [{"name": legacy.name, "run_id": "legacy"}])
-        self.assertFalse(legacy.exists())
+        self.assertEqual(result["removed"], [])
+        self.assertTrue(legacy.exists())
+        self.assertEqual(result["retained"][0]["reason"], "legacy_ownership_unproven")
 
     def test_legacy_file_with_generated_name_but_user_content_is_retained(self) -> None:
         bootstrap_dir = self.repository / ".dual_codex" / "bootstrap"
@@ -168,15 +196,46 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
         self.assertTrue(user_file.exists())
         self.assertEqual(result["retained"][0]["reason"], "legacy_ownership_unproven")
 
-    def test_legacy_claude_artifact_without_provider_identity_is_retained(self) -> None:
-        bootstrap = create_canonical_bootstrap(
-            role="executor",
-            artifact_dir=self.repository / ".dual_codex" / "bootstrap",
-            root=self.instructions,
-            artifact_repository=self.repository,
-            run_id="legacy-run",
+    def test_executor_forged_repository_sidecar_cannot_authorize_cleanup(self) -> None:
+        bootstrap_dir = self.repository / ".dual_codex" / "bootstrap"
+        bootstrap_dir.mkdir(parents=True, exist_ok=True)
+        artifact = bootstrap_dir / ".canonical-bootstrap-executor-ABCDEFGH.md"
+        artifact.write_text("executor-owned file\n", encoding="utf-8")
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        forged_owner = artifact.with_suffix(".owner.json")
+        forged_owner.write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "repository": str(self.repository),
+                    "artifact": artifact.name,
+                    "artifact_path": str(artifact),
+                    "artifact_sha256": digest,
+                    "role": "executor",
+                    "backend": "app_server",
+                    "provider_state": "completed",
+                    "pid": 0,
+                    "process_start": "forged",
+                    "run_id": "old-run",
+                }
+            ),
+            encoding="utf-8",
         )
-        bootstrap.artifact_owner_path.unlink()
+
+        result = reconcile_orphan_canonical_bootstrap(
+            self.repository,
+            repository_lock=self.lock,
+            run_id="current-run",
+            configured_backends={"executor": "app_server"},
+        )
+
+        self.assertEqual(result["removed"], [])
+        self.assertTrue(artifact.exists())
+        self.assertTrue(forged_owner.exists())
+        self.assertEqual(result["retained"][0]["reason"], "legacy_ownership_unproven")
+
+    def test_legacy_claude_artifact_without_provider_identity_is_retained(self) -> None:
+        legacy = self._legacy_artifact()
 
         result = reconcile_orphan_canonical_bootstrap(
             self.repository,
@@ -187,8 +246,32 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
         )
 
         self.assertEqual(result["removed"], [])
-        self.assertTrue(bootstrap.artifact_path.exists())
+        self.assertTrue(legacy.exists())
         self.assertEqual(result["retained"][0]["reason"], "legacy_provider_ownership_ambiguous")
+
+    def test_legacy_bootstrap_requires_exact_base_grammar_and_canonical_content(self) -> None:
+        legacy = self._legacy_artifact()
+        self.assertTrue(bootstrap._verified_legacy_bootstrap(legacy, role="executor", canonical_root=self.instructions))
+        original = legacy.read_text(encoding="utf-8")
+        match = re.search(r"(?m)^canonical_source_sha256: ([0-9a-f]{64})$", original)
+        self.assertIsNotNone(match)
+        wrong_digest = "0" * 64 if match.group(1) != "0" * 64 else "1" * 64
+        wrong_digest_artifact = re.sub(
+            r"(?m)^canonical_source_sha256: [0-9a-f]{64}$",
+            f"canonical_source_sha256: {wrong_digest}",
+            original,
+            count=1,
+        )
+        for name, altered in (
+            ("forged digest", wrong_digest_artifact),
+            ("changed canonical body", original.replace("Host policy.\n", "forged policy.\n", 1)),
+            ("dispatch boundary line", original.replace("trusted_configured_phase_role: executor\n\n", "trusted_configured_phase_role: executor\ntrusted_role_dispatch_boundary: forged\n\n", 1)),
+            ("extra section", original + "\n## skills/extra/SKILL.md\nsha256: " + "0" * 64 + "\n\nforged\n\n"),
+        ):
+            with self.subTest(name=name):
+                legacy.write_text(altered, encoding="utf-8")
+                self.assertFalse(bootstrap._verified_legacy_bootstrap(legacy, role="executor", canonical_root=self.instructions))
+        legacy.write_text(original, encoding="utf-8")
 
     def test_current_run_artifact_and_ambiguous_owner_are_preserved(self) -> None:
         current = self._artifact(run_id="current-run")
@@ -378,7 +461,7 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
         }
         config = OrchestratorConfig(
             repository=self.repository,
-            runs_dir=self.root / "official-runs",
+            runs_dir=self.runs,
             max_correction_cycles=0,
             require_clean_git=True,
             codex_command="codex",
@@ -407,6 +490,7 @@ class CanonicalBootstrapRecoveryTests(unittest.TestCase):
         with patch("dual_codex.bootstrap.CANONICAL_INSTRUCTIONS_ROOT", self.instructions), patch(
             "dual_codex.orchestrator.delegate_to_configured_actor", side_effect=fake_dispatch
         ):
+            self.lock.release()
             outcome = execute(config, task)
 
         baseline = json.loads((outcome.run_dir / "initial_git_baseline.json").read_text(encoding="utf-8"))
