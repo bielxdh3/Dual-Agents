@@ -186,6 +186,42 @@ def _commit_test_file(repository: Path, relative_path: str = "tracked.txt") -> P
 
 
 class SecurityScanArbitrationTests(unittest.TestCase):
+    def test_ownerless_deep_cancel_calls_only_the_exact_app_admin_tool(self) -> None:
+        client = object.__new__(_McpReadClient)
+        client.tool_names = frozenset({"cancel_codex_security_scan_from_app"})
+        calls: list[tuple[str, dict]] = []
+
+        def request(method: str, params: dict) -> dict:
+            calls.append((method, params))
+            return {
+                "structuredContent": {
+                    "workspace": {
+                        "results": {
+                            "scanId": params["arguments"]["scanId"],
+                            "progress": {"status": "canceled"},
+                        }
+                    }
+                },
+                "isError": False,
+            }
+
+        client._request = request
+        scan_id = "964f6fef-4dac-4401-8143-5814bb0acdf3"
+        result = client.cancel_ownerless_deep_scan(scan_id)
+        self.assertEqual(calls, [("tools/call", {"name": "cancel_codex_security_scan_from_app", "arguments": {"scanId": scan_id}})])
+        self.assertTrue(result["tool_call_attempted"])
+        self.assertTrue(result["result_scan_id_matches"])
+        self.assertEqual(result["result_status"], "canceled")
+
+    def test_ownerless_deep_cancel_reports_unsupported_without_calling_any_tool(self) -> None:
+        client = object.__new__(_McpReadClient)
+        client.tool_names = frozenset()
+        client._request = lambda *_args: self.fail("unsupported provider must not receive a tool call")
+        result = client.cancel_ownerless_deep_scan("964f6fef-4dac-4401-8143-5814bb0acdf3")
+        self.assertFalse(result["tool_available"])
+        self.assertFalse(result["tool_call_attempted"])
+        self.assertEqual(result["failure_class"], "SECURITY_SCAN_OWNERLESS_ADMIN_UNSUPPORTED")
+
     def test_mcp_read_client_rejects_non_object_jsonrpc_frames(self) -> None:
         client = object.__new__(_McpReadClient)
         client._request_id = 0

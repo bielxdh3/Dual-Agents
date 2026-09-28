@@ -52,6 +52,10 @@ def _effective_turn_timeout(agent: AgentConfig, config: OrchestratorConfig) -> t
 _EVENT_PUBLICATION_QUEUE_SIZE = 64
 _HEADLESS_RAW_EVENTS_VERSION = "responses-raw-v1"
 _WINDOWS_SANDBOX_MODES = {"elevated", "unelevated"}
+_SECURITY_RECOVERY_PLUGIN_ID = "codex-security@openai-curated-remote"
+_SECURITY_RECOVERY_MCP_SERVER = "codex-security"
+_SECURITY_RECOVERY_TOOL = "cancel_codex_security_scan"
+_SECURITY_RECOVERY_NON_TOOL_ITEMS = frozenset({"agentMessage", "reasoning", "plan", "userMessage", "summary"})
 
 
 def _canonical_workspace_roots(*roots: Path) -> list[str]:
@@ -67,6 +71,34 @@ def _canonical_workspace_roots(*roots: Path) -> list[str]:
         seen.add(key)
         result.append(str(root))
     return result
+
+
+def _thread_binding_signature(binding: Mapping[str, Any]) -> tuple[Any, ...] | None:
+    """Compare repository roots without relying on ephemeral environment IDs."""
+
+    cwd = binding.get("cwd")
+    roots = binding.get("runtimeWorkspaceRoots")
+    environments = binding.get("environments")
+    if not isinstance(cwd, str) or not isinstance(roots, list) or not isinstance(environments, list):
+        return None
+    try:
+        environment_signature = tuple(
+            (
+                path_identity_key(environment.get("cwd", "")),
+                tuple(path_identity_key(root) for root in environment.get("runtimeWorkspaceRoots", [])),
+            )
+            for environment in environments
+            if isinstance(environment, Mapping)
+        )
+        if len(environment_signature) != len(environments):
+            return None
+        return (
+            path_identity_key(cwd),
+            tuple(path_identity_key(root) for root in roots),
+            environment_signature,
+        )
+    except (OSError, RuntimeError, ValueError, TypeError):
+        return None
 
 
 def _thread_binding(response: Mapping[str, Any]) -> dict[str, Any]:
@@ -224,6 +256,7 @@ def _app_server_command(
     *,
     agent: AgentConfig | None = None,
     role: str = "",
+    security_recovery: bool = False,
 ) -> list[str]:
     """Build the non-interactive App Server command.
 
@@ -245,8 +278,150 @@ def _app_server_command(
         and agent.sandbox == "workspace-write"
     ):
         command.extend(["-c", 'windows.sandbox="elevated"'])
+    if security_recovery:
+        # This process is dedicated to one maintenance turn. Replacing the
+        # configured MCP/plugin maps gives the provider no other MCP tools,
+        # even when the normal Codex Apps bridge exposes write operations.
+        # The loopback URL is inert and satisfies config validation for the
+        # app-hosted codex_apps server while it is disabled.
+        command.extend(
+            [
+                "-c",
+                "features.shell_tool=false",
+                "-c",
+                "features.hooks=false",
+                "-c",
+                "features.multi_agent=false",
+                "-c",
+                "features.apps=false",
+                "-c",
+                "features.browser_use=false",
+                "-c",
+                "features.browser_use_external=false",
+                "-c",
+                "features.browser_use_full_cdp_access=false",
+                "-c",
+                "features.computer_use=false",
+                "-c",
+                "features.image_generation=false",
+                "-c",
+                "features.sleep_tool=false",
+                "-c",
+                'web_search="disabled"',
+                "-c",
+                'mcp_servers={codex_apps={url="http://127.0.0.1:9",enabled=false}}',
+                "-c",
+                'plugins={"codex-security@openai-curated-remote"={enabled=true,mcp_servers={"codex-security"={enabled=true,enabled_tools=["cancel_codex_security_scan"]}}}}',
+            ]
+        )
     command.append("--stdio")
     return command
+
+
+def _validate_security_cancel_tool_catalog(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Require the dedicated process to expose exactly one MCP tool."""
+
+    if "error" in response:
+        raise AppServerError(
+            "App Server could not verify the Security recovery MCP tool catalog.",
+            failure_class="SECURITY_RECOVERY_TOOL_CATALOG_UNAVAILABLE",
+        )
+    result = response.get("result")
+    data = result.get("data") if isinstance(result, Mapping) else None
+    cursor = result.get("nextCursor") if isinstance(result, Mapping) else None
+    if not isinstance(data, list) or cursor not in (None, ""):
+        raise AppServerError(
+            "App Server returned an incomplete Security recovery MCP tool catalog.",
+            failure_class="SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE",
+        )
+
+    allowed = {(_SECURITY_RECOVERY_MCP_SERVER, _SECURITY_RECOVERY_TOOL)}
+    observed: set[tuple[str, str]] = set()
+    authorized_server_count = 0
+    for server in data:
+        if not isinstance(server, Mapping):
+            raise AppServerError(
+                "App Server returned an invalid Security recovery MCP server entry.",
+                failure_class="SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE",
+            )
+        server_name = server.get("name")
+        plugin_id = server.get("pluginId")
+        tools = server.get("tools")
+        if not isinstance(server_name, str) or not isinstance(tools, Mapping):
+            raise AppServerError(
+                "App Server returned an incomplete Security recovery MCP server entry.",
+                failure_class="SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE",
+            )
+        if server_name == _SECURITY_RECOVERY_MCP_SERVER and plugin_id != _SECURITY_RECOVERY_PLUGIN_ID:
+            raise AppServerError(
+                "The Security recovery MCP server has an unexpected provider binding.",
+                failure_class="SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE",
+            )
+        if server_name == _SECURITY_RECOVERY_MCP_SERVER:
+            authorized_server_count += 1
+        if server_name == "codex_apps" and plugin_id is not None:
+            raise AppServerError(
+                "The disabled Codex Apps MCP server has an unexpected provider binding.",
+                failure_class="SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE",
+            )
+        for tool_name in tools:
+            if not isinstance(tool_name, str):
+                raise AppServerError(
+                    "App Server returned an invalid Security recovery MCP tool name.",
+                    failure_class="SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE",
+                )
+            observed.add((server_name, tool_name))
+
+    if observed != allowed or authorized_server_count != 1:
+        raise AppServerError(
+            "The dedicated App Server did not expose exactly the authorized Security cancellation tool.",
+            failure_class="SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE",
+        )
+    return {
+        "server_count": len(data),
+        "available_tool_count": len(observed),
+        "exact_allowlist_verified": True,
+    }
+
+
+def _validate_security_recovery_native_tool_policy(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Require the disposable App Server's non-MCP tool surfaces to be off."""
+
+    if "error" in response:
+        raise AppServerError(
+            "App Server could not verify the Security recovery native tool policy.",
+            failure_class="SECURITY_RECOVERY_NATIVE_TOOL_POLICY_UNAVAILABLE",
+        )
+    result = response.get("result")
+    effective = result.get("config") if isinstance(result, Mapping) else None
+    features = effective.get("features") if isinstance(effective, Mapping) else None
+    required_features = (
+        "apps",
+        "browser_use",
+        "browser_use_external",
+        "browser_use_full_cdp_access",
+        "computer_use",
+        "image_generation",
+        "hooks",
+        "multi_agent",
+        "sleep_tool",
+        "shell_tool",
+    )
+    if not isinstance(features, Mapping) or any(features.get(key) is not False for key in required_features):
+        raise AppServerError(
+            "App Server did not confirm that every unrelated native tool surface is disabled.",
+            failure_class="SECURITY_RECOVERY_NATIVE_TOOL_POLICY_UNSAFE",
+        )
+    if effective.get("web_search") != "disabled":
+        raise AppServerError(
+            "App Server did not confirm that web search is disabled for Security recovery.",
+            failure_class="SECURITY_RECOVERY_NATIVE_TOOL_POLICY_UNSAFE",
+        )
+    return {
+        "verified": True,
+        "disabled_features": list(required_features),
+        "web_search": "disabled",
+    }
 
 
 def _report_object(message: str) -> dict[str, Any] | None:
@@ -558,6 +733,7 @@ class _AppServerProcess:
         progress: Callable[[str], None] | None,
         role: str = "",
         require_workspace_ready: bool = False,
+        security_recovery_mode: bool = False,
     ) -> None:
         self.config = config
         self.agent = agent
@@ -565,6 +741,7 @@ class _AppServerProcess:
         self.progress = progress
         self.role = str(role or "")
         self.require_workspace_ready = bool(require_workspace_ready)
+        self.security_recovery_mode = bool(security_recovery_mode)
         self.runtime_config_identity = _runtime_config_identity(
             agent,
             config,
@@ -609,8 +786,14 @@ class _AppServerProcess:
         self.last_turn_provenance: dict[str, Any] = {}
         self._active_thread_id = ""
         self._active_thread_resumed = False
+        self._active_security_cancel_approval: dict[str, Any] | None = None
         self.request_methods: list[str] = []
-        command = _app_server_command(config, agent=agent, role=role)
+        command = _app_server_command(
+            config,
+            agent=agent,
+            role=role,
+            security_recovery=self.security_recovery_mode,
+        )
         process_args = _prepare_command([str(item) for item in command])
         env = codex_environment(agent, isolate_desktop_bridge=True)
         if os.name == "nt" and require_workspace_ready and agent.sandbox == "workspace-write":
@@ -930,6 +1113,31 @@ class _AppServerProcess:
 
     def _respond_to_server_request(self, message: dict[str, Any]) -> None:
         method = str(message.get("method", ""))
+        active_security_approval = getattr(self, "_active_security_cancel_approval", None)
+        if method == "item/permissions/requestApproval" and active_security_approval is not None:
+            context = active_security_approval
+            context["approval_request_count"] = int(context.get("approval_request_count", 0)) + 1
+            reason = self._security_cancel_approval_denial_reason(message, context)
+            response: dict[str, Any] = {"jsonrpc": "2.0", "id": message.get("id")}
+            if reason is None:
+                context["approval_granted"] = True
+                context["approved_item_id"] = str(message.get("params", {}).get("itemId", ""))
+                response["result"] = {"permissions": {}, "scope": "turn", "strictAutoReview": True}
+            else:
+                context["approval_denial_reason"] = reason
+                context["unexpected_item_seen"] = True
+                context.setdefault("unexpected_item_types", []).append("invalid_security_cancel_approval")
+                response["error"] = {
+                    "code": -32000,
+                    "message": "Security cancellation approval denied by Dual Codex.",
+                }
+            self._send(response)
+            if reason is not None:
+                self._request_security_recovery_turn_cancel()
+            return
+        if active_security_approval is not None:
+            active_security_approval["unexpected_item_seen"] = True
+            active_security_approval.setdefault("unexpected_item_types", []).append(method)
         # Never grant an approval or permission implicitly. Normal workspace-write
         # turns use approvalPolicy=never; an unexpected request is a hard denial.
         if method in {"item/commandExecution/requestApproval", "item/fileChange/requestApproval"}:
@@ -969,6 +1177,227 @@ class _AppServerProcess:
         else:
             response["result"] = result
         self._send(response)
+        if active_security_approval is not None:
+            self._request_security_recovery_turn_cancel()
+
+    def _request_security_recovery_turn_cancel(self) -> None:
+        """Send one nonblocking cancel for the exact unexpected maintenance turn."""
+
+        context = getattr(self, "_active_security_cancel_approval", None)
+        if not isinstance(context, dict) or context.get("unexpected_item_seen") is not True:
+            return
+        if context.get("turn_cancel_requested") is True:
+            return
+        expected_thread_id = context.get("thread_id")
+        active_thread_id = getattr(self, "_active_thread_id", "")
+        active_turn = getattr(self, "_active_turn_provenance", None)
+        turn_id = active_turn.get("turn_id") if isinstance(active_turn, Mapping) else None
+        if (
+            not isinstance(expected_thread_id, str)
+            or not expected_thread_id
+            or active_thread_id != expected_thread_id
+            or not isinstance(turn_id, str)
+            or not turn_id
+        ):
+            context["turn_cancel_deferred"] = True
+            return
+        self._next_id += 1
+        request_id = self._next_id
+        context["turn_cancel_requested"] = True
+        context["turn_cancel_request_id"] = request_id
+        context["turn_cancel_confirmed"] = False
+        try:
+            self._send(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": "turn/cancel",
+                    "params": {"threadId": expected_thread_id, "turnId": turn_id},
+                }
+            )
+        except Exception:
+            context["turn_cancel_failure_class"] = "SECURITY_RECOVERY_CANCEL_SEND_FAILED"
+
+    def _consume_security_recovery_turn_cancel_response(self, message: Mapping[str, Any]) -> bool:
+        """Record the bounded response to the one maintenance turn/cancel request."""
+
+        context = getattr(self, "_active_security_cancel_approval", None)
+        if not isinstance(context, dict):
+            return False
+        request_id = context.get("turn_cancel_request_id")
+        if request_id is None or message.get("id") != request_id or "method" in message:
+            return False
+        context["turn_cancel_confirmed"] = "error" not in message
+        return True
+
+    def _security_cancel_approval_denial_reason(
+        self,
+        message: Mapping[str, Any],
+        context: Mapping[str, Any],
+    ) -> str | None:
+        """Match one exact MCP cancellation request against trusted host state."""
+
+        if (
+            context.get("operation") != "security_scan_cancel"
+            or context.get("approval_policy") != "on-request"
+            or context.get("binding_validated") is not True
+            or context.get("tool_catalog_validated") is not True
+            or context.get("approval_granted") is True
+            or int(context.get("approval_request_count", 0)) != 1
+        ):
+            return "maintenance_context_invalid"
+        params = message.get("params")
+        if not isinstance(params, Mapping):
+            return "request_shape_invalid"
+        allowed_fields = {
+            "cwd", "environmentId", "itemId", "permissions", "reason", "startedAtMs", "threadId", "turnId"
+        }
+        required_fields = {"cwd", "itemId", "permissions", "startedAtMs", "threadId", "turnId"}
+        if not required_fields.issubset(params) or not set(params).issubset(allowed_fields):
+            return "request_shape_invalid"
+        if isinstance(params.get("startedAtMs"), bool) or not isinstance(params.get("startedAtMs"), int):
+            return "request_shape_invalid"
+        if params.get("reason") is not None and not isinstance(params.get("reason"), str):
+            return "request_shape_invalid"
+        if params.get("environmentId") is not None and not isinstance(params.get("environmentId"), str):
+            return "request_shape_invalid"
+        active_turn = self._active_turn_provenance
+        expected_turn_id = active_turn.get("turn_id") if isinstance(active_turn, Mapping) else None
+        expected_thread_id = str(context.get("thread_id", ""))
+        if (
+            not expected_thread_id
+            or self._active_thread_id != expected_thread_id
+            or self._active_thread_resumed is not True
+            or params.get("threadId") != expected_thread_id
+            or not isinstance(expected_turn_id, str)
+            or not expected_turn_id
+            or params.get("turnId") != expected_turn_id
+        ):
+            return "thread_or_turn_mismatch"
+        expected_repository = str(context.get("repository", ""))
+        requested_environment_id = params.get("environmentId")
+        if requested_environment_id is not None:
+            environment_ids = context.get("environment_ids")
+            if (
+                not isinstance(requested_environment_id, str)
+                or not isinstance(environment_ids, list)
+                or requested_environment_id not in environment_ids
+            ):
+                return "environment_binding_mismatch"
+        requested_cwd = params.get("cwd")
+        if not isinstance(requested_cwd, str) or not expected_repository:
+            return "repository_binding_mismatch"
+        try:
+            if path_identity_key(requested_cwd) != path_identity_key(expected_repository):
+                return "repository_binding_mismatch"
+        except (OSError, RuntimeError, ValueError):
+            return "repository_binding_mismatch"
+        permissions = params.get("permissions")
+        if not isinstance(permissions, Mapping) or not set(permissions).issubset({"fileSystem", "network"}):
+            return "permission_profile_mismatch"
+        if any(value not in (None, {}, []) for value in permissions.values()):
+            return "permission_profile_mismatch"
+        item_id = params.get("itemId")
+        calls = context.get("mcp_tool_calls")
+        if not isinstance(item_id, str) or not isinstance(calls, list) or len(calls) != 1:
+            return "tool_call_count_mismatch"
+        call = calls[0]
+        if not isinstance(call, Mapping) or call.get("item_id") != item_id:
+            return "tool_item_mismatch"
+        if call.get("thread_id") != expected_thread_id or call.get("turn_id") != expected_turn_id:
+            return "tool_item_binding_mismatch"
+        if call.get("authorized") is not True:
+            return "tool_or_scan_mismatch"
+        if context.get("unexpected_item_seen") is True:
+            return "unexpected_tool_seen"
+        return None
+
+    def _capture_security_cancel_event(self, method: str, params: Mapping[str, Any]) -> None:
+        context = getattr(self, "_active_security_cancel_approval", None)
+        if context is None:
+            return
+        if method not in {"item/started", "item/completed"}:
+            return
+        item = params.get("item")
+        if not isinstance(item, Mapping):
+            context["unexpected_item_seen"] = True
+            context.setdefault("unexpected_item_types", []).append("missing_item_payload")
+            return
+        item_type = str(item.get("type", ""))
+        item_id = str(item.get("id", ""))
+        expected_thread_id = str(context.get("thread_id", ""))
+        thread_id = params.get("threadId")
+        turn_id = params.get("turnId")
+        active_turn = self._active_turn_provenance
+        expected_turn_id = active_turn.get("turn_id") if isinstance(active_turn, Mapping) else None
+        if method == "item/started":
+            if item_type == "mcpToolCall":
+                context["mcp_tool_call_count"] = int(context.get("mcp_tool_call_count", 0)) + 1
+                arguments = item.get("arguments")
+                exact_arguments = (
+                    isinstance(arguments, Mapping)
+                    and set(arguments) == {"scanId"}
+                    and arguments.get("scanId") == context.get("scan_id")
+                )
+                authorized = (
+                    exact_arguments
+                    and item.get("server") == "codex-security"
+                    and item.get("tool") == "cancel_codex_security_scan"
+                )
+                if authorized:
+                    context["matching_tool_call_count"] = int(context.get("matching_tool_call_count", 0)) + 1
+                else:
+                    context["unexpected_item_seen"] = True
+                if thread_id != expected_thread_id or not isinstance(turn_id, str) or (
+                    isinstance(expected_turn_id, str) and expected_turn_id and turn_id != expected_turn_id
+                ):
+                    context["unexpected_item_seen"] = True
+                context.setdefault("mcp_tool_calls", []).append(
+                    {
+                        "item_id": item_id,
+                        "thread_id": str(thread_id or ""),
+                        "turn_id": str(turn_id or ""),
+                        "authorized": bool(authorized),
+                    }
+                )
+            elif item_type not in _SECURITY_RECOVERY_NON_TOOL_ITEMS:
+                context["unexpected_item_seen"] = True
+                context.setdefault("unexpected_item_types", []).append(item_type)
+        elif item_id and any(
+            isinstance(call, Mapping) and call.get("item_id") == item_id and call.get("authorized") is True
+            for call in context.get("mcp_tool_calls", [])
+        ):
+            if thread_id != expected_thread_id or not isinstance(turn_id, str) or (
+                isinstance(expected_turn_id, str) and expected_turn_id and turn_id != expected_turn_id
+            ):
+                context["unexpected_item_seen"] = True
+                return
+            result = item.get("result")
+            has_result = isinstance(result, Mapping)
+            provider_error = bool(item.get("error")) or (has_result and result.get("isError") is True)
+            provider_error_class = ""
+            if has_result:
+                content = result.get("content")
+                rendered = " ".join(
+                    str(entry.get("text", ""))
+                    for entry in content[:16]
+                    if isinstance(entry, Mapping) and isinstance(entry.get("text"), str)
+                ) if isinstance(content, list) else ""
+                if re.search(r"(?i)\bscan\s+not\s+found\b", rendered):
+                    provider_error_class = "scan_not_found"
+                elif provider_error:
+                    provider_error_class = "provider_error"
+            status = str(item.get("status", ""))
+            safe_statuses = {"inProgress", "completed", "failed", "declined", "interrupted"}
+            context["provider_tool_result"] = {
+                "item_status": status if status in safe_statuses else "unknown",
+                "result_returned": has_result,
+                "provider_error": bool(provider_error),
+                "provider_error_class": provider_error_class,
+            }
+        elif item_type not in _SECURITY_RECOVERY_NON_TOOL_ITEMS:
+            context["unexpected_item_seen"] = True
+            context.setdefault("unexpected_item_types", []).append(item_type)
 
     def _next_message(self, timeout: float) -> dict[str, Any]:
         deadline = time.monotonic() + timeout
@@ -1023,6 +1452,8 @@ class _AppServerProcess:
             method = message.get("method")
             params = message.get("params")
             params = params if isinstance(params, Mapping) else {}
+            if isinstance(method, str):
+                self._capture_security_cancel_event(method, params)
             provider_turn = params.get("turn")
             event_turn_id = provider_turn.get("id") if isinstance(provider_turn, Mapping) else params.get("turnId")
             if active_turn is not None:
@@ -1032,6 +1463,7 @@ class _AppServerProcess:
                     active_turn["last_provider_event_timestamp"] = datetime.now(timezone.utc).isoformat()
                     if isinstance(method, str) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_./-]{0,127}", method):
                         active_turn["last_safe_provider_notification_method"] = method
+            self._request_security_recovery_turn_cancel()
             event_message = message
             if message.get("method") == "rawResponseItem/completed":
                 if isinstance(params, dict):
@@ -1094,6 +1526,8 @@ class _AppServerProcess:
                     raise
                 if message.get("id") == request_id:
                     return message
+                if self._consume_security_recovery_turn_cancel_response(message):
+                    continue
                 self._record_notification(message)
                 self._pending.append(message)
 
@@ -1107,6 +1541,336 @@ class _AppServerProcess:
         if pending is not None:
             return pending
         return self._next_message(timeout)
+
+    def _resume_exact_security_thread_unlocked(
+        self,
+        thread_id: str,
+        repository: Path,
+        *,
+        approval_policy: str,
+    ) -> dict[str, Any]:
+        """Resume one operator-specified thread without creating a replacement."""
+
+        if not isinstance(thread_id, str) or not thread_id.strip():
+            raise AppServerError(
+                "Security recovery requires an exact owner thread ID.",
+                failure_class="SECURITY_RECOVERY_OWNER_THREAD_INVALID",
+            )
+        if approval_policy not in {"never", "on-request"}:
+            raise AppServerError(
+                "Security recovery requested an unsupported approval policy.",
+                failure_class="SECURITY_RECOVERY_APPROVAL_POLICY_INVALID",
+            )
+        repository = repository.resolve(strict=True)
+        roots = _canonical_workspace_roots(repository)
+        params: dict[str, Any] = {
+            "cwd": str(repository),
+            "runtimeWorkspaceRoots": roots,
+            "sandbox": self.agent.sandbox,
+            "approvalPolicy": approval_policy,
+            "experimentalRawEvents": True,
+        }
+        if self.agent.model:
+            params["model"] = self.agent.model
+        if self.agent.service_tier:
+            params["serviceTier"] = self.agent.service_tier
+        response = self.request(
+            "thread/resume",
+            {"threadId": thread_id, **params},
+            timeout=self.config.app_server_thread_timeout,
+        )
+        if "error" in response:
+            if _is_stale_thread_error(response):
+                raise AppServerError(
+                    "The exact Security recovery owner thread is stale or not found.",
+                    failure_class="SECURITY_RECOVERY_OWNER_THREAD_STALE",
+                )
+            raise AppServerError(
+                "App Server rejected the exact Security recovery owner thread resume.",
+                failure_class="SECURITY_RECOVERY_OWNER_THREAD_RESUME_REJECTED",
+            )
+        result = response.get("result")
+        thread = result.get("thread") if isinstance(result, Mapping) else None
+        returned_id = thread.get("id") if isinstance(thread, Mapping) else None
+        if returned_id != thread_id:
+            raise AppServerError(
+                "App Server returned a different thread ID for the Security recovery owner thread.",
+                failure_class="SECURITY_RECOVERY_OWNER_THREAD_BINDING_MISMATCH",
+            )
+        try:
+            binding = _validate_thread_binding(response, repository)
+        except AppServerError as exc:
+            raise AppServerError(
+                "App Server returned a mismatched Security recovery repository binding.",
+                failure_class="SECURITY_RECOVERY_OWNER_THREAD_BINDING_MISMATCH",
+            ) from exc
+        expected_root = path_identity_key(repository)
+        environments = binding.get("environments")
+        if not isinstance(environments, list) or not environments:
+            raise AppServerError(
+                "App Server returned no Security recovery environment binding.",
+                failure_class="SECURITY_RECOVERY_OWNER_THREAD_BINDING_MISMATCH",
+            )
+        for environment in environments:
+            if not isinstance(environment, Mapping):
+                raise AppServerError(
+                    "App Server returned an invalid Security recovery environment binding.",
+                    failure_class="SECURITY_RECOVERY_OWNER_THREAD_BINDING_MISMATCH",
+                )
+            environment_roots = environment.get("runtimeWorkspaceRoots")
+            if (
+                path_identity_key(environment.get("cwd", "")) != expected_root
+                or not isinstance(environment_roots, list)
+                or len(environment_roots) != 1
+                or path_identity_key(environment_roots[0]) != expected_root
+            ):
+                raise AppServerError(
+                    "App Server returned an unexpected Security recovery repository environment.",
+                    failure_class="SECURITY_RECOVERY_OWNER_THREAD_BINDING_MISMATCH",
+                )
+        thread_cwd = thread.get("cwd") if isinstance(thread, Mapping) else None
+        if isinstance(thread_cwd, str) and path_identity_key(thread_cwd) != expected_root:
+            raise AppServerError(
+                "App Server returned a different Security recovery thread cwd.",
+                failure_class="SECURITY_RECOVERY_OWNER_THREAD_BINDING_MISMATCH",
+            )
+        self.last_thread_request = dict(params)
+        self.last_thread_binding = dict(binding)
+        self._active_thread_id = thread_id
+        self._active_thread_resumed = True
+        return dict(binding)
+
+    def _verify_security_cancel_tool_catalog(self) -> dict[str, Any]:
+        response = self.request(
+            "mcpServerStatus/list",
+            {"limit": 100},
+            timeout=self.config.app_server_initialize_timeout,
+        )
+        return _validate_security_cancel_tool_catalog(response)
+
+    def _verify_security_recovery_native_tool_policy(self, repository: Path) -> dict[str, Any]:
+        response = self.request(
+            "config/read",
+            {"cwd": str(repository.resolve()), "includeLayers": False},
+            timeout=self.config.app_server_initialize_timeout,
+        )
+        return _validate_security_recovery_native_tool_policy(response)
+
+    def run_security_cancel_turn(
+        self,
+        repository: Path,
+        owner_thread_id: str,
+        scan_id: str,
+        prompt: str,
+    ) -> dict[str, Any]:
+        """Run one bounded cancellation turn on an exact resumed owner thread."""
+
+        with self._lock:
+            previous_journal = self._event_journal
+            previous_context = self._event_context
+            previous_dispatch_provenance = getattr(self, "_active_dispatch_provenance", None)
+            self._event_journal = None
+            self._event_context = {}
+            self._active_dispatch_provenance = {"maintenance_operation": "security_scan_cancel"}
+            self.last_turn_provenance = {}
+            outcome: dict[str, Any] = {
+                "thread_id": owner_thread_id,
+                "turn_id": "",
+                "thread_resumed": False,
+                "thread_binding": {},
+                "turn_state": "not_started",
+                "approval_policy": "on-request",
+                "approval_granted": False,
+                "approval_request_count": 0,
+                "tool_call_attempted": False,
+                "tool_call_count": 0,
+                "tool_server": "codex-security",
+                "tool_name": "cancel_codex_security_scan",
+                "scan_id": scan_id,
+                "tool_catalog": {},
+                "tool_catalog_validated": False,
+                "native_tool_policy": {},
+                "native_tool_policy_validated": False,
+                "provider_tool_result": None,
+                "approval_state_cleared": True,
+                "approval_policy_reset": False,
+                "turn_cancel_requested": False,
+                "turn_cancel_confirmed": False,
+                "failure_class": "",
+            }
+            resumed = False
+            turn_attempted = False
+            context: dict[str, Any] | None = None
+            try:
+                if self.security_recovery_mode is not True:
+                    outcome["failure_class"] = "SECURITY_RECOVERY_PROCESS_NOT_ISOLATED"
+                    return outcome
+                try:
+                    native_tool_policy = self._verify_security_recovery_native_tool_policy(repository)
+                except AppServerError as exc:
+                    outcome["failure_class"] = exc.failure_class or "SECURITY_RECOVERY_NATIVE_TOOL_POLICY_UNSAFE"
+                    return outcome
+                outcome["native_tool_policy"] = native_tool_policy
+                outcome["native_tool_policy_validated"] = True
+                try:
+                    catalog = self._verify_security_cancel_tool_catalog()
+                except AppServerError as exc:
+                    outcome["failure_class"] = exc.failure_class or "SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE"
+                    return outcome
+                outcome["tool_catalog"] = {"before_resume": catalog}
+                try:
+                    binding = self._resume_exact_security_thread_unlocked(
+                        owner_thread_id,
+                        repository,
+                        approval_policy="never",
+                    )
+                except AppServerError as exc:
+                    outcome["failure_class"] = exc.failure_class or "SECURITY_RECOVERY_OWNER_THREAD_RESUME_FAILED"
+                    outcome["resume_failure_class"] = outcome["failure_class"]
+                    return outcome
+                resumed = True
+                outcome["thread_resumed"] = True
+                outcome["thread_binding"] = binding
+                try:
+                    catalog = self._verify_security_cancel_tool_catalog()
+                except AppServerError as exc:
+                    outcome["failure_class"] = exc.failure_class or "SECURITY_RECOVERY_TOOL_CATALOG_UNSAFE"
+                    return outcome
+                outcome["tool_catalog"]["after_resume"] = catalog
+                outcome["tool_catalog_validated"] = True
+                context = {
+                    "operation": "security_scan_cancel",
+                    "approval_policy": "on-request",
+                    "binding_validated": True,
+                    "tool_catalog_validated": True,
+                    "thread_id": owner_thread_id,
+                    "repository": str(repository.resolve()),
+                    "environment_ids": [
+                        str(environment.get("environmentId", ""))
+                        for environment in binding.get("environments", [])
+                        if isinstance(environment, Mapping) and environment.get("environmentId")
+                    ],
+                    "scan_id": scan_id,
+                    "approval_request_count": 0,
+                    "approval_granted": False,
+                    "mcp_tool_call_count": 0,
+                    "matching_tool_call_count": 0,
+                    "mcp_tool_calls": [],
+                    "unexpected_item_seen": False,
+                    "unexpected_item_types": [],
+                    "provider_tool_result": None,
+                    "approval_denial_reason": "",
+                }
+                self._active_security_cancel_approval = context
+                turn_attempted = True
+                try:
+                    turn = self._turn_unlocked(
+                        owner_thread_id,
+                        prompt,
+                        repository,
+                        approval_policy="on-request",
+                        sandbox_policy={"type": "readOnly", "networkAccess": False},
+                        persist_thread_mapping=False,
+                    )
+                    outcome["turn_state"] = "completed"
+                    outcome["turn_id"] = str(turn.get("turn_id", ""))
+                    if (
+                        context.get("unexpected_item_seen") is True
+                        or int(context.get("mcp_tool_call_count", 0)) != 1
+                        or int(context.get("matching_tool_call_count", 0)) != 1
+                        or int(context.get("approval_request_count", 0)) != 1
+                        or context.get("approval_granted") is not True
+                    ):
+                        outcome["turn_state"] = "failed"
+                        outcome["failure_class"] = "SECURITY_RECOVERY_UNEXPECTED_TOOL_OR_APPROVAL_STATE"
+                except Exception as exc:
+                    outcome["turn_state"] = "failed"
+                    failure = _finalize_turn_failure(self, exc)
+                    active = self._active_turn_provenance
+                    if isinstance(active, Mapping):
+                        outcome["turn_id"] = str(active.get("turn_id") or "")
+                    outcome["failure_class"] = (
+                        str(getattr(exc, "failure_class", ""))
+                        or str(getattr(exc, "termination_classification", ""))
+                        or (str(failure.get("termination_classification", "")) if failure else "")
+                        or "APP_SERVER_PROVIDER_ERROR"
+                    )
+                    outcome["turn_provenance"] = failure or {}
+                    active_turn = self._active_turn_provenance
+                    failed_turn_id = active_turn.get("turn_id") if isinstance(active_turn, Mapping) else None
+                    if isinstance(failed_turn_id, str) and failed_turn_id:
+                        if isinstance(context, dict) and context.get("turn_cancel_requested") is True:
+                            outcome["turn_cancel_requested"] = True
+                            outcome["turn_cancel_confirmed"] = context.get("turn_cancel_confirmed") is True
+                        else:
+                            outcome["turn_cancel_requested"] = True
+                            try:
+                                cancel_response = self.request(
+                                    "turn/cancel",
+                                    {"threadId": owner_thread_id, "turnId": failed_turn_id},
+                                    timeout=self.config.app_server_thread_timeout,
+                                )
+                                outcome["turn_cancel_confirmed"] = "error" not in cancel_response
+                            except Exception:
+                                outcome["turn_cancel_confirmed"] = False
+                finally:
+                    if isinstance(self._active_turn_provenance, Mapping):
+                        if not outcome.get("turn_provenance"):
+                            self.last_turn_provenance = dict(self._active_turn_provenance)
+                        self._active_turn_provenance = None
+                    if isinstance(context, dict):
+                        outcome["approval_granted"] = context.get("approval_granted") is True
+                        outcome["approval_request_count"] = int(context.get("approval_request_count", 0))
+                        outcome["approval_denial_reason"] = str(context.get("approval_denial_reason", ""))
+                        outcome["tool_call_attempted"] = int(context.get("mcp_tool_call_count", 0)) > 0
+                        outcome["tool_call_count"] = int(context.get("mcp_tool_call_count", 0))
+                        outcome["matching_tool_call_count"] = int(context.get("matching_tool_call_count", 0))
+                        outcome["unexpected_item_seen"] = context.get("unexpected_item_seen") is True
+                        outcome["unexpected_item_types"] = list(context.get("unexpected_item_types", []))
+                        if context.get("turn_cancel_requested") is True:
+                            outcome["turn_cancel_requested"] = True
+                            outcome["turn_cancel_confirmed"] = context.get("turn_cancel_confirmed") is True
+                        cancel_failure_class = context.get("turn_cancel_failure_class")
+                        if isinstance(cancel_failure_class, str) and cancel_failure_class:
+                            outcome["turn_cancel_failure_class"] = cancel_failure_class
+                        provider_result = context.get("provider_tool_result")
+                        outcome["provider_tool_result"] = dict(provider_result) if isinstance(provider_result, Mapping) else None
+                    self._active_security_cancel_approval = None
+                    outcome["approval_state_cleared"] = self._active_security_cancel_approval is None
+                    if turn_attempted:
+                        try:
+                            reset_binding = self._resume_exact_security_thread_unlocked(
+                                owner_thread_id,
+                                repository,
+                                approval_policy="never",
+                            )
+                            if _thread_binding_signature(reset_binding) != _thread_binding_signature(
+                                outcome.get("thread_binding", {})
+                            ):
+                                raise AppServerError(
+                                    "The Security recovery owner thread binding changed while resetting approval policy.",
+                                    failure_class="SECURITY_RECOVERY_OWNER_THREAD_BINDING_MISMATCH",
+                                )
+                            outcome["approval_policy_reset"] = True
+                        except Exception as exc:
+                            outcome["approval_policy_reset"] = False
+                            outcome["approval_policy_reset_failure_class"] = (
+                                str(getattr(exc, "failure_class", ""))
+                                or str(getattr(exc, "termination_classification", ""))
+                                or "SECURITY_RECOVERY_APPROVAL_POLICY_RESET_FAILED"
+                            )
+                            if not outcome.get("failure_class"):
+                                outcome["failure_class"] = "SECURITY_RECOVERY_APPROVAL_POLICY_RESET_FAILED"
+                if not outcome.get("turn_provenance"):
+                    outcome["turn_provenance"] = dict(self.last_turn_provenance)
+                return outcome
+            finally:
+                self._active_security_cancel_approval = None
+                if not resumed:
+                    outcome["approval_state_cleared"] = True
+                self._event_journal = previous_journal
+                self._event_context = previous_context
+                self._active_dispatch_provenance = previous_dispatch_provenance
 
     def _thread_id_for_unlocked(self, repository: Path) -> tuple[str, bool]:
         repository = repository.resolve(strict=False)
@@ -1160,14 +1924,26 @@ class _AppServerProcess:
         with self._lock:
             return self._thread_id_for_unlocked(repository)
 
-    def _turn_unlocked(self, thread_id: str, prompt: str, repository: Path) -> dict[str, Any]:
+    def _turn_unlocked(
+        self,
+        thread_id: str,
+        prompt: str,
+        repository: Path,
+        *,
+        approval_policy: str | None = None,
+        sandbox_policy: Mapping[str, Any] | None = None,
+        persist_thread_mapping: bool = True,
+    ) -> dict[str, Any]:
         params: dict[str, Any] = {
             "threadId": thread_id,
             "input": [{"type": "text", "text": prompt}],
-            "approvalPolicy": "never" if self.agent.sandbox == "workspace-write" else "on-request",
+            "approvalPolicy": approval_policy or ("never" if self.agent.sandbox == "workspace-write" else "on-request"),
             "cwd": str(repository.resolve()),
         }
-        if self.agent.sandbox == "workspace-write":
+        if sandbox_policy is not None:
+            params["sandboxPolicy"] = dict(sandbox_policy)
+            params["runtimeWorkspaceRoots"] = _canonical_workspace_roots(repository)
+        elif self.agent.sandbox == "workspace-write":
             params["sandboxPolicy"] = _workspace_write_sandbox_policy(
                 repository,
                 network_access=self.agent.network_access,
@@ -1219,6 +1995,7 @@ class _AppServerProcess:
                 termination_classification="APP_SERVER_PROTOCOL_ERROR",
             )
         self._active_turn_provenance["turn_id"] = turn_id
+        self._request_security_recovery_turn_cancel()
 
         started = False
         completed: dict[str, Any] | None = None
@@ -1265,6 +2042,8 @@ class _AppServerProcess:
                     continue
                 raise
             if "id" in message and "method" not in message:
+                if self._consume_security_recovery_turn_cancel_response(message):
+                    continue
                 self._pending.append(message)
                 continue
             self._record_notification(message)
@@ -1345,15 +2124,16 @@ class _AppServerProcess:
         # A fresh thread has no durable rollout until its first turn is
         # accepted. Persist only materialized threads so a later invocation
         # cannot resume the unmaterialized id returned by thread/start.
-        _save_thread_mapping(
-            self.config,
-            self.agent,
-            repository,
-            thread_id,
-            role=self.role,
-            windows_sandbox=self.windows_sandbox,
-            require_workspace_ready=bool(getattr(self, "require_workspace_ready", False)),
-        )
+        if persist_thread_mapping:
+            _save_thread_mapping(
+                self.config,
+                self.agent,
+                repository,
+                thread_id,
+                role=self.role,
+                windows_sandbox=self.windows_sandbox,
+                require_workspace_ready=bool(getattr(self, "require_workspace_ready", False)),
+            )
         return {
             "thread_id": thread_id,
             "turn_id": turn_id,
@@ -1880,6 +2660,85 @@ def run_codex_app_server(
         else:
             metadata["availability_failure_class"] = "provider_runtime_unavailable"
         return CommandResult(command, 1, "", failure_reason, metadata)
+
+
+def run_codex_security_cancel_turn(
+    *,
+    config: OrchestratorConfig,
+    agent: AgentConfig,
+    repository: Path,
+    owner_thread_id: str,
+    scan_id: str,
+) -> dict[str, Any]:
+    """Resume an exact owner thread and request one exact Codex Security cancellation."""
+
+    if agent.backend != "app_server" or agent.sandbox != "workspace-write":
+        raise AppServerError(
+            "Security recovery requires the configured workspace-write App Server Executor profile.",
+            failure_class="SECURITY_RECOVERY_EXECUTOR_PROFILE_UNSUPPORTED",
+        )
+    prompt = (
+        f"Cancel only Codex Security scan {scan_id} using the official Codex Security cancellation tool available "
+        "to this owner thread. Do not cancel, start, or modify any other scan. Do not make repository edits or use "
+        "any other tool. After the tool call, report only the exact result."
+    )
+    process: _AppServerProcess | None = None
+    result: dict[str, Any] = {
+        "thread_id": owner_thread_id,
+        "turn_state": "not_started",
+        "failure_class": "SECURITY_RECOVERY_APP_SERVER_NO_RESULT",
+    }
+    try:
+        process = _AppServerProcess(
+            config=config,
+            agent=agent,
+            repository=repository,
+            progress=None,
+            role="executor",
+            require_workspace_ready=True,
+            security_recovery_mode=True,
+        )
+        run = getattr(process, "run_security_cancel_turn", None)
+        if not callable(run):
+            raise AppServerError(
+                "The configured App Server adapter does not support exact-thread Security recovery.",
+                failure_class="SECURITY_RECOVERY_ADAPTER_UNSUPPORTED",
+            )
+        result = run(repository, owner_thread_id, scan_id, prompt)
+        if not isinstance(result, dict):
+            result = {
+                "thread_id": owner_thread_id,
+                "turn_state": "failed",
+                "failure_class": "SECURITY_RECOVERY_APP_SERVER_INVALID_RESULT",
+            }
+    except Exception as exc:
+        failure_class = (
+            str(getattr(exc, "failure_class", ""))
+            or str(getattr(exc, "termination_classification", ""))
+            or type(exc).__name__.upper()
+        )
+        if not re.fullmatch(r"[A-Z0-9_]{1,128}", failure_class):
+            failure_class = type(exc).__name__.upper()
+        result = {
+            "thread_id": owner_thread_id,
+            "turn_state": "failed",
+            "failure_class": failure_class,
+        }
+    finally:
+        close_error = False
+        if process is not None:
+            try:
+                process.close()
+            except Exception:
+                close_error = True
+        try:
+            closed = process is None or bool(process.process.poll() is not None)
+        except Exception:
+            closed = False
+        result["temporary_tool_policy_cleared"] = bool(closed and not close_error)
+        if not result["temporary_tool_policy_cleared"]:
+            result["failure_class"] = "SECURITY_RECOVERY_TOOL_POLICY_CLEAR_FAILED"
+    return result
 
 
 def app_server_call(

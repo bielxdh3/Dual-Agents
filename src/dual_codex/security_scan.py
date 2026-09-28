@@ -28,6 +28,7 @@ _READ_TOOLS = frozenset(
         "get_codex_security_completed_scan",
     }
 )
+_OWNERLESS_DEEP_CANCEL_TOOL = "cancel_codex_security_scan_from_app"
 _MAX_MCP_LINE = 2 * 1024 * 1024
 _MCP_TIMEOUT_SECONDS = 20.0
 
@@ -617,6 +618,7 @@ class _McpReadClient:
                     "The installed Codex Security MCP server is missing required read APIs.",
                     failure_class="SECURITY_SCAN_PROVIDER_UNAVAILABLE",
                 )
+            self.tool_names = frozenset(str(name) for name in tool_names if isinstance(name, str))
         except BaseException:
             self.close()
             raise
@@ -715,6 +717,54 @@ class _McpReadClient:
             failure_class="SECURITY_SCAN_PROVIDER_UNAVAILABLE",
         )
 
+    def cancel_ownerless_deep_scan(self, scan_id: str) -> dict[str, Any]:
+        """Call the provider's explicit app-only exact-ID cancellation tool."""
+
+        if _OWNERLESS_DEEP_CANCEL_TOOL not in getattr(self, "tool_names", frozenset()):
+            return {
+                "tool": _OWNERLESS_DEEP_CANCEL_TOOL,
+                "scan_id": scan_id,
+                "tool_available": False,
+                "tool_call_attempted": False,
+                "result_returned": False,
+                "provider_error": True,
+                "failure_class": "SECURITY_SCAN_OWNERLESS_ADMIN_UNSUPPORTED",
+            }
+        try:
+            result = self._request(
+                "tools/call",
+                {"name": _OWNERLESS_DEEP_CANCEL_TOOL, "arguments": {"scanId": scan_id}},
+            )
+        except Exception as exc:
+            return {
+                "tool": _OWNERLESS_DEEP_CANCEL_TOOL,
+                "scan_id": scan_id,
+                "tool_available": True,
+                "tool_call_attempted": True,
+                "result_returned": False,
+                "provider_error": True,
+                "failure_class": str(getattr(exc, "failure_class", ""))
+                or "SECURITY_SCAN_PROVIDER_UNAVAILABLE",
+            }
+        structured = result.get("structuredContent")
+        workspace = structured.get("workspace") if isinstance(structured, Mapping) else None
+        workspace_results = workspace.get("results") if isinstance(workspace, Mapping) else None
+        result_scan_id = workspace_results.get("scanId") if isinstance(workspace_results, Mapping) else None
+        progress = workspace_results.get("progress") if isinstance(workspace_results, Mapping) else None
+        result_status = progress.get("status") if isinstance(progress, Mapping) else None
+        if not isinstance(result_status, str) and isinstance(workspace_results, Mapping):
+            result_status = workspace_results.get("status")
+        return {
+            "tool": _OWNERLESS_DEEP_CANCEL_TOOL,
+            "scan_id": scan_id,
+            "tool_available": True,
+            "tool_call_attempted": True,
+            "result_returned": True,
+            "provider_error": result.get("isError") is True,
+            "result_scan_id_matches": result_scan_id == scan_id,
+            "result_status": result_status if isinstance(result_status, str) and result_status in SCAN_STATUSES else "unknown",
+        }
+
     def close(self) -> None:
         if self.process.poll() is None:
             if self.process.stdin is not None:
@@ -771,6 +821,19 @@ class CodexSecurityProvider:
                     )
                 offset = next_offset
         return [dict(scan) for scan in scans]
+
+    def cancel_ownerless_deep_scan(self, scan_id: str) -> dict[str, Any]:
+        """Run the supported app-only exact-ID tool, never editing the ledger directly."""
+
+        env = codex_environment(self.agent, isolate_desktop_bridge=True)
+        executable = _node_executable(env)
+        with _McpReadClient(
+            executable,
+            self.plugin_root / "mcp" / "server.mjs",
+            self.plugin_root,
+            env,
+        ) as client:
+            return client.cancel_ownerless_deep_scan(scan_id)
 
     def arbitrate(
         self,

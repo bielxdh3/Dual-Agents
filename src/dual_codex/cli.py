@@ -21,6 +21,7 @@ from .orchestrator import execute
 from .process import run_command
 from .publication import PublicationError, execute_publication, publication_request_from_json
 from .report import atomic_write_json
+from .security_recovery import cancel_security_scan
 from .terminal import TerminalError, TerminalManager, session_id_for
 from .registry import (
     abbreviate_path,
@@ -214,6 +215,26 @@ def _parser() -> argparse.ArgumentParser:
     )
     publication.add_argument("--request-file", required=True, help="Typed non-secret publication request JSON")
     publication.add_argument("--result-file", required=True, help="Atomic JSON result path")
+
+    security = sub.add_parser("security", help="Run an explicitly authorized Security maintenance operation")
+    security_sub = security.add_subparsers(dest="security_command", required=True)
+    cancel_scan = security_sub.add_parser(
+        "cancel-scan",
+        help="Cancel exactly one validated Codex Security scan",
+    )
+    cancel_scan.add_argument("--repository", required=True, help="Exact Git worktree root")
+    cancel_scan.add_argument("--target", required=True, help="Exact Codex Security target path")
+    cancel_scan.add_argument("--scan-id", required=True, help="Exact scan UUID; wildcards are not supported")
+    cancel_scan.add_argument("--revision", required=True, help="Expected scan target revision")
+    cancel_scan.add_argument("--scope", required=True, help="Expected scan scope")
+    cancel_scan.add_argument("--mode", required=True, choices=("standard", "deep"))
+    owner = cancel_scan.add_mutually_exclusive_group(required=True)
+    owner.add_argument("--owner-thread", help="Exact App Server owner thread UUID")
+    owner.add_argument(
+        "--ownerless-admin",
+        action="store_true",
+        help="Use the provider's app-only exact-ID API for an ownerless Deep scan",
+    )
 
     terminal = sub.add_parser("terminal", help="Manage native Windows Codex terminal sessions")
     terminal_sub = terminal.add_subparsers(dest="terminal_command", required=True)
@@ -785,6 +806,22 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             print("DUAL_CODEX_PUBLICATION_RESULT " + json.dumps(result.as_dict(), ensure_ascii=False), flush=True)
             return 0 if result.status == "completed" else 1
+        if args.command == "security":
+            if args.security_command != "cancel-scan":
+                raise ValueError(f"Unsupported Security command '{args.security_command}'.")
+            result = cancel_security_scan(
+                config,
+                repository=args.repository,
+                target_path=args.target,
+                scan_id=args.scan_id,
+                expected_revision=args.revision,
+                scope=args.scope,
+                mode=args.mode,
+                owner_thread_id=args.owner_thread,
+                ownerless_admin=args.ownerless_admin,
+            )
+            print("DUAL_CODEX_SECURITY_RECOVERY_RESULT " + json.dumps(result, ensure_ascii=False), flush=True)
+            return 0 if result.get("success") is True else 1
         if args.command == "account":
             _account_command(args, config)
             return 0

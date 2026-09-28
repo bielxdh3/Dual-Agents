@@ -808,6 +808,49 @@ class AppServerTests(unittest.TestCase):
         self.assertFalse(disabled["networkAccess"])
         self.assertTrue(enabled["networkAccess"])
 
+    def test_security_recovery_command_is_separate_and_has_exact_mcp_allowlist(self) -> None:
+        config = _config(Path("C:/dual-codex-test"))
+        agent = AgentConfig(
+            codex_home=Path("C:/dual-codex-test/profile"),
+            model="",
+            reasoning_effort="high",
+            sandbox="workspace-write",
+            account_name="codex-secundario",
+            backend="app_server",
+        )
+        normal = _app_server_command(config, agent=agent, role="executor")
+        maintenance = _app_server_command(
+            config,
+            agent=agent,
+            role="executor",
+            security_recovery=True,
+        )
+        self.assertNotIn("mcp_servers=", " ".join(normal))
+        self.assertNotIn("plugins=", " ".join(normal))
+        self.assertNotIn("features.shell_tool=false", normal)
+        self.assertNotIn("features.hooks=false", normal)
+        self.assertNotIn("features.multi_agent=false", normal)
+        self.assertNotIn('web_search="disabled"', normal)
+        self.assertNotIn("features.browser_use=false", normal)
+        self.assertNotIn("features.computer_use=false", normal)
+        self.assertNotIn("features.apps=false", normal)
+        self.assertIn("features.shell_tool=false", maintenance)
+        self.assertIn("features.hooks=false", maintenance)
+        self.assertIn("features.multi_agent=false", maintenance)
+        self.assertIn('web_search="disabled"', maintenance)
+        self.assertIn("features.apps=false", maintenance)
+        self.assertIn("features.browser_use=false", maintenance)
+        self.assertIn("features.browser_use_external=false", maintenance)
+        self.assertIn("features.browser_use_full_cdp_access=false", maintenance)
+        self.assertIn("features.computer_use=false", maintenance)
+        self.assertIn("features.image_generation=false", maintenance)
+        self.assertIn("features.sleep_tool=false", maintenance)
+        self.assertIn("mcp_servers={codex_apps={url=\"http://127.0.0.1:9\",enabled=false}}", maintenance)
+        self.assertIn(
+            'plugins={"codex-security@openai-curated-remote"={enabled=true,mcp_servers={"codex-security"={enabled=true,enabled_tools=["cancel_codex_security_scan"]}}}}',
+            maintenance,
+        )
+
     @unittest.skipUnless(os.name == "nt", "Windows Executor sandbox policy")
     def test_elevated_sandbox_override_is_limited_to_workspace_write_executor(self) -> None:
         root = Path("C:/dual-codex-test")
