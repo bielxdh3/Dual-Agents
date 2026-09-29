@@ -285,6 +285,107 @@ def _directory_identity(info: os.stat_result) -> tuple[int, int, int, int]:
     )
 
 
+def _opened_file_matches_lstat(path_info: os.stat_result, opened_info: os.stat_result) -> bool:
+    """Compare a no-follow path stat with the identity obtained from its open handle."""
+
+    if os.name != "nt":
+        return _stat_identity(path_info) == _stat_identity(opened_info)
+
+    # Windows path stat adds executable bits for known executable suffixes;
+    # fstat has only the handle and does not infer those bits from the name.
+    # Keep file type, non-execute mode bits, volume/file identity, timestamps,
+    # and reparse attributes in the comparison.
+    path_mode = path_info.st_mode
+    opened_mode = opened_info.st_mode
+    if stat.S_IFMT(path_mode) != stat.S_IFMT(opened_mode):
+        return False
+    if (stat.S_IMODE(path_mode) & ~0o111) != (stat.S_IMODE(opened_mode) & ~0o111):
+        return False
+    if not getattr(path_info, "st_ino", 0) or not getattr(opened_info, "st_ino", 0):
+        return False
+    return (
+        path_info.st_dev == opened_info.st_dev
+        and path_info.st_ino == opened_info.st_ino
+        and path_info.st_size == opened_info.st_size
+        and path_info.st_mtime_ns == opened_info.st_mtime_ns
+        and getattr(path_info, "st_file_attributes", 0) == getattr(opened_info, "st_file_attributes", 0)
+    )
+
+
+def _reparse_directory_snapshot(
+    repository: Path,
+    path: Path,
+    before: os.stat_result,
+    root_before: os.stat_result,
+    parent_snapshots: list[tuple[Path, os.stat_result]],
+) -> dict[str, object]:
+    """Represent only a stable directory reparse point whose target is inventoried in this repository."""
+
+    if not stat.S_ISDIR(before.st_mode):
+        return {"kind": "unknown", "reason": "reparse_point"}
+    try:
+        raw_target = os.readlink(path)
+        normalized_target = raw_target
+        if os.name == "nt":
+            if normalized_target.startswith("\\\\?\\UNC\\"):
+                normalized_target = "\\\\" + normalized_target[8:]
+            elif normalized_target.startswith("\\\\?\\"):
+                normalized_target = normalized_target[4:]
+        target_path = Path(normalized_target)
+        if not target_path.is_absolute():
+            target_path = path.parent / target_path
+        repository_root = repository.resolve(strict=True)
+        resolved_target = target_path.resolve(strict=True)
+        try:
+            target_relative = resolved_target.relative_to(repository_root)
+        except ValueError:
+            return {"kind": "unknown", "reason": "reparse_target_outside_repository"}
+        if not target_relative.parts:
+            return {"kind": "unknown", "reason": "reparse_target_repository_root"}
+
+        target_info: os.stat_result | None = None
+        current = repository_root
+        for part in target_relative.parts:
+            current = current / part
+            target_info = current.lstat()
+            if (
+                not stat.S_ISDIR(target_info.st_mode)
+                or stat.S_ISLNK(target_info.st_mode)
+                or _is_reparse_point(target_info)
+            ):
+                return {"kind": "unknown", "reason": "reparse_target_unsafe"}
+        if target_info is None:
+            return {"kind": "unknown", "reason": "reparse_target_unavailable"}
+        if os.name == "nt" and not target_info.st_ino:
+            return {"kind": "unknown", "reason": "reparse_target_identity_unavailable"}
+
+        link_after = path.lstat()
+        target_after = resolved_target.lstat()
+        root_after = repository.lstat()
+        parents_unchanged = all(
+            _stat_identity(parent.lstat()) == _stat_identity(parent_before)
+            for parent, parent_before in parent_snapshots
+        )
+        if (
+            not stat.S_ISDIR(link_after.st_mode)
+            or not _is_reparse_point(link_after)
+            or (os.name == "nt" and (not before.st_ino or not link_after.st_ino))
+            or _stat_identity(before) != _stat_identity(link_after)
+            or os.readlink(path) != raw_target
+            or _stat_identity(target_info) != _stat_identity(target_after)
+            or _stat_identity(root_before) != _stat_identity(root_after)
+            or not parents_unchanged
+        ):
+            return {"kind": "unknown", "reason": "reparse_path_changed_during_snapshot"}
+        return {
+            "kind": "directory_reparse",
+            "target": target_relative.as_posix(),
+            "target_identity": list(_directory_identity(target_info)),
+        }
+    except (OSError, RuntimeError, ValueError):
+        return {"kind": "unknown", "reason": "reparse_target_unavailable"}
+
+
 def _worktree_snapshot(
     repository: Path,
     relative_path: str,
@@ -326,7 +427,7 @@ def _worktree_snapshot(
         except OSError:
             return {"kind": "unknown", "reason": "symlink_read_failed"}
     if _is_reparse_point(before):
-        return {"kind": "unknown", "reason": "reparse_point"}
+        return _reparse_directory_snapshot(repository, path, before, root_info, parent_snapshots)
     if stat.S_ISDIR(before.st_mode):
         return {"kind": "directory", "mode": stat.S_IMODE(before.st_mode)}
     if not stat.S_ISREG(before.st_mode):
@@ -343,7 +444,7 @@ def _worktree_snapshot(
                 not stat.S_ISREG(opened.st_mode)
                 or _is_reparse_point(opened)
                 or stat.S_ISLNK(opened.st_mode)
-                or _stat_identity(opened) != _stat_identity(before)
+                or not _opened_file_matches_lstat(before, opened)
             ):
                 return {"kind": "unknown", "reason": "unsafe_opened_file"}
             digest = hashlib.sha256()
@@ -776,6 +877,25 @@ def capture_git_baseline(repository: Path, *, include_ignored: bool = False) -> 
     snapshots = {path: _worktree_snapshot(repository, path) for path in paths_to_hash}
     if include_ignored:
         snapshots.update(_ignored_tree_snapshots(repository, ignored_paths))
+        inventoried_paths = set(tracked_paths).union(untracked_paths, ignored_paths)
+        # A directory alias is safe only when its canonical target is also
+        # covered by Git's tracked/untracked/ignored inventory. Its contents
+        # are hashed at that canonical path, avoiding duplicate traversal of
+        # large workspace trees through node_modules links.
+        def normalized_inventory_path(value: str) -> str:
+            return os.path.normcase(value.replace("\\", "/").rstrip("/")).replace("\\", "/")
+
+        for path, snapshot in tuple(snapshots.items()):
+            if snapshot.get("kind") != "directory_reparse":
+                continue
+            target_key = normalized_inventory_path(str(snapshot.get("target", "")))
+            covered = any(
+                (candidate := normalized_inventory_path(item)) == target_key
+                or candidate.startswith(target_key + "/")
+                for item in inventoried_paths
+            )
+            if not covered:
+                snapshots[path] = {"kind": "unknown", "reason": "reparse_target_not_git_inventoried"}
         # A scan-only Executor could write through a pre-existing repository
         # symlink to data that the repository snapshot does not cover. Fail
         # closed instead of treating link-text stability as target stability.

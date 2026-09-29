@@ -204,6 +204,35 @@ class SecurityRecoveryTests(unittest.TestCase):
             self.assertEqual(saved["classification"], result["classification"])
             self.assertEqual(saved["preflight_failure_class"], "ATTRIBUTEERROR")
 
+    def test_incomplete_mutation_baseline_prevents_provider_and_cancellation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository = _init_repo(root)
+            provider = _FakeSecurityProvider([_scan(repository)])
+            incomplete_baseline = {
+                "repository": str(repository.resolve()),
+                "complete": False,
+                "worktree_snapshots": {"unsafe-link": {"kind": "unknown", "reason": "reparse_point"}},
+            }
+            unknown_attribution = {
+                "status": "unknown",
+                "unknown_paths": ["unsafe-link"],
+            }
+            with patch("dual_codex.security_recovery.capture_git_baseline", return_value=incomplete_baseline), patch(
+                "dual_codex.security_recovery.attribute_git_mutations", return_value=unknown_attribution
+            ), patch("dual_codex.security_recovery.CodexSecurityProvider", return_value=provider) as provider_constructor:
+                result = self._run(root, provider)
+
+            provider_constructor.assert_not_called()
+            self.assertFalse(result["cancellation_attempted"])
+            self.assertFalse(result["tool_call_attempted"])
+            self.assertIsNone(result["ledger_before"])
+            self.assertIsNone(result["ledger_after"])
+            self.assertEqual(result["preflight_failure_class"], "SECURITY_RECOVERY_MUTATION_BASELINE_INCOMPLETE")
+            self.assertEqual(result["classification"], "SECURITY_RECOVERY_MUTATION_ATTRIBUTION_FAILED")
+            self.assertEqual(result["mutation_attribution"]["status"], "unknown")
+            self.assertEqual(result["mutation_attribution"]["unknown_path_count"], 1)
+
     def test_cancellation_requires_exact_owner_or_explicit_deep_admin_authority(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -4,14 +4,17 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from dual_codex.git import (
     _git_metadata_snapshots,
     _git_object_inventory,
+    _opened_file_matches_lstat,
     _worktree_snapshot,
     attribute_git_mutations,
     capture_git_baseline,
@@ -299,6 +302,262 @@ class GitBaselineTests(unittest.TestCase):
             with patch("dual_codex.git.os.open", side_effect=swapped_open):
                 snapshot = _worktree_snapshot(repository, "tracked.txt")
             self.assertEqual(snapshot, {"kind": "unknown", "reason": "unsafe_opened_file"})
+
+    def test_windows_open_handle_identity_ignores_only_suffix_derived_execute_bits(self) -> None:
+        path_info = SimpleNamespace(
+            st_dev=7,
+            st_ino=19,
+            st_size=24,
+            st_mtime_ns=31,
+            st_mode=stat.S_IFREG | 0o777,
+            st_file_attributes=32,
+        )
+        opened_info = SimpleNamespace(
+            st_dev=7,
+            st_ino=19,
+            st_size=24,
+            st_mtime_ns=31,
+            st_mode=stat.S_IFREG | 0o666,
+            st_file_attributes=32,
+        )
+        with patch("dual_codex.git.os.name", "nt"):
+            self.assertTrue(_opened_file_matches_lstat(path_info, opened_info))
+            for field, value in (
+                ("st_dev", 8),
+                ("st_ino", 20),
+                ("st_size", 25),
+                ("st_mtime_ns", 32),
+                ("st_file_attributes", 33),
+                ("st_mode", stat.S_IFREG | 0o600),
+                ("st_mode", stat.S_IFDIR | 0o666),
+            ):
+                with self.subTest(field=field, value=value):
+                    changed = SimpleNamespace(**vars(opened_info))
+                    setattr(changed, field, value)
+                    self.assertFalse(_opened_file_matches_lstat(path_info, changed))
+
+    @unittest.skipUnless(os.name == "nt", "Windows path stat adds executable bits from executable suffixes")
+    def test_windows_ignored_cmd_file_baselines_and_detects_content_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = self._repository(Path(temporary))
+            (repository / ".gitignore").write_text("tool.cmd\n", encoding="utf-8")
+            tool = repository / "tool.cmd"
+            tool.write_text("first\n", encoding="utf-8")
+            subprocess.run(["git", "add", ".gitignore"], cwd=repository, check=True)
+            subprocess.run(["git", "commit", "-qm", "ignore generated command"], cwd=repository, check=True)
+
+            baseline = capture_git_baseline(repository, include_ignored=True)
+            self.assertTrue(baseline["complete"], baseline["worktree_snapshots"])
+            self.assertEqual(baseline["worktree_snapshots"]["tool.cmd"]["kind"], "file")
+
+            tool.write_text("changed\n", encoding="utf-8")
+            mutation = attribute_git_mutations(repository, baseline, include_ignored=True)
+            self.assertEqual(mutation["status"], "complete")
+            self.assertEqual(mutation["run_touched_paths"], ["tool.cmd"])
+
+    def _reparse_fixture(self, root: Path) -> tuple[Path, Path, Path]:
+        repository = self._repository(root)
+        (repository / ".gitignore").write_text(
+            "node_modules/\npackages/auth/generated/\n", encoding="utf-8"
+        )
+        target = repository / "packages" / "auth"
+        target.mkdir(parents=True)
+        (target / "module.py").write_text("original\n", encoding="utf-8")
+        subprocess.run(["git", "add", ".gitignore", "packages/auth/module.py"], cwd=repository, check=True)
+        subprocess.run(["git", "commit", "-qm", "add workspace package"], cwd=repository, check=True)
+        ignored = target / "generated"
+        ignored.mkdir()
+        (ignored / "baseline.txt").write_text("ignored baseline\n", encoding="utf-8")
+        link = repository / "node_modules" / "@bielos" / "auth"
+        link.mkdir(parents=True)
+        return repository, target, link
+
+    def _fake_directory_reparse_lstat(self, link: Path):
+        original_lstat = Path.lstat
+
+        def lstat_with_reparse(path: Path):
+            info = original_lstat(path)
+            if path == link:
+                return SimpleNamespace(
+                    st_dev=info.st_dev,
+                    st_ino=info.st_ino,
+                    st_size=info.st_size,
+                    st_mtime_ns=info.st_mtime_ns,
+                    st_ctime_ns=info.st_ctime_ns,
+                    st_mode=info.st_mode,
+                    st_file_attributes=getattr(info, "st_file_attributes", 0) | 0x400,
+                )
+            return info
+
+        return lstat_with_reparse
+
+    def test_in_repository_directory_reparse_target_is_inventoried_and_mutations_are_attributed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository, target, link = self._reparse_fixture(Path(temporary))
+            original_readlink = os.readlink
+
+            def readlink_with_target(path, *args, **kwargs):
+                if Path(path) == link:
+                    return str(target)
+                return original_readlink(path, *args, **kwargs)
+
+            with patch("pathlib.Path.lstat", self._fake_directory_reparse_lstat(link)), patch(
+                "dual_codex.git.os.readlink", side_effect=readlink_with_target
+            ):
+                (target / "module.py").write_text("preexisting package edit\n", encoding="utf-8")
+                baseline = capture_git_baseline(repository, include_ignored=True)
+                self.assertTrue(baseline["complete"], baseline["worktree_snapshots"])
+                reparse_snapshot = baseline["worktree_snapshots"]["node_modules/@bielos/auth"]
+                self.assertEqual(reparse_snapshot["kind"], "directory_reparse")
+                self.assertEqual(reparse_snapshot["target"], "packages/auth")
+                self.assertTrue(reparse_snapshot["target_identity"])
+
+                (target / "module.py").write_text("updated through workspace target\n", encoding="utf-8")
+                (target / "created.py").write_text("new package file\n", encoding="utf-8")
+                mutation = attribute_git_mutations(repository, baseline, include_ignored=True)
+
+            self.assertEqual(mutation["status"], "complete")
+            self.assertEqual(mutation["run_touched_paths"], ["packages/auth/module.py"])
+            self.assertEqual(mutation["run_created_paths"], ["packages/auth/created.py"])
+
+    @unittest.skipUnless(os.name == "nt", "native directory junctions are Windows-specific")
+    def test_native_windows_junction_target_is_inventoried_and_mutations_are_attributed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository, _target, link = self._reparse_fixture(Path(temporary))
+            target = repository / "packages" / "auth"
+            link.rmdir()
+            powershell = shutil.which("powershell.exe")
+            if powershell is None:
+                self.skipTest("Windows PowerShell is unavailable for junction creation")
+            command = f"New-Item -ItemType Junction -Path '{link}' -Target '{target}' | Out-Null"
+            linked = subprocess.run(
+                [powershell, "-NoProfile", "-NonInteractive", "-Command", command],
+                cwd=repository,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if linked.returncode != 0 or not link.exists():
+                self.skipTest("native junction creation is unavailable")
+
+            (link / "module.py").write_text("preexisting edit through junction\n", encoding="utf-8")
+            baseline = capture_git_baseline(repository, include_ignored=True)
+            self.assertTrue(baseline["complete"], baseline["worktree_snapshots"])
+            reparse_snapshot = baseline["worktree_snapshots"]["node_modules/@bielos/auth"]
+            self.assertEqual(reparse_snapshot["kind"], "directory_reparse")
+            self.assertEqual(reparse_snapshot["target"], "packages/auth")
+
+            (link / "module.py").write_text("changed through junction\n", encoding="utf-8")
+            (link / "created.py").write_text("new file through junction\n", encoding="utf-8")
+            (link / "generated" / "baseline.txt").write_text("ignored file changed\n", encoding="utf-8")
+            (link / "generated" / "created.txt").write_text("new ignored file\n", encoding="utf-8")
+            mutation = attribute_git_mutations(repository, baseline, include_ignored=True)
+
+            self.assertEqual(mutation["status"], "complete")
+            self.assertCountEqual(
+                mutation["run_touched_paths"],
+                ["packages/auth/module.py", "packages/auth/generated/baseline.txt"],
+            )
+            self.assertCountEqual(
+                mutation["run_created_paths"],
+                ["packages/auth/created.py", "packages/auth/generated/created.txt"],
+            )
+
+    def test_directory_reparse_target_outside_repository_or_unreadable_stays_unknown(self) -> None:
+        for unreadable in (False, True):
+            with self.subTest(unreadable=unreadable), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                repository, _target, link = self._reparse_fixture(root)
+                external = root / "external"
+                external.mkdir()
+                original_readlink = os.readlink
+
+                def readlink_with_target(path, *args, **kwargs):
+                    if Path(path) == link:
+                        if unreadable:
+                            raise PermissionError("test reparse target unreadable")
+                        return str(external)
+                    return original_readlink(path, *args, **kwargs)
+
+                with patch("pathlib.Path.lstat", self._fake_directory_reparse_lstat(link)), patch(
+                    "dual_codex.git.os.readlink", side_effect=readlink_with_target
+                ):
+                    baseline = capture_git_baseline(repository, include_ignored=True)
+
+                self.assertFalse(baseline["complete"])
+                self.assertEqual(
+                    baseline["worktree_snapshots"]["node_modules/@bielos/auth"],
+                    {
+                        "kind": "unknown",
+                        "reason": "reparse_target_unavailable"
+                        if unreadable
+                        else "reparse_target_outside_repository",
+                    },
+                )
+
+    def test_directory_reparse_retarget_or_identity_change_during_snapshot_stays_unknown(self) -> None:
+        for change in ("target", "identity"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
+                repository, target, link = self._reparse_fixture(Path(temporary))
+                alternate_target = repository / "packages" / "config"
+                alternate_target.mkdir()
+                original_readlink = os.readlink
+                readlink_calls = 0
+                link_lstat_calls = 0
+                base_lstat = self._fake_directory_reparse_lstat(link)
+
+                def readlink_with_change(path, *args, **kwargs):
+                    nonlocal readlink_calls
+                    if Path(path) == link:
+                        readlink_calls += 1
+                        if change == "target" and readlink_calls > 1:
+                            return str(alternate_target)
+                        return str(target)
+                    return original_readlink(path, *args, **kwargs)
+
+                def lstat_with_identity_change(path: Path):
+                    nonlocal link_lstat_calls
+                    info = base_lstat(path)
+                    if path == link:
+                        link_lstat_calls += 1
+                        if change == "identity" and link_lstat_calls == 2:
+                            return SimpleNamespace(**{**vars(info), "st_ino": info.st_ino + 1})
+                    return info
+
+                with patch("pathlib.Path.lstat", lstat_with_identity_change), patch(
+                    "dual_codex.git.os.readlink", side_effect=readlink_with_change
+                ):
+                    baseline = capture_git_baseline(repository, include_ignored=True)
+
+                self.assertFalse(baseline["complete"])
+                self.assertEqual(
+                    baseline["worktree_snapshots"]["node_modules/@bielos/auth"],
+                    {"kind": "unknown", "reason": "reparse_path_changed_during_snapshot"},
+                )
+
+    def test_directory_reparse_target_without_git_inventory_stays_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository, _target, link = self._reparse_fixture(Path(temporary))
+            untracked_target = repository / "empty-workspace"
+            untracked_target.mkdir()
+            original_readlink = os.readlink
+
+            def readlink_with_target(path, *args, **kwargs):
+                if Path(path) == link:
+                    return str(untracked_target)
+                return original_readlink(path, *args, **kwargs)
+
+            with patch("pathlib.Path.lstat", self._fake_directory_reparse_lstat(link)), patch(
+                "dual_codex.git.os.readlink", side_effect=readlink_with_target
+            ):
+                baseline = capture_git_baseline(repository, include_ignored=True)
+
+            self.assertFalse(baseline["complete"])
+            self.assertEqual(
+                baseline["worktree_snapshots"]["node_modules/@bielos/auth"],
+                {"kind": "unknown", "reason": "reparse_target_not_git_inventoried"},
+            )
 
 
 if __name__ == "__main__":

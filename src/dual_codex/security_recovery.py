@@ -361,6 +361,7 @@ def cancel_security_scan(
         baseline = capture_git_baseline(repository_root, include_ignored=True)
         if baseline.get("complete") is not True:
             preflight_classification = "SECURITY_RECOVERY_MUTATION_BASELINE_INCOMPLETE"
+            record["preflight_failure_class"] = preflight_classification
             return record
         provider = CodexSecurityProvider(executor)
         scans = provider.list_target_scans(target)
