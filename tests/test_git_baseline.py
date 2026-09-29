@@ -15,6 +15,7 @@ from dual_codex.git import (
     _git_metadata_snapshots,
     _git_object_inventory,
     _opened_file_matches_lstat,
+    _reparse_target_tree_snapshots,
     _worktree_snapshot,
     attribute_git_mutations,
     capture_git_baseline,
@@ -417,7 +418,7 @@ class GitBaselineTests(unittest.TestCase):
                 mutation = attribute_git_mutations(repository, baseline, include_ignored=True)
 
             self.assertEqual(mutation["status"], "complete")
-            self.assertEqual(mutation["run_touched_paths"], ["packages/auth/module.py"])
+            self.assertCountEqual(mutation["run_touched_paths"], ["packages/auth", "packages/auth/module.py"])
             self.assertEqual(mutation["run_created_paths"], ["packages/auth/created.py"])
 
     @unittest.skipUnless(os.name == "nt", "native directory junctions are Windows-specific")
@@ -457,7 +458,12 @@ class GitBaselineTests(unittest.TestCase):
             self.assertEqual(mutation["status"], "complete")
             self.assertCountEqual(
                 mutation["run_touched_paths"],
-                ["packages/auth/module.py", "packages/auth/generated/baseline.txt"],
+                [
+                    "packages/auth",
+                    "packages/auth/generated",
+                    "packages/auth/module.py",
+                    "packages/auth/generated/baseline.txt",
+                ],
             )
             self.assertCountEqual(
                 mutation["run_created_paths"],
@@ -497,7 +503,7 @@ class GitBaselineTests(unittest.TestCase):
                 )
 
     def test_directory_reparse_retarget_or_identity_change_during_snapshot_stays_unknown(self) -> None:
-        for change in ("target", "identity"):
+        for change in ("target", "identity", "target_after_tree", "identity_after_tree"):
             with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
                 repository, target, link = self._reparse_fixture(Path(temporary))
                 alternate_target = repository / "packages" / "config"
@@ -511,7 +517,9 @@ class GitBaselineTests(unittest.TestCase):
                     nonlocal readlink_calls
                     if Path(path) == link:
                         readlink_calls += 1
-                        if change == "target" and readlink_calls > 1:
+                        if (change == "target" and readlink_calls > 1) or (
+                            change == "target_after_tree" and readlink_calls > 2
+                        ):
                             return str(alternate_target)
                         return str(target)
                     return original_readlink(path, *args, **kwargs)
@@ -521,7 +529,9 @@ class GitBaselineTests(unittest.TestCase):
                     info = base_lstat(path)
                     if path == link:
                         link_lstat_calls += 1
-                        if change == "identity" and link_lstat_calls == 2:
+                        if (change == "identity" and link_lstat_calls == 2) or (
+                            change == "identity_after_tree" and link_lstat_calls >= 3
+                        ):
                             return SimpleNamespace(**{**vars(info), "st_ino": info.st_ino + 1})
                     return info
 
@@ -536,11 +546,12 @@ class GitBaselineTests(unittest.TestCase):
                     {"kind": "unknown", "reason": "reparse_path_changed_during_snapshot"},
                 )
 
-    def test_directory_reparse_target_without_git_inventory_stays_unknown(self) -> None:
+    def test_directory_reparse_target_without_git_inventory_is_snapshotted_and_mutations_are_attributed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository, _target, link = self._reparse_fixture(Path(temporary))
             untracked_target = repository / "empty-workspace"
-            untracked_target.mkdir()
+            nested_empty_directory = untracked_target / "src"
+            nested_empty_directory.mkdir(parents=True)
             original_readlink = os.readlink
 
             def readlink_with_target(path, *args, **kwargs):
@@ -553,10 +564,56 @@ class GitBaselineTests(unittest.TestCase):
             ):
                 baseline = capture_git_baseline(repository, include_ignored=True)
 
-            self.assertFalse(baseline["complete"])
+                self.assertTrue(baseline["complete"], baseline["worktree_snapshots"])
+                target_tree_identity = baseline["worktree_snapshots"]["empty-workspace"]["identity"]
+                alias_snapshot = baseline["worktree_snapshots"]["node_modules/@bielos/auth"]
+                self.assertEqual(alias_snapshot["kind"], "directory_reparse")
+                self.assertEqual(alias_snapshot["target"], "empty-workspace")
+                self.assertEqual(
+                    alias_snapshot["target_identity"],
+                    [target_tree_identity[0], target_tree_identity[1], target_tree_identity[4], target_tree_identity[5]],
+                )
+                self.assertTrue(alias_snapshot["link_parent_identities"])
+                self.assertTrue(alias_snapshot["target_parent_identities"])
+                self.assertEqual(baseline["worktree_snapshots"]["empty-workspace"]["kind"], "directory_tree")
+                self.assertEqual(baseline["worktree_snapshots"]["empty-workspace/src"]["kind"], "directory_tree")
+
+                (untracked_target / "src" / "new-file.py").write_text("new through target\n", encoding="utf-8")
+                (untracked_target / "new-empty-directory").mkdir()
+                mutation = attribute_git_mutations(repository, baseline, include_ignored=True)
+
+            self.assertEqual(mutation["status"], "complete")
+            self.assertCountEqual(
+                mutation["run_created_paths"],
+                ["empty-workspace/src/new-file.py", "empty-workspace/new-empty-directory"],
+            )
+            self.assertIn("empty-workspace", mutation["run_touched_paths"])
+
+    def test_directory_reparse_target_tree_rejects_nested_reparse_points(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = self._repository(Path(temporary))
+            target = repository / "empty-workspace"
+            nested = target / "nested"
+            nested.mkdir(parents=True)
+            original_lstat = Path.lstat
+
+            def lstat_with_nested_reparse(path: Path):
+                info = original_lstat(path)
+                if path == nested:
+                    return SimpleNamespace(
+                        st_dev=info.st_dev,
+                        st_ino=info.st_ino,
+                        st_mode=info.st_mode,
+                        st_file_attributes=getattr(info, "st_file_attributes", 0) | 0x400,
+                    )
+                return info
+
+            with patch("pathlib.Path.lstat", lstat_with_nested_reparse):
+                snapshots = _reparse_target_tree_snapshots(repository, "empty-workspace", {})
+
             self.assertEqual(
-                baseline["worktree_snapshots"]["node_modules/@bielos/auth"],
-                {"kind": "unknown", "reason": "reparse_target_not_git_inventoried"},
+                snapshots,
+                {"empty-workspace/nested": {"kind": "unknown", "reason": "reparse_target_tree_nested_reparse"}},
             )
 
 

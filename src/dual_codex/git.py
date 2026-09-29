@@ -319,7 +319,7 @@ def _reparse_directory_snapshot(
     root_before: os.stat_result,
     parent_snapshots: list[tuple[Path, os.stat_result]],
 ) -> dict[str, object]:
-    """Represent only a stable directory reparse point whose target is inventoried in this repository."""
+    """Represent only a stable directory reparse point whose target is inside this repository."""
 
     if not stat.S_ISDIR(before.st_mode):
         return {"kind": "unknown", "reason": "reparse_point"}
@@ -345,7 +345,8 @@ def _reparse_directory_snapshot(
 
         target_info: os.stat_result | None = None
         current = repository_root
-        for part in target_relative.parts:
+        target_parent_snapshots = [(repository_root, root_before)]
+        for index, part in enumerate(target_relative.parts):
             current = current / part
             target_info = current.lstat()
             if (
@@ -354,6 +355,8 @@ def _reparse_directory_snapshot(
                 or _is_reparse_point(target_info)
             ):
                 return {"kind": "unknown", "reason": "reparse_target_unsafe"}
+            if index < len(target_relative.parts) - 1:
+                target_parent_snapshots.append((current, target_info))
         if target_info is None:
             return {"kind": "unknown", "reason": "reparse_target_unavailable"}
         if os.name == "nt" and not target_info.st_ino:
@@ -366,6 +369,10 @@ def _reparse_directory_snapshot(
             _stat_identity(parent.lstat()) == _stat_identity(parent_before)
             for parent, parent_before in parent_snapshots
         )
+        target_parents_unchanged = all(
+            _stat_identity(parent.lstat()) == _stat_identity(parent_before)
+            for parent, parent_before in target_parent_snapshots
+        )
         if (
             not stat.S_ISDIR(link_after.st_mode)
             or not _is_reparse_point(link_after)
@@ -375,15 +382,136 @@ def _reparse_directory_snapshot(
             or _stat_identity(target_info) != _stat_identity(target_after)
             or _stat_identity(root_before) != _stat_identity(root_after)
             or not parents_unchanged
+            or not target_parents_unchanged
         ):
             return {"kind": "unknown", "reason": "reparse_path_changed_during_snapshot"}
         return {
             "kind": "directory_reparse",
             "target": target_relative.as_posix(),
+            "link_identity": list(_stat_identity(before)),
             "target_identity": list(_directory_identity(target_info)),
+            "link_parent_identities": [
+                [".", list(_stat_identity(root_before))],
+                *[
+                    [parent.relative_to(repository).as_posix(), list(_stat_identity(parent_info))]
+                    for parent, parent_info in parent_snapshots
+                ],
+            ],
+            "target_parent_identities": [
+                [".", list(_stat_identity(root_before))],
+                *[
+                    [parent.relative_to(repository_root).as_posix(), list(_stat_identity(parent_info))]
+                    for parent, parent_info in target_parent_snapshots[1:]
+                ],
+            ],
         }
     except (OSError, RuntimeError, ValueError):
         return {"kind": "unknown", "reason": "reparse_target_unavailable"}
+
+
+def _reparse_target_tree_snapshots(
+    repository: Path,
+    relative_root: str,
+    existing_snapshots: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    """Snapshot the canonical target tree, including empty directories and files absent from Git inventory."""
+
+    if (
+        not relative_root
+        or relative_root.startswith("/")
+        or any(part in {"", ".", ".."} for part in relative_root.split("/"))
+    ):
+        return {relative_root: {"kind": "unknown", "reason": "reparse_target_tree_invalid_path"}}
+
+    snapshots: dict[str, dict[str, object]] = {}
+    directories: dict[str, tuple[os.stat_result, tuple[str, ...]]] = {}
+    entries: dict[str, os.stat_result] = {}
+    parents: list[tuple[Path, os.stat_result]] = []
+    existing_by_key = {
+        os.path.normcase(path.replace("\\", "/").rstrip("/")).replace("\\", "/"): (path, snapshot)
+        for path, snapshot in existing_snapshots.items()
+    }
+    root = repository
+    try:
+        root_info = root.lstat()
+        if not stat.S_ISDIR(root_info.st_mode) or stat.S_ISLNK(root_info.st_mode) or _is_reparse_point(root_info):
+            return {relative_root: {"kind": "unknown", "reason": "reparse_target_tree_unsafe_root"}}
+        current = root
+        for part in relative_root.split("/")[:-1]:
+            current = current / part
+            info = current.lstat()
+            if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode) or _is_reparse_point(info):
+                return {relative_root: {"kind": "unknown", "reason": "reparse_target_tree_unsafe_parent"}}
+            parents.append((current, info))
+
+        pending = [relative_root]
+        visited = 0
+        while pending:
+            relative = pending.pop()
+            directory = repository.joinpath(*relative.split("/"))
+            before = directory.lstat()
+            if (
+                not stat.S_ISDIR(before.st_mode)
+                or stat.S_ISLNK(before.st_mode)
+                or _is_reparse_point(before)
+                or (os.name == "nt" and not before.st_ino)
+            ):
+                return {relative: {"kind": "unknown", "reason": "reparse_target_tree_unsafe_directory"}}
+            with os.scandir(directory) as iterator:
+                children = sorted(iterator, key=lambda entry: entry.name)
+            child_names = tuple(entry.name for entry in children)
+            directories[relative] = (before, child_names)
+            snapshots[relative] = {"kind": "directory_tree", "identity": list(_stat_identity(before))}
+
+            for entry in children:
+                visited += 1
+                if visited > 100_000:
+                    return {relative_root: {"kind": "unknown", "reason": "reparse_target_tree_budget_exceeded"}}
+                child_relative = f"{relative}/{entry.name}"
+                child_path = repository.joinpath(*child_relative.split("/"))
+                info = child_path.lstat()
+                entries[child_relative] = info
+                if stat.S_ISLNK(info.st_mode) or _is_reparse_point(info):
+                    return {child_relative: {"kind": "unknown", "reason": "reparse_target_tree_nested_reparse"}}
+                if stat.S_ISDIR(info.st_mode):
+                    pending.append(child_relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    return {child_relative: {"kind": "unknown", "reason": "reparse_target_tree_unsupported_entry"}}
+
+                key = os.path.normcase(child_relative).replace("\\", "/")
+                existing = existing_by_key.get(key)
+                if existing is not None and existing[1].get("kind") == "file":
+                    snapshots[existing[0]] = existing[1]
+                    continue
+                if existing is not None and existing[1].get("kind") == "unknown":
+                    snapshots[existing[0]] = existing[1]
+                    return snapshots
+                file_snapshot = _worktree_snapshot(repository, child_relative)
+                snapshots[child_relative] = file_snapshot
+                if file_snapshot.get("kind") != "file":
+                    return snapshots
+
+        for relative, (before, names_before) in directories.items():
+            directory = repository.joinpath(*relative.split("/"))
+            after = directory.lstat()
+            with os.scandir(directory) as iterator:
+                names_after = tuple(sorted(entry.name for entry in iterator))
+            if _stat_identity(before) != _stat_identity(after) or names_before != names_after:
+                return {relative: {"kind": "unknown", "reason": "reparse_target_tree_changed_during_snapshot"}}
+        for relative, before in entries.items():
+            path = repository.joinpath(*relative.split("/"))
+            after = path.lstat()
+            if _stat_identity(before) != _stat_identity(after):
+                return {relative: {"kind": "unknown", "reason": "reparse_target_tree_changed_during_snapshot"}}
+        for parent, before in parents:
+            if _stat_identity(before) != _stat_identity(parent.lstat()):
+                return {relative_root: {"kind": "unknown", "reason": "reparse_target_tree_parent_changed"}}
+        if _stat_identity(root_info) != _stat_identity(root.lstat()):
+            return {relative_root: {"kind": "unknown", "reason": "reparse_target_tree_root_changed"}}
+    except (OSError, RuntimeError, ValueError):
+        return {relative_root: {"kind": "unknown", "reason": "reparse_target_tree_unavailable"}}
+    return snapshots
 
 
 def _worktree_snapshot(
@@ -877,25 +1005,20 @@ def capture_git_baseline(repository: Path, *, include_ignored: bool = False) -> 
     snapshots = {path: _worktree_snapshot(repository, path) for path in paths_to_hash}
     if include_ignored:
         snapshots.update(_ignored_tree_snapshots(repository, ignored_paths))
-        inventoried_paths = set(tracked_paths).union(untracked_paths, ignored_paths)
-        # A directory alias is safe only when its canonical target is also
-        # covered by Git's tracked/untracked/ignored inventory. Its contents
-        # are hashed at that canonical path, avoiding duplicate traversal of
-        # large workspace trees through node_modules links.
-        def normalized_inventory_path(value: str) -> str:
-            return os.path.normcase(value.replace("\\", "/").rstrip("/")).replace("\\", "/")
-
+        # Capture each canonical target tree so file content and empty-directory
+        # changes remain attributable even when Git has no path for the target.
+        # Reuse already hashed file snapshots and fail closed for nested links.
         for path, snapshot in tuple(snapshots.items()):
             if snapshot.get("kind") != "directory_reparse":
                 continue
-            target_key = normalized_inventory_path(str(snapshot.get("target", "")))
-            covered = any(
-                (candidate := normalized_inventory_path(item)) == target_key
-                or candidate.startswith(target_key + "/")
-                for item in inventoried_paths
+            target_snapshots = _reparse_target_tree_snapshots(
+                repository,
+                str(snapshot.get("target", "")),
+                snapshots,
             )
-            if not covered:
-                snapshots[path] = {"kind": "unknown", "reason": "reparse_target_not_git_inventoried"}
+            snapshots.update(target_snapshots)
+            if _worktree_snapshot(repository, path) != snapshot:
+                snapshots[path] = {"kind": "unknown", "reason": "reparse_path_changed_during_snapshot"}
         # A scan-only Executor could write through a pre-existing repository
         # symlink to data that the repository snapshot does not cover. Fail
         # closed instead of treating link-text stability as target stability.
