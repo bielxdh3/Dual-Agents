@@ -600,6 +600,7 @@ class SecurityCancelApprovalTests(unittest.TestCase):
             "scan_id": scan_id,
             "approval_request_count": 0,
             "approval_granted": False,
+            "approval_scope": "",
             "mcp_tool_call_count": 0,
             "matching_tool_call_count": 0,
             "mcp_tool_calls": [],
@@ -631,18 +632,25 @@ class SecurityCancelApprovalTests(unittest.TestCase):
             }
         )
 
-    def _request(self, repository: Path, *, thread_id: str = OWNER_THREAD, cwd: str | None = None, item_id: str = "item-1") -> dict:
+    def _request(self, repository: Path, *, thread_id: str = OWNER_THREAD, turn_id: str = "turn-1", scan_id: str = SCAN_ID) -> dict:
+        del repository  # The real elicitation does not carry cwd; host thread binding is validated before the turn.
         return {
-            "jsonrpc": "2.0",
             "id": 7,
-            "method": "item/permissions/requestApproval",
+            "method": "mcpServer/elicitation/request",
             "params": {
-                "cwd": cwd or str(repository),
-                "itemId": item_id,
-                "permissions": {},
-                "startedAtMs": 10,
+                "_meta": {
+                    "codex_approval_kind": "mcp_tool_call",
+                    "tool_description": "Cancel one Security scan.",
+                    "tool_params": {"scanId": scan_id},
+                    "tool_params_display": [{"name": "scanId", "value": scan_id}],
+                    "tool_title": "Cancel Security scan",
+                },
+                "message": "Allow the Security tool call?",
+                "mode": "form",
+                "requestedSchema": {"type": "object", "properties": {}},
+                "serverName": "codex-security",
                 "threadId": thread_id,
-                "turnId": "turn-1",
+                "turnId": turn_id,
             },
         }
 
@@ -652,10 +660,11 @@ class SecurityCancelApprovalTests(unittest.TestCase):
             process, sent = self._process(repository)
             self._start_item(process)
             process._respond_to_server_request(self._request(repository))
-            self.assertEqual(sent[-1]["result"], {"permissions": {}, "scope": "turn", "strictAutoReview": True})
+            self.assertEqual(sent[-1]["result"], {"action": "accept", "content": None})
             self.assertTrue(process._active_security_cancel_approval["approval_granted"])
+            self.assertEqual(process._active_security_cancel_approval["approval_scope"], "one_time")
             process._respond_to_server_request(self._request(repository))
-            self.assertIn("error", sent[-2])
+            self.assertEqual(sent[-2]["result"], {"action": "decline", "content": None})
             self.assertEqual(sent[-1]["method"], "turn/cancel")
             self.assertEqual(process._active_security_cancel_approval["approval_request_count"], 2)
 
@@ -669,7 +678,7 @@ class SecurityCancelApprovalTests(unittest.TestCase):
                 process, sent = self._process(repository)
                 self._start_item(process, tool=tool, scan_id=scan_id)
                 process._respond_to_server_request(self._request(repository))
-                self.assertIn("error", sent[-1])
+                self.assertEqual(sent[-1]["result"], {"action": "decline", "content": None})
                 self.assertFalse(process._active_security_cancel_approval["approval_granted"])
 
     def test_wrong_thread_and_wrong_repository_binding_are_denied(self) -> None:
@@ -678,26 +687,26 @@ class SecurityCancelApprovalTests(unittest.TestCase):
             process, sent = self._process(repository)
             self._start_item(process, thread_id="other-thread")
             process._respond_to_server_request(self._request(repository))
-            self.assertIn("error", sent[-1])
+            self.assertEqual(sent[-1]["result"], {"action": "decline", "content": None})
             self.assertFalse(process._active_security_cancel_approval["approval_granted"])
 
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
             process, sent = self._process(repository)
-            process._active_security_cancel_approval["environment_ids"] = ["local"]
+            process._active_security_cancel_approval["binding_validated"] = False
             self._start_item(process)
-            request = self._request(repository)
-            request["params"]["environmentId"] = "other"
-            process._respond_to_server_request(request)
-            self.assertIn("error", sent[-2])
+            process._respond_to_server_request(self._request(repository))
+            self.assertEqual(sent[-2]["result"], {"action": "decline", "content": None})
+            self.assertEqual(sent[-1]["method"], "turn/cancel")
             self.assertFalse(process._active_security_cancel_approval["approval_granted"])
 
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
             process, sent = self._process(repository)
             self._start_item(process)
-            process._respond_to_server_request(self._request(repository, cwd=str(repository / "other")))
-            self.assertIn("error", sent[-2])
+            process._respond_to_server_request(self._request(repository, thread_id="other-thread"))
+            self.assertEqual(sent[-2]["result"], {"action": "decline", "content": None})
+            self.assertEqual(sent[-1]["method"], "turn/cancel")
             self.assertFalse(process._active_security_cancel_approval["approval_granted"])
 
     def test_extra_mcp_tool_call_is_denied(self) -> None:
@@ -707,7 +716,79 @@ class SecurityCancelApprovalTests(unittest.TestCase):
             self._start_item(process)
             self._start_item(process, tool="get_codex_security_scan", item_id="item-2")
             process._respond_to_server_request(self._request(repository))
-            self.assertIn("error", sent[-1])
+            self.assertEqual(sent[-1]["result"], {"action": "decline", "content": None})
+            self.assertFalse(process._active_security_cancel_approval["approval_granted"])
+
+    def test_second_identical_mcp_call_immediately_invalidates_maintenance_turn(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            process, sent = self._process(repository)
+            self._start_item(process)
+            process._respond_to_server_request(self._request(repository))
+            self.assertEqual(sent[-1], {"id": 7, "result": {"action": "accept", "content": None}})
+            self._start_item(process, item_id="item-2")
+            context = process._active_security_cancel_approval
+            self.assertTrue(context["unexpected_item_seen"])
+            self.assertIn("multiple_mcp_tool_calls", context["unexpected_item_types"])
+            self.assertEqual(sent[-1]["method"], "turn/cancel")
+
+    def test_wrong_server_turn_arguments_and_malformed_requests_are_denied(self) -> None:
+        mutations = (
+            lambda request: request.update(jsonrpc="2.0"),
+            lambda request: request.update(unexpected="field"),
+            lambda request: request.pop("id"),
+            lambda request: request.update(id=True),
+            lambda request: request["params"].update(serverName="other-server"),
+            lambda request: request["params"].update(turnId="other-turn"),
+            lambda request: request["params"]["_meta"]["tool_params"].update(scanId="other-scan"),
+            lambda request: request["params"].update(requestedSchema={"type": "object", "properties": {"approve": {"type": "boolean"}}}),
+            lambda request: request["params"]["_meta"].update(persist=[{}]),
+        )
+        for mutate in mutations:
+            with self.subTest(mutation=mutate), tempfile.TemporaryDirectory() as directory:
+                repository = Path(directory)
+                process, sent = self._process(repository)
+                self._start_item(process)
+                request = self._request(repository)
+                mutate(request)
+                process._respond_to_server_request(request)
+                self.assertEqual(sent[-2]["result"], {"action": "decline", "content": None})
+                self.assertFalse(process._active_security_cancel_approval["approval_granted"])
+                self.assertEqual(sent[-1]["method"], "turn/cancel")
+
+    def test_elicitation_before_matching_item_and_missing_scan_id_are_denied(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            process, sent = self._process(repository)
+            process._respond_to_server_request(self._request(repository))
+            self.assertEqual(sent[-2]["result"], {"action": "decline", "content": None})
+            self.assertFalse(process._active_security_cancel_approval["approval_granted"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            process, sent = self._process(repository)
+            self._start_item(process)
+            request = self._request(repository)
+            request["params"]["_meta"]["tool_params"] = {}
+            process._respond_to_server_request(request)
+            self.assertEqual(sent[-2]["result"], {"action": "decline", "content": None})
+            self.assertFalse(process._active_security_cancel_approval["approval_granted"])
+
+    def test_completed_tool_request_cannot_be_replayed_or_approved_after_completion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            process, sent = self._process(repository)
+            self._start_item(process)
+            process._capture_security_cancel_event(
+                "item/completed",
+                {
+                    "threadId": OWNER_THREAD,
+                    "turnId": "turn-1",
+                    "item": {"id": "item-1", "type": "mcpToolCall", "status": "completed", "result": {"isError": False}},
+                },
+            )
+            process._respond_to_server_request(self._request(repository))
+            self.assertEqual(sent[-2]["result"], {"action": "decline", "content": None})
             self.assertFalse(process._active_security_cancel_approval["approval_granted"])
 
     def test_dynamic_tool_request_is_denied_and_invalidates_maintenance_turn(self) -> None:
@@ -784,9 +865,9 @@ class SecurityCancelApprovalTests(unittest.TestCase):
             )
             self.assertEqual(sent[-1]["result"], {"decision": "decline"})
             process._respond_to_server_request(self._request(repository))
-            self.assertEqual(sent[-1]["result"], {"permissions": {}, "scope": "turn", "strictAutoReview": False})
+            self.assertEqual(sent[-1], {"id": 7, "result": {"action": "decline", "content": None}})
 
-    def _lifecycle_process(self, repository: Path, *, fail_turn: bool = False):
+    def _lifecycle_process(self, repository: Path, *, fail_turn: bool = False, scan_not_found: bool = False):
         process = object.__new__(_AppServerProcess)
         process._lock = threading.RLock()
         process.config = SimpleNamespace(app_server_thread_timeout=2, app_server_initialize_timeout=2)
@@ -916,25 +997,14 @@ class SecurityCancelApprovalTests(unittest.TestCase):
                             "server": "codex-security",
                             "tool": "cancel_codex_security_scan",
                             "arguments": {"scanId": SCAN_ID},
+                            "status": "inProgress",
                         },
                     },
                 }
             )
-            process._respond_to_server_request(
-                {
-                    "jsonrpc": "2.0",
-                    "id": 5,
-                    "method": "item/permissions/requestApproval",
-                    "params": {
-                        "cwd": str(cwd),
-                        "itemId": "item-1",
-                        "permissions": {},
-                        "startedAtMs": 1,
-                        "threadId": thread_id,
-                        "turnId": "turn-1",
-                    },
-                }
-            )
+            approval = self._request(cwd, thread_id=thread_id)
+            approval["id"] = 5
+            process._respond_to_server_request(approval)
             process._record_notification(
                 {
                     "jsonrpc": "2.0",
@@ -945,8 +1015,11 @@ class SecurityCancelApprovalTests(unittest.TestCase):
                         "item": {
                             "id": "item-1",
                             "type": "mcpToolCall",
-                            "status": "completed",
-                            "result": {"isError": False},
+                            "status": "failed" if scan_not_found else "completed",
+                            "result": {
+                                "isError": False,
+                                "content": [{"text": "Scan not found"}] if scan_not_found else [],
+                            },
                         },
                     },
                 }
@@ -1017,7 +1090,8 @@ class SecurityCancelApprovalTests(unittest.TestCase):
             self.assertTrue(outcome["approval_policy_reset"])
             self.assertTrue(outcome["approval_state_cleared"])
             self.assertIsNone(process._active_security_cancel_approval)
-            self.assertEqual(sent[-1]["result"]["permissions"], {})
+            self.assertEqual(sent[-1], {"id": 5, "result": {"action": "accept", "content": None}})
+            self.assertNotIn("_meta", sent[-1]["result"])
 
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
@@ -1028,6 +1102,19 @@ class SecurityCancelApprovalTests(unittest.TestCase):
             self.assertTrue(outcome["approval_policy_reset"])
             self.assertTrue(outcome["approval_state_cleared"])
             self.assertIsNone(process._active_security_cancel_approval)
+
+    def test_provider_scan_not_found_is_reported_after_valid_one_time_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            process, sent = self._lifecycle_process(repository, scan_not_found=True)
+            outcome = process.run_security_cancel_turn(repository, OWNER_THREAD, SCAN_ID, "cancel exact scan")
+            self.assertEqual(outcome["turn_state"], "completed")
+            self.assertTrue(outcome["approval_granted"])
+            self.assertEqual(outcome["approval_scope"], "one_time")
+            self.assertEqual(outcome["provider_tool_result"]["provider_error_class"], "scan_not_found")
+            self.assertEqual(outcome["provider_tool_result"]["item_status"], "failed")
+            self.assertEqual(outcome["failure_class"], "")
+            self.assertEqual(sent[-1], {"id": 5, "result": {"action": "accept", "content": None}})
 
 
 class SecurityCancelToolCatalogTests(unittest.TestCase):

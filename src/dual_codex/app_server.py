@@ -311,7 +311,7 @@ def _app_server_command(
                 "-c",
                 'mcp_servers={codex_apps={url="http://127.0.0.1:9",enabled=false}}',
                 "-c",
-                'plugins={"codex-security@openai-curated-remote"={enabled=true,mcp_servers={"codex-security"={enabled=true,enabled_tools=["cancel_codex_security_scan"]}}}}',
+                'plugins={"codex-security@openai-curated-remote"={enabled=true,mcp_servers={"codex-security"={enabled=true,enabled_tools=["cancel_codex_security_scan"],tools={cancel_codex_security_scan={approval_mode="prompt"}}}}}}',
             ]
         )
     command.append("--stdio")
@@ -1114,23 +1114,28 @@ class _AppServerProcess:
     def _respond_to_server_request(self, message: dict[str, Any]) -> None:
         method = str(message.get("method", ""))
         active_security_approval = getattr(self, "_active_security_cancel_approval", None)
-        if method == "item/permissions/requestApproval" and active_security_approval is not None:
+        if method == "mcpServer/elicitation/request" and active_security_approval is not None:
             context = active_security_approval
             context["approval_request_count"] = int(context.get("approval_request_count", 0)) + 1
-            reason = self._security_cancel_approval_denial_reason(message, context)
-            response: dict[str, Any] = {"jsonrpc": "2.0", "id": message.get("id")}
+            reason = self._security_cancel_elicitation_denial_reason(message, context)
+            # Codex 0.157.0's App Server uses its own JSON-RPC-shaped wire
+            # envelope, which omits the JSON-RPC 2.0 version member.
+            response: dict[str, Any] = {"id": message.get("id")}
             if reason is None:
                 context["approval_granted"] = True
-                context["approved_item_id"] = str(message.get("params", {}).get("itemId", ""))
-                response["result"] = {"permissions": {}, "scope": "turn", "strictAutoReview": True}
+                calls = context.get("mcp_tool_calls", [])
+                context["approved_item_id"] = str(calls[0].get("item_id", "")) if calls else ""
+                context["approval_scope"] = "one_time"
+                # `__approval` is an internal TUI form field, not a wire-level
+                # elicitation answer. `accept` is the App Server's one-time
+                # authorization action; omitting persistence metadata prevents
+                # a session or durable tool grant.
+                response["result"] = {"action": "accept", "content": None}
             else:
                 context["approval_denial_reason"] = reason
                 context["unexpected_item_seen"] = True
-                context.setdefault("unexpected_item_types", []).append("invalid_security_cancel_approval")
-                response["error"] = {
-                    "code": -32000,
-                    "message": "Security cancellation approval denied by Dual Codex.",
-                }
+                context.setdefault("unexpected_item_types", []).append("invalid_security_cancel_elicitation")
+                response["result"] = {"action": "decline", "content": None}
             self._send(response)
             if reason is not None:
                 self._request_security_recovery_turn_cancel()
@@ -1162,7 +1167,7 @@ class _AppServerProcess:
         elif method == "item/tool/requestUserInput":
             result = {"answers": {}}
         elif method == "mcpServer/elicitation/request":
-            result = {"action": "decline"}
+            result = {"action": "decline", "content": None}
         elif method == "currentTime/read":
             result = {"currentTimeAt": int(time.time())}
         elif method == "item/permissions/requestApproval":
@@ -1171,7 +1176,9 @@ class _AppServerProcess:
             result = {"decision": {"denied": {"rejection": "Dual Codex does not auto-approve requests."}}}
         else:
             result = None
-        response: dict[str, Any] = {"jsonrpc": "2.0", "id": message.get("id")}
+        response: dict[str, Any] = {"id": message.get("id")}
+        if method != "mcpServer/elicitation/request":
+            response["jsonrpc"] = "2.0"
         if result is None:
             response["error"] = {"code": -32000, "message": "Unsupported server request; denied by Dual Codex."}
         else:
@@ -1230,13 +1237,23 @@ class _AppServerProcess:
         context["turn_cancel_confirmed"] = "error" not in message
         return True
 
-    def _security_cancel_approval_denial_reason(
+    def _security_cancel_elicitation_denial_reason(
         self,
         message: Mapping[str, Any],
         context: Mapping[str, Any],
     ) -> str | None:
-        """Match one exact MCP cancellation request against trusted host state."""
+        """Match one exact Codex MCP tool approval elicitation to trusted host state."""
 
+        request_id = message.get("id")
+        if (
+            set(message) != {"id", "method", "params"}
+            or message.get("method") != "mcpServer/elicitation/request"
+            or not (
+                (type(request_id) is int)
+                or (isinstance(request_id, str) and bool(request_id) and len(request_id) <= 256)
+            )
+        ):
+            return "request_envelope_invalid"
         if (
             context.get("operation") != "security_scan_cancel"
             or context.get("approval_policy") != "on-request"
@@ -1249,18 +1266,67 @@ class _AppServerProcess:
         params = message.get("params")
         if not isinstance(params, Mapping):
             return "request_shape_invalid"
-        allowed_fields = {
-            "cwd", "environmentId", "itemId", "permissions", "reason", "startedAtMs", "threadId", "turnId"
+        required_fields = {"_meta", "message", "mode", "requestedSchema", "serverName", "threadId", "turnId"}
+        if set(params) != required_fields:
+            return "request_shape_invalid"
+        if (
+            params.get("serverName") != "codex-security"
+            or params.get("mode") != "form"
+            or not isinstance(params.get("message"), str)
+            or not params.get("message")
+            or len(params["message"]) > 2048
+        ):
+            return "request_shape_invalid"
+        requested_schema = params.get("requestedSchema")
+        if (
+            not isinstance(requested_schema, Mapping)
+            or set(requested_schema) - {"type", "properties", "required"}
+            or requested_schema.get("type") != "object"
+            or requested_schema.get("properties") != {}
+            or requested_schema.get("required", []) != []
+        ):
+            return "request_shape_invalid"
+        metadata = params.get("_meta")
+        required_metadata_fields = {
+            "codex_approval_kind",
+            "tool_description",
+            "tool_params",
+            "tool_params_display",
+            "tool_title",
         }
-        required_fields = {"cwd", "itemId", "permissions", "startedAtMs", "threadId", "turnId"}
-        if not required_fields.issubset(params) or not set(params).issubset(allowed_fields):
+        allowed_metadata_fields = required_metadata_fields | {"persist"}
+        if (
+            not isinstance(metadata, Mapping)
+            or not required_metadata_fields.issubset(metadata)
+            or not set(metadata).issubset(allowed_metadata_fields)
+        ):
             return "request_shape_invalid"
-        if isinstance(params.get("startedAtMs"), bool) or not isinstance(params.get("startedAtMs"), int):
-            return "request_shape_invalid"
-        if params.get("reason") is not None and not isinstance(params.get("reason"), str):
-            return "request_shape_invalid"
-        if params.get("environmentId") is not None and not isinstance(params.get("environmentId"), str):
-            return "request_shape_invalid"
+        if metadata.get("codex_approval_kind") != "mcp_tool_call":
+            return "approval_kind_mismatch"
+        if "persist" in metadata:
+            persist_options = metadata.get("persist")
+            if (
+                not isinstance(persist_options, list)
+                or len(persist_options) > 2
+                or any(not isinstance(option, str) or option not in {"session", "always"} for option in persist_options)
+                or len(persist_options) != len(set(persist_options))
+            ):
+                return "persistent_approval_shape_mismatch"
+        tool_params = metadata.get("tool_params")
+        if not isinstance(tool_params, Mapping) or set(tool_params) != {"scanId"}:
+            return "tool_arguments_mismatch"
+        if tool_params.get("scanId") != context.get("scan_id"):
+            return "tool_arguments_mismatch"
+        if (
+            not isinstance(metadata.get("tool_title"), str)
+            or not metadata.get("tool_title")
+            or len(metadata["tool_title"]) > 256
+            or not isinstance(metadata.get("tool_description"), str)
+            or len(metadata["tool_description"]) > 2048
+            or not isinstance(metadata.get("tool_params_display"), list)
+            or len(metadata["tool_params_display"]) > 8
+        ):
+            return "request_metadata_shape_mismatch"
         active_turn = self._active_turn_provenance
         expected_turn_id = active_turn.get("turn_id") if isinstance(active_turn, Mapping) else None
         expected_thread_id = str(context.get("thread_id", ""))
@@ -1274,39 +1340,15 @@ class _AppServerProcess:
             or params.get("turnId") != expected_turn_id
         ):
             return "thread_or_turn_mismatch"
-        expected_repository = str(context.get("repository", ""))
-        requested_environment_id = params.get("environmentId")
-        if requested_environment_id is not None:
-            environment_ids = context.get("environment_ids")
-            if (
-                not isinstance(requested_environment_id, str)
-                or not isinstance(environment_ids, list)
-                or requested_environment_id not in environment_ids
-            ):
-                return "environment_binding_mismatch"
-        requested_cwd = params.get("cwd")
-        if not isinstance(requested_cwd, str) or not expected_repository:
-            return "repository_binding_mismatch"
-        try:
-            if path_identity_key(requested_cwd) != path_identity_key(expected_repository):
-                return "repository_binding_mismatch"
-        except (OSError, RuntimeError, ValueError):
-            return "repository_binding_mismatch"
-        permissions = params.get("permissions")
-        if not isinstance(permissions, Mapping) or not set(permissions).issubset({"fileSystem", "network"}):
-            return "permission_profile_mismatch"
-        if any(value not in (None, {}, []) for value in permissions.values()):
-            return "permission_profile_mismatch"
-        item_id = params.get("itemId")
         calls = context.get("mcp_tool_calls")
-        if not isinstance(item_id, str) or not isinstance(calls, list) or len(calls) != 1:
+        if not isinstance(calls, list) or len(calls) != 1:
             return "tool_call_count_mismatch"
         call = calls[0]
-        if not isinstance(call, Mapping) or call.get("item_id") != item_id:
+        if not isinstance(call, Mapping) or not isinstance(call.get("item_id"), str) or not call.get("item_id"):
             return "tool_item_mismatch"
         if call.get("thread_id") != expected_thread_id or call.get("turn_id") != expected_turn_id:
             return "tool_item_binding_mismatch"
-        if call.get("authorized") is not True:
+        if call.get("authorized") is not True or call.get("completed") is not False:
             return "tool_or_scan_mismatch"
         if context.get("unexpected_item_seen") is True:
             return "unexpected_tool_seen"
@@ -1333,6 +1375,9 @@ class _AppServerProcess:
         if method == "item/started":
             if item_type == "mcpToolCall":
                 context["mcp_tool_call_count"] = int(context.get("mcp_tool_call_count", 0)) + 1
+                if context["mcp_tool_call_count"] != 1:
+                    context["unexpected_item_seen"] = True
+                    context.setdefault("unexpected_item_types", []).append("multiple_mcp_tool_calls")
                 arguments = item.get("arguments")
                 exact_arguments = (
                     isinstance(arguments, Mapping)
@@ -1348,8 +1393,14 @@ class _AppServerProcess:
                     context["matching_tool_call_count"] = int(context.get("matching_tool_call_count", 0)) + 1
                 else:
                     context["unexpected_item_seen"] = True
-                if thread_id != expected_thread_id or not isinstance(turn_id, str) or (
-                    isinstance(expected_turn_id, str) and expected_turn_id and turn_id != expected_turn_id
+                if (
+                    not item_id
+                    or item.get("status") != "inProgress"
+                    or thread_id != expected_thread_id
+                    or not isinstance(turn_id, str)
+                    or (
+                        isinstance(expected_turn_id, str) and expected_turn_id and turn_id != expected_turn_id
+                    )
                 ):
                     context["unexpected_item_seen"] = True
                 context.setdefault("mcp_tool_calls", []).append(
@@ -1358,6 +1409,7 @@ class _AppServerProcess:
                         "thread_id": str(thread_id or ""),
                         "turn_id": str(turn_id or ""),
                         "authorized": bool(authorized),
+                        "completed": False,
                     }
                 )
             elif item_type not in _SECURITY_RECOVERY_NON_TOOL_ITEMS:
@@ -1372,6 +1424,15 @@ class _AppServerProcess:
             ):
                 context["unexpected_item_seen"] = True
                 return
+            matching_calls = [
+                call
+                for call in context.get("mcp_tool_calls", [])
+                if isinstance(call, dict) and call.get("item_id") == item_id and call.get("authorized") is True
+            ]
+            if len(matching_calls) != 1 or matching_calls[0].get("completed") is True:
+                context["unexpected_item_seen"] = True
+                return
+            matching_calls[0]["completed"] = True
             result = item.get("result")
             has_result = isinstance(result, Mapping)
             provider_error = bool(item.get("error")) or (has_result and result.get("isError") is True)
@@ -1753,6 +1814,7 @@ class _AppServerProcess:
                     "scan_id": scan_id,
                     "approval_request_count": 0,
                     "approval_granted": False,
+                    "approval_scope": "",
                     "mcp_tool_call_count": 0,
                     "matching_tool_call_count": 0,
                     "mcp_tool_calls": [],
@@ -1780,6 +1842,9 @@ class _AppServerProcess:
                         or int(context.get("matching_tool_call_count", 0)) != 1
                         or int(context.get("approval_request_count", 0)) != 1
                         or context.get("approval_granted") is not True
+                        or context.get("approval_scope") != "one_time"
+                        or not isinstance(context.get("provider_tool_result"), Mapping)
+                        or context["provider_tool_result"].get("result_returned") is not True
                     ):
                         outcome["turn_state"] = "failed"
                         outcome["failure_class"] = "SECURITY_RECOVERY_UNEXPECTED_TOOL_OR_APPROVAL_STATE"
@@ -1822,6 +1887,10 @@ class _AppServerProcess:
                         outcome["approval_granted"] = context.get("approval_granted") is True
                         outcome["approval_request_count"] = int(context.get("approval_request_count", 0))
                         outcome["approval_denial_reason"] = str(context.get("approval_denial_reason", ""))
+                        outcome["approval_request_method"] = (
+                            "mcpServer/elicitation/request" if int(context.get("approval_request_count", 0)) > 0 else ""
+                        )
+                        outcome["approval_scope"] = str(context.get("approval_scope", ""))
                         outcome["tool_call_attempted"] = int(context.get("mcp_tool_call_count", 0)) > 0
                         outcome["tool_call_count"] = int(context.get("mcp_tool_call_count", 0))
                         outcome["matching_tool_call_count"] = int(context.get("matching_tool_call_count", 0))

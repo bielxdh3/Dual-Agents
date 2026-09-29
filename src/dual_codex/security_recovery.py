@@ -311,6 +311,7 @@ def cancel_security_scan(
                     "codex_apps_enabled": False,
                     "enabled_security_mcp_server": "codex-security",
                     "enabled_security_tool_names": ["cancel_codex_security_scan"],
+                    "enabled_security_tool_approval_mode": "prompt",
                     "apps_enabled": False,
                     "browser_use_enabled": False,
                     "browser_use_external_enabled": False,
@@ -333,6 +334,8 @@ def cancel_security_scan(
                 if owner_thread
                 else "codex-security.cancel_codex_security_scan_from_app"
             ),
+            "expected_request_method": "mcpServer/elicitation/request" if owner_thread else "provider_exact_id_call",
+            "allowed_approval_scope": "one_time" if owner_thread else "not_applicable",
             "approval_granted": False,
         },
         "ledger_before": None,
@@ -439,6 +442,8 @@ def cancel_security_scan(
             record["approval"]["approval_granted"] = action_result.get("approval_granted") is True
             record["approval"]["request_count"] = int(action_result.get("approval_request_count", 0))
             record["approval"]["denial_reason"] = str(action_result.get("approval_denial_reason", ""))
+            record["approval"]["request_method"] = str(action_result.get("approval_request_method", ""))
+            record["approval"]["scope"] = str(action_result.get("approval_scope", ""))
             record["provider_outcome"] = {
                 "tool": "codex-security.cancel_codex_security_scan",
                 "scan_id": scan_id,

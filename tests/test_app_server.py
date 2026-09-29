@@ -847,7 +847,7 @@ class AppServerTests(unittest.TestCase):
         self.assertIn("features.sleep_tool=false", maintenance)
         self.assertIn("mcp_servers={codex_apps={url=\"http://127.0.0.1:9\",enabled=false}}", maintenance)
         self.assertIn(
-            'plugins={"codex-security@openai-curated-remote"={enabled=true,mcp_servers={"codex-security"={enabled=true,enabled_tools=["cancel_codex_security_scan"]}}}}',
+            'plugins={"codex-security@openai-curated-remote"={enabled=true,mcp_servers={"codex-security"={enabled=true,enabled_tools=["cancel_codex_security_scan"],tools={cancel_codex_security_scan={approval_mode="prompt"}}}}}}',
             maintenance,
         )
 
