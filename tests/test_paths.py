@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ctypes
+import errno
 import os
 from pathlib import Path
 import stat
@@ -15,10 +17,68 @@ from dual_codex.paths import (
     safe_open_regular_file,
     safe_read_bytes,
     safe_unlink_if_identity,
+    _windows_os_error,
 )
 
 
 class SafePathHelperTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "native Windows error mapping is Windows-specific")
+    def test_windows_errors_preserve_winerror_instead_of_reporting_errno(self) -> None:
+        error = _windows_os_error(5, r"C:\controlled\parent")
+
+        self.assertIsInstance(error, PermissionError)
+        self.assertEqual(error.errno, errno.EACCES)
+        self.assertEqual(error.winerror, 5)
+        self.assertEqual(error.filename, r"C:\controlled\parent")
+
+    @unittest.skipUnless(os.name == "nt", "native Windows parent handles are Windows-specific")
+    def test_temp_file_creation_uses_read_only_parent_pinning(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            parent_access_masks: list[int] = []
+            real_win_dll = ctypes.WinDLL
+
+            class _CreateFileProxy:
+                def __init__(self, function):
+                    object.__setattr__(self, "_function", function)
+
+                def __call__(self, *args):
+                    if int(args[5]) & 0x02000000:  # FILE_FLAG_BACKUP_SEMANTICS means a parent directory handle.
+                        parent_access_masks.append(int(args[1]))
+                    return self._function(*args)
+
+                def __getattr__(self, name):
+                    return getattr(self._function, name)
+
+                def __setattr__(self, name, value):
+                    setattr(self._function, name, value)
+
+            class _Kernel32Proxy:
+                def __init__(self, library):
+                    self._library = library
+                    self.CreateFileW = _CreateFileProxy(library.CreateFileW)
+
+                def __getattr__(self, name):
+                    return getattr(self._library, name)
+
+            def tracked_win_dll(name, *args, **kwargs):
+                library = real_win_dll(name, *args, **kwargs)
+                return _Kernel32Proxy(library) if name == "kernel32" else library
+
+            with patch("ctypes.WinDLL", side_effect=tracked_win_dll):
+                bootstrap_dir = safe_ensure_directory_tree(parent / "bootstrap")
+                self.assertTrue(parent_access_masks)
+                self.assertEqual(set(parent_access_masks), {0x0080})
+                parent_access_masks.clear()
+                descriptor, created = safe_create_temp_file(bootstrap_dir, prefix="bootstrap-")
+                os.close(descriptor)
+
+            self.assertTrue(parent_access_masks)
+            self.assertEqual(set(parent_access_masks), {0x0080})
+            self.assertTrue(bootstrap_dir.is_dir())
+            self.assertTrue(created.is_file())
+            created.unlink()
+
     def test_safe_open_regular_file_uses_verified_parent_chain(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

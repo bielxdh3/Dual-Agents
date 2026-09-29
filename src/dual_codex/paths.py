@@ -14,6 +14,14 @@ PathLike: TypeAlias = str | os.PathLike[str]
 _REPARSE_FLAG = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
 
 
+def _windows_os_error(error: int, filename: str | None = None) -> OSError:
+    """Preserve a Win32 error code instead of treating it as a Python errno."""
+
+    import ctypes
+
+    return OSError(None, ctypes.FormatError(error).strip(), filename, error)
+
+
 def _file_identity(info) -> tuple[int, int, int, int, int, int]:
     return (
         info.st_dev,
@@ -83,12 +91,13 @@ def _posix_parent_fd(target: Path):
 
 
 @contextmanager
-def _windows_parent_handle(target: Path, *, for_write: bool = False):
+def _windows_parent_handle(target: Path):
     """Pin every Windows parent directory, rejecting reparse components.
 
-    Each parent is opened with OPEN_REPARSE_POINT and without FILE_SHARE_DELETE.
-    Holding the chain prevents its names from being renamed/replaced while the
-    operation uses the deepest directory handle as the destination anchor.
+    Each parent is opened with OPEN_REPARSE_POINT and FILE_READ_ATTRIBUTES only,
+    without FILE_SHARE_DELETE. Holding the chain prevents its names from being
+    renamed or replaced while the path-based operation runs. The operation
+    itself performs the required access check when it opens or creates its leaf.
     """
 
     import ctypes
@@ -129,8 +138,6 @@ def _windows_parent_handle(target: Path, *, for_write: bool = False):
     kernel32.GetFileInformationByHandle.restype = wintypes.BOOL
 
     file_read_attributes = 0x0080
-    file_add_file = 0x0002
-    file_delete_child = 0x0040
     share_read = 0x00000001
     share_write = 0x00000002
     open_existing = 3
@@ -146,8 +153,6 @@ def _windows_parent_handle(target: Path, *, for_write: bool = False):
             if not _is_regular_directory(path_info):
                 raise OSError("file parent is not a regular directory")
             desired_access = file_read_attributes
-            if for_write and parent == target.parent:
-                desired_access |= file_add_file | file_delete_child
             handle = kernel32.CreateFileW(
                 str(parent),
                 desired_access,
@@ -160,12 +165,12 @@ def _windows_parent_handle(target: Path, *, for_write: bool = False):
             invalid_handle = ctypes.c_void_p(-1).value
             if handle == invalid_handle:
                 error = ctypes.get_last_error()
-                raise OSError(error, os.strerror(error), str(parent))
+                raise _windows_os_error(error, str(parent)) from None
             info = _ByHandleInfo()
             if not kernel32.GetFileInformationByHandle(handle, ctypes.byref(info)):
                 error = ctypes.get_last_error()
                 kernel32.CloseHandle(handle)
-                raise OSError(error, os.strerror(error), str(parent))
+                raise _windows_os_error(error, str(parent)) from None
             file_id = (int(info.index_high) << 32) | int(info.index_low)
             if (
                 info.attributes & (directory_attribute | reparse_attribute) != directory_attribute
@@ -213,7 +218,7 @@ def safe_ensure_directory_tree(path: PathLike, *, mode: int = 0o700) -> Path:
                     if not _is_regular_directory(current) or _file_identity(current) != _file_identity(existing):
                         raise OSError("directory path changed during validation")
                 continue
-            with _windows_parent_handle(directory, for_write=True):
+            with _windows_parent_handle(directory):
                 try:
                     directory.mkdir(mode=mode)
                 except FileExistsError:
@@ -291,9 +296,7 @@ def _windows_open_file(
     invalid_handle = ctypes.c_void_p(-1).value
     if handle == invalid_handle:
         error = ctypes.get_last_error()
-        if creation == 1 and error in {80, 183}:  # ERROR_FILE_EXISTS / ERROR_ALREADY_EXISTS
-            raise FileExistsError(error, os.strerror(error), str(path))
-        raise OSError(error, os.strerror(error), str(path))
+        raise _windows_os_error(error, str(path)) from None
     try:
         descriptor = msvcrt.open_osfhandle(int(handle), os.O_BINARY | descriptor_flags)
     except BaseException:
@@ -321,7 +324,7 @@ def safe_open_regular_file(path: PathLike, *, flags: int, mode: int = 0o600) -> 
             desired_access |= 0x80000000  # GENERIC_READ
         creation = 1 if exclusive else (4 if creating else 3)  # CREATE_NEW / OPEN_ALWAYS / OPEN_EXISTING
         descriptor_flags = access_mode | (flags & getattr(os, "O_APPEND", 0)) | os.O_BINARY
-        with _windows_parent_handle(target, for_write=bool(desired_access & 0x40000000)):
+        with _windows_parent_handle(target):
             try:
                 before = target.lstat()
             except FileNotFoundError:
@@ -424,7 +427,7 @@ def _windows_mark_delete(handle) -> None:
     disposition = _DispositionInfo(1)
     if not kernel32.SetFileInformationByHandle(handle, 4, ctypes.byref(disposition), ctypes.sizeof(disposition)):
         error = ctypes.get_last_error()
-        raise OSError(error, os.strerror(error))
+        raise _windows_os_error(error) from None
 
 
 def _windows_rename_by_handle(handle, parent_handle, name: str, *, replace: bool) -> None:
@@ -464,7 +467,7 @@ def _windows_rename_by_handle(handle, parent_handle, name: str, *, replace: bool
         buffer_size,
     ):
         error = ctypes.get_last_error()
-        raise OSError(error, os.strerror(error), name)
+        raise _windows_os_error(error, name) from None
 
 
 def path_identity_key(value: PathLike) -> str:
@@ -570,7 +573,7 @@ def safe_atomic_write_bytes(path: PathLike, content: bytes) -> None:
     if os.name == "nt":
         import msvcrt
 
-        with _windows_parent_handle(target, for_write=True) as parent_handle:
+        with _windows_parent_handle(target) as parent_handle:
             try:
                 initial_file = target.lstat()
             except FileNotFoundError:
