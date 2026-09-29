@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+import errno
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import stat
 import subprocess
@@ -306,6 +307,73 @@ def _phase_failure_state(exc: BaseException) -> str:
     }:
         return "timeout"
     return "failed"
+
+
+def _safe_os_error_provenance(exc: BaseException, *, fallback_stage: str) -> dict:
+    """Return bounded OS-error evidence without persisting messages or full paths."""
+
+    if not isinstance(exc, OSError):
+        return {}
+    context = getattr(exc, "_dual_codex_path_context", {})
+    if not isinstance(context, Mapping):
+        context = {}
+    stage = str(context.get("stage", fallback_stage))
+    operation = str(context.get("operation", "filesystem_operation"))
+    component = context.get("path_component")
+    if not isinstance(component, str) or not component:
+        filename = getattr(exc, "filename", None)
+        component = PureWindowsPath(str(filename)).name if filename else ""
+    allowed_stages = {"safe_ensure_directory_tree", "safe_create_temp_file", "actor_dispatch", "run"}
+    if stage not in allowed_stages:
+        stage = fallback_stage if fallback_stage in allowed_stages else "unknown_stage"
+    allowed_operations = {
+        "open_root",
+        "open_child_directory",
+        "open_parent_for_directory_creation",
+        "create_child_directory",
+        "open_concurrently_created_directory",
+        "verify_created_directory",
+        "create_exclusive_temp_file",
+        "filesystem_operation",
+    }
+    if operation not in allowed_operations:
+        operation = "filesystem_operation"
+    component_classes = {
+        "bootstrap": "bootstrap",
+        ".dual_codex": "dual_codex_control",
+        "runs": "runs",
+    }
+    component = component_classes.get(component.casefold(), "other_component")
+
+    error_number = exc.errno if isinstance(exc.errno, int) and not isinstance(exc.errno, bool) else None
+    winerror = getattr(exc, "winerror", None)
+    if not isinstance(winerror, int) or isinstance(winerror, bool):
+        winerror = None
+    if winerror is not None:
+        failure_class = {
+            2: "windows_file_not_found",
+            3: "windows_path_not_found",
+            5: "windows_access_denied",
+            32: "windows_sharing_violation",
+            80: "windows_already_exists",
+            183: "windows_already_exists",
+            1117: "windows_io_device_error",
+        }.get(winerror, "windows_error")
+    elif error_number == errno.EIO:
+        failure_class = "io_error"
+    elif error_number in {errno.EACCES, errno.EPERM}:
+        failure_class = "access_denied"
+    elif error_number in {errno.ENOENT, errno.ENOTDIR}:
+        failure_class = "path_not_found"
+    else:
+        failure_class = "os_error"
+    return {
+        "failure_class": failure_class,
+        "failure_stage": stage,
+        "operation": operation,
+        "path_component": component,
+        "os_error": {"errno": error_number, "winerror": winerror},
+    }
 
 
 _SECURITY_SCAN_INTENT = re.compile(
@@ -1821,6 +1889,7 @@ def _dispatch_phase(
                 "failure_type": type(exc).__name__,
             }
         )
+        entry.update(_safe_os_error_provenance(exc, fallback_stage="actor_dispatch"))
         if actor is None:
             entry["configured_actor"] = False
             entry["routing_error"] = type(exc).__name__
@@ -2294,6 +2363,7 @@ def _execute_locked(
                 "failure_class": str(getattr(exc, "failure_class", "")),
                 "failed_at": datetime.now(timezone.utc).isoformat(),
             }
+            failure_record.update(_safe_os_error_provenance(exc, fallback_stage="run"))
             failed_phase = next(
                 (item for item in reversed(phase_provenance) if item.get("role") == run_state.get("last_phase")),
                 None,

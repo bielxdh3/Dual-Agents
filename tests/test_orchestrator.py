@@ -11,7 +11,7 @@ from unittest.mock import patch
 from dual_codex.codex import ActorResultError
 from dual_codex.config import AccountConfig, AgentConfig, OrchestratorConfig
 from dual_codex.delegation import DelegationError, RepositoryLock
-from dual_codex.orchestrator import execute
+from dual_codex.orchestrator import _safe_os_error_provenance, execute
 from dual_codex.process import CommandError, CommandResult
 from dual_codex.security_scan import PLUGIN_ID, SecurityScanError, arbitrate_security_scans, stable_target_id
 
@@ -40,6 +40,30 @@ class OrchestratorTests(unittest.TestCase):
         )
         self._bootstrap_patch.start()
         self.addCleanup(self._bootstrap_patch.stop)
+
+    def test_os_error_provenance_is_bounded_and_keeps_platform_codes(self) -> None:
+        error = OSError(5, "private exception text", r"E:\BielOS\.dual_codex\bootstrap")
+        error.winerror = 5
+        error._dual_codex_path_context = {
+            "stage": "safe_ensure_directory_tree",
+            "operation": "create_child_directory",
+            "path_component": "bootstrap",
+        }
+
+        evidence = _safe_os_error_provenance(error, fallback_stage="actor_dispatch")
+
+        self.assertEqual(evidence["failure_class"], "windows_access_denied")
+        self.assertEqual(evidence["failure_stage"], "safe_ensure_directory_tree")
+        self.assertEqual(evidence["operation"], "create_child_directory")
+        self.assertEqual(evidence["path_component"], "bootstrap")
+        self.assertEqual(evidence["os_error"], {"errno": 5, "winerror": 5})
+        encoded = json.dumps(evidence)
+        self.assertNotIn(r"E:\BielOS", encoded)
+        self.assertNotIn("private exception text", encoded)
+
+        error._dual_codex_path_context["path_component"] = "api-key-user-73f4"
+        redacted = _safe_os_error_provenance(error, fallback_stage="actor_dispatch")
+        self.assertEqual(redacted["path_component"], "other_component")
 
     def test_run_and_delegate_share_repository_lock(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

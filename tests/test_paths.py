@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ctypes
 import errno
 import os
 from pathlib import Path
@@ -18,10 +17,32 @@ from dual_codex.paths import (
     safe_read_bytes,
     safe_unlink_if_identity,
     _windows_os_error,
+    _windows_nt_create_file_at,
+    _windows_open_root,
+    _windows_open_verified_directory_at,
 )
 
 
 class SafePathHelperTests(unittest.TestCase):
+    def test_windows_relative_component_rejects_alternate_data_stream_names(self) -> None:
+        with self.assertRaises(ValueError):
+            _windows_nt_create_file_at(
+                None,
+                "control.json:stream",
+                access=0,
+                share=0,
+                disposition=0,
+                options=0,
+            )
+
+    def test_safe_open_regular_file_rejects_implicit_truncate_and_append(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "control.json"
+            for flag in (os.O_TRUNC, os.O_APPEND):
+                with self.subTest(flag=flag), self.assertRaises(ValueError):
+                    safe_open_regular_file(target, flags=os.O_CREAT | os.O_RDWR | flag)
+            self.assertFalse(target.exists())
+
     @unittest.skipUnless(os.name == "nt", "native Windows error mapping is Windows-specific")
     def test_windows_errors_preserve_winerror_instead_of_reporting_errno(self) -> None:
         error = _windows_os_error(5, r"C:\controlled\parent")
@@ -32,52 +53,133 @@ class SafePathHelperTests(unittest.TestCase):
         self.assertEqual(error.filename, r"C:\controlled\parent")
 
     @unittest.skipUnless(os.name == "nt", "native Windows parent handles are Windows-specific")
-    def test_temp_file_creation_uses_read_only_parent_pinning(self) -> None:
+    def test_temp_file_creation_uses_relative_parent_handles_without_delete_child(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             parent = Path(temporary)
-            parent_access_masks: list[int] = []
-            real_win_dll = ctypes.WinDLL
+            relative_calls: list[tuple[int, str, int, int]] = []
+            from dual_codex import paths
 
-            class _CreateFileProxy:
-                def __init__(self, function):
-                    object.__setattr__(self, "_function", function)
+            native_create = paths._windows_nt_create_file_at
 
-                def __call__(self, *args):
-                    if int(args[5]) & 0x02000000:  # FILE_FLAG_BACKUP_SEMANTICS means a parent directory handle.
-                        parent_access_masks.append(int(args[1]))
-                    return self._function(*args)
+            def tracked_create(parent_handle, name, **kwargs):
+                relative_calls.append((int(kwargs["access"]), name, int(kwargs["disposition"]), int(kwargs["options"])))
+                return native_create(parent_handle, name, **kwargs)
 
-                def __getattr__(self, name):
-                    return getattr(self._function, name)
-
-                def __setattr__(self, name, value):
-                    setattr(self._function, name, value)
-
-            class _Kernel32Proxy:
-                def __init__(self, library):
-                    self._library = library
-                    self.CreateFileW = _CreateFileProxy(library.CreateFileW)
-
-                def __getattr__(self, name):
-                    return getattr(self._library, name)
-
-            def tracked_win_dll(name, *args, **kwargs):
-                library = real_win_dll(name, *args, **kwargs)
-                return _Kernel32Proxy(library) if name == "kernel32" else library
-
-            with patch("ctypes.WinDLL", side_effect=tracked_win_dll):
+            with patch("dual_codex.paths._windows_nt_create_file_at", side_effect=tracked_create):
                 bootstrap_dir = safe_ensure_directory_tree(parent / "bootstrap")
-                self.assertTrue(parent_access_masks)
-                self.assertEqual(set(parent_access_masks), {0x0080})
-                parent_access_masks.clear()
                 descriptor, created = safe_create_temp_file(bootstrap_dir, prefix="bootstrap-")
                 os.close(descriptor)
 
-            self.assertTrue(parent_access_masks)
-            self.assertEqual(set(parent_access_masks), {0x0080})
+            self.assertTrue(relative_calls)
+            self.assertIn(0x0084, [access for access, _, _, _ in relative_calls])  # FILE_ADD_SUBDIRECTORY
+            self.assertIn(0x0082, [access for access, _, _, _ in relative_calls])  # FILE_ADD_FILE
+            self.assertTrue(any(name.startswith("bootstrap-") and disposition == 2 for _, name, disposition, _ in relative_calls))
+            self.assertTrue(all(not access & 0x0040 for access, _, _, _ in relative_calls))
+            self.assertTrue(all("\\" not in name and "/" not in name for _, name, _, _ in relative_calls))
             self.assertTrue(bootstrap_dir.is_dir())
             self.assertTrue(created.is_file())
             created.unlink()
+
+    @unittest.skipUnless(os.name == "nt", "native Windows directory identity checks are Windows-specific")
+    def test_verified_directory_open_rejects_path_handle_identity_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            child = root / "child"
+            child.mkdir()
+            parent_handle = _windows_open_root(root)
+            original_lstat = Path.lstat
+
+            def mismatched_lstat(path: Path):
+                info = original_lstat(path)
+                if path == child:
+                    return SimpleNamespace(
+                        st_mode=info.st_mode,
+                        st_dev=info.st_dev,
+                        st_ino=info.st_ino + 1,
+                        st_file_attributes=getattr(info, "st_file_attributes", 0),
+                    )
+                return info
+
+            try:
+                with patch.object(Path, "lstat", new=mismatched_lstat):
+                    with self.assertRaisesRegex(OSError, "directory path changed"):
+                        _windows_open_verified_directory_at(parent_handle, child.name, child)
+            finally:
+                from dual_codex.paths import _windows_close_handle
+
+                _windows_close_handle(parent_handle)
+
+    @unittest.skipUnless(os.name == "nt", "Windows reparse metadata checks are platform-specific")
+    def test_reparse_directory_metadata_is_rejected_without_symlink_privilege(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            child = root / "child"
+            child.mkdir()
+            parent_handle = _windows_open_root(root)
+            original_lstat = Path.lstat
+
+            def reparse_lstat(path: Path):
+                info = original_lstat(path)
+                if path == child:
+                    return SimpleNamespace(
+                        st_mode=info.st_mode,
+                        st_dev=info.st_dev,
+                        st_ino=info.st_ino,
+                        st_file_attributes=0x400,
+                    )
+                return info
+
+            try:
+                with patch.object(Path, "lstat", new=reparse_lstat):
+                    with self.assertRaisesRegex(OSError, "regular non-reparse directory"):
+                        _windows_open_verified_directory_at(parent_handle, child.name, child)
+            finally:
+                from dual_codex.paths import _windows_close_handle
+
+                _windows_close_handle(parent_handle)
+
+    @unittest.skipUnless(os.name == "nt", "Windows reparse metadata checks are platform-specific")
+    def test_reparse_leaf_metadata_is_rejected_without_symlink_privilege(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "control.json"
+            target.write_bytes(b"regular file on disk")
+            disk_info = target.stat()
+            reparse_info = SimpleNamespace(
+                st_mode=stat.S_IFREG | 0o600,
+                st_dev=disk_info.st_dev,
+                st_ino=disk_info.st_ino,
+                st_size=disk_info.st_size,
+                st_mtime_ns=disk_info.st_mtime_ns,
+                st_file_attributes=0x400,
+            )
+
+            with patch("dual_codex.paths._windows_stat_file_at", return_value=reparse_info):
+                with self.assertRaisesRegex(OSError, "regular non-reparse"):
+                    safe_read_bytes(target)
+                with self.assertRaisesRegex(OSError, "regular non-reparse"):
+                    safe_open_regular_file(target, flags=os.O_RDWR)
+
+    @unittest.skipUnless(os.name == "nt", "Windows non-exclusive O_CREAT handle permissions are Windows-specific")
+    def test_open_existing_file_with_o_creat_does_not_require_parent_add_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "existing.json"
+            target.write_bytes(b"existing")
+            calls: list[tuple[int, int]] = []
+            from dual_codex import paths
+
+            native_create = paths._windows_nt_create_file_at
+
+            def tracked_create(parent_handle, name, **kwargs):
+                calls.append((int(kwargs["access"]), int(kwargs["disposition"])))
+                return native_create(parent_handle, name, **kwargs)
+
+            with patch("dual_codex.paths._windows_nt_create_file_at", side_effect=tracked_create):
+                descriptor = safe_open_regular_file(target, flags=os.O_CREAT | os.O_RDWR)
+            os.close(descriptor)
+
+            self.assertTrue(calls)
+            self.assertFalse(any(access & 0x0002 for access, _ in calls))  # No FILE_ADD_FILE on existing-file path.
+            self.assertEqual(target.read_bytes(), b"existing")
 
     def test_safe_open_regular_file_uses_verified_parent_chain(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -202,6 +304,50 @@ class SafePathHelperTests(unittest.TestCase):
                 if redirect_state:
                     self._remove_redirect(parent, redirect_state[0][1])
 
+    @unittest.skipUnless(os.name == "nt", "native Windows leaf identity checks are Windows-specific")
+    def test_open_rejects_regular_leaf_replaced_after_relative_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            target = parent / "control.json"
+            replacement = parent / "replacement.json"
+            target.write_bytes(b"snapshot object")
+            replacement.write_bytes(b"replacement object")
+            from dual_codex import paths
+
+            native_stat = paths._windows_stat_file_at
+
+            def snapshot_then_replace(parent_handle, name):
+                info = native_stat(parent_handle, name)
+                os.replace(replacement, target)
+                return info
+
+            with patch("dual_codex.paths._windows_stat_file_at", side_effect=snapshot_then_replace):
+                with self.assertRaisesRegex(OSError, "control file changed"):
+                    safe_open_regular_file(target, flags=os.O_RDWR)
+            self.assertEqual(target.read_bytes(), b"replacement object")
+
+    @unittest.skipUnless(os.name == "nt", "native Windows leaf identity checks are Windows-specific")
+    def test_read_rejects_regular_leaf_replaced_after_relative_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            target = parent / "control.json"
+            replacement = parent / "replacement.json"
+            target.write_bytes(b"snapshot object")
+            replacement.write_bytes(b"replacement object")
+            from dual_codex import paths
+
+            native_stat = paths._windows_stat_file_at
+
+            def snapshot_then_replace(parent_handle, name):
+                info = native_stat(parent_handle, name)
+                os.replace(replacement, target)
+                return info
+
+            with patch("dual_codex.paths._windows_stat_file_at", side_effect=snapshot_then_replace):
+                with self.assertRaisesRegex(OSError, "bounded regular"):
+                    safe_read_bytes(target)
+            self.assertEqual(target.read_bytes(), b"replacement object")
+
     def test_atomic_write_stays_on_opened_parent_when_ancestor_is_swapped(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -324,61 +470,41 @@ class SafePathHelperTests(unittest.TestCase):
     def test_reparse_leaf_attributes_are_rejected_by_read_write_and_unlink_helpers(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             parent = Path(temporary)
+            external = parent / "external.json"
             target = parent / "control.json"
-            target.write_bytes(b"regular on disk")
+            external.write_bytes(b"outside content")
+            try:
+                target.symlink_to(external)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"file symlink creation unavailable: {type(exc).__name__}")
             expected = target.lstat()
-            actual_lstat = Path.lstat
-            reparse_info = SimpleNamespace(
-                st_mode=stat.S_IFREG | 0o600,
-                st_dev=expected.st_dev,
-                st_ino=expected.st_ino,
-                st_size=expected.st_size,
-                st_mtime_ns=expected.st_mtime_ns,
-                st_file_attributes=0x400,
-            )
-
-            def report_reparse(path: Path):
-                if path == target:
-                    return reparse_info
-                return actual_lstat(path)
-
-            with patch.object(Path, "lstat", new=report_reparse):
-                with self.assertRaises(OSError):
-                    safe_read_bytes(target)
-                with self.assertRaises(OSError):
-                    safe_atomic_write_bytes(target, b"blocked")
-                self.assertFalse(safe_unlink_if_identity(target, expected))
-            self.assertEqual(target.read_bytes(), b"regular on disk")
+            with self.assertRaises(OSError):
+                safe_read_bytes(target)
+            with self.assertRaises(OSError):
+                safe_atomic_write_bytes(target, b"blocked")
+            self.assertFalse(safe_unlink_if_identity(target, expected))
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(external.read_bytes(), b"outside content")
 
     @unittest.skipUnless(os.name == "nt", "native reparse attributes are Windows-specific")
     def test_reparse_parent_attributes_are_rejected_by_read_and_write_helpers(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            actual = root / "actual"
+            actual.mkdir()
+            (actual / "control.json").write_bytes(b"regular on disk")
             parent = root / "repo"
-            parent.mkdir()
+            try:
+                parent.symlink_to(actual, target_is_directory=True)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"directory symlink creation unavailable: {type(exc).__name__}")
+
             target = parent / "control.json"
-            target.write_bytes(b"regular on disk")
-            actual_lstat = Path.lstat
-            parent_info = SimpleNamespace(
-                st_mode=stat.S_IFDIR | 0o700,
-                st_dev=os.stat(parent).st_dev,
-                st_ino=os.stat(parent).st_ino,
-                st_size=0,
-                st_mtime_ns=0,
-                st_file_attributes=0x400,
-            )
-
-            def report_reparse(path: Path):
-                if path == parent:
-                    return parent_info
-                return actual_lstat(path)
-
-            with patch.object(Path, "lstat", new=report_reparse):
-                with self.assertRaises(OSError):
-                    safe_read_bytes(target)
-                with self.assertRaises(OSError):
-                    safe_atomic_write_bytes(target, b"blocked")
-            self.assertEqual(target.read_bytes(), b"regular on disk")
+            with self.assertRaises(OSError):
+                safe_read_bytes(target)
+            with self.assertRaises(OSError):
+                safe_atomic_write_bytes(target, b"blocked")
+            self.assertEqual((actual / "control.json").read_bytes(), b"regular on disk")
 
 
 if __name__ == "__main__":
