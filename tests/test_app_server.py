@@ -81,6 +81,7 @@ class _FakeProcess:
         self.thread_id = "thread-probe"
         self.turn_number = 0
         self.command_exec_params: list[dict] = []
+        self.command_exec_error: dict | None = None
         self.start_error = False
         self.resume_error = False
         self.response_roots_override: list[str] | None = None
@@ -206,6 +207,9 @@ class _FakeProcess:
         elif method == "command/exec":
             params = message["params"]
             self.command_exec_params.append(params)
+            if self.command_exec_error is not None:
+                self._emit({"jsonrpc": "2.0", "id": request_id, "error": self.command_exec_error})
+                return
             argv = params.get("command", [])
             if len(argv) >= 2 and argv[0] == "node" and argv[1] == "-e":
                 stdout = (
@@ -927,6 +931,8 @@ class AppServerTests(unittest.TestCase):
                 self.assertEqual(len(policy["writableRoots"]), len(expected_roots))
                 for actual, expected in zip(policy["writableRoots"], expected_roots):
                     self.assertTrue(same_path(actual, expected), (actual, expected))
+            self.assertEqual(fake.turn_params[0]["sandboxPolicy"], fake.command_exec_params[0]["sandboxPolicy"])
+            self.assertEqual(fake.turn_params[0]["approvalPolicy"], "never")
             readiness = result.metadata["app_server_executor_readiness"]
             self.assertEqual(readiness["status"], "ready")
             self.assertTrue(readiness["child_process"])
@@ -940,6 +946,219 @@ class AppServerTests(unittest.TestCase):
             self.assertFalse(result.metadata["fallback_used"])
             self.assertEqual(result.metadata["actor_id"], "codex-secundario")
             self.assertIn("windows.sandbox=\"elevated\"", result.command)
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
+    def test_executor_readiness_records_sanitized_command_exec_rejection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                backend="app_server",
+                network_access=False,
+            )
+            fake = _FakeProcess()
+            fake.windows_sandbox = "elevated"
+            fake.command_exec_error = {
+                "code": -32603,
+                "message": (
+                    "exec failed: windows sandbox: pin C:\\Users\\tester\\auth.json "
+                    "cmd.exe /d /c exit 0 "
+                    "PROFILE_PATH=C:\\Program Files\\Codex "
+                    "OPENAI_API_KEY=OPENAI_PRIVATE AWS_SECRET_ACCESS_KEY=AWS_PRIVATE "
+                    "token=DO_NOT_STORE"
+                ),
+                "data": {"password": "PRIVATE_ERROR_DATA"},
+            }
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                    result = run_codex_app_server(
+                        config=_config(root),
+                        agent=agent,
+                        repository=repository,
+                        prompt="probe",
+                        output_path=root / "result.json",
+                        session_id="executor-readiness-rejection",
+                        role="executor",
+                        require_workspace_ready=True,
+                    )
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.metadata["availability_failure_class"], "EXECUTOR_COMMAND_EXEC_REJECTED")
+            self.assertEqual(result.metadata["app_server_windows_sandbox"], "elevated")
+            self.assertEqual(result.metadata["app_server_windows_sandbox_readiness"], "ready")
+            readiness = result.metadata["app_server_executor_readiness"]
+            self.assertEqual(readiness["status"], "failed")
+            self.assertEqual(readiness["failure_class"], "EXECUTOR_COMMAND_EXEC_REJECTED")
+            self.assertEqual(readiness["readiness_probe"], "trivial_subprocess")
+            self.assertEqual(readiness["operation"], "command/exec")
+            self.assertEqual(readiness["command_category"], "cmd_trivial")
+            self.assertEqual(readiness["protocol_error_code"], -32603)
+            self.assertEqual(readiness["error_category"], "windows_sandbox")
+            self.assertTrue(readiness["request_rejected"])
+            self.assertFalse(readiness["process_result_received"])
+            self.assertEqual(readiness["process_launch_status"], "not_proven")
+            self.assertTrue(readiness["result_missing"])
+            self.assertIn("[REDACTED_AUTH_PATH]", readiness["error_message"])
+            self.assertIn("PROFILE_PATH=[REDACTED_REMAINDER]", readiness["error_message"])
+            self.assertNotIn("auth.json", readiness["error_message"])
+            self.assertNotIn("DO_NOT_STORE", readiness["error_message"])
+            self.assertNotIn("OPENAI_PRIVATE", readiness["error_message"])
+            self.assertNotIn("AWS_PRIVATE", readiness["error_message"])
+            self.assertNotIn("C:\\Program Files\\Codex", readiness["error_message"])
+            self.assertNotIn("Files\\Codex", readiness["error_message"])
+            self.assertNotIn("cmd.exe", readiness["error_message"])
+            self.assertNotIn("/d /c exit 0", readiness["error_message"])
+            self.assertNotIn("PRIVATE_ERROR_DATA", json.dumps(readiness))
+            self.assertNotIn("command", readiness)
+            self.assertNotIn("thread/start", fake.request_order)
+            self.assertNotIn("turn/start", fake.request_order)
+            self.assertEqual(fake.thread_params, [])
+            self.assertEqual(fake.turn_params, [])
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
+    def test_executor_sandbox_readiness_failure_is_recorded_before_command_exec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                backend="app_server",
+                network_access=False,
+            )
+            fake = _FakeProcess()
+            fake.windows_sandbox = "elevated"
+            fake.windows_sandbox_readiness = "updateRequired"
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                    result = run_codex_app_server(
+                        config=_config(root),
+                        agent=agent,
+                        repository=repository,
+                        prompt="preflight only",
+                        output_path=root / "result.json",
+                        session_id="executor-sandbox-not-ready",
+                        role="executor",
+                        require_workspace_ready=True,
+                    )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.metadata["availability_failure_class"], "EXECUTOR_SANDBOX_NOT_READY")
+            self.assertEqual(result.metadata["app_server_windows_sandbox"], "elevated")
+            self.assertEqual(result.metadata["app_server_windows_sandbox_readiness"], "updateRequired")
+            readiness = result.metadata["app_server_executor_readiness"]
+            self.assertEqual(readiness["status"], "failed")
+            self.assertEqual(readiness["failure_class"], "EXECUTOR_SANDBOX_NOT_READY")
+            self.assertEqual(readiness["windows_sandbox"], "elevated")
+            self.assertEqual(readiness["windows_sandbox_readiness"], "updateRequired")
+            self.assertNotIn("command/exec", fake.request_order)
+            self.assertNotIn("thread/start", fake.request_order)
+            self.assertNotIn("turn/start", fake.request_order)
+
+    def test_executor_command_rejections_and_missing_results_fail_closed(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=True,
+            )
+
+            def run_probe(response: dict, expected_class: str) -> tuple[dict, dict]:
+                process = object.__new__(_AppServerProcess)
+                process.agent = agent
+                process.repository = repository
+                process.executor_readiness = {"status": "not_checked"}
+                process.request = Mock(return_value=response)
+                with self.assertRaises(AppServerError) as raised:
+                    process._executor_command(
+                        ["cmd.exe", "/d", "/c", "exit", "0"],
+                        readiness_probe="trivial_subprocess",
+                        command_category="cmd_trivial",
+                    )
+                self.assertEqual(raised.exception.failure_class, expected_class)
+                return process.executor_readiness, process.request.call_args.args[1]
+
+            def run_transport_failure() -> dict:
+                process = object.__new__(_AppServerProcess)
+                process.agent = agent
+                process.repository = repository
+                process.executor_readiness = {"status": "not_checked"}
+                process.request = Mock(
+                    side_effect=AppServerError(
+                        "App Server exited while running cmd.exe /d /c exit 0 "
+                        "OPENAI_API_KEY=OPENAI_PRIVATE FOO=FOO_PRIVATE",
+                        failure_class="APP_SERVER_PROCESS_EXIT",
+                    )
+                )
+                with self.assertRaises(AppServerError) as raised:
+                    process._executor_command(
+                        ["cmd.exe", "/d", "/c", "exit", "0"],
+                        readiness_probe="trivial_subprocess",
+                        command_category="cmd_trivial",
+                    )
+                self.assertEqual(raised.exception.failure_class, "EXECUTOR_COMMAND_EXEC_TRANSPORT_FAILED")
+                return process.executor_readiness
+
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                expected_cache = executor_npm_cache(agent).resolve()
+                policy_rejection, policy_request = run_probe(
+                    {"error": {"code": -32602, "message": "Invalid sandboxPolicy"}},
+                    "EXECUTOR_SANDBOX_POLICY_REJECTED",
+                )
+                missing_result, missing_request = run_probe(
+                    {"jsonrpc": "2.0", "id": 1},
+                    "EXECUTOR_COMMAND_EXEC_RESULT_MISSING",
+                )
+                transport_failure = run_transport_failure()
+
+            for readiness in (policy_rejection, missing_result):
+                self.assertEqual(readiness["status"], "failed")
+                self.assertFalse(readiness["process_result_received"])
+                self.assertEqual(readiness["process_launch_status"], "not_proven")
+            self.assertEqual(policy_rejection["error_category"], "sandbox_policy")
+            self.assertEqual(policy_rejection["protocol_error_code"], -32602)
+            self.assertTrue(policy_rejection["request_rejected"])
+            self.assertTrue(missing_result["result_missing"])
+            self.assertFalse(missing_result["request_rejected"])
+            self.assertEqual(policy_request["sandboxPolicy"], missing_request["sandboxPolicy"])
+            self.assertEqual(policy_request["sandboxPolicy"]["type"], "workspaceWrite")
+            self.assertTrue(policy_request["sandboxPolicy"]["networkAccess"])
+            expected_roots = [repository.resolve(), (repository / ".git").resolve(), expected_cache]
+            actual_roots = [Path(path).resolve() for path in policy_request["sandboxPolicy"]["writableRoots"]]
+            self.assertEqual(actual_roots, expected_roots)
+            self.assertEqual(transport_failure["failure_class"], "EXECUTOR_COMMAND_EXEC_TRANSPORT_FAILED")
+            self.assertEqual(transport_failure["transport_failure_class"], "APP_SERVER_PROCESS_EXIT")
+            self.assertNotIn("OPENAI_PRIVATE", transport_failure["error_message"])
+            self.assertNotIn("FOO_PRIVATE", transport_failure["error_message"])
+            self.assertNotIn("cmd.exe", transport_failure["error_message"])
+            self.assertNotIn("/d /c exit 0", transport_failure["error_message"])
+            self.assertNotIn("OPENAI_PRIVATE", _sanitize_stderr("OPENAI_API_KEY=OPENAI_PRIVATE"))
+            self.assertNotIn("AWS_PRIVATE", _sanitize_stderr("AWS_SECRET_ACCESS_KEY=AWS_PRIVATE"))
 
     @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
     def test_executor_readiness_classifies_child_git_worker_and_network_failures(self) -> None:
@@ -975,14 +1194,18 @@ class AppServerTests(unittest.TestCase):
             success = {"result": {"exitCode": 0, "stdout": "ready", "stderr": ""}}
             worker_success = {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": True, "temp_write": True, "cache_write": True}), "stderr": ""}}
             cases = [
-                ([{"error": {"message": "blocked"}}], "EXECUTOR_SUBPROCESS_UNAVAILABLE"),
+                ([{"error": {"message": "blocked"}}], "EXECUTOR_COMMAND_EXEC_REJECTED"),
+                ([{"result": {"exitCode": 1, "stdout": "", "stderr": "cmd"}}], "EXECUTOR_SUBPROCESS_UNAVAILABLE"),
                 ([success, {"result": {"exitCode": 1, "stdout": "", "stderr": "git"}}], "EXECUTOR_GIT_UNAVAILABLE"),
+                ([success, success, {"result": {"exitCode": 1, "stdout": "", "stderr": "node"}}], "EXECUTOR_NODE_UNAVAILABLE"),
                 ([success, success, success, {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": False, "temp_write": True, "cache_write": True}), "stderr": ""}}], "EXECUTOR_NODE_WORKER_UNAVAILABLE"),
+                ([success, success, success, {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": True, "temp_write": False, "cache_write": True}), "stderr": ""}}], "EXECUTOR_WRITE_PATH_UNAVAILABLE"),
+                ([success, success, success, {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": True, "temp_write": True, "cache_write": False}), "stderr": ""}}], "EXECUTOR_WRITE_PATH_UNAVAILABLE"),
                 ([success, success, success, worker_success, {"result": {"exitCode": 2, "stdout": json.dumps({"registry": False, "prisma_host": True}), "stderr": ""}}], "EXECUTOR_NETWORK_UNAVAILABLE"),
             ]
             with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
-                for responses, expected in cases:
-                    with self.subTest(failure=expected):
+                for probe_index, (responses, expected) in enumerate(cases):
+                    with self.subTest(failure=expected, probe=probe_index):
                         process = build_process(responses)
                         with self.assertRaises(AppServerError) as raised:
                             process.check_executor_capabilities()
@@ -1109,7 +1332,8 @@ class AppServerTests(unittest.TestCase):
                     session_id="blocked-session",
                 )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("not provisioned", result.stderr)
+            self.assertIn("Windows sandbox readiness did not report ready", result.stderr)
+            self.assertIn("readiness=notConfigured", result.stderr)
             self.assertIn("codex sandbox setup --elevated --current-user", result.stderr)
             self.assertNotIn("unelevated", result.stderr)
             self.assertNotIn("danger-full-access", result.stderr)

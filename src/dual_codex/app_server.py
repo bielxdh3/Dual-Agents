@@ -36,10 +36,12 @@ class AppServerError(RuntimeError):
         *,
         failure_class: str = "",
         termination_classification: str = "",
+        readiness_evidence: Mapping[str, Any] | None = None,
     ):
         super().__init__(message)
         self.failure_class = failure_class
         self.termination_classification = termination_classification
+        self.readiness_evidence = dict(readiness_evidence or {})
 
 
 def _effective_turn_timeout(agent: AgentConfig, config: OrchestratorConfig) -> tuple[float, str]:
@@ -619,8 +621,11 @@ def _tool_item_evidence(item: Any) -> dict[str, Any] | None:
 
 
 _AUTH_PATH = re.compile(r"(?i)(?:[A-Za-z]:)?[^\r\n\s\"']*auth\.json")
+_APP_SERVER_ASSIGNMENT = re.compile(
+    r"(?i)(?<![A-Z0-9_])([A-Z_][A-Z0-9_]{0,79}\s*=\s*)(?:\"[^\"]*\"|'[^']*'|[^\s,}]+)"
+)
 _SECRET = re.compile(
-    r"(?ix)(authorization\s*:\s*bearer\s+|\b(?:token|api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\b\"?\s*[:=]\s*)(?:\"[^\"]*\"|'[^']*'|[^\s,}]+)"
+    r"(?ix)(authorization\s*:\s*bearer\s+|\b[A-Z0-9_]*(?:token|api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|credential|authorization)[A-Z0-9_]*\b\"?\s*[:=]\s*)(?:\"[^\"]*\"|'[^']*'|[^\s,}]+)"
 )
 
 
@@ -630,6 +635,18 @@ def _sanitize_stderr(value: str) -> str:
         lambda match: f"{match.group(0).split(':', 1)[0].split('=', 1)[0]}=[REDACTED]",
         value,
     )[-8000:]
+
+
+def _safe_executor_error_message(value: str, command: list[str]) -> str:
+    message = _sanitize_stderr(value)
+    for argument in sorted(command, key=len, reverse=True):
+        if argument:
+            message = message.replace(argument, "[REDACTED_COMMAND_ARG]")
+    assignment = _APP_SERVER_ASSIGNMENT.search(message)
+    if assignment is not None:
+        name = assignment.group(1).partition("=")[0].strip()
+        message = f"{message[:assignment.start()]}{name}=[REDACTED_REMAINDER]"
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", _json_error(message))[:500]
 
 
 def _provider_turn_failure_class(turn: Mapping[str, Any]) -> str:
@@ -771,7 +788,7 @@ class _AppServerProcess:
         self._closed = False
         self.windows_sandbox = ""
         self.windows_sandbox_readiness = "not_checked"
-        self.executor_readiness: dict[str, bool | str] = {"status": "not_required"}
+        self.executor_readiness: dict[str, Any] = {"status": "not_required"}
         self.initialize_params: dict[str, Any] = {
             "clientInfo": {
                 "name": "dual-codex",
@@ -858,6 +875,7 @@ class _AppServerProcess:
 
         if os.name != "nt":
             return "", "not_applicable"
+        failure_prefix = "EXECUTOR_" if require_workspace_ready else "APP_SERVER_"
         response = self.request(
             "config/read",
             {"cwd": str(self.repository), "includeLayers": False},
@@ -866,7 +884,8 @@ class _AppServerProcess:
         if "error" in response:
             raise AppServerError(
                 "Unable to verify the effective Windows sandbox policy: "
-                + _error_message(response)
+                + _error_message(response),
+                failure_class=f"{failure_prefix}SANDBOX_POLICY_UNAVAILABLE",
             )
         result = response.get("result")
         effective = result.get("config") if isinstance(result, Mapping) else None
@@ -876,10 +895,20 @@ class _AppServerProcess:
             # No explicit setting is intentionally left to Codex defaults and
             # recorded as such; the adapter never supplies a fallback value.
             if require_workspace_ready:
-                raise AppServerError("WINDOWS_SANDBOX_NOT_CONFIGURED: workspace-write Codex Executor requires a configured Windows sandbox.")
+                raise AppServerError(
+                    "EXECUTOR_SANDBOX_NOT_CONFIGURED: workspace-write Codex Executor requires a configured Windows sandbox.",
+                    failure_class="EXECUTOR_SANDBOX_NOT_CONFIGURED",
+                    readiness_evidence={
+                        "windows_sandbox": "unspecified",
+                        "windows_sandbox_readiness": "not_checked",
+                    },
+                )
             return "unspecified", "not_checked"
         if not isinstance(mode, str) or mode not in _WINDOWS_SANDBOX_MODES:
-            raise AppServerError(f"Unsupported effective Windows sandbox policy: {mode!r}.")
+            raise AppServerError(
+                f"Unsupported effective Windows sandbox policy: {mode!r}.",
+                failure_class=f"{failure_prefix}SANDBOX_CONFIGURATION_INVALID",
+            )
         if mode != "elevated" and not require_workspace_ready:
             return mode, "not_required"
         readiness = self.request(
@@ -890,24 +919,48 @@ class _AppServerProcess:
         if "error" in readiness:
             raise AppServerError(
                 "Unable to verify elevated Windows sandbox provisioning: "
-                + _error_message(readiness)
+                + _error_message(readiness),
+                failure_class=f"{failure_prefix}SANDBOX_READINESS_UNAVAILABLE",
+                readiness_evidence={
+                    "windows_sandbox": mode,
+                    "windows_sandbox_readiness": "unknown",
+                },
             )
         readiness_result = readiness.get("result")
         status = readiness_result.get("status") if isinstance(readiness_result, Mapping) else None
         if status != "ready":
+            safe_status = (
+                status
+                if isinstance(status, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", status)
+                else "unknown"
+            )
             raise AppServerError(
-                "WINDOWS_SANDBOX_NOT_READY: Windows sandbox is not ready (not provisioned) "
-                f"(readiness={status or 'unknown'}). Run the official command "
-                f"from an administrative terminal: {_windows_sandbox_setup_command(self.agent)}"
+                f"{failure_prefix}SANDBOX_NOT_READY: Windows sandbox readiness did not report ready "
+                f"(readiness={safe_status}). Run the official command "
+                f"from an administrative terminal: {_windows_sandbox_setup_command(self.agent)}",
+                failure_class=f"{failure_prefix}SANDBOX_NOT_READY",
+                readiness_evidence={
+                    "windows_sandbox": mode,
+                    "windows_sandbox_readiness": safe_status,
+                },
             )
         return mode, "ready"
+
+    def _record_executor_readiness_failure(self, failure_class: str, **evidence: Any) -> None:
+        current = getattr(self, "executor_readiness", {})
+        readiness = dict(current) if isinstance(current, Mapping) else {}
+        readiness.update(evidence)
+        readiness["status"] = "failed"
+        readiness["failure_class"] = failure_class
+        self.executor_readiness = readiness
 
     def _executor_command(
         self,
         command: list[str],
         *,
         timeout_ms: int = 8000,
-        failure_class: str,
+        readiness_probe: str,
+        command_category: str,
     ) -> dict[str, Any]:
         npm_cache = executor_npm_cache(self.agent)
         policy = _workspace_write_sandbox_policy(
@@ -915,6 +968,12 @@ class _AppServerProcess:
             network_access=self.agent.network_access,
             npm_cache=npm_cache,
         )
+        probe_evidence: dict[str, Any] = {
+            "readiness_probe": readiness_probe,
+            "operation": "command/exec",
+            "command_category": command_category,
+        }
+        self.executor_readiness = {"status": "checking", **probe_evidence}
         try:
             response = self.request(
                 "command/exec",
@@ -927,21 +986,116 @@ class _AppServerProcess:
                 timeout=(timeout_ms / 1000) + 3,
             )
         except AppServerError as exc:
+            self._record_executor_readiness_failure(
+                "EXECUTOR_COMMAND_EXEC_TRANSPORT_FAILED",
+                **probe_evidence,
+                request_rejected=False,
+                process_result_received=False,
+                process_launch_status="not_proven",
+                result_missing=True,
+                transport_failure_class=(
+                    exc.failure_class
+                    if re.fullmatch(r"[A-Z0-9_]{1,80}", exc.failure_class)
+                    else "APP_SERVER_ERROR"
+                ),
+                error_message=_safe_executor_error_message(str(exc), command),
+            )
             raise AppServerError(
-                f"{failure_class}: required Executor readiness command did not complete.",
-                failure_class=failure_class,
+                "EXECUTOR_COMMAND_EXEC_TRANSPORT_FAILED: Executor readiness command/exec did not complete.",
+                failure_class="EXECUTOR_COMMAND_EXEC_TRANSPORT_FAILED",
             ) from exc
         if "error" in response:
+            error = response.get("error")
+            code = error.get("code") if isinstance(error, Mapping) else None
+            if isinstance(code, bool) or not isinstance(code, int) and not (
+                isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", code)
+            ):
+                code = None
+            raw_message = error.get("message") if isinstance(error, Mapping) else None
+            message = _safe_executor_error_message(raw_message, command) if isinstance(raw_message, str) else ""
+            lowered = message.casefold()
+            if "permissionprofile" in lowered or "permission profile" in lowered:
+                error_category = "permission_profile"
+                rejection_class = "EXECUTOR_PERMISSION_PROFILE_REJECTED"
+            elif "sandboxpolicy" in lowered or "sandbox policy" in lowered:
+                error_category = "sandbox_policy"
+                rejection_class = "EXECUTOR_SANDBOX_POLICY_REJECTED"
+            elif "windows sandbox" in lowered:
+                error_category = "windows_sandbox"
+                rejection_class = "EXECUTOR_COMMAND_EXEC_REJECTED"
+            elif code == -32601:
+                error_category = "method_not_found"
+                rejection_class = "EXECUTOR_COMMAND_EXEC_REJECTED"
+            elif code == -32602:
+                error_category = "invalid_params"
+                rejection_class = "EXECUTOR_COMMAND_EXEC_REJECTED"
+            elif code == -32603:
+                error_category = "internal_error"
+                rejection_class = "EXECUTOR_COMMAND_EXEC_REJECTED"
+            else:
+                error_category = "request_rejected"
+                rejection_class = "EXECUTOR_COMMAND_EXEC_REJECTED"
+            safe_evidence: dict[str, Any] = {
+                **probe_evidence,
+                "request_rejected": True,
+                "process_result_received": False,
+                "process_launch_status": "not_proven",
+                "result_missing": "result" not in response,
+                "error_category": error_category,
+            }
+            if code is not None:
+                safe_evidence["protocol_error_code"] = code
+            if message:
+                safe_evidence["error_message"] = message
+            self._record_executor_readiness_failure(rejection_class, **safe_evidence)
             raise AppServerError(
-                f"{failure_class}: App Server sandbox rejected a required Executor readiness command.",
-                failure_class=failure_class,
+                f"{rejection_class}: App Server rejected Executor readiness command/exec ({error_category}).",
+                failure_class=rejection_class,
             )
         result = response.get("result")
         if not isinstance(result, Mapping):
+            failure_class = (
+                "EXECUTOR_COMMAND_EXEC_RESULT_MISSING"
+                if "result" not in response
+                else "EXECUTOR_COMMAND_EXEC_RESULT_INVALID"
+            )
+            self._record_executor_readiness_failure(
+                failure_class,
+                **probe_evidence,
+                request_rejected=False,
+                process_result_received=False,
+                process_launch_status="not_proven",
+                result_missing="result" not in response,
+                response_result_present="result" in response,
+            )
             raise AppServerError(
-                f"{failure_class}: App Server omitted the Executor readiness command result.",
+                f"{failure_class}: App Server omitted a valid command/exec result.",
                 failure_class=failure_class,
             )
+        exit_code = result.get("exitCode")
+        if isinstance(exit_code, bool) or not isinstance(exit_code, int):
+            self._record_executor_readiness_failure(
+                "EXECUTOR_COMMAND_EXEC_RESULT_INVALID",
+                **probe_evidence,
+                request_rejected=False,
+                process_result_received=False,
+                process_launch_status="not_proven",
+                result_missing=False,
+                response_result_present=True,
+            )
+            raise AppServerError(
+                "EXECUTOR_COMMAND_EXEC_RESULT_INVALID: App Server returned a command/exec result without an integer exit code.",
+                failure_class="EXECUTOR_COMMAND_EXEC_RESULT_INVALID",
+            )
+        self.executor_readiness = {
+            "status": "checking",
+            **probe_evidence,
+            "request_rejected": False,
+            "process_result_received": True,
+            "process_launch_status": "result_received",
+            "result_missing": False,
+            "exit_code": exit_code,
+        }
         return dict(result)
 
     def check_executor_capabilities(self) -> dict[str, bool | str]:
@@ -950,7 +1104,13 @@ class _AppServerProcess:
         if os.name != "nt" or self.agent.sandbox != "workspace-write" or self.role != "executor":
             self.executor_readiness = {"status": "not_applicable"}
             return dict(self.executor_readiness)
+        self.executor_readiness = {"status": "checking"}
         if self.windows_sandbox != "elevated" or self.windows_sandbox_readiness != "ready":
+            self._record_executor_readiness_failure(
+                "EXECUTOR_SANDBOX_UNAVAILABLE",
+                windows_sandbox=self.windows_sandbox,
+                windows_sandbox_readiness=self.windows_sandbox_readiness,
+            )
             raise AppServerError(
                 "EXECUTOR_SANDBOX_UNAVAILABLE: the Executor requires the provisioned elevated Windows sandbox.",
                 failure_class="EXECUTOR_SANDBOX_UNAVAILABLE",
@@ -958,23 +1118,46 @@ class _AppServerProcess:
 
         trivial = self._executor_command(
             ["cmd.exe", "/d", "/c", "exit", "0"],
-            failure_class="EXECUTOR_SUBPROCESS_UNAVAILABLE",
+            readiness_probe="trivial_subprocess",
+            command_category="cmd_trivial",
         )
         if trivial.get("exitCode") != 0:
+            self._record_executor_readiness_failure(
+                "EXECUTOR_SUBPROCESS_UNAVAILABLE",
+                process_result_received=True,
+                result_missing=False,
+                exit_code=trivial.get("exitCode"),
+            )
             raise AppServerError(
                 "EXECUTOR_SUBPROCESS_UNAVAILABLE: the Windows sandbox could not launch a trivial child process.",
                 failure_class="EXECUTOR_SUBPROCESS_UNAVAILABLE",
             )
 
-        git = self._executor_command(["git", "--version"], failure_class="EXECUTOR_GIT_UNAVAILABLE")
+        git = self._executor_command(
+            ["git", "--version"], readiness_probe="git_version", command_category="git_version"
+        )
         if git.get("exitCode") != 0:
+            self._record_executor_readiness_failure(
+                "EXECUTOR_GIT_UNAVAILABLE",
+                process_result_received=True,
+                result_missing=False,
+                exit_code=git.get("exitCode"),
+            )
             raise AppServerError(
                 "EXECUTOR_GIT_UNAVAILABLE: Git could not launch inside the Executor sandbox.",
                 failure_class="EXECUTOR_GIT_UNAVAILABLE",
             )
 
-        node = self._executor_command(["node", "--version"], failure_class="EXECUTOR_NODE_UNAVAILABLE")
+        node = self._executor_command(
+            ["node", "--version"], readiness_probe="node_version", command_category="node_version"
+        )
         if node.get("exitCode") != 0:
+            self._record_executor_readiness_failure(
+                "EXECUTOR_NODE_UNAVAILABLE",
+                process_result_received=True,
+                result_missing=False,
+                exit_code=node.get("exitCode"),
+            )
             raise AppServerError(
                 "EXECUTOR_NODE_UNAVAILABLE: Node could not launch inside the Executor sandbox.",
                 failure_class="EXECUTOR_NODE_UNAVAILABLE",
@@ -984,23 +1167,53 @@ class _AppServerProcess:
         worker = self._executor_command(
             ["node", "-e", node_checks],
             timeout_ms=12000,
-            failure_class="EXECUTOR_NODE_WORKER_UNAVAILABLE",
+            readiness_probe="node_child_worker_write_paths",
+            command_category="node_runtime_probe",
         )
         try:
             worker_result = json.loads(str(worker.get("stdout", "")))
         except (TypeError, json.JSONDecodeError):
             worker_result = {}
         if worker.get("exitCode") != 0 or not isinstance(worker_result, Mapping) or not worker_result.get("child"):
+            self._record_executor_readiness_failure(
+                "EXECUTOR_SUBPROCESS_UNAVAILABLE",
+                readiness_probe="node_child_process",
+                command_category="node_runtime_probe",
+                process_result_received=True,
+                result_missing=False,
+                exit_code=worker.get("exitCode"),
+                failed_runtime_check="child_process",
+            )
             raise AppServerError(
                 "EXECUTOR_SUBPROCESS_UNAVAILABLE: Node could not launch a child process inside the sandbox.",
                 failure_class="EXECUTOR_SUBPROCESS_UNAVAILABLE",
             )
         if not worker_result.get("worker"):
+            self._record_executor_readiness_failure(
+                "EXECUTOR_NODE_WORKER_UNAVAILABLE",
+                readiness_probe="node_worker",
+                command_category="node_runtime_probe",
+                process_result_received=True,
+                result_missing=False,
+                exit_code=worker.get("exitCode"),
+                failed_runtime_check="worker",
+            )
             raise AppServerError(
                 "EXECUTOR_NODE_WORKER_UNAVAILABLE: Node worker_threads could not start inside the sandbox.",
                 failure_class="EXECUTOR_NODE_WORKER_UNAVAILABLE",
             )
         if not worker_result.get("temp_write") or not worker_result.get("cache_write"):
+            self._record_executor_readiness_failure(
+                "EXECUTOR_WRITE_PATH_UNAVAILABLE",
+                readiness_probe="temp_and_npm_cache_write",
+                command_category="node_runtime_probe",
+                process_result_received=True,
+                result_missing=False,
+                exit_code=worker.get("exitCode"),
+                failed_runtime_check=(
+                    "temp_write" if not worker_result.get("temp_write") else "npm_cache_write"
+                ),
+            )
             raise AppServerError(
                 "EXECUTOR_WRITE_PATH_UNAVAILABLE: TEMP or the exact npm cache root is not writable.",
                 failure_class="EXECUTOR_WRITE_PATH_UNAVAILABLE",
@@ -1022,13 +1235,26 @@ class _AppServerProcess:
             probe = self._executor_command(
                 ["node", "-e", network],
                 timeout_ms=11000,
-                failure_class="EXECUTOR_NETWORK_UNAVAILABLE",
+                readiness_probe="network_endpoints",
+                command_category="network_probe",
             )
             try:
                 network_result = json.loads(str(probe.get("stdout", "")))
             except (TypeError, json.JSONDecodeError):
                 network_result = {}
             if probe.get("exitCode") != 0 or not isinstance(network_result, Mapping) or not network_result.get("registry") or not network_result.get("prisma_host"):
+                self._record_executor_readiness_failure(
+                    "EXECUTOR_NETWORK_UNAVAILABLE",
+                    readiness_probe="network_endpoints",
+                    command_category="network_probe",
+                    process_result_received=True,
+                    result_missing=False,
+                    exit_code=probe.get("exitCode"),
+                    failed_runtime_check=(
+                        "registry" if not isinstance(network_result, Mapping) or not network_result.get("registry")
+                        else "prisma_host"
+                    ),
+                )
                 raise AppServerError(
                     "EXECUTOR_NETWORK_UNAVAILABLE: networkAccess is enabled but npm or Prisma HTTPS is unreachable.",
                     failure_class="EXECUTOR_NETWORK_UNAVAILABLE",
@@ -2728,6 +2954,37 @@ def run_codex_app_server(
             metadata["availability_failure_class"] = "authentication_unavailable"
         else:
             metadata["availability_failure_class"] = "provider_runtime_unavailable"
+        failure_class = str(metadata.get("availability_failure_class") or failure_class)
+        if role == "executor" and require_workspace_ready:
+            if process is not None:
+                metadata["app_server_windows_sandbox"] = getattr(process, "windows_sandbox", "")
+                metadata["app_server_windows_sandbox_readiness"] = getattr(
+                    process, "windows_sandbox_readiness", "not_checked"
+                )
+            readiness_evidence = getattr(exc, "readiness_evidence", None)
+            if isinstance(readiness_evidence, Mapping):
+                if "windows_sandbox" in readiness_evidence:
+                    metadata["app_server_windows_sandbox"] = readiness_evidence["windows_sandbox"]
+                if "windows_sandbox_readiness" in readiness_evidence:
+                    metadata["app_server_windows_sandbox_readiness"] = readiness_evidence[
+                        "windows_sandbox_readiness"
+                    ]
+                recorded_readiness = metadata.get("app_server_executor_readiness", {})
+                failed_readiness = dict(recorded_readiness) if isinstance(recorded_readiness, Mapping) else {}
+                failed_readiness.update(readiness_evidence)
+                failed_readiness["status"] = "failed"
+                failed_readiness["failure_class"] = failure_class
+                metadata["app_server_executor_readiness"] = failed_readiness
+            readiness = getattr(process, "executor_readiness", None) if process is not None else None
+            if not isinstance(readiness, Mapping):
+                readiness = metadata.get("app_server_executor_readiness", {})
+            if not isinstance(readiness, Mapping):
+                readiness = {}
+            if readiness.get("status") != "ready":
+                failed_readiness = dict(readiness)
+                failed_readiness["status"] = "failed"
+                failed_readiness["failure_class"] = failure_class
+                metadata["app_server_executor_readiness"] = failed_readiness
         return CommandResult(command, 1, "", failure_reason, metadata)
 
 

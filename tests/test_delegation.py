@@ -799,31 +799,37 @@ class DelegationTests(unittest.TestCase):
                 fallback_roles=("executor",),
             )
             config = replace(base, accounts=accounts, fallback_enabled=True)
-            request_file = root / "request.json"
-            result_file = root / "result.json"
-            request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
+            for failure_class in (
+                "EXECUTOR_SUBPROCESS_UNAVAILABLE",
+                "EXECUTOR_COMMAND_EXEC_REJECTED",
+                "EXECUTOR_SANDBOX_NOT_READY",
+            ):
+                with self.subTest(failure_class=failure_class):
+                    request_file = root / f"request-{failure_class}.json"
+                    result_file = root / f"result-{failure_class}.json"
+                    request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
 
-            def run_executor(**kwargs):
-                self.assertEqual(kwargs["agent"].account_name, "executor")
-                return CommandResult(
-                    ["app-server"],
-                    1,
-                    "",
-                    "Executor child process could not launch",
-                    {"availability_failure_class": "EXECUTOR_SUBPROCESS_UNAVAILABLE"},
-                )
+                    def run_executor(*, failure_class: str = failure_class, **kwargs):
+                        self.assertEqual(kwargs["agent"].account_name, "executor")
+                        return CommandResult(
+                            ["app-server"],
+                            1,
+                            "",
+                            "Executor readiness failed",
+                            {"availability_failure_class": failure_class},
+                        )
 
-            with patch("dual_codex.delegation.login_status", return_value="OK"), patch(
-                "dual_codex.delegation.run_codex_exec", side_effect=run_executor
-            ) as execute_mock:
-                outcome = delegate(config, request_file=request_file, result_file=result_file)
+                    with patch("dual_codex.delegation.login_status", return_value="OK"), patch(
+                        "dual_codex.delegation.run_codex_exec", side_effect=run_executor
+                    ) as execute_mock:
+                        outcome = delegate(config, request_file=request_file, result_file=result_file)
 
-            result = json.loads(result_file.read_text(encoding="utf-8"))
-            self.assertEqual(outcome.status, "failed")
-            self.assertTrue(result["fallback_enabled"])
-            self.assertFalse(result["fallback_used"])
-            self.assertEqual(result["executor_account"], "executor")
-            self.assertEqual(execute_mock.call_count, 1)
+                    result = json.loads(result_file.read_text(encoding="utf-8"))
+                    self.assertEqual(outcome.status, "failed")
+                    self.assertTrue(result["fallback_enabled"])
+                    self.assertFalse(result["fallback_used"])
+                    self.assertEqual(result["executor_account"], "executor")
+                    self.assertEqual(execute_mock.call_count, 1)
 
     def test_explicit_request_workspace_beats_config_and_reaches_executor(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
