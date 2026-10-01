@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import hashlib
 import json
 from pathlib import Path
 from typing import Any, Mapping
 
 from .config import OrchestratorConfig
-from .delegation import _pid_alive, _process_start_token
+from .delegation import _pid_alive, _process_start_token, repository_lock_path
 from .live_events import LiveEvent, journal_path, read_journal, repository_identity
-from .paths import path_identity_key
 
 
 MAX_READER_EVENTS = 128
@@ -120,8 +118,7 @@ class LiveExecutorReader:
         )
 
     def _lock_snapshot(self, run_id: str) -> dict[str, Any]:
-        digest = hashlib.sha256(path_identity_key(self.repository).encode("utf-8")).hexdigest()[:24]
-        path = self.config.runs_dir / ".locks" / f"{digest}.json"
+        path = repository_lock_path(self.config.runs_dir, self.repository)
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(raw, dict):

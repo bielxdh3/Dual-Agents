@@ -326,6 +326,7 @@ def run_antigravity(
     task_artifact_path: Path | None = None,
     task_sha256: str = "",
     progress: Callable[[str], None] | None = None,
+    process_started: Callable[[int], None] | None = None,
 ) -> CommandResult:
     """Run one streamed Antigravity turn and wait for its terminal result."""
 
@@ -446,6 +447,12 @@ def run_antigravity(
             startup_failure=True,
         )
         return CommandResult(display_command, 1, "", str(exc), metadata)
+    if process_started is not None:
+        try:
+            process_started(process.pid)
+        except BaseException:
+            _close_process(process, force=True)
+            raise
 
     events: queue.Queue[_StreamItem] = queue.Queue()
     stdout_lines: list[str] = []

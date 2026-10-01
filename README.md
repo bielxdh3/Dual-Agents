@@ -89,10 +89,10 @@ A **profile is not a role**. A profile owns provider metadata and authentication
 
 | Provider | Orchestrator | Architect | Executor | Reviewer | Notes |
 |---|:---:|:---:|:---:|:---:|---|
-| **Codex** | ✅ | ✅ | ✅ | ✅ | Isolated by `CODEX_HOME`; native Windows and App Server transports are supported where configured. |
+| **Codex** | ✅ | ✅ | App Server | ✅ | Isolated by `CODEX_HOME`; the assigned Executor role uses App Server. Native Windows TUI sessions are managed separately. |
 | **Antigravity / Gemini** | — | — | ✅ | — | Headless executor through the installed `agy` runtime. Current runtime does not advertise isolated multi-account state roots. |
-| **Anthropic Claude** | — | ✅ | ⚠️ | ✅ | Isolated with `CLAUDE_CONFIG_DIR`. Native-Windows Executor is file-edit-only; command-running Executor is blocked. |
-| **OpenAI-compatible API** | ✅ | ✅ | — | ✅ | BYOK through `env:VARIABLE`; no local tool/workspace execution is claimed. |
+| **Anthropic Claude** | — | — | — | ✅ | Restricted Claude profiles cannot read canonical Architect skills and are supported only as Reviewer. |
+| **OpenAI-compatible API** | ✅ | — | — | ✅ | BYOK through `env:VARIABLE`; supports non-tool roles only and provides no local tool/workspace execution. |
 
 Provider support is capability-driven. A configured profile is rejected before dispatch when its runtime cannot safely satisfy the selected role.
 
@@ -100,10 +100,10 @@ Provider support is capability-driven. A configured profile is rejected before d
 
 - assign independent provider profiles to **Orchestrator, Architect, Executor, and Reviewer** roles;
 - reassign roles without re-authenticating an existing profile;
-- use **Codex** as an Architect, Reviewer, Orchestrator, or Executor;
+- use **Codex App Server** as the assigned Executor; manage native Windows TUI sessions separately;
 - use **Antigravity/Gemini** as a structured headless Executor;
-- use **Claude Code** for bounded Architect/Reviewer work and file-edit-only execution on native Windows;
-- use declared **OpenAI-compatible API** profiles for non-tool roles;
+- use **Claude Code** for bounded Reviewer work;
+- use declared **OpenAI-compatible API** profiles for supported non-tool roles;
 - configure provider-aware models, reasoning/effort, and supported service tiers;
 - keep Codex state isolated by `CODEX_HOME` and Claude state by `CLAUDE_CONFIG_DIR`;
 - preserve exact provider sessions where the adapter supports safe continuation;
@@ -125,7 +125,7 @@ Provider support is capability-driven. A configured profile is rejected before d
 | Role/profile separation | Implemented |
 | Codex provider | Implemented |
 | Antigravity/Gemini provider | Implemented for Executor |
-| Claude Code provider | Implemented; read-only roles and native-Windows file-only Executor bounded |
+| Claude Code provider | Implemented for Reviewer; not assignable as Executor |
 | OpenAI-compatible API profiles | Implemented for declared non-tool roles |
 | Role-scoped fallback | Implemented; disabled by default |
 | Dashboard profile management | Implemented |
@@ -239,6 +239,11 @@ This is only an example. Roles are independent from profile names and providers.
 dual-codex run task.md
 ```
 
+When a registered config points to a different project, pass the target Git
+root explicitly with `--repository`. The Codex App entrypoint and one-time
+global skill installation are documented in
+[APP-INTEGRATION.md](docs/APP-INTEGRATION.md).
+
 For explicit delegation:
 
 ```powershell
@@ -303,7 +308,7 @@ Dual Agents is designed around explicit local trust boundaries:
 - internal chain-of-thought is not exposed as dashboard telemetry.
 
 > [!NOTE]
-> Claude Code on native Windows does not provide the OS command sandbox required for a command-running Executor. Dual Agents therefore keeps native-Windows Claude execution file-edit-only. WSL2 command execution is separate future scope.
+> Claude Code is Reviewer-only in the role registry. Its restricted native Windows adapter does not provide the OS command sandbox required for command-running Executor work. WSL2 command execution is separate future scope.
 
 ## Persistent Codex terminals
 
@@ -371,7 +376,7 @@ Deep runtime details, schemas, migration behavior, terminal internals, and failu
 - Windows is the primary supported runtime target.
 - Antigravity/Gemini is currently an Executor-only provider.
 - The installed `agy` runtime does not currently provide verified isolated multi-account state roots.
-- Native-Windows Claude command execution remains intentionally unavailable; Claude Executor is file-edit-only.
+- Claude Code remains Reviewer-only in the role registry; its restricted native Windows adapter cannot run shell commands.
 - Claude multi-account isolation uses separate state roots, but two independently authenticated accounts have not been live-validated together.
 - OpenAI-compatible API profiles do not provide local workspace/tool execution.
 - Some legacy `dual-codex` naming remains in the CLI and package metadata.

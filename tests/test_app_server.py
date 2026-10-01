@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import queue
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -14,10 +16,13 @@ from dual_codex.app_server import (
     _PROCESSES,
     _canonical_workspace_roots,
     _app_server_command,
+    _finalize_turn_failure,
     _load_thread_mapping,
     _mapping_path,
     _normalise_report,
+    _provider_turn_failure_class,
     _process_key,
+    _get_process,
     _save_thread_mapping,
     _sanitize_stderr,
     _workspace_write_sandbox_policy,
@@ -75,6 +80,8 @@ class _FakeProcess:
         self.request_order: list[str] = []
         self.thread_id = "thread-probe"
         self.turn_number = 0
+        self.command_exec_params: list[dict] = []
+        self.command_exec_error: dict | None = None
         self.start_error = False
         self.resume_error = False
         self.response_roots_override: list[str] | None = None
@@ -197,6 +204,26 @@ class _FakeProcess:
             self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"config": {"windows": windows}, "origins": {}}})
         elif method == "windowsSandbox/readiness":
             self._emit({"jsonrpc": "2.0", "id": request_id, "result": {"status": self.windows_sandbox_readiness}})
+        elif method == "command/exec":
+            params = message["params"]
+            self.command_exec_params.append(params)
+            if self.command_exec_error is not None:
+                self._emit({"jsonrpc": "2.0", "id": request_id, "error": self.command_exec_error})
+                return
+            argv = params.get("command", [])
+            if len(argv) >= 2 and argv[0] == "node" and argv[1] == "-e":
+                stdout = (
+                    json.dumps({"registry": True, "prisma_host": True})
+                    if "checks={registry:false,prisma_host:false}" in argv[-1]
+                    else json.dumps({"child": True, "worker": True, "temp_write": True, "cache_write": True})
+                )
+            else:
+                stdout = "ready"
+            self._emit({
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {"exitCode": 0, "stdout": stdout, "stderr": ""},
+            })
 
 
 def _config(root: Path) -> OrchestratorConfig:
@@ -219,6 +246,282 @@ class AppServerTests(unittest.TestCase):
         for process in list(_PROCESSES.values()):
             process.close()
         _PROCESSES.clear()
+
+    def _turn_process(
+        self,
+        repository: Path,
+        *,
+        timeout: float,
+        progress: list[str],
+        agent_timeout: float | None = None,
+    ):
+        from dual_codex.app_server import _AppServerProcess
+
+        process = object.__new__(_AppServerProcess)
+        process.agent = SimpleNamespace(
+            sandbox="read-only",
+            model="",
+            reasoning_effort="",
+            service_tier="",
+            network_access=False,
+            app_server_turn_timeout=agent_timeout,
+        )
+        process.config = SimpleNamespace(app_server_turn_start_timeout=5, app_server_turn_timeout=timeout)
+        process.repository = repository
+        process.progress = progress.append
+        process.role = "executor"
+        process.windows_sandbox = ""
+        process._events = []
+        process.request_methods = []
+        process.last_thread_request = {}
+        process.last_thread_binding = {}
+        process._active_turn_provenance = None
+        process.last_turn_provenance = {}
+        process._active_thread_id = "thread-1"
+        process._active_thread_resumed = False
+        process.request = Mock(return_value={"result": {"turn": {"id": "turn-1"}}})
+        process._record_notification = Mock()
+        process._read_event = Mock(
+            side_effect=[
+                {"jsonrpc": "2.0", "method": "turn/started", "params": {"turn": {"id": "turn-1"}}},
+                {
+                    "jsonrpc": "2.0",
+                    "method": "turn/completed",
+                    "params": {"turn": {"id": "turn-1", "status": "completed", "items": [{"type": "agentMessage", "text": "PRIVATE_REASONING"}]}},
+                },
+            ]
+        )
+        return process
+
+    def test_app_server_heartbeat_uses_existing_progress_callback_without_content(self) -> None:
+        from dual_codex.app_server import _save_thread_mapping
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            events: list[str] = []
+            process = self._turn_process(repository, timeout=30, progress=events)
+            clock = iter([0.0, 0.0, 1.0, 16.0, 16.0, 16.0])
+            with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock, 16.0)), patch(
+                "dual_codex.app_server._save_thread_mapping"
+            ) as save_mapping:
+                result = process._turn_unlocked("thread-1", "PRIVATE_PROMPT", repository)
+
+            self.assertEqual(result["turn_status"], "completed")
+            self.assertEqual(events, ["app-server turn turn-1 still running"])
+            self.assertNotIn("PRIVATE_PROMPT", "\n".join(events))
+            self.assertNotIn("PRIVATE_REASONING", "\n".join(events))
+            save_mapping.assert_called_once()
+
+    def test_app_server_turn_timeout_remains_hard_and_does_not_wait_past_deadline(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            events: list[str] = []
+            process = self._turn_process(repository, timeout=5, progress=events)
+            clock = iter([0.0, 0.0, 6.0])
+            with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock)):
+                with self.assertRaisesRegex(AppServerError, "Timed out waiting for turn/completed") as raised:
+                    process._turn_unlocked("thread-1", "private", repository)
+            process._read_event.assert_not_called()
+            self.assertEqual(events, [])
+            self.assertEqual(raised.exception.failure_class, "HOST_TURN_DEADLINE")
+            self.assertEqual(process.last_turn_provenance["termination_classification"], "HOST_TURN_DEADLINE")
+            self.assertTrue(process.last_turn_provenance["host_deadline_expired"])
+
+    def test_app_server_turn_provenance_records_effective_timeout_source_and_thread_state(self) -> None:
+        from dual_codex.app_server import _save_thread_mapping
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            process = self._turn_process(repository, timeout=600, agent_timeout=3600, progress=[])
+            process._active_thread_resumed = True
+            with patch("dual_codex.app_server.time.monotonic", return_value=0.0), patch(
+                "dual_codex.app_server._save_thread_mapping"
+            ):
+                result = process._turn_unlocked("thread-1", "PRIVATE_PROMPT", repository)
+
+            provenance = result["turn_provenance"]
+            self.assertEqual(provenance["turn_timeout_seconds"], 3600)
+            self.assertEqual(provenance["timeout_source"], "account_role_override")
+            self.assertEqual(provenance["thread_state"], "resumed")
+            self.assertTrue(provenance["thread_resumed"])
+            self.assertEqual(provenance["turn_id"], "turn-1")
+            self.assertEqual(provenance["termination_classification"], "TURN_COMPLETED")
+            self.assertNotIn("PRIVATE_PROMPT", json.dumps(provenance))
+            self.assertNotIn("PRIVATE_REASONING", json.dumps(provenance))
+
+    def test_app_server_turn_provenance_records_global_default_for_fresh_thread(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            process = self._turn_process(repository, timeout=600, progress=[])
+            with patch("dual_codex.app_server.time.monotonic", return_value=0.0), patch(
+                "dual_codex.app_server._save_thread_mapping"
+            ):
+                result = process._turn_unlocked("thread-1", "PRIVATE_PROMPT", repository)
+
+            provenance = result["turn_provenance"]
+            self.assertEqual(provenance["turn_timeout_seconds"], 600)
+            self.assertEqual(provenance["timeout_source"], "global_default")
+            self.assertEqual(provenance["thread_state"], "fresh")
+            self.assertFalse(provenance["thread_resumed"])
+            self.assertIsInstance(provenance["turn_start_monotonic"], float)
+            self.assertIsInstance(provenance["turn_start_timestamp"], str)
+
+    def test_app_server_turn_provenance_records_only_safe_provider_event_metadata(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        process = object.__new__(_AppServerProcess)
+        process._active_turn_provenance = {"turn_id": "turn-1"}
+        process._events = []
+        message = {
+            "jsonrpc": "2.0",
+            "method": "item/started",
+            "params": {"turnId": "turn-1", "item": {"type": "agentMessage", "text": "PRIVATE_PROMPT"}},
+        }
+        process._record_notification(message)
+        provenance = process._active_turn_provenance
+
+        self.assertEqual(provenance["last_safe_provider_notification_method"], "item/started")
+        self.assertIsInstance(provenance["last_provider_event_timestamp"], str)
+        self.assertNotIn("PRIVATE_PROMPT", json.dumps(provenance))
+
+    def test_app_server_failure_provenance_distinguishes_process_exit(self) -> None:
+        process = SimpleNamespace(
+            last_turn_provenance={
+                "termination_classification": "IN_PROGRESS",
+                "host_deadline_expired": False,
+                "thread_resumed": False,
+            },
+            process=SimpleNamespace(poll=lambda: 17),
+        )
+        error = AppServerError(
+            "App Server process exited unexpectedly.",
+            failure_class="APP_SERVER_PROCESS_EXIT",
+            termination_classification="APP_SERVER_PROCESS_EXIT",
+        )
+        provenance = _finalize_turn_failure(process, error)
+        self.assertEqual(provenance["termination_classification"], "APP_SERVER_PROCESS_EXIT")
+        self.assertFalse(provenance["host_deadline_expired"])
+        self.assertFalse(provenance["app_server_process_alive_at_failure"])
+        self.assertEqual(provenance["app_server_process_exit_code"], 17)
+        self.assertIn("exit code 17", provenance["failure_reason"])
+
+    def test_app_server_failure_provenance_preserves_provider_error_before_deadline(self) -> None:
+        process = SimpleNamespace(
+            last_turn_provenance={
+                "termination_classification": "APP_SERVER_ERROR_EVENT",
+                "host_deadline_expired": False,
+                "thread_resumed": False,
+            },
+            process=SimpleNamespace(poll=lambda: None),
+        )
+        error = AppServerError(
+            "App Server emitted an error notification.",
+            failure_class="APP_SERVER_ERROR_EVENT",
+            termination_classification="APP_SERVER_ERROR_EVENT",
+        )
+        provenance = _finalize_turn_failure(process, error)
+        self.assertEqual(provenance["termination_classification"], "APP_SERVER_ERROR_EVENT")
+        self.assertFalse(provenance["host_deadline_expired"])
+        self.assertTrue(provenance["app_server_process_alive_at_failure"])
+        self.assertEqual(provenance["failure_reason"], str(error))
+        self.assertNotIn("provider_runtime_unavailable", json.dumps(provenance))
+
+    def test_app_server_provider_timeout_is_distinct_from_host_deadline(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            process = self._turn_process(repository, timeout=600, progress=[])
+            process.process = SimpleNamespace(poll=lambda: None)
+            process._read_event = Mock(
+                side_effect=[
+                    {"jsonrpc": "2.0", "method": "turn/started", "params": {"turn": {"id": "turn-1"}}},
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "turn/completed",
+                        "params": {
+                            "turn": {
+                                "id": "turn-1",
+                                "status": "failed",
+                                "error": {
+                                    "code": "provider_timeout",
+                                    "type": "model_timeout",
+                                    "message": "PRIVATE_PROMPT PRIVATE_REASONING private provider payload",
+                                    "payload": {"secret": "private provider payload"},
+                                },
+                            }
+                        },
+                    },
+                ]
+            )
+            with patch("dual_codex.app_server._save_thread_mapping"):
+                with self.assertRaises(AppServerError) as raised:
+                    process._turn_unlocked("thread-1", "PRIVATE_PROMPT", repository)
+            self.assertEqual(raised.exception.failure_class, "PROVIDER_TURN_TIMEOUT")
+            provenance = _finalize_turn_failure(process, raised.exception)
+
+        self.assertEqual(provenance["termination_classification"], "PROVIDER_TURN_TIMEOUT")
+        self.assertFalse(provenance["host_deadline_expired"])
+        self.assertEqual(provenance["provider_error_code"], "provider_timeout")
+        self.assertEqual(provenance["provider_error_type"], "model_timeout")
+        self.assertEqual(
+            provenance["failure_reason"],
+            "App Server turn turn-1 ended with status 'failed'. Provider error code=provider_timeout, type=model_timeout.",
+        )
+        self.assertNotIn("private provider payload", json.dumps(provenance))
+        self.assertNotIn("PRIVATE_PROMPT", json.dumps(provenance))
+        self.assertNotIn("PRIVATE_REASONING", json.dumps(provenance))
+
+    def test_failure_provenance_keeps_host_timeout_cause_without_prompt_or_secret(self) -> None:
+        message = "Timed out waiting for turn/completed (turn-1)."
+        process = SimpleNamespace(
+            last_turn_provenance={
+                "termination_classification": "HOST_TURN_DEADLINE",
+                "host_deadline_expired": True,
+                "turn_id": "turn-1",
+            },
+            process=SimpleNamespace(poll=lambda: None),
+        )
+        provenance = _finalize_turn_failure(
+            process,
+            AppServerError(message, failure_class="HOST_TURN_DEADLINE", termination_classification="HOST_TURN_DEADLINE"),
+        )
+        self.assertEqual(provenance["failure_reason"], message)
+        serialized = json.dumps(provenance)
+        self.assertNotIn("PRIVATE_PROMPT", serialized)
+        self.assertNotIn("PRIVATE_REASONING", serialized)
+        self.assertNotIn("secret-value", serialized)
+
+    def test_app_server_account_role_timeout_overrides_only_turn_completion(self) -> None:
+        from dual_codex.app_server import _save_thread_mapping
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            process = self._turn_process(repository, timeout=5, agent_timeout=3600, progress=[])
+            clock = iter([0.0, 0.0, 6.0, 6.0, 7.0, 7.0])
+            with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock)), patch(
+                "dual_codex.app_server._save_thread_mapping"
+            ):
+                result = process._turn_unlocked("thread-1", "private", repository)
+
+            self.assertEqual(result["turn_status"], "completed")
+            self.assertEqual(process.config.app_server_turn_start_timeout, 5)
+            self.assertEqual(process.config.app_server_turn_timeout, 5)
+
+    def test_app_server_heartbeat_does_not_extend_hard_turn_deadline(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            events: list[str] = []
+            process = self._turn_process(repository, timeout=16, progress=events)
+            clock = iter([0.0, 0.0, 15.0, 15.0, 17.0])
+            with patch("dual_codex.app_server.time.monotonic", side_effect=lambda: next(clock, 17.0)):
+                with self.assertRaisesRegex(AppServerError, "Timed out waiting for turn/completed"):
+                    process._turn_unlocked("thread-1", "private", repository)
+
+            process._read_event.assert_called_once()
+            self.assertEqual(events, ["app-server turn turn-1 still running"])
 
     def test_structured_turns_reuse_thread_and_clear_api_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -300,15 +603,25 @@ class AppServerTests(unittest.TestCase):
                     request_id="request-1",
                     run_id="run-1",
                 )
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+            time.sleep(0.05)
 
             self.assertEqual(first.returncode, 0)
             self.assertEqual(second.returncode, 0)
             self.assertEqual(
                 first.command,
-                ["codex", "app-server", "--stdio"],
+                ["codex", "app-server", "-c", 'windows.sandbox="elevated"', "--stdio"],
             )
             self.assertEqual(first.metadata["app_server_thread_id"], "thread-probe")
             self.assertEqual(second.metadata["app_server_thread_id"], "thread-probe")
+            self.assertEqual(first.metadata["app_server_dispatch_provenance"]["turn_timeout_seconds"], 5)
+            self.assertEqual(first.metadata["app_server_dispatch_provenance"]["timeout_source"], "global_default")
+            self.assertEqual(first.metadata["app_server_dispatch_provenance"]["process_reuse_state"], "new_process")
+            self.assertEqual(second.metadata["app_server_dispatch_provenance"]["turn_timeout_seconds"], 5)
+            self.assertEqual(second.metadata["app_server_dispatch_provenance"]["process_reuse_state"], "reused_process")
+            self.assertTrue(second.metadata["app_server_dispatch_provenance"]["reused_process_runtime_identity_matched"])
             self.assertEqual(first.metadata["app_server_turn_id"], "turn-1")
             self.assertEqual(second.metadata["app_server_turn_id"], "turn-2")
             self.assertEqual(second.metadata["task_transport"], "app_server")
@@ -499,6 +812,405 @@ class AppServerTests(unittest.TestCase):
         self.assertFalse(disabled["networkAccess"])
         self.assertTrue(enabled["networkAccess"])
 
+    def test_security_recovery_command_is_separate_and_has_exact_mcp_allowlist(self) -> None:
+        config = _config(Path("C:/dual-codex-test"))
+        agent = AgentConfig(
+            codex_home=Path("C:/dual-codex-test/profile"),
+            model="",
+            reasoning_effort="high",
+            sandbox="workspace-write",
+            account_name="codex-secundario",
+            backend="app_server",
+        )
+        normal = _app_server_command(config, agent=agent, role="executor")
+        maintenance = _app_server_command(
+            config,
+            agent=agent,
+            role="executor",
+            security_recovery=True,
+        )
+        self.assertNotIn("mcp_servers=", " ".join(normal))
+        self.assertNotIn("plugins=", " ".join(normal))
+        self.assertNotIn("features.shell_tool=false", normal)
+        self.assertNotIn("features.hooks=false", normal)
+        self.assertNotIn("features.multi_agent=false", normal)
+        self.assertNotIn('web_search="disabled"', normal)
+        self.assertNotIn("features.browser_use=false", normal)
+        self.assertNotIn("features.computer_use=false", normal)
+        self.assertNotIn("features.apps=false", normal)
+        self.assertIn("features.shell_tool=false", maintenance)
+        self.assertIn("features.hooks=false", maintenance)
+        self.assertIn("features.multi_agent=false", maintenance)
+        self.assertIn('web_search="disabled"', maintenance)
+        self.assertIn("features.apps=false", maintenance)
+        self.assertIn("features.browser_use=false", maintenance)
+        self.assertIn("features.browser_use_external=false", maintenance)
+        self.assertIn("features.browser_use_full_cdp_access=false", maintenance)
+        self.assertIn("features.computer_use=false", maintenance)
+        self.assertIn("features.image_generation=false", maintenance)
+        self.assertIn("features.sleep_tool=false", maintenance)
+        self.assertIn("mcp_servers={codex_apps={url=\"http://127.0.0.1:9\",enabled=false}}", maintenance)
+        self.assertIn(
+            'plugins={"codex-security@openai-curated-remote"={enabled=true,mcp_servers={"codex-security"={enabled=true,enabled_tools=["cancel_codex_security_scan"],tools={cancel_codex_security_scan={approval_mode="prompt"}}}}}}',
+            maintenance,
+        )
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor sandbox policy")
+    def test_elevated_sandbox_override_is_limited_to_workspace_write_executor(self) -> None:
+        root = Path("C:/dual-codex-test")
+        config = _config(root)
+        executor = AgentConfig(
+            codex_home=root / "executor-profile",
+            model="",
+            reasoning_effort="high",
+            sandbox="workspace-write",
+            account_name="executor",
+            backend="app_server",
+        )
+        architect_command = _app_server_command(config, agent=executor, role="architect")
+        reviewer_command = _app_server_command(config, agent=executor, role="reviewer")
+        executor_command = _app_server_command(config, agent=executor, role="executor")
+        self.assertNotIn("windows.sandbox", " ".join(architect_command))
+        self.assertNotIn("windows.sandbox", " ".join(reviewer_command))
+        self.assertIn('windows.sandbox="elevated"', executor_command)
+        read_only = AgentConfig(
+            codex_home=root / "read-only-profile",
+            model="",
+            reasoning_effort="high",
+            sandbox="read-only",
+            account_name="executor",
+            backend="app_server",
+        )
+        self.assertNotIn("windows.sandbox", " ".join(_app_server_command(config, agent=read_only, role="executor")))
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
+    def test_executor_readiness_runs_before_turn_with_bounded_workspace_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                backend="app_server",
+                network_access=False,
+            )
+            fake = _FakeProcess()
+            fake.windows_sandbox = "elevated"
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                expected_cache = executor_npm_cache(agent)
+                with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                    result = run_codex_app_server(
+                        config=_config(root),
+                        agent=agent,
+                        repository=repository,
+                        prompt="probe",
+                        output_path=root / "result.json",
+                        session_id="executor-readiness",
+                        role="executor",
+                        require_workspace_ready=True,
+                    )
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+            time.sleep(0.05)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(fake.request_order.index("command/exec") < fake.request_order.index("turn/start"), True)
+            self.assertEqual(len(fake.command_exec_params), 4)
+            expected_roots = [repository.resolve(), (repository / ".git").resolve(), expected_cache.resolve()]
+            for params in fake.command_exec_params:
+                self.assertNotIn("outputBytesCap", params)
+                self.assertEqual(params["timeoutMs"], 8000 if params["command"][0] != "node" or len(params["command"]) == 2 else 12000)
+                policy = params["sandboxPolicy"]
+                self.assertEqual(policy["type"], "workspaceWrite")
+                self.assertFalse(policy["networkAccess"])
+                self.assertEqual(len(policy["writableRoots"]), len(expected_roots))
+                for actual, expected in zip(policy["writableRoots"], expected_roots):
+                    self.assertTrue(same_path(actual, expected), (actual, expected))
+            self.assertEqual(fake.turn_params[0]["sandboxPolicy"], fake.command_exec_params[0]["sandboxPolicy"])
+            self.assertEqual(fake.turn_params[0]["approvalPolicy"], "never")
+            readiness = result.metadata["app_server_executor_readiness"]
+            self.assertEqual(readiness["status"], "ready")
+            self.assertTrue(readiness["child_process"])
+            self.assertTrue(readiness["git"])
+            self.assertTrue(readiness["node_child_process"])
+            self.assertTrue(readiness["node_worker"])
+            self.assertTrue(readiness["temp_write"])
+            self.assertTrue(readiness["npm_cache_write"])
+            self.assertFalse(readiness["network_enabled"])
+            self.assertFalse(set(readiness) & {"token", "handoffClaimToken", "secret", "credential"})
+            self.assertFalse(result.metadata["fallback_used"])
+            self.assertEqual(result.metadata["actor_id"], "codex-secundario")
+            self.assertIn("windows.sandbox=\"elevated\"", result.command)
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
+    def test_executor_readiness_records_sanitized_command_exec_rejection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                backend="app_server",
+                network_access=False,
+            )
+            fake = _FakeProcess()
+            fake.windows_sandbox = "elevated"
+            fake.command_exec_error = {
+                "code": -32603,
+                "message": (
+                    "exec failed: windows sandbox: pin C:\\Users\\tester\\auth.json "
+                    "cmd.exe /d /c exit 0 "
+                    "PROFILE_PATH=C:\\Program Files\\Codex "
+                    "OPENAI_API_KEY=OPENAI_PRIVATE AWS_SECRET_ACCESS_KEY=AWS_PRIVATE "
+                    "token=DO_NOT_STORE"
+                ),
+                "data": {"password": "PRIVATE_ERROR_DATA"},
+            }
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                    result = run_codex_app_server(
+                        config=_config(root),
+                        agent=agent,
+                        repository=repository,
+                        prompt="probe",
+                        output_path=root / "result.json",
+                        session_id="executor-readiness-rejection",
+                        role="executor",
+                        require_workspace_ready=True,
+                    )
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.metadata["availability_failure_class"], "EXECUTOR_COMMAND_EXEC_REJECTED")
+            self.assertEqual(result.metadata["app_server_windows_sandbox"], "elevated")
+            self.assertEqual(result.metadata["app_server_windows_sandbox_readiness"], "ready")
+            readiness = result.metadata["app_server_executor_readiness"]
+            self.assertEqual(readiness["status"], "failed")
+            self.assertEqual(readiness["failure_class"], "EXECUTOR_COMMAND_EXEC_REJECTED")
+            self.assertEqual(readiness["readiness_probe"], "trivial_subprocess")
+            self.assertEqual(readiness["operation"], "command/exec")
+            self.assertEqual(readiness["command_category"], "cmd_trivial")
+            self.assertEqual(readiness["protocol_error_code"], -32603)
+            self.assertEqual(readiness["error_category"], "windows_sandbox")
+            self.assertTrue(readiness["request_rejected"])
+            self.assertFalse(readiness["process_result_received"])
+            self.assertEqual(readiness["process_launch_status"], "not_proven")
+            self.assertTrue(readiness["result_missing"])
+            self.assertIn("[REDACTED_AUTH_PATH]", readiness["error_message"])
+            self.assertIn("PROFILE_PATH=[REDACTED_REMAINDER]", readiness["error_message"])
+            self.assertNotIn("auth.json", readiness["error_message"])
+            self.assertNotIn("DO_NOT_STORE", readiness["error_message"])
+            self.assertNotIn("OPENAI_PRIVATE", readiness["error_message"])
+            self.assertNotIn("AWS_PRIVATE", readiness["error_message"])
+            self.assertNotIn("C:\\Program Files\\Codex", readiness["error_message"])
+            self.assertNotIn("Files\\Codex", readiness["error_message"])
+            self.assertNotIn("cmd.exe", readiness["error_message"])
+            self.assertNotIn("/d /c exit 0", readiness["error_message"])
+            self.assertNotIn("PRIVATE_ERROR_DATA", json.dumps(readiness))
+            self.assertNotIn("command", readiness)
+            self.assertNotIn("thread/start", fake.request_order)
+            self.assertNotIn("turn/start", fake.request_order)
+            self.assertEqual(fake.thread_params, [])
+            self.assertEqual(fake.turn_params, [])
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
+    def test_executor_sandbox_readiness_failure_is_recorded_before_command_exec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="codex-secundario",
+                backend="app_server",
+                network_access=False,
+            )
+            fake = _FakeProcess()
+            fake.windows_sandbox = "elevated"
+            fake.windows_sandbox_readiness = "updateRequired"
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                with patch("dual_codex.app_server.subprocess.Popen", return_value=fake):
+                    result = run_codex_app_server(
+                        config=_config(root),
+                        agent=agent,
+                        repository=repository,
+                        prompt="preflight only",
+                        output_path=root / "result.json",
+                        session_id="executor-sandbox-not-ready",
+                        role="executor",
+                        require_workspace_ready=True,
+                    )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.metadata["availability_failure_class"], "EXECUTOR_SANDBOX_NOT_READY")
+            self.assertEqual(result.metadata["app_server_windows_sandbox"], "elevated")
+            self.assertEqual(result.metadata["app_server_windows_sandbox_readiness"], "updateRequired")
+            readiness = result.metadata["app_server_executor_readiness"]
+            self.assertEqual(readiness["status"], "failed")
+            self.assertEqual(readiness["failure_class"], "EXECUTOR_SANDBOX_NOT_READY")
+            self.assertEqual(readiness["windows_sandbox"], "elevated")
+            self.assertEqual(readiness["windows_sandbox_readiness"], "updateRequired")
+            self.assertNotIn("command/exec", fake.request_order)
+            self.assertNotIn("thread/start", fake.request_order)
+            self.assertNotIn("turn/start", fake.request_order)
+
+    def test_executor_command_rejections_and_missing_results_fail_closed(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=True,
+            )
+
+            def run_probe(response: dict, expected_class: str) -> tuple[dict, dict]:
+                process = object.__new__(_AppServerProcess)
+                process.agent = agent
+                process.repository = repository
+                process.executor_readiness = {"status": "not_checked"}
+                process.request = Mock(return_value=response)
+                with self.assertRaises(AppServerError) as raised:
+                    process._executor_command(
+                        ["cmd.exe", "/d", "/c", "exit", "0"],
+                        readiness_probe="trivial_subprocess",
+                        command_category="cmd_trivial",
+                    )
+                self.assertEqual(raised.exception.failure_class, expected_class)
+                return process.executor_readiness, process.request.call_args.args[1]
+
+            def run_transport_failure() -> dict:
+                process = object.__new__(_AppServerProcess)
+                process.agent = agent
+                process.repository = repository
+                process.executor_readiness = {"status": "not_checked"}
+                process.request = Mock(
+                    side_effect=AppServerError(
+                        "App Server exited while running cmd.exe /d /c exit 0 "
+                        "OPENAI_API_KEY=OPENAI_PRIVATE FOO=FOO_PRIVATE",
+                        failure_class="APP_SERVER_PROCESS_EXIT",
+                    )
+                )
+                with self.assertRaises(AppServerError) as raised:
+                    process._executor_command(
+                        ["cmd.exe", "/d", "/c", "exit", "0"],
+                        readiness_probe="trivial_subprocess",
+                        command_category="cmd_trivial",
+                    )
+                self.assertEqual(raised.exception.failure_class, "EXECUTOR_COMMAND_EXEC_TRANSPORT_FAILED")
+                return process.executor_readiness
+
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                expected_cache = executor_npm_cache(agent).resolve()
+                policy_rejection, policy_request = run_probe(
+                    {"error": {"code": -32602, "message": "Invalid sandboxPolicy"}},
+                    "EXECUTOR_SANDBOX_POLICY_REJECTED",
+                )
+                missing_result, missing_request = run_probe(
+                    {"jsonrpc": "2.0", "id": 1},
+                    "EXECUTOR_COMMAND_EXEC_RESULT_MISSING",
+                )
+                transport_failure = run_transport_failure()
+
+            for readiness in (policy_rejection, missing_result):
+                self.assertEqual(readiness["status"], "failed")
+                self.assertFalse(readiness["process_result_received"])
+                self.assertEqual(readiness["process_launch_status"], "not_proven")
+            self.assertEqual(policy_rejection["error_category"], "sandbox_policy")
+            self.assertEqual(policy_rejection["protocol_error_code"], -32602)
+            self.assertTrue(policy_rejection["request_rejected"])
+            self.assertTrue(missing_result["result_missing"])
+            self.assertFalse(missing_result["request_rejected"])
+            self.assertEqual(policy_request["sandboxPolicy"], missing_request["sandboxPolicy"])
+            self.assertEqual(policy_request["sandboxPolicy"]["type"], "workspaceWrite")
+            self.assertTrue(policy_request["sandboxPolicy"]["networkAccess"])
+            expected_roots = [repository.resolve(), (repository / ".git").resolve(), expected_cache]
+            actual_roots = [Path(path).resolve() for path in policy_request["sandboxPolicy"]["writableRoots"]]
+            self.assertEqual(actual_roots, expected_roots)
+            self.assertEqual(transport_failure["failure_class"], "EXECUTOR_COMMAND_EXEC_TRANSPORT_FAILED")
+            self.assertEqual(transport_failure["transport_failure_class"], "APP_SERVER_PROCESS_EXIT")
+            self.assertNotIn("OPENAI_PRIVATE", transport_failure["error_message"])
+            self.assertNotIn("FOO_PRIVATE", transport_failure["error_message"])
+            self.assertNotIn("cmd.exe", transport_failure["error_message"])
+            self.assertNotIn("/d /c exit 0", transport_failure["error_message"])
+            self.assertNotIn("OPENAI_PRIVATE", _sanitize_stderr("OPENAI_API_KEY=OPENAI_PRIVATE"))
+            self.assertNotIn("AWS_PRIVATE", _sanitize_stderr("AWS_SECRET_ACCESS_KEY=AWS_PRIVATE"))
+
+    @unittest.skipUnless(os.name == "nt", "Windows Executor readiness gate")
+    def test_executor_readiness_classifies_child_git_worker_and_network_failures(self) -> None:
+        from dual_codex.app_server import _AppServerProcess
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            (repository / ".git").mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=True,
+            )
+
+            def build_process(responses: list[dict]):
+                process = object.__new__(_AppServerProcess)
+                process.agent = agent
+                process.repository = repository
+                process.role = "executor"
+                process.windows_sandbox = "elevated"
+                process.windows_sandbox_readiness = "ready"
+                process.executor_readiness = {"status": "not_checked"}
+                process.config = SimpleNamespace(app_server_initialize_timeout=2)
+                process.request = Mock(side_effect=responses)
+                return process
+
+            success = {"result": {"exitCode": 0, "stdout": "ready", "stderr": ""}}
+            worker_success = {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": True, "temp_write": True, "cache_write": True}), "stderr": ""}}
+            cases = [
+                ([{"error": {"message": "blocked"}}], "EXECUTOR_COMMAND_EXEC_REJECTED"),
+                ([{"result": {"exitCode": 1, "stdout": "", "stderr": "cmd"}}], "EXECUTOR_SUBPROCESS_UNAVAILABLE"),
+                ([success, {"result": {"exitCode": 1, "stdout": "", "stderr": "git"}}], "EXECUTOR_GIT_UNAVAILABLE"),
+                ([success, success, {"result": {"exitCode": 1, "stdout": "", "stderr": "node"}}], "EXECUTOR_NODE_UNAVAILABLE"),
+                ([success, success, success, {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": False, "temp_write": True, "cache_write": True}), "stderr": ""}}], "EXECUTOR_NODE_WORKER_UNAVAILABLE"),
+                ([success, success, success, {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": True, "temp_write": False, "cache_write": True}), "stderr": ""}}], "EXECUTOR_WRITE_PATH_UNAVAILABLE"),
+                ([success, success, success, {"result": {"exitCode": 0, "stdout": json.dumps({"child": True, "worker": True, "temp_write": True, "cache_write": False}), "stderr": ""}}], "EXECUTOR_WRITE_PATH_UNAVAILABLE"),
+                ([success, success, success, worker_success, {"result": {"exitCode": 2, "stdout": json.dumps({"registry": False, "prisma_host": True}), "stderr": ""}}], "EXECUTOR_NETWORK_UNAVAILABLE"),
+            ]
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(root / "localappdata")}):
+                for probe_index, (responses, expected) in enumerate(cases):
+                    with self.subTest(failure=expected, probe=probe_index):
+                        process = build_process(responses)
+                        with self.assertRaises(AppServerError) as raised:
+                            process.check_executor_capabilities()
+                        self.assertEqual(raised.exception.failure_class, expected)
+
     def test_headless_app_server_does_not_override_profile_windows_sandbox(self) -> None:
         command = _app_server_command(_config(Path("C:/dual-codex-test")))
         self.assertEqual(
@@ -620,7 +1332,8 @@ class AppServerTests(unittest.TestCase):
                     session_id="blocked-session",
                 )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("not provisioned", result.stderr)
+            self.assertIn("Windows sandbox readiness did not report ready", result.stderr)
+            self.assertIn("readiness=notConfigured", result.stderr)
             self.assertIn("codex sandbox setup --elevated --current-user", result.stderr)
             self.assertNotIn("unelevated", result.stderr)
             self.assertNotIn("danger-full-access", result.stderr)
@@ -645,6 +1358,53 @@ class AppServerTests(unittest.TestCase):
             )
             self.assertFalse(_mapping_path(config, agent, repository).exists())
 
+    def test_thread_mapping_identity_tracks_effective_runtime_configuration(self) -> None:
+        from dataclasses import replace
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=False,
+            )
+            _save_thread_mapping(config, agent, repository, "thread-1", role="executor")
+            self.assertIsNone(
+                _load_thread_mapping(
+                    config,
+                    replace(agent, app_server_turn_timeout=3600),
+                    repository,
+                    role="executor",
+                )
+            )
+            _save_thread_mapping(config, agent, repository, "thread-1", role="executor")
+            self.assertIsNone(
+                _load_thread_mapping(config, replace(agent, network_access=True), repository, role="executor")
+            )
+            _save_thread_mapping(config, agent, repository, "thread-2", role="executor")
+            self.assertIsNone(
+                _load_thread_mapping(config, replace(agent, sandbox="read-only"), repository, role="executor")
+            )
+            _save_thread_mapping(config, agent, repository, "thread-3", role="executor")
+            agent.codex_home.mkdir(parents=True)
+            (agent.codex_home / "config.toml").write_text("[features]\nnew = true\n", encoding="utf-8")
+            self.assertIsNone(_load_thread_mapping(config, agent, repository, role="executor"))
+            _save_thread_mapping(
+                config, agent, repository, "thread-4", role="executor", require_workspace_ready=True
+            )
+            self.assertIsNone(
+                _load_thread_mapping(
+                    config, agent, repository, role="executor", require_workspace_ready=False
+                )
+            )
+
     def test_process_key_is_scoped_to_repository(self) -> None:
         config = _config(Path("C:/dual-codex-test"))
         agent = AgentConfig(
@@ -659,6 +1419,298 @@ class AppServerTests(unittest.TestCase):
             _process_key(agent, config, Path("C:/repo-a")),
             _process_key(agent, config, Path("C:/repo-b")),
         )
+
+    def test_persistent_process_reuse_requires_exact_runtime_identity(self) -> None:
+        from dataclasses import replace
+
+        from dual_codex.app_server import _runtime_config_identity, _thread_mapping_identity
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=True,
+                service_tier="priority",
+                app_server_turn_timeout=600,
+            )
+            created = []
+
+            class FakePersistentProcess:
+                def __init__(self, **kwargs):
+                    self.agent = kwargs["agent"]
+                    self.config = kwargs["config"]
+                    self.repository = repository
+                    self.role = kwargs["role"]
+                    self.require_workspace_ready = kwargs["require_workspace_ready"]
+                    self.runtime_config_identity = _runtime_config_identity(
+                        self.agent, self.config, repository, self.role, self.require_workspace_ready
+                    )
+                    self.thread_mapping_identity = _thread_mapping_identity(
+                        self.agent, self.config, repository, self.role, self.require_workspace_ready
+                    )
+                    self.process = SimpleNamespace(poll=lambda: None)
+                    self.progress = kwargs["progress"]
+                    self.pid = len(created) + 5000
+                    self.close = Mock()
+                    created.append(self)
+
+            with patch("dual_codex.app_server._AppServerProcess", FakePersistentProcess):
+                dispatch = {}
+                first = _get_process(config, agent, repository, None, role="executor", dispatch_provenance=dispatch)
+                self.assertEqual(dispatch["turn_timeout_seconds"], 600)
+                self.assertEqual(dispatch["timeout_source"], "account_role_override")
+                self.assertEqual(dispatch["process_reuse_state"], "new_process")
+                self.assertIsNone(dispatch["reused_process_runtime_identity_matched"])
+
+                same_identity = {}
+                reused = _get_process(config, replace(agent, label="metadata-only"), repository, None, role="executor", dispatch_provenance=same_identity)
+                self.assertIs(reused, first)
+                self.assertEqual(same_identity["process_reuse_state"], "reused_process")
+                self.assertTrue(same_identity["reused_process_runtime_identity_matched"])
+                self.assertEqual(same_identity["runtime_config_identity"], first.runtime_config_identity)
+                self.assertEqual(len(created), 1)
+
+                changed_values = [
+                    replace(agent, app_server_turn_timeout=3600),
+                    replace(agent, model="gpt-test-next"),
+                    replace(agent, reasoning_effort="medium"),
+                    replace(agent, service_tier="flex"),
+                    replace(agent, network_access=False),
+                    replace(agent, sandbox="read-only"),
+                ]
+                current = first
+                for changed in changed_values:
+                    next_process = _get_process(config, changed, repository, None, role="executor")
+                    self.assertIsNot(next_process, current)
+                    current.close.assert_called_once_with()
+                    self.assertNotEqual(
+                        next_process.runtime_config_identity,
+                        current.runtime_config_identity,
+                    )
+                    current = next_process
+
+                global_timeout_change = _get_process(
+                    replace(config, app_server_turn_timeout=9), current.agent, repository, None, role="executor"
+                )
+                self.assertIsNot(global_timeout_change, current)
+                self.assertNotEqual(global_timeout_change.runtime_config_identity, current.runtime_config_identity)
+
+                secret_agent = replace(global_timeout_change.agent, label="secret-value", auth_reference="secret-value")
+                self.assertEqual(
+                    _runtime_config_identity(secret_agent, config, repository, "executor", False),
+                    _runtime_config_identity(global_timeout_change.agent, config, repository, "executor", False),
+                )
+                serialized = json.dumps(
+                    {
+                        "identity": global_timeout_change.runtime_config_identity,
+                        "dispatch": same_identity,
+                    }
+                )
+                self.assertNotIn("secret-value", serialized)
+
+    def test_dead_matching_process_preserves_compatible_thread_mapping(self) -> None:
+        from dual_codex.app_server import _load_thread_mapping
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repo"
+            repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                app_server_turn_timeout=600,
+            )
+            created = []
+
+            class FakePersistentProcess:
+                def __init__(self, **kwargs):
+                    from dual_codex.app_server import _runtime_config_identity, _thread_mapping_identity
+
+                    self.agent = kwargs["agent"]
+                    self.config = kwargs["config"]
+                    self.repository = repository
+                    self.role = kwargs["role"]
+                    self.require_workspace_ready = kwargs["require_workspace_ready"]
+                    self.runtime_config_identity = _runtime_config_identity(
+                        self.agent, self.config, repository, self.role, self.require_workspace_ready
+                    )
+                    self.thread_mapping_identity = _thread_mapping_identity(
+                        self.agent, self.config, repository, self.role, self.require_workspace_ready
+                    )
+                    self.process = SimpleNamespace(poll=lambda: None)
+                    self.close = Mock()
+                    created.append(self)
+
+            with patch("dual_codex.app_server._AppServerProcess", FakePersistentProcess):
+                first = _get_process(config, agent, repository, None, role="executor")
+                _save_thread_mapping(config, agent, repository, "valid-session-thread", role="executor")
+                first.process.poll = lambda: 1
+                replacement = _get_process(config, agent, repository, None, role="executor")
+
+            self.assertEqual(len(created), 2)
+            self.assertIsNot(replacement, first)
+            first.close.assert_called_once_with()
+            self.assertEqual(
+                _load_thread_mapping(config, agent, repository, role="executor"),
+                "valid-session-thread",
+            )
+
+    def test_process_replacement_does_not_hold_global_lock_while_closing_other_turn(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+        from dataclasses import replace
+
+        from dual_codex.app_server import _runtime_config_identity, _thread_mapping_identity
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repo"
+            unrelated_repository = root / "other-repo"
+            repository.mkdir()
+            unrelated_repository.mkdir()
+            config = _config(root)
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="workspace-write",
+                account_name="executor",
+                backend="app_server",
+                network_access=True,
+                app_server_turn_timeout=600,
+            )
+
+            class FakePersistentProcess:
+                def __init__(self, **kwargs):
+                    self.agent = kwargs["agent"]
+                    self.config = kwargs["config"]
+                    self.repository = kwargs["repository"]
+                    self.role = kwargs["role"]
+                    self.require_workspace_ready = kwargs["require_workspace_ready"]
+                    self.runtime_config_identity = _runtime_config_identity(
+                        self.agent, self.config, self.repository, self.role, self.require_workspace_ready
+                    )
+                    self.thread_mapping_identity = _thread_mapping_identity(
+                        self.agent, self.config, self.repository, self.role, self.require_workspace_ready
+                    )
+                    self.process = SimpleNamespace(poll=lambda: None)
+                    self.progress = kwargs["progress"]
+                    self.pid = 6000
+                    self.close = Mock()
+
+            close_entered = threading.Event()
+            release_close = threading.Event()
+
+            with patch("dual_codex.app_server._AppServerProcess", FakePersistentProcess):
+                old = _get_process(config, agent, repository, None, role="executor")
+
+                def slow_close():
+                    close_entered.set()
+                    release_close.wait(timeout=5)
+
+                old.close = slow_close
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    replacement = pool.submit(
+                        _get_process,
+                        config,
+                        replace(agent, app_server_turn_timeout=3600),
+                        repository,
+                        None,
+                        "executor",
+                    )
+                    self.assertTrue(close_entered.wait(timeout=1))
+                    unrelated = pool.submit(
+                        _get_process,
+                        config,
+                        agent,
+                        unrelated_repository,
+                        None,
+                        "executor",
+                    )
+                    try:
+                        unrelated_process = unrelated.result(timeout=1)
+                    finally:
+                        release_close.set()
+                    replacement_process = replacement.result(timeout=2)
+
+                self.assertIsNot(unrelated_process, old)
+                self.assertIsNot(replacement_process, old)
+                self.assertEqual(replacement_process.agent.app_server_turn_timeout, 3600)
+
+    def test_timeout_change_recreates_live_process_and_dispatch_provenance_uses_3600(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repository = root / "repo"
+            repository.mkdir()
+            agent = AgentConfig(
+                codex_home=root / "profile",
+                model="gpt-test",
+                reasoning_effort="high",
+                sandbox="read-only",
+                account_name="executor",
+                backend="app_server",
+                app_server_turn_timeout=600,
+            )
+            config = _config(root)
+            processes = []
+
+            def create_process(*args, **kwargs):
+                process = _FakeProcess(*args, **kwargs)
+                processes.append(process)
+                return process
+
+            with patch("dual_codex.app_server.subprocess.Popen", side_effect=create_process):
+                first_dispatch = []
+                first = run_codex_app_server(
+                    config=config,
+                    agent=agent,
+                    repository=repository,
+                    prompt="first",
+                    output_path=root / "first.json",
+                    session_id="session",
+                    dispatch_started=first_dispatch.append,
+                )
+                second_dispatch = []
+                second = run_codex_app_server(
+                    config=config,
+                    agent=AgentConfig(
+                        **{**agent.__dict__, "app_server_turn_timeout": 3600}
+                    ),
+                    repository=repository,
+                    prompt="second",
+                    output_path=root / "second.json",
+                    session_id="session",
+                    dispatch_started=second_dispatch.append,
+                )
+
+            for process in list(_PROCESSES.values()):
+                process.close()
+            _PROCESSES.clear()
+            time.sleep(0.05)
+
+            self.assertEqual(first.returncode, 0)
+            self.assertEqual(second.returncode, 0)
+            self.assertEqual(len(processes), 2)
+            self.assertEqual(first_dispatch[0]["turn_timeout_seconds"], 600)
+            self.assertEqual(second_dispatch[0]["turn_timeout_seconds"], 3600)
+            self.assertEqual(second_dispatch[0]["timeout_source"], "account_role_override")
+            self.assertEqual(second_dispatch[0]["process_reuse_state"], "new_process")
+            self.assertIsNone(second_dispatch[0]["reused_process_runtime_identity_matched"])
+            self.assertEqual(second.metadata["app_server_turn_provenance"]["turn_timeout_seconds"], 3600)
+            self.assertEqual(second.metadata["app_server_turn_provenance"]["runtime_config_identity"], second_dispatch[0]["runtime_config_identity"])
+            self.assertEqual(second.metadata["app_server_turn_provenance"]["process_reuse_state"], "new_process")
 
     def test_thread_mapping_is_scoped_to_profile_repository_and_role(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -920,12 +1972,29 @@ class AppServerTests(unittest.TestCase):
         process._messages = queue.Queue()
         process._messages.put(None)
         process._stderr = deque(['state=auth.json token="secret-value"'])
+        process.process = SimpleNamespace(poll=lambda: 17)
 
         with self.assertRaisesRegex(AppServerError, "process exited unexpectedly") as raised:
             process._next_message(0.1)
 
         self.assertIn("[REDACTED_AUTH_PATH]", str(raised.exception))
         self.assertNotIn("secret-value", str(raised.exception))
+        self.assertEqual(raised.exception.termination_classification, "APP_SERVER_PROCESS_EXIT")
+
+    def test_stdout_eof_while_app_server_is_alive_is_transport_failure(self) -> None:
+        from collections import deque
+        from dual_codex.app_server import _AppServerProcess
+
+        process = object.__new__(_AppServerProcess)
+        process._messages = queue.Queue()
+        process._messages.put(None)
+        process._stderr = deque()
+        process.process = SimpleNamespace(poll=lambda: None)
+
+        with self.assertRaises(AppServerError) as raised:
+            process._next_message(0.1)
+
+        self.assertEqual(raised.exception.termination_classification, "APP_SERVER_TRANSPORT_EOF")
 
     def test_report_normalisation_keeps_existing_delegation_shape(self) -> None:
         value = json.loads(

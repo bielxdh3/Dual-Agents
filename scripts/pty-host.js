@@ -17,6 +17,7 @@ const approvalPolicy = values.get("--approval-policy") || "on-request";
 const model = values.get("--model") || "";
 const reasoningEffort = values.get("--reasoning-effort") || "";
 const addDir = values.get("--add-dir") || "";
+const windowsSandboxMode = values.get("--windows-sandbox-mode") || "";
 
 if (!/^[A-Za-z0-9_-]{1,96}$/.test(sessionId || "")) throw new Error("invalid session id");
 if (!/^\\\\\.\\pipe\\dual-codex-[A-Za-z0-9_-]{1,160}$/.test(pipePath || "")) throw new Error("invalid named pipe");
@@ -24,6 +25,7 @@ if (!cwd || /[\r\n]/.test(cwd)) throw new Error("invalid working directory");
 if (!new Set(["read-only", "workspace-write"]).has(sandbox)) throw new Error("invalid sandbox");
 if (!new Set(["on-request", "never"]).has(approvalPolicy)) throw new Error("invalid approval policy");
 if (addDir && /[\r\n]/.test(addDir)) throw new Error("invalid additional directory");
+if (windowsSandboxMode && !new Set(["unelevated", "elevated"]).has(windowsSandboxMode)) throw new Error("invalid Windows sandbox mode");
 
 function quoteCmdArg(value) {
   const text = String(value);
@@ -47,6 +49,7 @@ const launchArgs = [
 ];
 if (model) launchArgs.push("--model", model);
 if (reasoningEffort) launchArgs.push("-c", `model_reasoning_effort="${reasoningEffort}"`);
+if (windowsSandboxMode) launchArgs.push("-c", `windows.sandbox="${windowsSandboxMode}"`);
 if (addDir) launchArgs.push("--add-dir", addDir);
 const launchLine = launchArgs.map(quoteCmdArg).join(" ");
 const output = [];

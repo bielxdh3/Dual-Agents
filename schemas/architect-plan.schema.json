@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "steps", "acceptance_criteria", "risks", "files_to_inspect", "skills_loaded"],
+  "properties": {
+    "summary": {"type": "string"},
+    "steps": {"type": "array", "items": {"type": "string"}},
+    "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+    "risks": {"type": "array", "items": {"type": "string"}},
+    "files_to_inspect": {"type": "array", "items": {"type": "string"}},
+    "skills_loaded": {
+      "description": "Additional task-specific skills the Architect actually loaded/read in this turn. Do not report the host-loaded mandatory Architect baseline merely because it was injected.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Short skill directory identifier from the combined pre-dispatch machine-wide global and target-project .agents/skills catalogs (for example, \"bielos-core-identity-implementation\"). Report identifiers only; a path to SKILL.md is never valid."
+      },
+      "uniqueItems": true
+    }
+  }
+}

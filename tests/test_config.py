@@ -89,6 +89,90 @@ executor = "executor"
             with self.assertRaisesRegex(ConfigError, "network_access must be a boolean"):
                 load_config(root / "config.toml")
 
+    def test_app_server_turn_timeout_is_scoped_to_account_and_role(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "config.toml").write_text(
+                """
+[orchestrator]
+repository = "repo"
+app_server_turn_timeout = 600
+legacy_exec_timeout = 2400
+
+[accounts.architect]
+codex_home = "profiles/architect"
+backend = "app_server"
+
+[accounts.codex-secundario]
+codex_home = "profiles/executor"
+backend = "app_server"
+
+[accounts.codex-secundario.app_server_turn_timeouts]
+executor = 3600
+
+[roles]
+orchestrator = "architect"
+architect = "architect"
+executor = "codex-secundario"
+""".strip(),
+                encoding="utf-8",
+            )
+
+            config = load_config(root / "config.toml")
+
+            self.assertEqual(config.executor.app_server_turn_timeout, 3600)
+            self.assertIsNone(config.architect.app_server_turn_timeout)
+            self.assertEqual(config.app_server_turn_timeout, 600)
+            self.assertEqual(config.legacy_exec_timeout, 2400)
+            self.assertEqual(config.app_server_turn_start_timeout, 30)
+            self.assertEqual(config.app_server_initialize_timeout, 30)
+            self.assertEqual(config.app_server_thread_timeout, 30)
+
+    def test_rejects_invalid_account_role_turn_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "config.toml").write_text(
+                """
+[orchestrator]
+repository = "repo"
+
+[accounts.executor]
+codex_home = "profile"
+backend = "app_server"
+
+[accounts.executor.app_server_turn_timeouts]
+executor = 0
+
+[roles]
+executor = "executor"
+""".strip(),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ConfigError, "must be positive and finite"):
+                load_config(root / "config.toml")
+
+    def test_legacy_exec_timeout_must_be_finite_and_positive(self) -> None:
+        for value in ("0", "inf"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                (root / "config.toml").write_text(
+                    f"""
+[orchestrator]
+repository = "repo"
+legacy_exec_timeout = {value}
+
+[accounts.executor]
+codex_home = "profile"
+backend = "windows"
+
+[roles]
+executor = "executor"
+""".strip(),
+                    encoding="utf-8",
+                )
+                with self.assertRaises(ConfigError):
+                    load_config(root / "config.toml")
+
 
 if __name__ == "__main__":
     unittest.main()

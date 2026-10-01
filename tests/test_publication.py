@@ -36,7 +36,7 @@ class FakeHostRunner:
         self.envs: list[dict[str, str] | None] = []
 
     def __call__(self, command, *, cwd, env=None, check=False, **kwargs):
-        command = [str(item) for item in command]
+        command = _normalized_git_command(command)
         self.commands.append(command)
         self.envs.append(env)
         if command[:3] == ["git", "rev-parse", "--show-toplevel"]:
@@ -73,6 +73,23 @@ class FakeHostRunner:
         if command[:3] == ["gh", "api", "--method"]:
             return CommandResult(command, 0, '{"number":54,"state":"open","draft":true,"headSha":"' + OLD_SHA + '","baseRef":"Root/main"}\n', "")
         raise AssertionError(f"unexpected command: {command}")
+
+
+def _normalized_git_command(command) -> list[str]:
+    values = [str(item) for item in command]
+    if not values or Path(values[0]).name.casefold() not in {"git", "git.exe"}:
+        return values
+    normalized = [values[0]]
+    index = 1
+    while index < len(values):
+        if values[index] == "-c" and index + 1 < len(values):
+            key = values[index + 1].split("=", 1)[0].casefold()
+            if key in {"core.hookspath", "core.fsmonitor", "diff.external"} or key.startswith("filter."):
+                index += 2
+                continue
+        normalized.extend(values[index:])
+        break
+    return normalized
 
 
 def _auth(*actions: str) -> MissionAuthorization:
@@ -172,7 +189,8 @@ class PublicationTests(unittest.TestCase):
             root = Path(temp)
             class NonDescendant(FakeHostRunner):
                 def __call__(self, command, **kwargs):
-                    if list(command)[:3] == ["git", "merge-base", "--is-ancestor"]:
+                    normalized = _normalized_git_command(command)
+                    if normalized[:3] == ["git", "merge-base", "--is-ancestor"]:
                         self.commands.append([str(item) for item in command])
                         return CommandResult([str(item) for item in command], 1, "", "")
                     return super().__call__(command, **kwargs)
@@ -254,7 +272,8 @@ class PublicationTests(unittest.TestCase):
 
             class WrongBranch(FakeHostRunner):
                 def __call__(self, command, **kwargs):
-                    if list(command)[:2] == ["git", "rev-parse"] and any(item.startswith("refs/heads/") for item in command):
+                    normalized = _normalized_git_command(command)
+                    if normalized[:2] == ["git", "rev-parse"] and any(item.startswith("refs/heads/") for item in normalized):
                         self.commands.append([str(item) for item in command])
                         self.envs.append(kwargs.get("env"))
                         return CommandResult([str(item) for item in command], 0, OTHER_SHA + "\n", "")
@@ -262,7 +281,8 @@ class PublicationTests(unittest.TestCase):
 
             class MissingCommit(FakeHostRunner):
                 def __call__(self, command, **kwargs):
-                    if list(command)[:3] == ["git", "rev-parse", "--verify"]:
+                    normalized = _normalized_git_command(command)
+                    if normalized[:3] == ["git", "rev-parse", "--verify"]:
                         self.commands.append([str(item) for item in command])
                         self.envs.append(kwargs.get("env"))
                         return CommandResult([str(item) for item in command], 1, "", "")
@@ -283,7 +303,8 @@ class PublicationTests(unittest.TestCase):
 
             class WrongBase(FakeHostRunner):
                 def __call__(self, command, **kwargs):
-                    if list(command)[:3] == ["git", "merge-base", "--is-ancestor"]:
+                    normalized = _normalized_git_command(command)
+                    if normalized[:3] == ["git", "merge-base", "--is-ancestor"]:
                         self.commands.append([str(item) for item in command])
                         self.envs.append(kwargs.get("env"))
                         return CommandResult([str(item) for item in command], 1, "", "")
@@ -433,7 +454,8 @@ class PublicationTests(unittest.TestCase):
 
             class RedirectedPushUrl(FakeHostRunner):
                 def __call__(self, command, **kwargs):
-                    if list(command)[:4] == ["git", "remote", "get-url", "--push"]:
+                    normalized = _normalized_git_command(command)
+                    if normalized[:4] == ["git", "remote", "get-url", "--push"]:
                         command = [str(item) for item in command]
                         self.commands.append(command)
                         self.envs.append(kwargs.get("env"))

@@ -4,13 +4,14 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Mapping
-from uuid import uuid4
+
+from .paths import safe_atomic_write_text, safe_ensure_directory_tree, safe_read_bytes
 
 
 EXECUTOR_REPORT_FIELDS = frozenset(
     {"summary", "files_changed", "commands_run", "tests", "remaining_issues"}
 )
-EXECUTOR_REPORT_OPTIONAL_FIELDS = frozenset({"memory_updates"})
+EXECUTOR_REPORT_OPTIONAL_FIELDS = frozenset({"memory_updates", "security_scan_provenance"})
 EXECUTOR_REPORT_REQUIRED_WITHOUT_TELEMETRY = EXECUTOR_REPORT_FIELDS - {"commands_run"}
 _EXTENDED_REPORT_FIELDS = frozenset(
     {
@@ -28,6 +29,7 @@ _EXTENDED_REPORT_FIELDS = frozenset(
         "tests",
         "remaining_issues",
         "memory_updates",
+        "security_scan_provenance",
         "push_result",
         "remote_result",
         "pr_result",
@@ -129,6 +131,8 @@ def _normalise_extended_report(value: Mapping[str, Any]) -> dict[str, Any] | Non
     }
     if "memory_updates" in value:
         result["memory_updates"] = value["memory_updates"]
+    if "security_scan_provenance" in value:
+        result["security_scan_provenance"] = value["security_scan_provenance"]
     return result
 
 
@@ -141,7 +145,7 @@ def normalise_executor_report(value: Mapping[str, Any]) -> dict[str, Any]:
 
     normalised = dict(value)
     if (
-        set(normalised).issubset(EXECUTOR_REPORT_FIELDS)
+        set(normalised).issubset(EXECUTOR_REPORT_FIELDS | EXECUTOR_REPORT_OPTIONAL_FIELDS)
         and EXECUTOR_REPORT_REQUIRED_WITHOUT_TELEMETRY.issubset(normalised)
         and "commands_run" not in normalised
     ):
@@ -157,14 +161,13 @@ def is_executor_report_shape(value: Mapping[str, Any]) -> bool:
 
     keys = set(value)
     return (
-        keys.issubset(EXECUTOR_REPORT_FIELDS)
+        keys.issubset(EXECUTOR_REPORT_FIELDS | EXECUTOR_REPORT_OPTIONAL_FIELDS)
         and EXECUTOR_REPORT_FIELDS.issubset(keys)
     )
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
-        value = json.load(handle)
+    value = json.loads(safe_read_bytes(path, max_bytes=64 * 1024 * 1024).decode("utf-8"))
     if not isinstance(value, dict):
         raise ValueError(f"Expected JSON object in {path}")
     return value
@@ -176,15 +179,9 @@ def dump_json(data: dict[str, Any]) -> str:
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     """Write a JSON object without leaving a partially written result."""
-    path = path.expanduser().resolve()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{uuid4().hex}")
-    try:
-        temporary.write_text(dump_json(data) + "\n", encoding="utf-8", newline="\n")
-        os.replace(temporary, path)
-    finally:
-        if temporary.exists():
-            temporary.unlink()
+    path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
+    safe_ensure_directory_tree(path.parent)
+    safe_atomic_write_text(path, dump_json(data) + "\n")
 
 
 def render_markdown(
@@ -195,6 +192,10 @@ def render_markdown(
     review: dict[str, Any],
     correction_cycles: int,
     phase_provenance: list[dict[str, Any]] | None = None,
+    mutation_attribution: Mapping[str, Any] | None = None,
+    initial_git_baseline: Mapping[str, Any] | None = None,
+    security_scan_authority: Mapping[str, Any] | None = None,
+    security_scan_authority_history: list[Mapping[str, Any]] | None = None,
 ) -> str:
     lines = [
         "# Dual Codex Run Report",
@@ -225,6 +226,57 @@ def render_markdown(
                 "",
             ]
         )
+    if isinstance(security_scan_authority, Mapping):
+        selected_id = str(security_scan_authority.get("selected_scan_id") or "")
+        status = str(security_scan_authority.get("authority_state") or "missing")
+        lines.extend(
+            [
+                "## Codex Security coverage",
+                "",
+                f"- Required mode and scope: `{security_scan_authority.get('required_mode', 'unknown')}` / `{security_scan_authority.get('required_scope', 'unknown')}`",
+                f"- Authority: **{status}** / generation **{security_scan_authority.get('generation', 'unknown')}** / fresh for acceptance: **{str(status == 'completed_fresh').lower()}**",
+                f"- Authoritative scan: `{selected_id or 'none'}` / mode `{security_scan_authority.get('selected_scan_mode', 'unknown')}` / scope `{security_scan_authority.get('selected_scan_scope', 'unknown')}`",
+                f"- Target: `{security_scan_authority.get('target_path', 'unknown')}` / revision `{security_scan_authority.get('target_revision', 'unknown')}`",
+                "",
+            ]
+        )
+        history = security_scan_authority_history or []
+        coverage_events = [
+            event
+            for event in history
+            if isinstance(event, Mapping)
+            and event.get("event") in {"run_owned", "completed_fresh", "completed_stale", "generation_authorized", "rescan_limit"}
+        ]
+        if coverage_events:
+            lines.extend(["### Security generation history", ""])
+            for event in coverage_events:
+                event_name = str(event.get("event", "unknown"))
+                generation = event.get("generation", "unknown")
+                scan_id = str(event.get("selected_scan_id") or event.get("previous_scan_id") or "none")
+                failure = f" / `{event.get('failure_class')}`" if event.get("failure_class") else ""
+                lines.append(f"- Generation {generation}: **{event_name}** / scan `{scan_id}`{failure}")
+            lines.append("")
+    else:
+        security_scan = implementation.get("security_scan_provenance")
+        if isinstance(security_scan, Mapping):
+            target = security_scan.get("target_identity")
+            target_path = target.get("path", "unknown") if isinstance(target, Mapping) else "unknown"
+            lines.extend(
+                [
+                    "## Executor-reported Codex Security evidence",
+                    "",
+                    "- Target: `{}`".format(target_path),
+                    "- Scan: `{}` / mode `{}` / action `{}` / `{}` → `{}`".format(
+                        security_scan.get("scan_id", "unknown"),
+                        security_scan.get("scan_mode", security_scan.get("mode", "unknown")),
+                        security_scan.get("action", "unknown"),
+                        security_scan.get("initial_status", "unknown"),
+                        security_scan.get("final_status", "unknown"),
+                    ),
+                    "- This is Executor-reported evidence; host authority is required to establish fresh coverage.",
+                    "",
+                ]
+            )
     if phase_provenance:
         lines.extend(["## Configured actor routing", ""])
         for item in phase_provenance:
@@ -239,5 +291,34 @@ def render_markdown(
                     configured=str(bool(item.get("configured_actor", False))).lower(),
                 )
             )
+        lines.append("")
+    if initial_git_baseline or mutation_attribution:
+        lines.extend(["## Git mutation attribution", ""])
+        if initial_git_baseline:
+            lines.append(
+                "- Initial baseline: `{path}` (HEAD `{head}`, SHA-256 `{sha256}`)".format(
+                    path=initial_git_baseline.get("path", "initial_git_baseline.json"),
+                    head=initial_git_baseline.get("head", "unknown"),
+                    sha256=initial_git_baseline.get("sha256", "unknown"),
+                )
+            )
+        if mutation_attribution:
+            lines.append(f"- Attribution status: **{mutation_attribution.get('status', 'unknown')}**")
+            for field, label in (
+                ("unchanged_preexisting_paths", "Unchanged pre-existing paths"),
+                ("run_touched_paths", "Changed further during run"),
+                ("run_created_paths", "Created during run"),
+                ("run_removed_paths", "Removed during run"),
+                ("unknown_paths", "Unknown attribution"),
+            ):
+                paths = mutation_attribution.get(field, [])
+                lines.append(f"- {label}: " + (", ".join(f"`{path}`" for path in paths) if paths else "none"))
+            ephemeral = mutation_attribution.get("dual_agents_ephemeral_artifacts", {})
+            if isinstance(ephemeral, Mapping):
+                final_artifacts = ephemeral.get("final", [])
+                lines.append(
+                    "- Dual Agents bootstrap artifacts remaining: "
+                    + (", ".join(f"`{path}`" for path in final_artifacts) if final_artifacts else "none")
+                )
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"

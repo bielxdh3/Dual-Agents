@@ -10,15 +10,20 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
 from dual_codex.config import load_config
+from dual_codex.config import AccountConfig
 from dual_codex.delegation import (
     DelegationError,
     InvalidRequestError,
     RepositoryLock,
+    _acquire_recovery_claim,
     _pid_alive,
+    _unlink_lock_if_identity,
+    _release_recovery_claim,
     delegate,
     parse_request,
     run_codex_exec as run_delegation_codex_exec,
@@ -30,7 +35,8 @@ from dual_codex.delegation import (
 )
 from dual_codex.cli import main
 from dual_codex.live_events import journal_path, read_journal
-from dual_codex.process import CommandResult, run_command
+from dual_codex.paths import safe_read_bytes
+from dual_codex.process import CommandError, CommandResult, run_command
 from dual_codex.terminal import TERMINAL_INLINE_MESSAGE_MAX, session_id_for
 
 
@@ -342,6 +348,7 @@ class DelegationTests(unittest.TestCase):
             self.assertIs(result, expected)
             self.assertEqual(legacy.call_args.kwargs["schema_path"], root / "schema.json")
             self.assertFalse(legacy.call_args.kwargs["check"])
+            self.assertEqual(legacy.call_args.kwargs["timeout"], config.legacy_exec_timeout)
 
     def test_terminal_report_validation_rejects_invalid_structured_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -681,6 +688,7 @@ class DelegationTests(unittest.TestCase):
             self.assertEqual(result["executor_account"], "executor")
             self.assertEqual(result["executor_label"], "Hidden executor")
             self.assertEqual(result["executor_sandbox"], "workspace-write")
+            self.assertEqual(result["executor_report_actor"], "executor")
             self.assertEqual(result["exit_code"], 0)
             self.assertEqual(result["files_changed"], ["src/example.py"])
             artifact = Path(execute_mock.call_args.kwargs["task_artifact_path"])
@@ -721,6 +729,107 @@ class DelegationTests(unittest.TestCase):
             self.assertEqual([event.state for event in events[-2:]], ["started", "completed"])
             self.assertEqual(events[-1].method, "run/completed")
             self.assertLess(events[-2].sequence, events[-1].sequence)
+
+    def test_failed_fallback_cannot_reuse_primary_executor_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            base = _make_config(root, repository)
+            accounts = dict(base.accounts)
+            accounts["fallback"] = AccountConfig(
+                name="fallback",
+                label="Fallback executor",
+                codex_home=root / "profiles" / "fallback",
+                model="",
+                reasoning_effort="medium",
+                backend="app_server",
+                fallback_roles=("executor",),
+            )
+            config = replace(base, accounts=accounts, fallback_enabled=True)
+            request_file = root / "request.json"
+            result_file = root / "result.json"
+            request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
+
+            def run_executor(**kwargs):
+                if kwargs["agent"].account_name == "executor":
+                    kwargs["output_path"].write_text(
+                        json.dumps({
+                            "summary": "Primary report that must not be reused",
+                            "files_changed": [],
+                            "commands_run": [],
+                            "tests": [],
+                            "remaining_issues": [],
+                        }),
+                        encoding="utf-8",
+                    )
+                    return CommandResult(["primary"], 1, "", "provider unavailable")
+                self.assertEqual(kwargs["agent"].account_name, "fallback")
+                return CommandResult(["fallback"], 1, "", "fallback failed")
+
+            with patch("dual_codex.delegation.login_status", return_value="OK"), patch(
+                "dual_codex.delegation.run_codex_exec", side_effect=run_executor
+            ):
+                outcome = delegate(config, request_file=request_file, result_file=result_file)
+
+            result = json.loads(result_file.read_text(encoding="utf-8"))
+            self.assertEqual(outcome.status, "failed")
+            self.assertTrue(result["fallback_used"])
+            self.assertEqual(result["executor_account"], "fallback")
+            self.assertEqual(result["executor_report_file"], "")
+            self.assertEqual(result["executor_report_actor"], "")
+            run_dir = Path(result["run_directory"])
+            primary_report = run_dir / "executor-report-attempt-1-executor.json"
+            fallback_report = run_dir / "executor-report-attempt-2-fallback.json"
+            self.assertTrue(primary_report.exists())
+            self.assertFalse(fallback_report.exists())
+
+    def test_executor_capability_failure_does_not_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            base = _make_config(root, repository)
+            accounts = dict(base.accounts)
+            accounts["fallback"] = AccountConfig(
+                name="fallback",
+                label="Fallback executor",
+                codex_home=root / "profiles" / "fallback",
+                model="",
+                reasoning_effort="medium",
+                backend="app_server",
+                fallback_roles=("executor",),
+            )
+            config = replace(base, accounts=accounts, fallback_enabled=True)
+            for failure_class in (
+                "EXECUTOR_SUBPROCESS_UNAVAILABLE",
+                "EXECUTOR_COMMAND_EXEC_REJECTED",
+                "EXECUTOR_SANDBOX_NOT_READY",
+            ):
+                with self.subTest(failure_class=failure_class):
+                    request_file = root / f"request-{failure_class}.json"
+                    result_file = root / f"result-{failure_class}.json"
+                    request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
+
+                    def run_executor(*, failure_class: str = failure_class, **kwargs):
+                        self.assertEqual(kwargs["agent"].account_name, "executor")
+                        return CommandResult(
+                            ["app-server"],
+                            1,
+                            "",
+                            "Executor readiness failed",
+                            {"availability_failure_class": failure_class},
+                        )
+
+                    with patch("dual_codex.delegation.login_status", return_value="OK"), patch(
+                        "dual_codex.delegation.run_codex_exec", side_effect=run_executor
+                    ) as execute_mock:
+                        outcome = delegate(config, request_file=request_file, result_file=result_file)
+
+                    result = json.loads(result_file.read_text(encoding="utf-8"))
+                    self.assertEqual(outcome.status, "failed")
+                    self.assertTrue(result["fallback_enabled"])
+                    self.assertFalse(result["fallback_used"])
+                    self.assertEqual(result["executor_account"], "executor")
+                    self.assertEqual(execute_mock.call_count, 1)
 
     def test_explicit_request_workspace_beats_config_and_reaches_executor(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1110,6 +1219,274 @@ class DelegationTests(unittest.TestCase):
             with patch("dual_codex.delegation._pid_alive", return_value=False):
                 stale.acquire()
             stale.release()
+
+    def test_repository_lock_uses_host_control_store_outside_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            runs_dir = repository / "runs"
+            state_root = root / "host-state"
+            with patch.dict(
+                os.environ,
+                {"LOCALAPPDATA": str(state_root), "XDG_STATE_HOME": str(state_root)},
+            ):
+                lock = RepositoryLock(runs_dir, repository, "request")
+                self.assertFalse(lock.path.is_relative_to(repository.resolve()))
+                self.assertTrue(lock.path.is_relative_to(state_root.resolve()))
+                self.assertFalse(runs_dir.exists())
+                lock.acquire()
+                lock.release()
+
+    def test_lock_recovers_live_pid_with_a_different_process_start_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            lock = RepositoryLock(root / "runs", repository, "new-request")
+            lock.path.parent.mkdir(parents=True)
+            lock.path.write_text(
+                json.dumps({
+                    "pid": os.getpid(),
+                    "process_start": "old-process-instance",
+                    "request_id": "stale-request",
+                }),
+                encoding="utf-8",
+            )
+            with patch("dual_codex.delegation._pid_alive", return_value=True), patch(
+                "dual_codex.delegation._safe_process_start_token", return_value="current-process-instance"
+            ):
+                lock.acquire()
+                self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "new-request")
+                lock.release()
+
+    def test_lock_retries_when_stale_file_disappears_during_inspection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            lock = RepositoryLock(root / "runs", repository, "new-owner")
+            lock.path.parent.mkdir(parents=True)
+            lock.path.write_text(json.dumps({"pid": 999999, "request_id": "stale-owner"}), encoding="utf-8")
+            read_bytes = safe_read_bytes
+            removed = False
+
+            def read_then_disappear(path: Path, **kwargs):
+                nonlocal removed
+                content = read_bytes(path, **kwargs)
+                if path == lock.path and not removed:
+                    removed = True
+                    path.unlink()
+                return content
+
+            with patch("dual_codex.delegation._pid_alive", return_value=False), patch(
+                "dual_codex.delegation.safe_read_bytes", side_effect=read_then_disappear
+            ):
+                lock.acquire()
+
+            self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "new-owner")
+            lock.release()
+
+    def test_lock_does_not_delete_replacement_owner_before_stale_unlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            lock = RepositoryLock(root / "runs", repository, "new-owner")
+            lock.path.parent.mkdir(parents=True)
+            lock.path.write_text(
+                json.dumps({"pid": os.getpid(), "process_start": "old-process-instance", "request_id": "stale-owner"}),
+                encoding="utf-8",
+            )
+            unlink_if_identity = _unlink_lock_if_identity
+            swapped = False
+
+            def replace_before_unlink(path, expected):
+                nonlocal swapped
+                if not swapped:
+                    swapped = True
+                    path.write_text(
+                        json.dumps({"pid": os.getpid(), "process_start": "current-process-instance", "request_id": "replacement-owner"}),
+                        encoding="utf-8",
+                    )
+                return unlink_if_identity(path, expected)
+
+            with patch("dual_codex.delegation._pid_alive", return_value=True), patch(
+                "dual_codex.delegation._safe_process_start_token", return_value="current-process-instance"
+            ), patch("dual_codex.delegation._unlink_lock_if_identity", side_effect=replace_before_unlink):
+                with self.assertRaisesRegex(DelegationError, "replacement-owner"):
+                    lock.acquire()
+
+            self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "replacement-owner")
+
+    def test_release_preserves_a_replacement_lock_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            lock = RepositoryLock(root / "runs", repository, "current-owner")
+            lock.acquire()
+            unlink_if_identity = _unlink_lock_if_identity
+
+            def replace_before_unlink(path, expected):
+                path.write_text(json.dumps({"pid": os.getpid(), "request_id": "replacement-owner"}), encoding="utf-8")
+                return unlink_if_identity(path, expected)
+
+            with patch("dual_codex.delegation._unlink_lock_if_identity", side_effect=replace_before_unlink):
+                lock.release()
+            self.assertEqual(json.loads(lock.path.read_text(encoding="utf-8"))["request_id"], "replacement-owner")
+
+    def test_concurrent_stale_lock_recovery_has_one_owner_and_preserves_new_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            first = RepositoryLock(root / "runs", repository, "first-request")
+            second = RepositoryLock(root / "runs", repository, "second-request")
+            first.path.parent.mkdir(parents=True)
+            first.path.write_text(
+                json.dumps({
+                    "pid": os.getpid(),
+                    "process_start": "old-process-instance",
+                    "request_id": "stale-request",
+                }),
+                encoding="utf-8",
+            )
+
+            start_together = threading.Barrier(2)
+            both_saw_stale = threading.Barrier(2)
+            claim_calls = 0
+            claim_calls_guard = threading.Lock()
+            owner_acquired = threading.Event()
+            other_finished = threading.Event()
+            state_guard = threading.Lock()
+            active_owners = 0
+            peak_owners = 0
+            outcomes: list[tuple[str, str]] = []
+
+            def synchronized_claim(path: Path) -> int | None:
+                nonlocal claim_calls
+                with claim_calls_guard:
+                    claim_calls += 1
+                    current_call = claim_calls
+                if current_call <= 2:
+                    both_saw_stale.wait(timeout=5)
+                return _acquire_recovery_claim(path)
+
+            def attempt(lock: RepositoryLock) -> None:
+                nonlocal active_owners, peak_owners
+                try:
+                    start_together.wait(timeout=5)
+                    lock.acquire()
+                except DelegationError as exc:
+                    outcomes.append(("rejected", str(exc)))
+                    other_finished.set()
+                    return
+                except Exception as exc:  # capture worker failures for the main assertion
+                    outcomes.append(("unexpected", repr(exc)))
+                    other_finished.set()
+                    return
+
+                with state_guard:
+                    active_owners += 1
+                    peak_owners = max(peak_owners, active_owners)
+                owner_acquired.set()
+                try:
+                    if not other_finished.wait(timeout=5):
+                        outcomes.append(("timeout", "second recovery did not finish"))
+                finally:
+                    with state_guard:
+                        active_owners -= 1
+                    lock.release()
+                outcomes.append(("acquired", lock.request_id))
+
+            with patch("dual_codex.delegation._pid_alive", return_value=True), patch(
+                "dual_codex.delegation._safe_process_start_token", return_value="current-process-instance"
+            ), patch("dual_codex.delegation._acquire_recovery_claim", side_effect=synchronized_claim):
+                workers = [
+                    threading.Thread(target=attempt, args=(lock,))
+                    for lock in (first, second)
+                ]
+                for worker in workers:
+                    worker.start()
+                for worker in workers:
+                    worker.join(timeout=7)
+
+            self.assertTrue(owner_acquired.is_set(), outcomes)
+            self.assertTrue(all(not worker.is_alive() for worker in workers), outcomes)
+            self.assertEqual(peak_owners, 1, outcomes)
+            self.assertEqual(active_owners, 0, outcomes)
+            self.assertEqual([kind for kind, _ in outcomes].count("acquired"), 1, outcomes)
+            self.assertEqual([kind for kind, _ in outcomes].count("rejected"), 1, outcomes)
+            self.assertFalse(first.path.exists())
+
+            claim = _acquire_recovery_claim(first.recovery_path)
+            self.assertIsNotNone(claim, "recovery claim should be released after contention")
+            _release_recovery_claim(claim)
+
+    def test_delegate_cli_emits_sanitized_result_on_internal_runtime_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            result_path = root / "result.json"
+            stdout = StringIO()
+            stderr = StringIO()
+            with patch("dual_codex.cli.load_config", side_effect=RuntimeError("TOKEN=secret-value")), redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main([
+                    "--config", str(root / "missing.toml"), "delegate", "--stdin",
+                    "--result-file", str(result_path),
+                ])
+            self.assertEqual(exit_code, 1)
+            self.assertIn("DUAL_CODEX_RESULT ", stdout.getvalue())
+            self.assertNotIn("secret-value", stdout.getvalue() + stderr.getvalue())
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("details were withheld", result["error"])
+
+    def test_delegate_cli_keeps_result_protocol_when_result_file_cannot_be_written(self) -> None:
+        stdout = StringIO()
+        stderr = StringIO()
+        with patch("dual_codex.cli.load_config", side_effect=RuntimeError("TOKEN=secret-value")), redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main([
+                "--config", "missing.toml", "delegate", "--stdin",
+                "--result-file", "\x00invalid",
+            ])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("DUAL_CODEX_RESULT ", stdout.getvalue())
+        self.assertIn('"result_file": "\\u0000invalid"', stdout.getvalue())
+        self.assertNotIn("secret-value", stdout.getvalue() + stderr.getvalue())
+
+    def test_safe_git_command_error_preserves_request_and_cli_result_protocol(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            repository = _make_repository(root)
+            config = _make_config(root, repository)
+            request_file = root / "request.json"
+            result_path = root / "result.json"
+            request_file.write_text(json.dumps(_request(repository)), encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with patch("dual_codex.delegation.antigravity_status", return_value="OK"), patch(
+                "dual_codex.git.run_git",
+                side_effect=CommandError(
+                    "Trusted host Git refused unsafe fsmonitor settings. TOKEN=secret-value"
+                ),
+            ), redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main([
+                    "--config", str(config.config_path), "delegate",
+                    "--request-file", str(request_file), "--result-file", str(result_path),
+                ])
+
+            self.assertEqual(exit_code, 1)
+            lines = stdout.getvalue().splitlines()
+            protocol_line = next(line for line in lines if line.startswith("DUAL_CODEX_RESULT "))
+            protocol = json.loads(protocol_line.removeprefix("DUAL_CODEX_RESULT "))
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertEqual(protocol["status"], "failed")
+            self.assertEqual(protocol["request_id"], "req-001")
+            self.assertEqual(result["request_id"], "req-001")
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("Trusted host Git refused unsafe fsmonitor settings", result["error"])
+            self.assertIn("TOKEN=[REDACTED]", result["error"])
+            self.assertNotIn("secret-value", stdout.getvalue() + stderr.getvalue())
+            self.assertNotIn("Traceback", stdout.getvalue() + stderr.getvalue())
+            self.assertIn("request_id", result)
+            self.assertIn("summary", result)
+            self.assertIn("exit_code", result)
 
     def test_pid_liveness_recognizes_current_and_dead_processes(self) -> None:
         self.assertTrue(_pid_alive(os.getpid()))

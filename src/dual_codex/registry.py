@@ -28,6 +28,9 @@ from .claude_code import claude_status
 from .process import codex_environment, run_command
 
 
+INTERACTIVE_AUTH_TIMEOUT = 300.0
+
+
 InputFn = Callable[[str], str]
 OutputFn = Callable[[str], None]
 _SECTION = re.compile(r"^\s*\[([^]]+)\]\s*(?:#.*)?$")
@@ -55,6 +58,25 @@ def roles_for_account(roles: Mapping[str, str], account_name: str) -> list[str]:
         [role for role, account in roles.items() if account == account_name],
         key=lambda role: (order.get(role, len(order)), role),
     )
+
+
+def _validate_supported_roles(
+    account_name: str,
+    backend: str,
+    roles: Iterable[str],
+    *,
+    role_kind: str = "role(s)",
+) -> None:
+    from .providers import supported_roles_for_backend
+
+    supported = set(supported_roles_for_backend(backend))
+    unsupported = sorted(set(roles) - supported)
+    if unsupported:
+        raise ConfigError(
+            f"Account '{account_name}' backend '{backend}' does not support {role_kind}: "
+            + ", ".join(unsupported)
+            + "."
+        )
 
 
 def _toml_string(value: str) -> str:
@@ -269,6 +291,7 @@ def _run_login(config: OrchestratorConfig, account: AccountConfig) -> None:
             [config.codex_command, "login"],
             cwd=config.project_root,
             env=codex_environment(_agent_for_status(account)),
+            timeout=INTERACTIVE_AUTH_TIMEOUT,
         )
     except Exception as exc:
         raise RuntimeError(f"Codex login failed for account '{account.name}'.") from exc
@@ -385,6 +408,8 @@ def add_account(
         enabled=enabled,
         fallback_roles=tuple(dict.fromkeys(validate_role_name(role) for role in (fallback_roles or []))),
     )
+    _validate_supported_roles(name, backend, requested_roles, role_kind="primary role(s)")
+    _validate_supported_roles(name, backend, account.fallback_roles, role_kind="fallback role(s)")
     output(f"Account: {account.name}")
     output(f"Label: {account.label or '(none)'}")
     if backend in {"windows", "app_server"}:
@@ -573,6 +598,20 @@ def update_account_settings(
         new_fallback_roles = account.fallback_roles
     else:
         new_fallback_roles = tuple(dict.fromkeys(validate_role_name(role) for role in fallback_roles))
+    if fallback_roles is not None or new_backend != account.backend:
+        _validate_supported_roles(
+            name,
+            new_backend,
+            new_fallback_roles,
+            role_kind="fallback role(s)",
+        )
+    if new_backend != account.backend:
+        _validate_supported_roles(
+            name,
+            new_backend,
+            roles_for_account(config.roles, name),
+            role_kind="primary role(s)",
+        )
     updated = replace(
         account,
         model=new_model,
@@ -617,6 +656,12 @@ def assign_role(config: OrchestratorConfig, role: str, account_name: str) -> tup
     account_name = validate_account_name(account_name)
     if account_name not in config.accounts:
         raise ConfigError(f"Unknown account '{account_name}'.")
+    _validate_supported_roles(
+        account_name,
+        config.accounts[account_name].backend,
+        (role,),
+        role_kind="primary role(s)",
+    )
     roles = dict(config.roles)
     previous = roles.get(role)
     roles[role] = account_name
@@ -663,6 +708,12 @@ def set_roles_for_account(
         if role in requested:
             raise ConfigError(f"Duplicate role '{role}'.")
         requested.append(role)
+    _validate_supported_roles(
+        account_name,
+        config.accounts[account_name].backend,
+        requested,
+        role_kind="primary role(s)",
+    )
 
     current = _validated_role_map(config.accounts, config.roles)
     resulting = {role: owner for role, owner in current.items() if owner != account_name}
@@ -679,6 +730,12 @@ def set_roles_for_account(
             role = validate_role_name(raw_role)
             if role not in validated_fallback:
                 validated_fallback.append(role)
+        _validate_supported_roles(
+            account_name,
+            config.accounts[account_name].backend,
+            validated_fallback,
+            role_kind="fallback role(s)",
+        )
         accounts[account_name] = replace(
             accounts[account_name],
             fallback_roles=tuple(validated_fallback),
@@ -706,6 +763,13 @@ def swap_roles(config: OrchestratorConfig, first: str, second: str) -> tuple[str
     previous = (roles.get(first), roles.get(second))
     roles[first], roles[second] = roles.get(second, ""), roles.get(first, "")
     roles = {role: account for role, account in roles.items() if account}
+    for role, account_name in roles.items():
+        _validate_supported_roles(
+            account_name,
+            config.accounts[account_name].backend,
+            (role,),
+            role_kind="primary role(s)",
+        )
     write_registry_config(config.config_path, config.accounts, roles)
     return previous
 

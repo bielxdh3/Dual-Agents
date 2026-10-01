@@ -20,7 +20,7 @@ import urllib.request
 from urllib.parse import urlsplit, urlunsplit
 
 from .antigravity import antigravity_status
-from .config import AccountConfig, AgentConfig, OrchestratorConfig
+from .config import AccountConfig, AgentConfig, OrchestratorConfig, SUPPORTED_ROLES
 from .process import CommandResult, _prepare_command
 
 
@@ -91,6 +91,26 @@ class ProviderCapabilities:
         if self.runtime_status in {"Unavailable", "Unknown"}:
             return False
         return not self.supported_roles or role in self.supported_roles
+
+
+_BACKEND_SUPPORTED_ROLES = {
+    "app_server": tuple(SUPPORTED_ROLES),
+    # The standalone delegate accepts Antigravity and App Server only. Keep
+    # Windows Executor out of assignable roles until both execution paths and
+    # the dashboard expose distinct, explicit modes.
+    "windows": tuple(role for role in SUPPORTED_ROLES if role != "executor"),
+    "antigravity": ("executor",),
+    "api": ("orchestrator", "reviewer"),
+    # The delegate protocol currently authorizes workspace-write execution
+    # only through Antigravity or App Server; keep the UI and registry aligned.
+    "claude_code": ("reviewer",),
+}
+
+
+def supported_roles_for_backend(backend: str) -> tuple[str, ...]:
+    """Return declarative role support, independent of runtime availability."""
+
+    return _BACKEND_SUPPORTED_ROLES.get(backend, ())
 
 
 class ProviderAdapter(Protocol):
@@ -250,7 +270,7 @@ class CodexAdapter:
             isolation_note="Codex profile state is isolated by the account CODEX_HOME.",
             credential_status="provider-managed",
             runtime_status="Configured",
-            supported_roles=("orchestrator", "architect", "reviewer", "executor"),
+            supported_roles=supported_roles_for_backend(account.backend),
         )
 
 
@@ -380,7 +400,7 @@ class AntigravityAdapter:
                 isolation_note="The installed agy 1.2.7 exposes no profile/state-root isolation flag.",
                 credential_status="provider-managed",
                 runtime_status="Unavailable",
-                supported_roles=("executor",),
+                supported_roles=supported_roles_for_backend(account.backend),
                 error=_safe_error(exc),
             )
         models = _parse_antigravity_models(result.stdout)
@@ -405,7 +425,7 @@ class AntigravityAdapter:
             runtime_status="Authenticated" if status == "OK" and result.returncode == 0 else "Unavailable",
             authenticated=status == "OK" and result.returncode == 0,
             error=error,
-            supported_roles=("executor",),
+            supported_roles=supported_roles_for_backend(account.backend),
         )
 
 
@@ -445,7 +465,7 @@ class OpenAICompatibleAdapter:
             runtime_status="Configured" if error is None and credential_status == "configured" else "Unavailable",
             authenticated=credential_status == "configured",
             error=error,
-            supported_roles=("orchestrator", "architect", "reviewer"),
+            supported_roles=supported_roles_for_backend(account.backend),
         )
 
     def run(
@@ -547,9 +567,7 @@ def api_adapter() -> OpenAICompatibleAdapter:
 def provider_supports_role(config: OrchestratorConfig, account: AccountConfig, role: str) -> bool:
     """Return role support from the provider capability boundary."""
 
-    if role == "executor" and account.backend == "api":
-        return False
-    if role in {"architect", "reviewer", "orchestrator"} and account.backend == "antigravity":
+    if role not in supported_roles_for_backend(account.backend):
         return False
     try:
         return provider_capabilities(config, account).supports_role(role)
