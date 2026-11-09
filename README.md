@@ -7,17 +7,18 @@
 **Local-first · Multi-provider · Role-based · Auditable**
 
 [![CI](https://github.com/bielxdh3/Dual-Agents/actions/workflows/tests.yml/badge.svg)](https://github.com/bielxdh3/Dual-Agents/actions/workflows/tests.yml)
-[![Status](https://img.shields.io/badge/status-active%20development-orange)](#project-status)
+[![Status](https://img.shields.io/badge/status-archived%20%7C%20unmaintained-64748B)](#project-status)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB)](#requirements)
-[![Providers](https://img.shields.io/badge/providers-Codex%20%C2%B7%20Gemini%20%C2%B7%20Claude%20%C2%B7%20API-6f42c1)](#providers-and-roles)\n[![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+[![Providers](https://img.shields.io/badge/providers-Codex%20%C2%B7%20Gemini%20%C2%B7%20Claude%20%C2%B7%20API-6f42c1)](#providers-and-roles)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
 Dual Agents is a local control plane for assigning independently configured AI providers to specialized coding roles, with explicit routing, bounded fallback, structured provenance, and provider-owned authentication.
 
 </div>
 
 > [!IMPORTANT]
-> Dual Agents is under active development. The configured-actor architecture, Codex execution, Antigravity/Gemini execution, Claude read-only review, Claude native-Windows file editing, role-scoped fallback, and the local dashboard are implemented and tested. Provider limitations remain explicit and fail closed rather than silently changing actors or privileges.
+> **Archived — discontinued and no longer maintained.** Dual Agents was retired because it is no longer used; more advanced repositories have superseded this approach. This codebase remains available as a **historical reference**, not an actively supported tool. Provider behavior, CLI integration and compatibility with current third-party runtimes are **not revalidated**.
 
 ## Why Dual Agents
 
@@ -83,6 +84,8 @@ Runs preserve configured and actual actors, provider/backend details, session id
 Optional fallback is role-scoped, explicit, and limited to eligible profiles.
 ```
 
+This diagram describes the **archived design**, not an actively maintained or currently verified provider integration.
+
 A **profile is not a role**. A profile owns provider metadata and authentication state; role assignment decides what that profile is allowed to do in the orchestration flow.
 
 ## Providers and roles
@@ -114,7 +117,9 @@ Provider support is capability-driven. A configured profile is rejected before d
 
 ## Project status
 
-**Current state: active development on `main`.**
+**Status: archived for disuse.** Newer, more advanced projects have taken over the role this experiment originally served. The repository is kept to preserve its architecture, test cases and implementation history; development and support have ended here.
+
+The following matrix records capabilities **at the time of archival**, not guaranteed behavior with current versions of Codex, Gemini, Claude or APIs.
 
 <details>
 <summary><strong>Implementation matrix</strong></summary>
@@ -174,6 +179,8 @@ Optional provider/runtime requirements depend on what you use:
 You do not need every provider installed to use Dual Agents.
 
 ## Quick start
+
+> **Historical setup only.** The commands and provider interfaces below are retained for reproducibility; they are not actively tested or supported with current tool versions.
 
 ### 1. Clone and install
 
@@ -373,7 +380,8 @@ Deep runtime details, schemas, migration behavior, terminal internals, and failu
 
 ## Current limitations
 
-- Windows is the primary supported runtime target.
+- This repository is archived; no ongoing updates, compatibility guarantees, bug fixes or new releases are planned here.
+- Windows was the primary implementation target at the time of archival.
 - Antigravity/Gemini is currently an Executor-only provider.
 - The installed `agy` runtime does not currently provide verified isolated multi-account state roots.
 - Claude Code remains Reviewer-only in the role registry; its restricted native Windows adapter cannot run shell commands.
